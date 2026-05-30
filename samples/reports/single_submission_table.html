@@ -1,0 +1,51 @@
+---
+name: single_submission_table
+label: "Submission detail (any schema)"
+description: "Renders a single submission as a plain table. Global — works against any schema, useful for ad-hoc review."
+type: Single
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>{{ submission.serviceName }} — {{ submission.submittedAt }}</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; color: #1c2128; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .meta { color: #57606a; font-size: 13px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #d0d7de; vertical-align: top; }
+  th { background: #f6f8fa; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .note { color: #57606a; font-style: italic; }
+</style>
+</head>
+<body>
+  <h1>Submission detail</h1>
+  <p class="meta">
+    Service: <strong>{{ submission.serviceName | default: submission.serviceAccountId }}</strong> ·
+    Submitted: <strong>{{ submission.submittedAt }}</strong> ·
+    Samples: <strong>{{ submission.samples.size }}</strong>
+    {% if submission.replacedAt %} · Last replaced: <strong>{{ submission.replacedAt }}</strong>{% endif %}
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Schema</th><th>Value</th><th class="num">Reading</th><th>Timestamp</th><th>Note</th></tr>
+    </thead>
+    <tbody>
+    {% for sa in submission.samples %}
+      <tr>
+        <td>{{ sa.schemaName }}</td>
+        <td>{{ sa.label | default: sa.valueName }}</td>
+        <td class="num">{{ sa.value }}{% if sa.unit %} {{ sa.unit }}{% endif %}</td>
+        <td>{{ sa.timestamp }}</td>
+        <td class="note">{{ sa.note }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

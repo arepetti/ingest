@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: missing XML comment on a public member. We aim to cover everything, but a few
+         internal-but-public helpers (mostly options classes) aren't worth documenting. Keep the
+         signal-to-noise high by suppressing the warning rather than peppering /// stubs. -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.MongoDB.Driver.v3" Version="9.5.2" />
+    <PackageReference Include="Microsoft.AspNetCore.OData" Version="9.4.1" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ingest.Core\Ingest.Core.csproj" />
+    <ProjectReference Include="..\Ingest.Infrastructure\Ingest.Infrastructure.csproj" />
+    <ProjectReference Include="..\Ingest.ServiceDefaults\Ingest.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <!-- Build the admin SPA and copy it into wwwroot when publishing -->
+  <PropertyGroup>
+    <SpaRoot>..\..\web\admin\</SpaRoot>
+    <SpaDist>$(SpaRoot)dist\</SpaDist>
+    <BuildSpaOnPublish Condition="'$(BuildSpaOnPublish)' == ''">true</BuildSpaOnPublish>
+  </PropertyGroup>
+
+  <Target Name="BuildSpa" BeforeTargets="ComputeFilesToPublish" Condition="'$(BuildSpaOnPublish)' == 'true'">
+    <Message Importance="high" Text="Building admin SPA in $(SpaRoot)" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="npm install --no-audit --no-fund" Condition="!Exists('$(SpaRoot)node_modules')" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="npm run build" />
+    <ItemGroup>
+      <SpaFiles Include="$(SpaDist)**" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="IncludeSpaInPublish" BeforeTargets="ComputeFilesToPublish" Condition="Exists('$(SpaDist)')">
+    <ItemGroup>
+      <SpaFiles Include="$(SpaDist)**" />
+      <ResolvedFileToPublish Include="@(SpaFiles)">
+        <RelativePath>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
+</Project>

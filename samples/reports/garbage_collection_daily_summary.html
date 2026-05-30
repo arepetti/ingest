@@ -1,0 +1,59 @@
+---
+name: garbage_collection_daily_summary
+label: "Garbage collection — daily summary"
+description: "One-page summary of a single daily submission against the garbage_collection schema. Shows headline KPIs at the top and the raw readings below."
+type: Single
+schemas: [garbage_collection]
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Daily summary — {{ submission.submittedAt }}</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; color: #1c2128; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 14px; text-transform: uppercase; color: #57606a; letter-spacing: 0.04em; margin: 24px 0 8px; }
+  .meta { color: #57606a; font-size: 13px; margin: 6px 0 16px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .card { padding: 12px 16px; border: 1px solid #d0d7de; border-radius: 8px; background: #f6f8fa; }
+  .cardLabel { font-size: 12px; color: #57606a; }
+  .cardValue { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #d0d7de; }
+  th { background: #f6f8fa; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #57606a; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+  <h1>{{ service.label | default: submission.serviceName }} — daily garbage collection</h1>
+  <p class="meta">Submitted {{ submission.submittedAt }} · {{ submission.samples.size }} readings</p>
+
+  <h2>Headline KPIs</h2>
+  <div class="cards">
+    {% for sa in submission.samples %}
+      {% if sa.valueName == 'tonnes_collected' or sa.valueName == 'routes_completed' or sa.valueName == 'routes_missed' or sa.valueName == 'recycling_tonnes_collected' or sa.valueName == 'vehicle_breakdowns' %}
+        <div class="card">
+          <div class="cardLabel">{{ sa.label | default: sa.valueName }}</div>
+          <div class="cardValue">{{ sa.value }}{% if sa.unit %} <span style="font-size:14px; color:#57606a">{{ sa.unit }}</span>{% endif %}</div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <h2>All readings</h2>
+  <table>
+    <thead><tr><th>KPI</th><th class="num">Value</th><th>Note</th></tr></thead>
+    <tbody>
+    {% for sa in submission.samples %}
+      <tr>
+        <td>{{ sa.label | default: sa.valueName }}</td>
+        <td class="num">{{ sa.value }}{% if sa.unit %} {{ sa.unit }}{% endif %}</td>
+        <td>{{ sa.note }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

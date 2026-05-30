@@ -1,0 +1,83 @@
+using Ingest.Core.Abstractions;
+using Ingest.Infrastructure.Mongo;
+using Ingest.Infrastructure.Reports;
+using Ingest.Infrastructure.Security;
+using Ingest.Infrastructure.Services;
+using Ingest.Infrastructure.Validation;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Driver;
+
+namespace Ingest.Infrastructure;
+
+/// <summary>
+/// Composition root for the infrastructure layer. Registers MongoDB, options binding,
+/// repositories, the API-key hasher, validation services and the high-level application
+/// services in a single call from the API host.
+/// </summary>
+public static class DependencyInjection
+{
+    /// <summary>Register all infrastructure dependencies on the given service collection.</summary>
+    /// <param name="services">Service collection.</param>
+    /// <param name="configuration">Application configuration; the <c>Mongo</c> and <c>ApiKey</c> sections are bound to <see cref="MongoOptions"/> and <see cref="Security.ApiKeyOptions"/> respectively.</param>
+    /// <returns>The same service collection, for chaining.</returns>
+    /// <remarks>
+    /// Expects an <see cref="IMongoClient"/> to already be in the container; the Aspire AppHost
+    /// supplies it via <c>AddMongoDBClient</c>. The connection string named <c>ingest</c> (or
+    /// fallback <c>mongo</c>) overrides <see cref="MongoOptions.Database"/> when it carries an
+    /// explicit database segment.
+    /// </remarks>
+    public static IServiceCollection AddIngestInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        MongoSetup.RegisterClassMaps();
+
+        services.Configure<MongoOptions>(configuration.GetSection("Mongo"));
+        services.Configure<ApiKeyOptions>(configuration.GetSection("ApiKey"));
+
+        services.AddSingleton<MongoContext>(sp =>
+        {
+            var client = sp.GetRequiredService<IMongoClient>();
+            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MongoOptions>>().Value;
+
+            // Prefer database from the connection string if it specifies one,
+            // otherwise fall back to MongoOptions.Database.
+            var settings = client.Settings;
+            string dbName = opts.Database;
+            try
+            {
+                var connStr = configuration.GetConnectionString("ingest") ?? configuration.GetConnectionString("mongo");
+                if (!string.IsNullOrWhiteSpace(connStr))
+                {
+                    var url = new MongoUrl(connStr);
+                    if (!string.IsNullOrWhiteSpace(url.DatabaseName)) dbName = url.DatabaseName;
+                }
+            }
+            catch { /* fall back silently to options */ }
+
+            return new MongoContext(client, dbName);
+        });
+
+        services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
+        services.AddScoped<ISchemaRepository, SchemaRepository>();
+        services.AddScoped<ISubmissionRepository, SubmissionRepository>();
+        services.AddScoped<ISampleRepository, SampleRepository>();
+        services.AddScoped<IReportRepository, ReportRepository>();
+
+        services.AddSingleton<IApiKeyHasher, ApiKeyHasher>();
+        services.AddSingleton<IExpressionEvaluator, NCalcExpressionEvaluator>();
+        services.AddSingleton<IExpressionTranslator, NCalcToJavaScriptTranslator>();
+        services.AddSingleton<IReportRenderer, FluidReportRenderer>();
+        services.AddScoped<ISubmissionValidator, SubmissionValidator>();
+        services.AddScoped<IStatusService, StatusService>();
+
+        // Application services — the thin orchestration layer the controllers delegate to.
+        services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<IApiKeyService, ApiKeyService>();
+        services.AddScoped<ISchemaService, SchemaService>();
+        services.AddScoped<ISubmissionService, SubmissionService>();
+        services.AddScoped<IReportService, ReportService>();
+
+        return services;
+    }
+}

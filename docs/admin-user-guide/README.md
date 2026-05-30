@@ -1,0 +1,67 @@
+# Admin user guide
+
+This guide walks an administrator through every task they're likely to perform from the admin SPA. It assumes you already have a working deployment (see [setup/hosting.md](../setup/hosting.md)) and at least the bootstrap admin key in hand (see [architecture/authentication.md § The bootstrap admin](../architecture/authentication.md#the-bootstrap-admin)).
+
+The guide is split into focused pages — pick whichever matches the task at hand.
+
+| Page                                          | What's inside                                                                 |
+|-----------------------------------------------|--------------------------------------------------------------------------------|
+| [accounts.md](accounts.md)                    | Creating people and applications, editing them, issuing & rotating API keys, disabling vs deleting, viewing a service's status. |
+| [schemas.md](schemas.md)                      | Designing schemas: per-value type/cadence flags, multi-line validation rules, conditional display (`Enabled if` / `Visible if`), warnings, historical-data view. |
+| [submissions.md](submissions.md)              | Browsing submissions with filters, editing/creating on behalf of a service, deleting submissions. |
+| [reports.md](reports.md)                      | Uploading HTML+Liquid report templates, what data they receive, the viewer's filter bar. |
+| [validation.md](validation.md)                | Writing custom validation rules — operators, conditionals, helpers, recipes. The companion to schemas.md when you start using the rule fields. |
+| [troubleshooting.md](troubleshooting.md)      | Common error messages and what they mean.                                      |
+
+## Signing in
+
+1. Browse to the deployment URL (`/` of the API host) — for example `https://ingest.example.org/`.
+2. Paste the API key in the form. The first one you'll use is the bootstrap admin key printed in the server logs on first start.
+3. Click **Sign in**.
+
+If you paste an **Application**-kind key the login screen rejects it with a clear error: only **User**-kind credentials can sign in. (Services use their keys against the API directly, not the SPA.)
+
+Once logged in:
+
+- The left sidebar carries **Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Reports**.
+- Service-role users see a stripped-down sidebar (Dashboard + Submissions only) — Schemas, Accounts and Reports call admin endpoints.
+- Your friendly **label** (or **name** as a fallback) and role show at the bottom.
+- **Sign out** is the icon next to your name.
+
+If you only see a blank screen after signing in, the most likely cause is that the API key was for a soft-deleted/disabled account. Clear `localStorage` and try a fresh key.
+
+## First steps after install
+
+1. **Rotate the bootstrap admin key.**
+   - Go to **Accounts**, find the bootstrap admin (default name `admin`), open the row menu (`⋮`) and choose **Manage keys**.
+   - Click **Generate key**, copy the plaintext shown in the dialog and save it somewhere safe (a password manager).
+   - **Revoke** the old (bootstrap) key from the same dialog.
+   - Sign out and sign back in with the new key to verify everything works.
+2. **Set a real `ApiKey:Pepper`** in your deployment configuration (see [architecture/authentication.md § Configuration knobs](../architecture/authentication.md#configuration-knobs)). Rotating the pepper later invalidates every key in the system, so do this once, early, and back up the value alongside the database credentials.
+3. **Create at least one operator account** so day-to-day analytics work doesn't require an admin key (see [accounts.md](accounts.md)).
+
+## Dashboard
+
+The dashboard greets you by **label** (or **name**) and surfaces a few at-a-glance widgets:
+
+- For Admins / Operators: total counts of services, schemas and submissions, plus a **Missing submissions** section showing one card per cadence (Daily / Weekly / Fortnightly / Monthly / Quarterly / Semi-annually / Yearly) that currently has work outstanding. Each card lists the affected `service • schema` rows with a `missing/total` count, and each row links straight to that service's status page so you can drill in. Cadences with nothing missing are simply omitted — if the whole section is gone, everyone is up to date for the current windows.
+- For Services: their own status (same data as `/api/me/status`).
+
+It's intentionally lightweight — for serious analytics, point PowerBI at the OData feed (see [setup/powerbi.md](../setup/powerbi.md)) or hit `/api/admin/query` from a custom dashboard.
+
+## Services console (Service-role users)
+
+Service-role users get a slimmer console (Dashboard + Submissions only). They can:
+
+- View their own submissions (the **Submissions** page is automatically filtered to their account).
+- Create submissions through the same on-behalf-of form (without picking the service — it's pinned to themselves).
+- Edit submissions whose cadence window is still open. Editing a closed-window submission is blocked with a clear validation error.
+
+This is meant for services that don't (yet) have an automated submitter and prefer to enter data through the UI for now. The forms are identical to the admin-side ones described in [submissions.md](submissions.md).
+
+## Where to go next
+
+- The deep-dive on each task lives in the focused pages linked at the top of this page.
+- For the API surface a Service account hits programmatically, see [client/api.md](../client/api.md).
+- For the auth model and how API keys are issued/verified, see [architecture/authentication.md](../architecture/authentication.md).
+- For the OData feed used by PowerBI and similar tools, see [setup/powerbi.md](../setup/powerbi.md).
