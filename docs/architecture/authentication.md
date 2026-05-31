@@ -128,17 +128,24 @@ On first start, `AdminBootstrapper` ensures the system is operable out of the bo
 
 1. Look for an account named `ApiKey:BootstrapAdminName` (default `admin`).
 2. If it doesn't exist, create one with kind `User` and role `Admin`.
-3. If the account has no active keys, generate one and write it to the logs at **Warning** level:
+3. If the account has no active keys, give it one:
+   - **If `ApiKey:BootstrapAdminKey` is set**, that exact key is used. Nothing secret is written to the logs — you configured the value, so you already have it. This is the recommended path: set the key in configuration and sign in immediately, no log-scraping required.
 
-   ```
-   warn: Bootstrapped admin API key (shown only this once): abc123.xyz... .
-         Use it in the X-Api-Key header. Rotate it via POST /api/admin/accounts/{Id}/keys,
-         then revoke this one.
-   ```
+     ```
+     warn: Bootstrapped admin account 'admin' with the API key from ApiKey:BootstrapAdminKey.
+           Present it in the X-Api-Key header. Rotate it via POST /api/admin/accounts/{Id}/keys once you're in.
+     ```
+   - **If it's empty** (the production default), a random key is generated and written to the logs **once** at `Warning` level:
 
-This is the only mechanism that ever surfaces a plaintext key in the logs. Once you've copied it, rotate immediately and revoke the bootstrap key.
+     ```
+     warn: Bootstrapped admin API key (shown only this once): abc123.xyz... .
+           Use it in the X-Api-Key header. Set ApiKey:BootstrapAdminKey to avoid this next time,
+           or rotate it via POST /api/admin/accounts/{Id}/keys then revoke this one.
+     ```
 
-If the admin account already has an active key, the bootstrapper logs a warning telling you how to bootstrap a new one (rename the bootstrap account in configuration, or insert a fresh admin record directly in Mongo).
+The generated-key path is the only mechanism that ever surfaces a plaintext key in the logs. Whichever path you take, rotate to a fresh key from the SPA/API and revoke the bootstrap one once you're set up — especially if you used a configured key shared with `docker-compose.yml` or a quickstart.
+
+If the admin account already has an active key, the bootstrapper leaves it untouched and logs how to bootstrap another one (point `ApiKey:BootstrapAdminName` at a fresh name, or insert an admin record directly in Mongo). Changing `ApiKey:BootstrapAdminKey` after the first boot has no effect — rotate through the API instead.
 
 ## Rotation
 
@@ -166,6 +173,7 @@ All under the `ApiKey` configuration section (`appsettings.json`, env vars, or u
 | `ApiKey:HeaderName`          | `X-Api-Key`              | Header carried by clients. |
 | `ApiKey:Pepper`              | `change-me-in-prod`      | **Set this in production.** Server-wide HMAC pepper. Rotating it invalidates every existing key — only do it during a planned migration. |
 | `ApiKey:BootstrapAdminName`  | `admin`                  | Name of the auto-bootstrapped admin account. Set to a fresh value if you've lost access to the existing admin and want to bootstrap a new one. |
+| `ApiKey:BootstrapAdminKey`   | *(empty)*                | Optional plaintext key (`{keyId}.{secret}`) assigned to the bootstrap admin on first start so you don't have to read it from the logs. Empty → a random key is generated and logged once. See [§ The bootstrap admin](#the-bootstrap-admin). |
 
 ## Frequently-asked questions
 

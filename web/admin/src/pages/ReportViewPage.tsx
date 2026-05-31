@@ -6,7 +6,7 @@ import {
   makeStyles, tokens,
 } from '@fluentui/react-components'
 import {
-  ArrowLeft20Regular, ArrowMaximize20Regular, ArrowMinimize20Regular,
+  ArrowDownload20Regular, ArrowLeft20Regular, ArrowMaximize20Regular, ArrowMinimize20Regular,
   Open20Regular, Play20Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
@@ -14,6 +14,7 @@ import { formatApiError } from '../api/client'
 import {
   useReport, useRenderReport, useSchemas, useSubmissions, useMySubmissions, useMe,
 } from '../api/hooks'
+import { downloadText } from '../utils/download'
 import type { RenderReportRequest, ReportRenderResponse } from '../api/types'
 
 const useStyles = makeStyles({
@@ -315,6 +316,17 @@ function ReportFrame({
   rendered, expanded, onToggleExpand,
 }: { rendered: ReportRenderResponse; expanded: boolean; onToggleExpand: () => void }) {
   const s = useStyles()
+  // Save the exact HTML we're showing to the user as a standalone file. Done entirely
+  // client-side — the server already shipped the bytes, no need for a download endpoint.
+  // Filename pattern: <reportName>-YYYYMMDDhhmm.html, sanitised so anything weird in a
+  // hand-rolled report name (it shouldn't happen — names are validated server-side — but
+  // belts and braces) doesn't escape into the OS save dialog.
+  const onDownload = () => {
+    const slug = (rendered.reportName || 'report').replace(/[^A-Za-z0-9._-]+/g, '_')
+    const stamp = formatTimestampForFile(new Date())
+    downloadText(`${slug}-${stamp}.html`, rendered.html, 'text/html;charset=utf-8')
+  }
+
   // `sandbox=""` strips every privilege — no script execution, no top-level navigation, no
   // form submission, no plugins. Reports render their template-produced HTML purely as
   // formatted text, which is exactly the threat model we want for admin-uploaded templates.
@@ -334,6 +346,9 @@ function ReportFrame({
         <Toolbar className={s.expandedToolbar}>
           <ToolbarButton icon={<ArrowMinimize20Regular />} onClick={onToggleExpand}>
             Collapse
+          </ToolbarButton>
+          <ToolbarButton icon={<ArrowDownload20Regular />} onClick={onDownload}>
+            Download
           </ToolbarButton>
           <Text>{rendered.reportLabel || rendered.reportName}</Text>
         </Toolbar>
@@ -358,8 +373,17 @@ function ReportFrame({
         >
           Open in new tab
         </ToolbarButton>
+        <ToolbarButton icon={<ArrowDownload20Regular />} onClick={onDownload}>
+          Download
+        </ToolbarButton>
       </Toolbar>
       {frame}
     </div>
   )
+}
+
+/** Compact, filesystem-safe `YYYYMMDDhhmm` stamp for download filenames. */
+function formatTimestampForFile(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`
 }

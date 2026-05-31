@@ -16,7 +16,9 @@ import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
 import { AccountAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
+import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
 import { confirmDelete } from '../utils/confirm'
+import { formatDate, formatDateTime } from '../utils/format'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -67,7 +69,9 @@ const kindHints: Record<AccountKind, string> = {
 export function ServicesPage() {
   const s = useStyles()
   const nav = useNavigate()
-  const { data, isLoading, error } = useAccounts()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const { data, isLoading, error } = useAccounts({ page, pageSize })
   const create = useCreateAccount()
   const update = useUpdateAccount()
   const del = useDeleteAccount()
@@ -158,11 +162,16 @@ export function ServicesPage() {
             <TableHeaderCell>Kind</TableHeaderCell>
             <TableHeaderCell>Role</TableHeaderCell>
             <TableHeaderCell>Status</TableHeaderCell>
+            <TableHeaderCell>Created</TableHeaderCell>
+            <TableHeaderCell>Created by</TableHeaderCell>
             <TableHeaderCell className={s.actionsHeader}>Actions</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <TableRow><TableCell colSpan={5}>Loading...</TableCell></TableRow>}
+          {isLoading && <GridMessageRow colSpan={7}>Loading…</GridMessageRow>}
+          {!isLoading && (data?.items ?? []).length === 0 && (
+            <GridMessageRow colSpan={7}>No accounts yet — click “New account” to add one.</GridMessageRow>
+          )}
           {(data?.items ?? []).map(a => (
             <TableRow
               key={a.id}
@@ -183,6 +192,12 @@ export function ServicesPage() {
                   {a.enabled ? 'Enabled' : 'Disabled'}
                 </Badge>
               </TableCell>
+              <TableCell>
+                <Tooltip content={formatDateTime(a.createdAt)} relationship="label">
+                  <span>{formatDate(a.createdAt)}</span>
+                </Tooltip>
+              </TableCell>
+              <TableCell>{a.createdBy || '—'}</TableCell>
               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
                 <RowActions
                   ariaLabel={`Actions for ${a.name}`}
@@ -205,6 +220,14 @@ export function ServicesPage() {
           ))}
         </TableBody>
       </Table>
+
+      <GridPager
+        page={page}
+        pageSize={pageSize}
+        total={data?.total ?? 0}
+        onPageChange={setPage}
+        onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
+      />
 
       <Drawer
         type="overlay"

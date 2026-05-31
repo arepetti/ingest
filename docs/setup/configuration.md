@@ -11,7 +11,9 @@ Ingest is a plain ASP.NET Core app, so the standard precedence applies (later so
 3. Environment variables.
 4. Command-line arguments.
 
-When passing nested keys through environment variables, replace `:` with `__`. For example `Ingest:EnableSwagger` becomes the env var `Ingest__EnableSwagger`. Both forms reach the same value internally.
+When passing nested keys through environment variables, replace `:` with `__` (double underscore). For example `Ingest:EnableSwagger` becomes the env var `Ingest__EnableSwagger`. Both forms reach the same value internally.
+
+`ASPNETCORE_ENVIRONMENT` selects which `appsettings.{Environment}.json` is layered on and toggles development-only behaviour (Swagger defaults on, CORS dev origins, user-secrets). The shipped Docker image sets it to `Production`; the Aspire local-dev host runs as `Development`. Leave it at `Production` for any real deployment.
 
 ## Connection
 
@@ -27,6 +29,7 @@ When passing nested keys through environment variables, replace `:` with `__`. F
 | `ApiKey:HeaderName`          | `X-Api-Key`              | HTTP header callers use to present the key. |
 | `ApiKey:Pepper`              | `dev-pepper-change-me`   | **Set this to a long random value in production.** Server-wide HMAC pepper that hardens stored key hashes. Rotating it invalidates every existing key — only do so during a planned migration. See [../architecture/authentication.md § Configuration knobs](../architecture/authentication.md#configuration-knobs). |
 | `ApiKey:BootstrapAdminName`  | `admin`                  | Name of the account the bootstrapper creates on first start. Change it later only if you want to bootstrap a *second* admin account (e.g. to recover from a lost key). |
+| `ApiKey:BootstrapAdminKey`   | *(empty)*                | Plaintext key (`{keyId}.{secret}`, e.g. `localdev.local-dev-admin-key-change-me`) assigned to the bootstrap admin on first start, so you don't have to read it from the logs. **When empty (the production default), the app generates a random key and logs it once.** Set this to a long, unique value if you use it — anyone who knows it has admin access until you rotate it. Changing it after the admin already has a key has no effect (rotate via the SPA/API instead). |
 
 ## Application behaviour
 

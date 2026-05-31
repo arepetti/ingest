@@ -4,7 +4,8 @@ Operations-side documentation: standing up the service and hooking reporting too
 
 | Page                                  | What's inside                                                                                       |
 |---------------------------------------|------------------------------------------------------------------------------------------------------|
-| [hosting.md](hosting.md)              | Step-by-step Azure deployment (Container Apps + Cosmos DB for MongoDB), plus alternatives (App Service, AKS, self-hosted MongoDB). Operational checklist. |
+| [quickstart.md](quickstart.md)        | Run the whole stack locally in ~5 minutes with **only Docker** — no .NET SDK, Node, or MongoDB. The fastest way to evaluate Ingest. |
+| [hosting.md](hosting.md)              | Step-by-step Azure deployment (Container Apps + Cosmos DB for MongoDB), including a **free ~$0 evaluation tier** (Container Apps free grant + vCore Free Tier + GHCR), plus alternatives (App Service, AKS, self-hosted MongoDB). Operational checklist. |
 | [configuration.md](configuration.md)  | Full reference for every configurable setting — connection string, API-key pepper and header, application behaviour, hosting/observability variables. |
 | [powerbi.md](powerbi.md)              | Connecting Power BI (or any OData v4 client) to the `/odata/samples` feed. Custom-header auth recipe, pre-filtering, data-model tips, refresh schedules. |
 

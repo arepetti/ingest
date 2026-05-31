@@ -176,7 +176,7 @@ export function TopBar({ me }: { me?: Me }) {
   const accountsQuery = useAccounts(undefined, !isService)
   const schemasQuery = useSchemas(undefined, !isService)
   // Reports are an operator/admin tool; same gating logic.
-  const reportsQuery = useReports(!isService)
+  const reportsQuery = useReports(undefined, !isService)
 
   // Memoise the name → label maps so buildBreadcrumbs gets stable inputs and isn't pointlessly
   // rerun while React Query mutates the parent objects between requests.

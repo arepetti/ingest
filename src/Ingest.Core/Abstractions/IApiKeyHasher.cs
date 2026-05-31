@@ -11,6 +11,15 @@ public interface IApiKeyHasher
     /// <returns>A <see cref="GeneratedApiKey"/> whose <c>Plaintext</c> field is the only value the user will ever see.</returns>
     GeneratedApiKey Generate();
 
+    /// <summary>
+    /// Derive the persisted artefacts (id, salt, hash) for a caller-supplied plaintext key — used
+    /// to seed a known key from configuration (e.g. the bootstrap admin key) rather than minting a
+    /// random one. A fresh random salt is generated, exactly as in <see cref="Generate"/>.
+    /// </summary>
+    /// <param name="plaintext">A well-formed <c>{keyId}.{secret}</c> string.</param>
+    /// <returns>The components to persist, or <c>null</c> when <paramref name="plaintext"/> is malformed.</returns>
+    GeneratedApiKey? Import(string plaintext);
+
     /// <summary>Split a presented key string into its id and secret components.</summary>
     /// <remarks>
     /// Intentionally not named <c>TryParse</c>: ASP.NET Core's Minimal API parameter binding

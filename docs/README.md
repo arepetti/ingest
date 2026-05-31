@@ -4,6 +4,10 @@ This folder collects the long-form documentation for **Ingest**, the small data-
 
 ## Pick your starting point
 
+### "I just want to try it"
+
+Run the whole stack locally with **only Docker** (no .NET SDK, Node, or MongoDB) via [**setup/quickstart.md**](setup/quickstart.md). It's the fastest way to see Ingest end-to-end before committing to a deployment.
+
 ### "I run a deployment / I manage accounts and schemas"
 
 Start with [**admin-user-guide/**](admin-user-guide/README.md). It splits into focused pages — accounts, schemas, submissions, validation rules, troubleshooting — so you can jump straight to the task at hand. Keep [architecture/authentication.md](architecture/authentication.md) handy for the key-lifecycle details.

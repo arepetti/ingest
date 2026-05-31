@@ -24,10 +24,12 @@ import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
 import { SchemaAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
+import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
 import { LayoutTreeEditor } from '../components/LayoutTreeEditor'
 import { ValueLabel } from '../components/ValueLabel'
 import { cadenceLabel } from '../utils/cadence'
 import { confirmDelete } from '../utils/confirm'
+import { formatDate, formatDateTime } from '../utils/format'
 import { downloadJson, pickJsonFile } from '../utils/download'
 import { validateExpression, type ExpressionSyntaxResult } from '../utils/expression'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
@@ -71,6 +73,8 @@ const useStyles = makeStyles({
   colEnabled:    { width: '110px' },
   colModifiable: { width: '110px' },
   colAudience:   { width: '160px' },
+  colCreated:    { width: '110px' },
+  colCreatedBy:  { width: '140px' },
   colActions:    { width: '80px' },
   truncate: {
     display: 'block',
@@ -171,7 +175,9 @@ export function SchemasPage() {
   const nav = useNavigate()
   const { data: me } = useMe()
   const isAdmin = me?.role === 'Admin'
-  const { data, isLoading, error } = useSchemas()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const { data, isLoading, error } = useSchemas({ page, pageSize })
   // The audience picker only cares about Service-role accounts (those who submit data); the kind
   // (User vs Application) is irrelevant here.
   const services = useAccounts({ role: 'Service' })
@@ -374,12 +380,15 @@ export function SchemasPage() {
             <TableHeaderCell className={s.colEnabled}>Enabled</TableHeaderCell>
             <TableHeaderCell className={s.colModifiable}>Modifiable</TableHeaderCell>
             <TableHeaderCell className={s.colAudience}>Audience</TableHeaderCell>
+            <TableHeaderCell className={s.colCreated}>Created</TableHeaderCell>
+            <TableHeaderCell className={s.colCreatedBy}>Created by</TableHeaderCell>
             <TableHeaderCell className={`${s.colActions} ${s.actionsHeader}`}>Actions</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && (
-            <TableRow><TableCell colSpan={6}>Loading...</TableCell></TableRow>
+          {isLoading && <GridMessageRow colSpan={8}>Loading…</GridMessageRow>}
+          {!isLoading && items.length === 0 && (
+            <GridMessageRow colSpan={8}>No schemas yet — click “New schema” to create one.</GridMessageRow>
           )}
           {items.map(sc => (
             <TableRow
@@ -402,6 +411,16 @@ export function SchemasPage() {
               </TableCell>
               <TableCell>{sc.modifiable ? 'Yes' : 'No'}</TableCell>
               <TableCell>{sc.isGlobal ? 'Global' : `${sc.serviceIds.length} service(s)`}</TableCell>
+              <TableCell className={s.colCreated}>
+                <Tooltip content={formatDateTime(sc.createdAt)} relationship="label">
+                  <span className={s.truncate}>{formatDate(sc.createdAt)}</span>
+                </Tooltip>
+              </TableCell>
+              <TableCell className={s.colCreatedBy}>
+                <Tooltip content={sc.createdBy || '—'} relationship="label">
+                  <span className={s.truncate}>{sc.createdBy || '—'}</span>
+                </Tooltip>
+              </TableCell>
               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
                 <RowActions
                   ariaLabel={`Actions for ${sc.name}`}
@@ -426,6 +445,14 @@ export function SchemasPage() {
           ))}
         </TableBody>
       </Table>
+
+      <GridPager
+        page={page}
+        pageSize={pageSize}
+        total={data?.total ?? 0}
+        onPageChange={setPage}
+        onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
+      />
 
       <Drawer
         type="overlay"

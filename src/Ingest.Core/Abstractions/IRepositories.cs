@@ -159,11 +159,12 @@ public interface ISubmissionRepository
     /// <returns>The submission, or <c>null</c>.</returns>
     Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default);
 
-    /// <summary>Page through submissions with optional service/date filters.</summary>
+    /// <summary>Page through submissions with optional service/schema/date filters.</summary>
     /// <param name="request">Paging + sort parameters; <c>IncludeDeleted</c> opts soft-deleted ones in.</param>
     /// <param name="serviceId">Restrict to a single account when non-null.</param>
     /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
+    /// <param name="schemaName">Restrict to submissions containing at least one sample for this schema when non-null.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A page of submissions with the total count.</returns>
     Task<PagedResult<Submission>> ListAsync(
@@ -171,6 +172,7 @@ public interface ISubmissionRepository
         Guid? serviceId = null,
         DateTime? from = null,
         DateTime? to = null,
+        string? schemaName = null,
         CancellationToken ct = default);
 
     /// <summary>Insert a new submission.</summary>

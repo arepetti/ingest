@@ -48,4 +48,27 @@ public class ApiKeyHasherTests
         var hasher = MakeHasher();
         Assert.False(hasher.TrySplit(input, out _, out _));
     }
+
+    [Fact]
+    public void Import_then_verify_succeeds()
+    {
+        var hasher = MakeHasher();
+        var imported = hasher.Import("localdev.local-dev-admin-key-change-me");
+
+        Assert.NotNull(imported);
+        Assert.Equal("localdev", imported!.KeyId);
+        Assert.Equal("local-dev-admin-key-change-me", imported.Secret);
+        // The persisted salt+hash must verify against the secret the caller supplied.
+        Assert.True(hasher.Verify(imported.Secret, imported.Salt, imported.Hash));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("nodot")]
+    [InlineData("onlyid.")]
+    public void Import_rejects_malformed(string input)
+    {
+        var hasher = MakeHasher();
+        Assert.Null(hasher.Import(input));
+    }
 }

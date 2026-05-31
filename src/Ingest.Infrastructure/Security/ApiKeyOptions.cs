@@ -18,9 +18,17 @@ public sealed class ApiKeyOptions
     public string Pepper { get; set; } = "change-me-in-prod";
 
     /// <summary>
-    /// Name of the bootstrap admin account created on first boot when no admin exists. Its API
-    /// key is logged once at startup so an operator can capture it; subsequent boots leave the
-    /// account alone.
+    /// Name of the bootstrap admin account created on first boot when no admin exists.
+    /// Subsequent boots leave the account alone.
     /// </summary>
     public string BootstrapAdminName { get; set; } = "admin";
+
+    /// <summary>
+    /// Optional plaintext API key (<c>{keyId}.{secret}</c>) used for the bootstrap admin account
+    /// on first boot. When set, an operator knows the admin key up-front and never has to read it
+    /// from the startup logs. When empty (the production default), the bootstrapper falls back to
+    /// generating a random key and logging it once. Set this to a long, unique value — anyone who
+    /// knows it has full admin access until you rotate it.
+    /// </summary>
+    public string BootstrapAdminKey { get; set; } = "";
 }

@@ -10,10 +10,11 @@ namespace Ingest.Api.Bootstrap;
 /// <summary>
 /// Startup hosted service that gives a fresh deployment a usable admin account and key.
 /// On first boot (when no account with the configured <see cref="ApiKeyOptions.BootstrapAdminName"/>
-/// exists) it creates the admin and mints a single API key, logging the plaintext exactly once
-/// as a warning so an operator can capture it from the console/log sink. Subsequent boots only
-/// re-create the key when no active key remains. Also responsible for the one-time Mongo index
-/// creation.
+/// exists) it creates the admin and gives it a single API key: if
+/// <see cref="ApiKeyOptions.BootstrapAdminKey"/> is configured that exact key is used (so the
+/// operator never has to read it from the logs), otherwise a random key is minted and logged
+/// once at warning level. Subsequent boots only add a key when no active key remains. Also
+/// responsible for the one-time Mongo index creation.
 /// </summary>
 public sealed class AdminBootstrapper : IHostedService
 {
@@ -77,7 +78,34 @@ public sealed class AdminBootstrapper : IHostedService
         var active = await keys.GetActiveByAccountAsync(admin.Id, cancellationToken);
         if (active.Count == 0)
         {
-            var generated = hasher.Generate();
+            // Prefer an operator-supplied key from configuration so nobody has to scrape it out of
+            // the logs. Fall back to a random key (logged once) when none is configured or it's
+            // malformed — that keeps a misconfigured deployment usable rather than locked out.
+            var configuredKey = _apiKey.BootstrapAdminKey?.Trim();
+            var fromConfig = !string.IsNullOrEmpty(configuredKey);
+
+            GeneratedApiKey generated;
+            if (fromConfig)
+            {
+                var imported = hasher.Import(configuredKey!);
+                if (imported is null)
+                {
+                    _logger.LogError(
+                        "ApiKey:BootstrapAdminKey is set but malformed (expected '<keyId>.<secret>'). " +
+                        "Falling back to a generated key.");
+                    generated = hasher.Generate();
+                    fromConfig = false;
+                }
+                else
+                {
+                    generated = imported;
+                }
+            }
+            else
+            {
+                generated = hasher.Generate();
+            }
+
             var entity = new ApiKey
             {
                 AccountId = admin.Id,
@@ -87,17 +115,29 @@ public sealed class AdminBootstrapper : IHostedService
             };
             await keys.AddAsync(entity, cancellationToken);
 
-            _logger.LogWarning(
-                "Bootstrapped admin API key (shown only this once): {Key}. " +
-                "Use it in the {Header} header. " +
-                "Rotate it via POST /api/admin/accounts/{Id}/keys, then revoke this one.",
-                generated.Plaintext, _apiKey.HeaderName, admin.Id);
+            if (fromConfig)
+            {
+                // Don't echo the configured secret back to the logs — the operator already has it.
+                _logger.LogWarning(
+                    "Bootstrapped admin account '{Name}' with the API key from ApiKey:BootstrapAdminKey. " +
+                    "Present it in the {Header} header. Rotate it via POST /api/admin/accounts/{Id}/keys once you're in.",
+                    admin.Name, _apiKey.HeaderName, admin.Id);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Bootstrapped admin API key (shown only this once): {Key}. " +
+                    "Use it in the {Header} header. Set ApiKey:BootstrapAdminKey to avoid this next time, " +
+                    "or rotate it via POST /api/admin/accounts/{Id}/keys then revoke this one.",
+                    generated.Plaintext, _apiKey.HeaderName, admin.Id);
+            }
         }
         else
         {
             _logger.LogWarning(
-                "Admin account '{Name}' already has {Count} active API key(s). " +
-                "If you've lost it, create a new admin account on the database directly or set ApiKey:BootstrapAdminName to a new value to bootstrap another one.",
+                "Admin account '{Name}' already has {Count} active API key(s); leaving it untouched. " +
+                "Changing ApiKey:BootstrapAdminKey now has no effect — rotate via the API/SPA, or set " +
+                "ApiKey:BootstrapAdminName to a new value to bootstrap another admin.",
                 admin.Name, active.Count);
         }
     }

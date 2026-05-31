@@ -1,0 +1,2034 @@
+diff --git a/.github/workflows/docker-image.yml b/.github/workflows/docker-image.yml
+new file mode 100644
+index 0000000..c1a8e9c
+--- /dev/null
++++ b/.github/workflows/docker-image.yml
+@@ -0,0 +1,63 @@
++name: Build and publish Docker image
++
++# Manual-only: trigger from the Actions tab (Run workflow). Nothing runs on push/PR.
++on:
++  workflow_dispatch:
++    inputs:
++      tag:
++        description: "Image tag to publish (the commit SHA is always published too)"
++        required: false
++        default: "latest"
++
++env:
++  REGISTRY: ghcr.io
++
++jobs:
++  build-and-push:
++    runs-on: ubuntu-latest
++    permissions:
++      contents: read
++      packages: write # needed to push to GHCR with the built-in GITHUB_TOKEN
++
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Compute lowercase image name
++        id: image
++        # GHCR requires an all-lowercase path; owner/repo may contain uppercase.
++        run: echo "name=${REGISTRY}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
++
++      - name: Set up Docker Buildx
++        uses: docker/setup-buildx-action@v3
++
++      - name: Log in to GitHub Container Registry
++        uses: docker/login-action@v3
++        with:
++          registry: ${{ env.REGISTRY }}
++          username: ${{ github.actor }}
++          password: ${{ secrets.GITHUB_TOKEN }}
++
++      - name: Build and push
++        uses: docker/build-push-action@v6
++        with:
++          context: .
++          file: ./Dockerfile
++          push: true
++          tags: |
++            ${{ steps.image.outputs.name }}:${{ inputs.tag }}
++            ${{ steps.image.outputs.name }}:${{ github.sha }}
++          cache-from: type=gha
++          cache-to: type=gha,mode=max
++
++      - name: Job summary
++        run: |
++          {
++            echo "### Published image"
++            echo ""
++            echo "- \`${{ steps.image.outputs.name }}:${{ inputs.tag }}\`"
++            echo "- \`${{ steps.image.outputs.name }}:${{ github.sha }}\`"
++            echo ""
++            echo "The package is created **private** by default — make it public from the"
++            echo "package settings if you want anonymous \`docker pull\`."
++          } >> "$GITHUB_STEP_SUMMARY"
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 5d8775e..21be04d 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -47,14 +47,13 @@ dotnet run --project src/Ingest.AppHost
+ 
+ The Aspire dashboard URL is printed in the console; the `admin` resource there links to <http://localhost:5173>.
+ 
+-On first start, look for a `Warning`-level log line from the API:
++The local-dev configuration (`src/Ingest.Api/appsettings.Development.json`) preconfigures a known bootstrap admin key, so on first start you can sign in straight away with:
+ 
+ ```
+-warn: Bootstrapped admin API key (shown only this once): abc123.xyz... .
+-      Use it in the X-Api-Key header.
++localdev.local-dev-admin-key-change-me
+ ```
+ 
+-Copy that value — you only get to see it once. Paste it on the SPA's login screen, then immediately [rotate it](docs/architecture/authentication.md#rotation) and revoke the bootstrap key.
++(That key only exists in the `Development` environment. In `Production` the `ApiKey:BootstrapAdminKey` is empty by default, so the app generates a random key and logs it once — see [the bootstrap admin](docs/architecture/authentication.md#the-bootstrap-admin).) Once you're in you can [rotate it](docs/architecture/authentication.md#rotation) like any other key.
+ 
+ ### Running the SPA standalone (without Aspire)
+ 
+@@ -93,9 +92,12 @@ docker build -t ingest .
+ docker run -p 8080:8080 `
+   -e ConnectionStrings__ingest="mongodb://host.docker.internal:27017/ingest" `
+   -e ApiKey__Pepper="please-change-me" `
++  -e ApiKey__BootstrapAdminKey="localdev.local-dev-admin-key-change-me" `
+   ingest
+ ```
+ 
++This run needs a MongoDB reachable at the connection string above; `host.docker.internal` resolves to the host from inside the container on Docker Desktop (Windows/macOS). On Linux, run the container with `--add-host=host.docker.internal:host-gateway` or point the connection string at a Mongo container on a shared Docker network. The easiest no-dependencies path is **`docker compose up --build`** from the repo root — see [docs/setup/quickstart.md](docs/setup/quickstart.md), which starts MongoDB for you.
++
+ For real deployments (Azure Container Apps, App Service, AKS, self-hosted) see [docs/setup/hosting.md](docs/setup/hosting.md). For the full set of environment variables you can pass, see [docs/setup/configuration.md](docs/setup/configuration.md).
+ 
+ ## Swagger / OpenAPI
+diff --git a/README.md b/README.md
+index 234a1cc..bbcf42e 100644
+--- a/README.md
++++ b/README.md
+@@ -68,12 +68,13 @@ Every change is **audited** (who did it, when) and **soft-deleted** by default 
+ 
+ ### One container, one database
+ 
+-The whole system ships as a single Docker image bundling the API and the admin SPA. Deploy it anywhere that runs a Linux container — the recommended target on Azure is **Container Apps + Cosmos DB for MongoDB (vCore)**, but App Service, AKS, or a self-hosted MongoDB all work. Health probes, structured logging and OpenTelemetry tracing are wired in by default.
++The whole system ships as a single Docker image bundling the API and the admin SPA. Deploy it anywhere that runs a Linux container — the recommended target on Azure is **Container Apps + Cosmos DB for MongoDB (vCore)**, but App Service, AKS, or a self-hosted MongoDB all work. Health probes, structured logging and OpenTelemetry tracing are wired in by default. Want to see it first? `docker compose up --build` runs the whole stack locally — see the [quickstart](docs/setup/quickstart.md).
+ 
+ ## Who it's for
+ 
+ | You are…                                          | …and you get                                                                                                                              | …start here                                                                                                                                  |
+ |---------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
++| **Just kicking the tyres**                        | The whole thing running locally in a couple of minutes with **only Docker** — no .NET SDK, Node, or MongoDB to install.                      | [docs/setup/quickstart.md](docs/setup/quickstart.md)                                                                                         |
+ | A **council administrator** running the catalogue | The web console for managing services, schemas, submissions, and watching status across all services.                                       | [docs/admin-user-guide/](docs/admin-user-guide/README.md)                                                                                    |
+ | A **service** sending KPI data                    | A stable REST API that lets a scheduled job or an existing back-office system push KPIs automatically — no more weekly form-filling. A web form is there as a fallback (or for getting started).                                                            | [docs/client/](docs/client/README.md)                                                                                                        |
+ | A **data analyst / report author**                | A direct OData feed for Power BI (and equivalents), with examples and refresh-schedule guidance.                                            | [docs/setup/powerbi.md](docs/setup/powerbi.md)                                                                                               |
+@@ -86,9 +87,9 @@ A single .NET 10 / ASP.NET Core back-end talks to MongoDB, exposes a REST API fo
+ 
+ ```
+ ┌─────────────────┐                 ┌─────────────────┐               ┌────────────┐
+-│ Service clients │   API key       │     Ingest      │  MongoDB.     │  MongoDB   │
++│ Service clients │   API key       │     Ingest      │  MongoDB      │  MongoDB   │
+ │ (scripts, bots, │ ───────────────►│   (API + SPA,   │ ─────────────►│  (Cosmos / │
+-│  schedulers …)  │                 │  single image)  │  Driver       │  hosted)   │
++│  schedulers …)  │                 │  single image)  │  wire protocol│  hosted)   │
+ └─────────────────┘                 └─────────────────┘               └────────────┘
+                                             ▲
+                                             │ OData / REST
+diff --git a/docker-compose.yml b/docker-compose.yml
+new file mode 100644
+index 0000000..e3917af
+--- /dev/null
++++ b/docker-compose.yml
+@@ -0,0 +1,55 @@
++# Try Ingest locally with nothing but Docker installed — no .NET SDK, no Node, no MongoDB.
++# The app image is built straight from the Dockerfile inside Docker, so the only thing you
++# need on your machine is Docker (Desktop or Engine).
++#
++#   docker compose up --build
++#
++# Then open http://localhost:8080 and sign in on the SPA login screen with this API key
++# (it's also the value to send in the X-Api-Key header for API calls):
++#
++#   localdev.local-dev-admin-key-change-me
++#
++# Swagger UI:        http://localhost:8080/swagger
++# Stop + wipe data:  docker compose down -v
++#
++# This stack is for EVALUATION ONLY. The admin key and pepper below are well-known placeholders;
++# never expose this to a network you don't trust. For production, see docs/setup/hosting.md.
++
++services:
++  mongo:
++    image: mongo:7
++    restart: unless-stopped
++    volumes:
++      - ingest-mongo-data:/data/db
++    healthcheck:
++      # Gate the app's start on Mongo actually answering, not just the container being up.
++      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
++      interval: 10s
++      timeout: 5s
++      retries: 5
++      start_period: 20s
++
++  ingest:
++    build:
++      context: .
++      dockerfile: Dockerfile
++    image: ingest:local
++    restart: unless-stopped
++    depends_on:
++      mongo:
++        condition: service_healthy
++    ports:
++      - "8080:8080"
++    environment:
++      ConnectionStrings__ingest: "mongodb://mongo:27017/ingest"
++      # Hardens stored key hashes. Any value works locally; change it for anything real.
++      ApiKey__Pepper: "local-dev-pepper-change-me"
++      # Known bootstrap admin key so you can log in immediately without scraping the logs.
++      # CHANGE THIS (and the pepper) before using this stack anywhere that matters.
++      ApiKey__BootstrapAdminKey: "localdev.local-dev-admin-key-change-me"
++      ASPNETCORE_ENVIRONMENT: "Production"
++      # Swagger is handy while evaluating; turn it off for real deployments.
++      Ingest__EnableSwagger: "true"
++
++volumes:
++  ingest-mongo-data:
+diff --git a/docs/README.md b/docs/README.md
+index bb9ff69..24daba2 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -4,6 +4,10 @@ This folder collects the long-form documentation for **Ingest**, the small data-
+ 
+ ## Pick your starting point
+ 
++### "I just want to try it"
++
++Run the whole stack locally with **only Docker** (no .NET SDK, Node, or MongoDB) via [**setup/quickstart.md**](setup/quickstart.md). It's the fastest way to see Ingest end-to-end before committing to a deployment.
++
+ ### "I run a deployment / I manage accounts and schemas"
+ 
+ Start with [**admin-user-guide/**](admin-user-guide/README.md). It splits into focused pages — accounts, schemas, submissions, validation rules, troubleshooting — so you can jump straight to the task at hand. Keep [architecture/authentication.md](architecture/authentication.md) handy for the key-lifecycle details.
+diff --git a/docs/admin-user-guide/README.md b/docs/admin-user-guide/README.md
+index 7f69069..e2a5ce0 100644
+--- a/docs/admin-user-guide/README.md
++++ b/docs/admin-user-guide/README.md
+@@ -16,7 +16,7 @@ The guide is split into focused pages — pick whichever matches the task at han
+ ## Signing in
+ 
+ 1. Browse to the deployment URL (`/` of the API host) — for example `https://ingest.example.org/`.
+-2. Paste the API key in the form. The first one you'll use is the bootstrap admin key printed in the server logs on first start.
++2. Paste the API key in the form. The first one you'll use is the bootstrap admin key: either the value you set in `ApiKey:BootstrapAdminKey`, or — if you left that empty — the random key printed in the server logs on first start (see [the bootstrap admin](../architecture/authentication.md#the-bootstrap-admin)).
+ 3. Click **Sign in**.
+ 
+ If you paste an **Application**-kind key the login screen rejects it with a clear error: only **User**-kind credentials can sign in. (Services use their keys against the API directly, not the SPA.)
+@@ -32,7 +32,7 @@ If you only see a blank screen after signing in, the most likely cause is that t
+ 
+ ## First steps after install
+ 
+-1. **Rotate the bootstrap admin key.**
++1. **Rotate the bootstrap admin key.** This matters most when the bootstrap key came from `ApiKey:BootstrapAdminKey` — that value may be shared (e.g. with a `docker-compose.yml` or quickstart) and is only as secret as your config.
+    - Go to **Accounts**, find the bootstrap admin (default name `admin`), open the row menu (`⋮`) and choose **Manage keys**.
+    - Click **Generate key**, copy the plaintext shown in the dialog and save it somewhere safe (a password manager).
+    - **Revoke** the old (bootstrap) key from the same dialog.
+diff --git a/docs/architecture/authentication.md b/docs/architecture/authentication.md
+index fd75bf5..97a2899 100644
+--- a/docs/architecture/authentication.md
++++ b/docs/architecture/authentication.md
+@@ -128,17 +128,24 @@ On first start, `AdminBootstrapper` ensures the system is operable out of the bo
+ 
+ 1. Look for an account named `ApiKey:BootstrapAdminName` (default `admin`).
+ 2. If it doesn't exist, create one with kind `User` and role `Admin`.
+-3. If the account has no active keys, generate one and write it to the logs at **Warning** level:
++3. If the account has no active keys, give it one:
++   - **If `ApiKey:BootstrapAdminKey` is set**, that exact key is used. Nothing secret is written to the logs — you configured the value, so you already have it. This is the recommended path: set the key in configuration and sign in immediately, no log-scraping required.
+ 
+-   ```
+-   warn: Bootstrapped admin API key (shown only this once): abc123.xyz... .
+-         Use it in the X-Api-Key header. Rotate it via POST /api/admin/accounts/{Id}/keys,
+-         then revoke this one.
+-   ```
++     ```
++     warn: Bootstrapped admin account 'admin' with the API key from ApiKey:BootstrapAdminKey.
++           Present it in the X-Api-Key header. Rotate it via POST /api/admin/accounts/{Id}/keys once you're in.
++     ```
++   - **If it's empty** (the production default), a random key is generated and written to the logs **once** at `Warning` level:
+ 
+-This is the only mechanism that ever surfaces a plaintext key in the logs. Once you've copied it, rotate immediately and revoke the bootstrap key.
++     ```
++     warn: Bootstrapped admin API key (shown only this once): abc123.xyz... .
++           Use it in the X-Api-Key header. Set ApiKey:BootstrapAdminKey to avoid this next time,
++           or rotate it via POST /api/admin/accounts/{Id}/keys then revoke this one.
++     ```
+ 
+-If the admin account already has an active key, the bootstrapper logs a warning telling you how to bootstrap a new one (rename the bootstrap account in configuration, or insert a fresh admin record directly in Mongo).
++The generated-key path is the only mechanism that ever surfaces a plaintext key in the logs. Whichever path you take, rotate to a fresh key from the SPA/API and revoke the bootstrap one once you're set up — especially if you used a configured key shared with `docker-compose.yml` or a quickstart.
++
++If the admin account already has an active key, the bootstrapper leaves it untouched and logs how to bootstrap another one (point `ApiKey:BootstrapAdminName` at a fresh name, or insert an admin record directly in Mongo). Changing `ApiKey:BootstrapAdminKey` after the first boot has no effect — rotate through the API instead.
+ 
+ ## Rotation
+ 
+@@ -166,6 +173,7 @@ All under the `ApiKey` configuration section (`appsettings.json`, env vars, or u
+ | `ApiKey:HeaderName`          | `X-Api-Key`              | Header carried by clients. |
+ | `ApiKey:Pepper`              | `change-me-in-prod`      | **Set this in production.** Server-wide HMAC pepper. Rotating it invalidates every existing key — only do it during a planned migration. |
+ | `ApiKey:BootstrapAdminName`  | `admin`                  | Name of the auto-bootstrapped admin account. Set to a fresh value if you've lost access to the existing admin and want to bootstrap a new one. |
++| `ApiKey:BootstrapAdminKey`   | *(empty)*                | Optional plaintext key (`{keyId}.{secret}`) assigned to the bootstrap admin on first start so you don't have to read it from the logs. Empty → a random key is generated and logged once. See [§ The bootstrap admin](#the-bootstrap-admin). |
+ 
+ ## Frequently-asked questions
+ 
+diff --git a/docs/setup/README.md b/docs/setup/README.md
+index 2471361..400591f 100644
+--- a/docs/setup/README.md
++++ b/docs/setup/README.md
+@@ -4,7 +4,8 @@ Operations-side documentation: standing up the service and hooking reporting too
+ 
+ | Page                                  | What's inside                                                                                       |
+ |---------------------------------------|------------------------------------------------------------------------------------------------------|
+-| [hosting.md](hosting.md)              | Step-by-step Azure deployment (Container Apps + Cosmos DB for MongoDB), plus alternatives (App Service, AKS, self-hosted MongoDB). Operational checklist. |
++| [quickstart.md](quickstart.md)        | Run the whole stack locally in ~5 minutes with **only Docker** — no .NET SDK, Node, or MongoDB. The fastest way to evaluate Ingest. |
++| [hosting.md](hosting.md)              | Step-by-step Azure deployment (Container Apps + Cosmos DB for MongoDB), including a **free ~$0 evaluation tier** (Container Apps free grant + vCore Free Tier + GHCR), plus alternatives (App Service, AKS, self-hosted MongoDB). Operational checklist. |
+ | [configuration.md](configuration.md)  | Full reference for every configurable setting — connection string, API-key pepper and header, application behaviour, hosting/observability variables. |
+ | [powerbi.md](powerbi.md)              | Connecting Power BI (or any OData v4 client) to the `/odata/samples` feed. Custom-header auth recipe, pre-filtering, data-model tips, refresh schedules. |
+ 
+diff --git a/docs/setup/configuration.md b/docs/setup/configuration.md
+index ba7bd04..b9e7fbd 100644
+--- a/docs/setup/configuration.md
++++ b/docs/setup/configuration.md
+@@ -11,7 +11,9 @@ Ingest is a plain ASP.NET Core app, so the standard precedence applies (later so
+ 3. Environment variables.
+ 4. Command-line arguments.
+ 
+-When passing nested keys through environment variables, replace `:` with `__`. For example `Ingest:EnableSwagger` becomes the env var `Ingest__EnableSwagger`. Both forms reach the same value internally.
++When passing nested keys through environment variables, replace `:` with `__` (double underscore). For example `Ingest:EnableSwagger` becomes the env var `Ingest__EnableSwagger`. Both forms reach the same value internally.
++
++`ASPNETCORE_ENVIRONMENT` selects which `appsettings.{Environment}.json` is layered on and toggles development-only behaviour (Swagger defaults on, CORS dev origins, user-secrets). The shipped Docker image sets it to `Production`; the Aspire local-dev host runs as `Development`. Leave it at `Production` for any real deployment.
+ 
+ ## Connection
+ 
+@@ -27,6 +29,7 @@ When passing nested keys through environment variables, replace `:` with `__`. F
+ | `ApiKey:HeaderName`          | `X-Api-Key`              | HTTP header callers use to present the key. |
+ | `ApiKey:Pepper`              | `dev-pepper-change-me`   | **Set this to a long random value in production.** Server-wide HMAC pepper that hardens stored key hashes. Rotating it invalidates every existing key — only do so during a planned migration. See [../architecture/authentication.md § Configuration knobs](../architecture/authentication.md#configuration-knobs). |
+ | `ApiKey:BootstrapAdminName`  | `admin`                  | Name of the account the bootstrapper creates on first start. Change it later only if you want to bootstrap a *second* admin account (e.g. to recover from a lost key). |
++| `ApiKey:BootstrapAdminKey`   | *(empty)*                | Plaintext key (`{keyId}.{secret}`, e.g. `localdev.local-dev-admin-key-change-me`) assigned to the bootstrap admin on first start, so you don't have to read it from the logs. **When empty (the production default), the app generates a random key and logs it once.** Set this to a long, unique value if you use it — anyone who knows it has admin access until you rotate it. Changing it after the admin already has a key has no effect (rotate via the SPA/API instead). |
+ 
+ ## Application behaviour
+ 
+diff --git a/docs/setup/hosting.md b/docs/setup/hosting.md
+index 11d5e4a..aaa426e 100644
+--- a/docs/setup/hosting.md
++++ b/docs/setup/hosting.md
+@@ -1,9 +1,15 @@
+ # Hosting
+ 
+-This guide explains how to host Ingest in **Microsoft Azure** end-to-end. The recommended target is **Azure Container Apps** backed by **Cosmos DB for MongoDB (vCore)** — it's the cheapest production-ready option and avoids running your own MongoDB cluster. Alternatives at the bottom for self-hosted MongoDB, App Service, or AKS.
++This guide explains how to host Ingest in **Microsoft Azure** end-to-end. The recommended target is **Azure Container Apps** backed by **Cosmos DB for MongoDB (vCore)** — a production-ready option that avoids running your own MongoDB cluster. Alternatives at the bottom for self-hosted MongoDB, App Service, or AKS.
+ 
+ The Ingest container is single-image: it bundles the compiled API **and** the built admin SPA. You don't need a separate static-web-app deployment.
+ 
++> **Just want to try it?** Don't deploy to Azure — run it locally with Docker in a couple of minutes (no Azure account, no .NET SDK). See [quickstart.md](quickstart.md). This page is for a real, persistent deployment.
++
++> **A note on cost.** The main guide below is not free: Cosmos DB for MongoDB vCore is billed per node-hour and the `M30` tier used below is a paid, always-on resource; Container Apps, ACR, and Log Analytics add smaller charges on top. Check the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/) for current numbers in your region, and see [§ Tearing it down](#tearing-it-down) to stop the meter when you're done evaluating.
++
++> **Want it for free?** You can deploy to Azure at roughly **$0** for evaluation or light use — Container Apps free grant + Cosmos DB vCore Free Tier + GHCR, no ACR. See [§ Free tier - a $0 evaluation deployment](#free-tier---a-0-evaluation-deployment). (Just trying it on your own machine instead? Use the [quickstart](quickstart.md).)
++
+ ## TL;DR
+ 
+ ```text
+@@ -42,10 +48,19 @@ The Ingest container is single-image: it bundles the compiled API **and** the bu
+ You need:
+ 
+ - An Azure subscription where you can create resource groups, ACR, Container Apps, and Cosmos DB.
+-- The [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and logged in (`az login`).
+-- Docker (or a CI pipeline that can do `docker build`).
++- The [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and logged in (`az login`). Use a recent version (`az version` ≥ 2.60) and install the extensions the newer commands need — the CLI will usually offer to install them automatically, or do it up front:
++
++  ```powershell
++  az upgrade
++  az extension add --name containerapp --upgrade
++  ```
++
++  (The `az cosmosdb mongocluster` commands ship with the core CLI but are relatively new, which is another reason to keep `az` current.)
++- Docker — only if you build locally (Step 3). You can skip it and let `az acr build` or the bundled GitHub Action build the image for you.
+ - A clone of this repository, including the `Dockerfile` at the root.
+ 
++> **Region availability.** Cosmos DB for MongoDB vCore and Container Apps aren't in every Azure region. Pick a region that offers both (the examples use `westeurope`). If a `create` call fails with a "not available in this location" error, try a larger region.
++
+ Pick names that follow your org's convention. The examples use:
+ 
+ | Resource        | Example name             |
+@@ -156,12 +171,20 @@ $MongoCs = $MongoCs.Replace("<user>", $AdminUser).Replace("<password>", $AdminPw
+ 
+ The result looks like `mongodb+srv://ingestadmin:<pwd>@ingest-db.mongocluster.cosmos.azure.com/ingest`.
+ 
++> **URL-encode special characters.** The example password is a GUID, so it's URL-safe as-is. If you choose your own admin password containing characters like `@ : / ? # % &`, you **must** percent-encode it inside the connection string (e.g. `@` → `%40`), otherwise the driver mis-parses the host. The cleanest way to avoid this class of bug is to keep the auto-generated GUID password.
++
+ ## Step 5 — Store secrets in Key Vault (recommended)
+ 
+ ```powershell
+ az keyvault create --name $Vault --resource-group $Rg --location $Location
+ az keyvault secret set --vault-name $Vault --name "mongo-cs"        --value $MongoCs
+ az keyvault secret set --vault-name $Vault --name "api-key-pepper"  --value (New-Guid).Guid
++
++# Optional but recommended: a known bootstrap admin key so you can sign in without
++# reading the logs. Use a long, unique value — anyone who knows it has admin access.
++$BootstrapKey = "admin." + [Convert]::ToBase64String([guid]::NewGuid().ToByteArray()).TrimEnd('=').Replace('+','-').Replace('/','_')
++az keyvault secret set --vault-name $Vault --name "bootstrap-admin-key" --value $BootstrapKey
++Write-Host "Bootstrap admin key (store it in your password manager): $BootstrapKey"
+ ```
+ 
+ Using Key Vault is optional — you can plug values into Container Apps secrets directly — but recommended because rotation becomes a one-line `az keyvault secret set`.
+@@ -231,10 +254,12 @@ az containerapp create `
+     --secrets `
+         "mongo-cs=keyvaultref:https://$Vault.vault.azure.net/secrets/mongo-cs,identityref:$Identity" `
+         "api-key-pepper=keyvaultref:https://$Vault.vault.azure.net/secrets/api-key-pepper,identityref:$Identity" `
++        "bootstrap-admin-key=keyvaultref:https://$Vault.vault.azure.net/secrets/bootstrap-admin-key,identityref:$Identity" `
+     --env-vars `
+         "ConnectionStrings__ingest=secretref:mongo-cs" `
+         "ApiKey__Pepper=secretref:api-key-pepper" `
+         "ApiKey__BootstrapAdminName=admin" `
++        "ApiKey__BootstrapAdminKey=secretref:bootstrap-admin-key" `
+         "Ingest__EnableSwagger=false" `
+         "Ingest__CorsDevOrigins=[]" `
+         "ASPNETCORE_FORWARDEDHEADERS_ENABLED=true"
+@@ -244,25 +269,37 @@ What this does:
+ 
+ - Pulls `ingest:1.0.0` from ACR using the managed identity (no admin user, no password leak).
+ - Exposes port `8080` (the container's `ASPNETCORE_URLS`) behind an HTTPS ingress.
+-- Wires two **Key Vault-backed secrets** into the app — `mongo-cs` for `ConnectionStrings:ingest` and `api-key-pepper` for `ApiKey:Pepper`.
++- Wires three **Key Vault-backed secrets** into the app — `mongo-cs` for `ConnectionStrings:ingest`, `api-key-pepper` for `ApiKey:Pepper`, and `bootstrap-admin-key` for `ApiKey:BootstrapAdminKey` so the first admin sign-in needs no log-scraping.
+ - Disables Swagger in production. Set `Ingest__EnableSwagger=true` if you want it on temporarily.
+ - Disables CORS — the SPA is served from the same origin as the API, so you don't need CORS in production at all.
+ - Enables forwarded-headers so URL generation knows the public hostname behind the Container Apps proxy.
+ 
+-If you didn't use Key Vault, replace the `--secrets` block with plain literals (`"mongo-cs=mongodb+srv://…"`).
++If you didn't use Key Vault, replace the `--secrets` block with plain literals (`"mongo-cs=mongodb+srv://…"`). If you'd rather not pre-set an admin key at all, drop the `bootstrap-admin-key` secret and the `ApiKey__BootstrapAdminKey` env var — the app then generates a random key and logs it once (Step 10 covers that path).
+ 
+ ## Step 9 — Grab the FQDN
+ 
+ ```powershell
+-az containerapp show --name $App --resource-group $Rg --query "properties.configuration.ingress.fqdn" -o tsv
++$Fqdn = az containerapp show --name $App --resource-group $Rg --query "properties.configuration.ingress.fqdn" -o tsv
+ # ingest.thankfulocean-…azurecontainerapps.io
+ ```
+ 
+-Open it in a browser: the admin SPA login screen should appear immediately.
++Smoke-test it before opening a browser — the unauthenticated health endpoint should return `Healthy`:
+ 
+-## Step 10 — Retrieve the bootstrap admin key
++```powershell
++curl "https://$Fqdn/health"
++```
+ 
+-The bootstrap admin is created automatically on first start and the plaintext key is **logged once** at `Warning` level. Read it from the Container Apps log stream:
++Then open `https://$Fqdn/` in a browser: the admin SPA login screen should appear.
++
++## Step 10 — Sign in with the bootstrap admin key
++
++**If you set `bootstrap-admin-key` in Step 5** (recommended), you already have the key — it's the `$BootstrapKey` value you stored in your password manager. Paste it on the login screen. No log-scraping needed. Confirm it works from the CLI too:
++
++```powershell
++curl "https://$Fqdn/api/me" -H "X-Api-Key: $BootstrapKey"
++```
++
++**If you didn't pre-set a key**, the bootstrapper generated one and **logged it once** at `Warning` level. Read it from the Container Apps log stream:
+ 
+ ```powershell
+ az containerapp logs show --name $App --resource-group $Rg --tail 200 | Select-String "Bootstrapped admin API key"
+@@ -272,12 +309,13 @@ You'll see something like:
+ 
+ ```
+ warn: Bootstrapped admin API key (shown only this once): abc123.xyz... .
+-      Use it in the X-Api-Key header. Rotate it via POST /api/admin/accounts/{Id}/keys, then revoke this one.
++      Use it in the X-Api-Key header. Set ApiKey:BootstrapAdminKey to avoid this next time,
++      or rotate it via POST /api/admin/accounts/{Id}/keys then revoke this one.
+ ```
+ 
+ Copy the value, then paste it on the login screen.
+ 
+-**Immediately afterwards**, rotate it: in the SPA go to **Accounts → admin → Manage keys → Generate key**, copy the new value, then revoke the bootstrap one. Save the new key in your password manager.
++**Either way, rotate immediately afterwards:** in the SPA go to **Accounts → admin → Manage keys → Generate key**, copy the new value, then revoke the bootstrap one. Save the new key in your password manager. This matters especially when the bootstrap key came from configuration — it's only as secret as your Key Vault/config.
+ 
+ ## Step 11 — Configure a custom domain (optional)
+ 
+@@ -344,6 +382,8 @@ jobs:
+ 
+ For zero-downtime deployments, Container Apps automatically does revision-based rollout: the new image runs alongside the old one until it passes readiness probes.
+ 
++If you'd rather publish the image to the **GitHub Container Registry** instead of ACR (handy for sharing a public image, or so others can run the [quickstart](quickstart.md) without building), this repo ships a manually-triggered workflow at [`.github/workflows/docker-image.yml`](../../.github/workflows/docker-image.yml). Run it from the **Actions** tab; it builds the `Dockerfile` and pushes `ghcr.io/<owner>/<repo>:<tag>` (plus the commit SHA) using the built-in `GITHUB_TOKEN`. Point `--image` / your container host at that registry instead of ACR if you go this route.
++
+ ## Configuration reference
+ 
+ The settings the deployment commands above pass — and every other knob you can twist — are catalogued in [configuration.md](configuration.md). In particular:
+@@ -352,6 +392,151 @@ The settings the deployment commands above pass — and every other knob you can
+ - **Recommended behind any reverse proxy:** `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`.
+ - **Optional but useful:** the OpenTelemetry / Application Insights variables for telemetry.
+ 
++## Free tier - a $0 evaluation deployment
++
++You can run Ingest on Azure for **roughly $0** — no self-hosting, no paid tiers — by combining three free offerings. This is great for a persistent demo, a pilot, or light internal use; it is **not** a production setup (see the caveats at the end).
++
++> **Microsoft 365 is not Azure.** A Microsoft 365 subscription does *not* include Azure compute or credits — it only gives you a free Microsoft Entra tenant for identity. To deploy anything here you still need a separate **Azure subscription** (the [Azure free account](https://azure.microsoft.com/free/) gives a time-limited credit plus always-free tiers, or use plain pay-as-you-go — you just won't be charged while you stay inside the free grants below).
++
++What makes it free:
++
++- **Compute — Azure Container Apps (Consumption), scaled to zero.** Every subscription gets a monthly free grant of 180,000 vCPU-seconds, 360,000 GiB-seconds, and 2 million requests. With `--min-replicas 0` the app costs nothing while idle and a low-traffic deployment stays inside the grant.
++- **Database — Cosmos DB for MongoDB vCore Free Tier (M0).** A lifetime-free, dedicated 32 GB cluster, one per subscription. It speaks the same MongoDB wire protocol and username/password auth Ingest already uses.
++- **Image — GitHub Container Registry (GHCR).** Built and pushed by the bundled [Build and publish Docker image](../../.github/workflows/docker-image.yml) workflow, so you skip Azure Container Registry (which has no free tier).
++
++No Key Vault and no managed identity are needed: secrets go straight into the Container App and the public image is pulled anonymously.
++
++### Variables
++
++```powershell
++$Rg           = "rg-ingest-free"
++$Location     = "northeurope"      # must be a Free Tier region (see Step 2)
++$Env          = "ingest-env"
++$App          = "ingest"
++$Cluster      = "ingest-db-free"
++$DbName       = "ingest"
++$AdminUser    = "ingestadmin"
++$AdminPwd     = (New-Guid).ToString()                 # GUID = URL-safe, store it somewhere
++$Image        = "ghcr.io/<owner>/<repo>:latest"       # your published GHCR image (lowercase)
++$Pepper       = (New-Guid).Guid
++$BootstrapKey = "admin." + [Convert]::ToBase64String([guid]::NewGuid().ToByteArray()).TrimEnd('=').Replace('+','-').Replace('/','_')
++```
++
++### Step F1 — Create the resource group
++
++```powershell
++az group create --name $Rg --location $Location
++```
++
++### Step F2 — Build and publish the image to GHCR
++
++There's no ACR in this path. Publish the image with the bundled workflow instead:
++
++1. In GitHub, open **Actions → Build and publish Docker image → Run workflow** (it's manual-only). It builds the `Dockerfile` and pushes `ghcr.io/<owner>/<repo>:latest` plus the commit SHA.
++2. Make the package public so Container Apps can pull it without credentials: **your repo → Packages → the package → Package settings → Change visibility → Public**. (Prefer to keep it private? See the registry note in the caveats.)
++
++Set `$Image` to the exact lowercase path shown on the package page.
++
++### Step F3 — Provision the free Mongo cluster
++
++The Free Tier is only offered in a limited set of regions — among them **East US, West US, West US 2, Central US, North Europe, France Central, Switzerland North, Australia East, Central India, Japan East**. Pick one for `$Location` (note `westeurope` is *not* on the list). Then:
++
++```powershell
++az cosmosdb mongocluster create `
++    --resource-group $Rg `
++    --cluster-name $Cluster `
++    --location $Location `
++    --administrator-user-name $AdminUser `
++    --administrator-password $AdminPwd `
++    --server-version 5.0 `
++    --shard-node-tier "Free" `
++    --shard-node-ha false `
++    --shard-node-disk-size-gb 32 `
++    --shard-node-count 1
++```
++
++`--shard-node-tier "Free"` is what selects the no-cost cluster; HA must be off and storage is fixed at 32 GB. (Newer Azure CLI versions rename the two credential flags to `--administrator-login` / `--administrator-login-password` — match your `az version`. The Free Tier also ignores premium disk types automatically.)
++
++Allow Azure services to reach it, then build the connection string (same as the paid [Step 4](#step-4--provision-cosmos-db-for-mongodb-vcore)):
++
++```powershell
++az cosmosdb mongocluster firewall-rule create `
++    --resource-group $Rg --cluster-name $Cluster `
++    --rule-name "azure-services" `
++    --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
++
++$MongoCs = az cosmosdb mongocluster list-connection-string `
++    --resource-group $Rg --cluster-name $Cluster `
++    --query "connectionStrings[0].connectionString" -o tsv
++$MongoCs = $MongoCs.Replace("<user>", $AdminUser).Replace("<password>", $AdminPwd) + "/$DbName"
++```
++
++### Step F4 — Create the Container Apps environment
++
++```powershell
++az provider register --namespace Microsoft.App
++az provider register --namespace Microsoft.OperationalInsights
++
++az containerapp env create --name $Env --resource-group $Rg --location $Location
++```
++
++This creates a Log Analytics workspace whose ingestion stays within its own free monthly grant at this volume.
++
++### Step F5 — Create the container app (public image, scale-to-zero, plain secrets)
++
++Container Apps requires you to register the registry **even for a public image**, then create the app:
++
++```powershell
++az containerapp registry set --name $App --resource-group $Rg --server ghcr.io
++
++az containerapp create `
++    --name $App `
++    --resource-group $Rg `
++    --environment $Env `
++    --image $Image `
++    --target-port 8080 `
++    --ingress external `
++    --min-replicas 0 --max-replicas 1 `
++    --cpu 0.5 --memory 1Gi `
++    --secrets `
++        "mongo-cs=$MongoCs" `
++        "api-key-pepper=$Pepper" `
++        "bootstrap-admin-key=$BootstrapKey" `
++    --env-vars `
++        "ConnectionStrings__ingest=secretref:mongo-cs" `
++        "ApiKey__Pepper=secretref:api-key-pepper" `
++        "ApiKey__BootstrapAdminKey=secretref:bootstrap-admin-key" `
++        "ApiKey__BootstrapAdminName=admin" `
++        "Ingest__EnableSwagger=false" `
++        "Ingest__CorsDevOrigins=[]" `
++        "ASPNETCORE_FORWARDEDHEADERS_ENABLED=true"
++```
++
++`--min-replicas 0` is the key to staying free: the app scales to zero when idle and only consumes the grant while serving traffic. Secrets are stored directly on the app (no Key Vault), and `ApiKey__BootstrapAdminKey` means you can sign in immediately without reading the logs.
++
++### Step F6 — Grab the URL, smoke-test, and sign in
++
++```powershell
++$Fqdn = az containerapp show --name $App --resource-group $Rg --query "properties.configuration.ingress.fqdn" -o tsv
++curl "https://$Fqdn/health"                                   # expect: Healthy
++curl "https://$Fqdn/api/me" -H "X-Api-Key: $BootstrapKey"     # confirms the admin key works
++```
++
++Open `https://$Fqdn/` and sign in with `$BootstrapKey`. The very first request after an idle period will be slow while the app cold-starts from zero — give it a few seconds and retry. Then rotate the bootstrap key as in [Step 10](#step-10--sign-in-with-the-bootstrap-admin-key).
++
++### Free-tier caveats
++
++This setup is for **evaluation and light use, not production**:
++
++- **No HA, no SLA, no backup/restore** on the Free Tier cluster, and storage is capped at **32 GB**.
++- **The cluster auto-pauses after 60 days of inactivity.** Data is retained — resume it from the portal/CLI — but a paused cluster will fail connections until resumed.
++- **Cold starts.** With `--min-replicas 0`, the first request after idle waits for the container to spin up (seconds). Set `--min-replicas 1` for snappy responses, but that runs continuously and will consume the free grant faster (and bill once exceeded).
++- **Free grants are per-subscription, per-calendar-month.** Heavy traffic that exceeds 180,000 vCPU-s / 360,000 GiB-s / 2M requests is billed at normal rates.
++- **Region-limited.** Both the vCore Free Tier and your app must live in a supported region (Step F3).
++- **Image visibility.** A public GHCR package pulls anonymously. To keep it private, supply a token with `read:packages` scope: `az containerapp registry set --name $App --resource-group $Rg --server ghcr.io --username <github-user> --password <token>`.
++
++> **No-Azure fallback.** If the vCore Free Tier isn't available in a region you can use, a **MongoDB Atlas M0** cluster (512 MB, free forever, deployable into Azure regions) works just as well — point `ConnectionStrings__ingest` at its connection string and keep the rest of this section unchanged.
++
+ ## Alternative hosting models
+ 
+ ### Azure App Service (Linux containers)
+@@ -360,7 +545,7 @@ Same image, slightly different plumbing:
+ 
+ 1. Create an **App Service Plan** (Linux, `B1` or higher).
+ 2. Create a **Web App for Containers** pointing at the same ACR.
+-3. Set **App settings** equivalent to the Container Apps env vars above (App Service uses `:` rather than `__` for nesting in env vars; the .NET runtime accepts both).
++3. Set **App settings** equivalent to the Container Apps env vars above. Use the `__` (double-underscore) form for nested keys — e.g. `ConnectionStrings__ingest`, `ApiKey__Pepper`, `ApiKey__BootstrapAdminKey`. (`:` works on Windows hosts but **not** in a Linux container's environment, so `__` is the portable choice.)
+ 4. Enable **System-assigned managed identity** on the Web App and grant it `AcrPull` on the registry + `Key Vault Secrets User` on the vault.
+ 5. Set the **container port** to `8080`.
+ 
+@@ -374,12 +559,22 @@ If your org standardises on AKS, the `Dockerfile` produces an image that runs an
+ 
+ If you prefer running MongoDB yourself (replica set on Azure VMs, MongoDB Atlas, …) point `ConnectionStrings:ingest` at it. The schema and indexes are managed by the app on startup (`MongoSetup.EnsureIndexesAsync`).
+ 
++## Tearing it down
++
++Cosmos DB vCore keeps billing whether or not anyone's using it, so delete everything when you're done evaluating. The simplest hammer is to drop the whole resource group:
++
++```powershell
++az group delete --name $Rg --yes --no-wait
++```
++
++That removes the Container App, ACR, Cosmos cluster, Key Vault, managed identity, and Log Analytics workspace in one go. (Key Vault may be retained in a *soft-deleted* state for the configured purge window; run `az keyvault purge --name $Vault` if you need to reuse the exact name immediately.) To pause cost without losing data instead, scale the app to zero (`az containerapp update --name $App --resource-group $Rg --min-replicas 0`) — note the Cosmos cluster still bills regardless.
++
+ ## Operational checklist
+ 
+ Before you call it "production":
+ 
+ - [ ] `ApiKey:Pepper` is set to a long random value and stored in Key Vault.
+-- [ ] Bootstrap admin key has been **rotated** and the original revoked.
++- [ ] Bootstrap admin key has been **rotated** and the original revoked (especially if `ApiKey:BootstrapAdminKey` was pre-set).
+ - [ ] Cosmos DB shard-node-ha is **on** if you can't tolerate planned maintenance.
+ - [ ] `Ingest:EnableSwagger` is `false`.
+ - [ ] Liveness/readiness probes are wired.
+diff --git a/docs/setup/quickstart.md b/docs/setup/quickstart.md
+new file mode 100644
+index 0000000..0623ed7
+--- /dev/null
++++ b/docs/setup/quickstart.md
+@@ -0,0 +1,106 @@
++# Quickstart — try Ingest in 5 minutes
++
++This is the fastest way to see Ingest running on your own machine. **You do not need the .NET SDK, Node.js, or MongoDB** — the only prerequisite is **Docker** ([Docker Desktop](https://www.docker.com/products/docker-desktop/) on Windows/macOS, or Docker Engine on Linux).
++
++If you're a developer who wants the hot-reload Aspire setup instead, see [CONTRIBUTING.md](../../CONTRIBUTING.md).
++
++> **This is an evaluation setup.** It ships with well-known placeholder secrets and is not safe to expose to an untrusted network. When you're ready for real, follow [hosting.md](hosting.md).
++
++## Windows: the one-click way
++
++On Windows you don't have to touch the command line at all. Double-click:
++
++```
++scripts\try-ingest.cmd
++```
++
++It checks whether Docker is installed, offers to install Docker Desktop for you (via `winget`, asking first), starts the Docker engine if needed, and then launches everything. If a step needs you to do something by hand (like the one-time Docker Desktop sign-in), it tells you exactly what. When it's done it prints the URL and the sign-in key below.
++
++Prefer to drive it yourself, or on macOS/Linux? Use one of the options below.
++
++## Option A — Docker Compose (recommended)
++
++This builds the image from source inside Docker (so you still don't need any SDK) and starts MongoDB alongside it.
++
++From the repository root:
++
++```bash
++docker compose up --build
++```
++
++The first run takes a few minutes while Docker builds the SPA and the API. When you see the app reporting that it's listening on port `8080`, open:
++
++- **Admin console:** <http://localhost:8080>
++- **Swagger / API explorer:** <http://localhost:8080/swagger>
++
++Sign in on the console with this API key (it's preconfigured in `docker-compose.yml`):
++
++```
++localdev.local-dev-admin-key-change-me
++```
++
++That's the admin key. The same value goes in the `X-Api-Key` header for direct API calls, e.g.:
++
++```bash
++curl http://localhost:8080/api/me -H "X-Api-Key: localdev.local-dev-admin-key-change-me"
++```
++
++### Stopping and cleaning up
++
++```bash
++docker compose down       # stop the containers, keep the data
++docker compose down -v     # stop and delete the MongoDB data volume too
++```
++
++## Option B — Use the published image
++
++Once someone has run the [Build and publish Docker image](../../.github/workflows/docker-image.yml) GitHub Action for this repository, a ready-built image is available on the GitHub Container Registry and you can skip the build step entirely.
++
++The image is published as `ghcr.io/<owner>/<repo>` (all lowercase) — for example `ghcr.io/your-org/ingest:latest`. If the package is private, run `docker login ghcr.io` first (use a GitHub token with `read:packages`).
++
++You still need a MongoDB to point it at. The simplest is two containers on a shared network:
++
++```bash
++# 1. A throwaway MongoDB
++docker network create ingest-net
++docker run -d --name ingest-mongo --network ingest-net mongo:7
++
++# 2. The app (replace <owner>/<repo> with the real image path)
++docker run --rm --name ingest --network ingest-net -p 8080:8080 \
++  -e ConnectionStrings__ingest="mongodb://ingest-mongo:27017/ingest" \
++  -e ApiKey__Pepper="local-dev-pepper-change-me" \
++  -e ApiKey__BootstrapAdminKey="localdev.local-dev-admin-key-change-me" \
++  -e Ingest__EnableSwagger="true" \
++  ghcr.io/<owner>/<repo>:latest
++```
++
++Then sign in exactly as in Option A.
++
++To tear it down:
++
++```bash
++docker rm -f ingest ingest-mongo
++docker network rm ingest-net
++```
++
++## What just happened
++
++- The container bundles the REST API **and** the admin SPA, served from the same origin — so `http://localhost:8080` is both the website and the API.
++- On first boot the app created an **admin account** and gave it the key you configured via `ApiKey__BootstrapAdminKey`. Because you set the key yourself, you never had to dig it out of the logs. (Leave that setting empty in production and the app falls back to generating a random key and printing it once — see [authentication.md](../architecture/authentication.md#the-bootstrap-admin).)
++- MongoDB stores everything. In Option A it lives in the `ingest-mongo-data` Docker volume and survives restarts until you `docker compose down -v`.
++
++## Next steps
++
++- **Kick the tyres as an admin.** Create a schema, issue a service key, post a submission. The [admin user guide](../admin-user-guide/README.md) walks through each task.
++- **Call the API.** The [client guide](../client/README.md) and [api.md](../client/api.md) show how a service authenticates and submits data programmatically.
++- **Change the secrets.** Before doing anything beyond a local trial, set your own `ApiKey__Pepper` and `ApiKey__BootstrapAdminKey` (or remove the latter and read the generated key from the logs). See [configuration.md](configuration.md).
++- **Deploy it for real.** [hosting.md](hosting.md) is the end-to-end Azure walkthrough — or run it on Azure for ~$0 with its [free-tier walkthrough](hosting.md#free-tier---a-0-evaluation-deployment).
++
++## Troubleshooting
++
++| Symptom | Likely cause / fix |
++|---------|--------------------|
++| `docker compose up` fails immediately with a port error | Something is already on port `8080`. Edit the `ports:` mapping in `docker-compose.yml` to e.g. `"9090:8080"` and use that port instead. |
++| Login says the key is invalid | Make sure you typed the whole key including the dot: `localdev.local-dev-admin-key-change-me`. If you changed `ApiKey__BootstrapAdminKey` *after* the first boot, the original key is still the active one — `docker compose down -v` to start fresh. |
++| The app container keeps restarting | It usually can't reach MongoDB. In Option A the app waits for Mongo's healthcheck; check `docker compose logs mongo`. In Option B make sure both containers are on the same `--network`. |
++| Blank screen after signing in | The key belonged to a disabled/deleted account. Clear the site's `localStorage` and sign in again with the bootstrap key. |
+diff --git a/scripts/try-ingest.cmd b/scripts/try-ingest.cmd
+new file mode 100644
+index 0000000..aaa3721
+--- /dev/null
++++ b/scripts/try-ingest.cmd
+@@ -0,0 +1,121 @@
++@echo off
++setlocal enableextensions
++
++title Ingest - try it locally
++
++echo.
++echo   Ingest local trial
++echo   ------------------
++echo   This starts Ingest on your machine using Docker. Nothing else to install by hand.
++echo.
++
++REM This script lives in \scripts; the docker-compose.yml is in the project root one level up.
++pushd "%~dp0.."
++
++set "DOCKER_DESKTOP=%ProgramFiles%\Docker\Docker\Docker Desktop.exe"
++
++REM ---- 1. Is the docker command available? ----
++where docker >nul 2>&1
++if errorlevel 1 goto :install_docker
++
++REM ---- 2. Is the Docker engine actually running? ----
++docker info >nul 2>&1
++if not errorlevel 1 goto :start_ingest
++
++echo Docker is installed, but its engine isn't running yet.
++if not exist "%DOCKER_DESKTOP%" (
++    echo Please start Docker Desktop manually, wait until it says "Engine running", then run this script again.
++    goto :end
++)
++
++echo Starting Docker Desktop for you...
++start "" "%DOCKER_DESKTOP%"
++
++set /a tries=0
++echo Waiting for Docker to be ready ^(the first launch can take a minute^)...
++:wait_loop
++set /a tries+=1
++docker info >nul 2>&1
++if not errorlevel 1 goto :start_ingest
++if %tries% geq 40 goto :engine_timeout
++timeout /t 3 /nobreak >nul 2>&1
++goto :wait_loop
++
++:engine_timeout
++echo.
++echo Docker still isn't ready. Once Docker Desktop shows "Engine running",
++echo run this script again.
++goto :end
++
++REM ---- 3. Docker isn't installed: offer to install it with winget ----
++:install_docker
++echo Docker doesn't seem to be installed on this machine.
++echo.
++where winget >nul 2>&1
++if errorlevel 1 goto :no_winget
++
++set "answer=N"
++set /p "answer=Install Docker Desktop now using winget? [y/N] "
++if /i not "%answer%"=="y" goto :install_declined
++
++echo.
++echo Installing Docker Desktop ^(this can take a few minutes^)...
++winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements
++if errorlevel 1 (
++    echo.
++    echo The installation didn't finish. You can install Docker Desktop by hand from:
++    echo     https://www.docker.com/products/docker-desktop/
++    goto :end
++)
++
++echo.
++echo Docker Desktop is installed. A few manual steps remain ^(Windows requires them^):
++echo     1. Open "Docker Desktop" from the Start menu.
++echo     2. The first launch may ask you to accept terms, and sometimes to sign out / restart.
++echo     3. Wait until it shows "Engine running".
++echo     4. Run this script again to start Ingest.
++goto :end
++
++:no_winget
++echo winget isn't available here, so Docker can't be installed automatically.
++echo Please install Docker Desktop by hand from:
++echo     https://www.docker.com/products/docker-desktop/
++echo Then run this script again.
++goto :end
++
++:install_declined
++echo.
++echo Okay, nothing was installed. Install Docker Desktop when you're ready, then run this script again.
++goto :end
++
++REM ---- 4. Everything's ready: build and start Ingest ----
++:start_ingest
++echo.
++echo Building and starting Ingest. The first run downloads and builds images, so please be patient...
++echo.
++docker compose up -d --build
++if errorlevel 1 (
++    echo.
++    echo Something went wrong while starting the containers. Scroll up to see the error.
++    goto :end
++)
++
++echo.
++echo   Ingest is starting up!
++echo   ----------------------
++echo   Open in your browser:  http://localhost:8080
++echo   API explorer ^(Swagger^): http://localhost:8080/swagger
++echo.
++echo   Sign in with this API key:
++echo       localdev.local-dev-admin-key-change-me
++echo.
++echo   It can take a few seconds to come up. If the page doesn't load, wait a moment and refresh.
++echo.
++echo   To stop Ingest later, run this from the project folder:
++echo       docker compose down
++
++:end
++popd >nul 2>&1
++echo.
++pause
++endlocal
+diff --git a/src/Ingest.Api/Bootstrap/AdminBootstrapper.cs b/src/Ingest.Api/Bootstrap/AdminBootstrapper.cs
+index cacabf6..9b845b4 100644
+--- a/src/Ingest.Api/Bootstrap/AdminBootstrapper.cs
++++ b/src/Ingest.Api/Bootstrap/AdminBootstrapper.cs
+@@ -10,10 +10,11 @@ namespace Ingest.Api.Bootstrap;
+ /// <summary>
+ /// Startup hosted service that gives a fresh deployment a usable admin account and key.
+ /// On first boot (when no account with the configured <see cref="ApiKeyOptions.BootstrapAdminName"/>
+-/// exists) it creates the admin and mints a single API key, logging the plaintext exactly once
+-/// as a warning so an operator can capture it from the console/log sink. Subsequent boots only
+-/// re-create the key when no active key remains. Also responsible for the one-time Mongo index
+-/// creation.
++/// exists) it creates the admin and gives it a single API key: if
++/// <see cref="ApiKeyOptions.BootstrapAdminKey"/> is configured that exact key is used (so the
++/// operator never has to read it from the logs), otherwise a random key is minted and logged
++/// once at warning level. Subsequent boots only add a key when no active key remains. Also
++/// responsible for the one-time Mongo index creation.
+ /// </summary>
+ public sealed class AdminBootstrapper : IHostedService
+ {
+@@ -77,7 +78,34 @@ public sealed class AdminBootstrapper : IHostedService
+         var active = await keys.GetActiveByAccountAsync(admin.Id, cancellationToken);
+         if (active.Count == 0)
+         {
+-            var generated = hasher.Generate();
++            // Prefer an operator-supplied key from configuration so nobody has to scrape it out of
++            // the logs. Fall back to a random key (logged once) when none is configured or it's
++            // malformed — that keeps a misconfigured deployment usable rather than locked out.
++            var configuredKey = _apiKey.BootstrapAdminKey?.Trim();
++            var fromConfig = !string.IsNullOrEmpty(configuredKey);
++
++            GeneratedApiKey generated;
++            if (fromConfig)
++            {
++                var imported = hasher.Import(configuredKey!);
++                if (imported is null)
++                {
++                    _logger.LogError(
++                        "ApiKey:BootstrapAdminKey is set but malformed (expected '<keyId>.<secret>'). " +
++                        "Falling back to a generated key.");
++                    generated = hasher.Generate();
++                    fromConfig = false;
++                }
++                else
++                {
++                    generated = imported;
++                }
++            }
++            else
++            {
++                generated = hasher.Generate();
++            }
++
+             var entity = new ApiKey
+             {
+                 AccountId = admin.Id,
+@@ -87,17 +115,29 @@ public sealed class AdminBootstrapper : IHostedService
+             };
+             await keys.AddAsync(entity, cancellationToken);
+ 
+-            _logger.LogWarning(
+-                "Bootstrapped admin API key (shown only this once): {Key}. " +
+-                "Use it in the {Header} header. " +
+-                "Rotate it via POST /api/admin/accounts/{Id}/keys, then revoke this one.",
+-                generated.Plaintext, _apiKey.HeaderName, admin.Id);
++            if (fromConfig)
++            {
++                // Don't echo the configured secret back to the logs — the operator already has it.
++                _logger.LogWarning(
++                    "Bootstrapped admin account '{Name}' with the API key from ApiKey:BootstrapAdminKey. " +
++                    "Present it in the {Header} header. Rotate it via POST /api/admin/accounts/{Id}/keys once you're in.",
++                    admin.Name, _apiKey.HeaderName, admin.Id);
++            }
++            else
++            {
++                _logger.LogWarning(
++                    "Bootstrapped admin API key (shown only this once): {Key}. " +
++                    "Use it in the {Header} header. Set ApiKey:BootstrapAdminKey to avoid this next time, " +
++                    "or rotate it via POST /api/admin/accounts/{Id}/keys then revoke this one.",
++                    generated.Plaintext, _apiKey.HeaderName, admin.Id);
++            }
+         }
+         else
+         {
+             _logger.LogWarning(
+-                "Admin account '{Name}' already has {Count} active API key(s). " +
+-                "If you've lost it, create a new admin account on the database directly or set ApiKey:BootstrapAdminName to a new value to bootstrap another one.",
++                "Admin account '{Name}' already has {Count} active API key(s); leaving it untouched. " +
++                "Changing ApiKey:BootstrapAdminKey now has no effect — rotate via the API/SPA, or set " +
++                "ApiKey:BootstrapAdminName to a new value to bootstrap another admin.",
+                 admin.Name, active.Count);
+         }
+     }
+diff --git a/src/Ingest.Api/Controllers/AdminSubmissionsController.cs b/src/Ingest.Api/Controllers/AdminSubmissionsController.cs
+index 15df375..57e1e87 100644
+--- a/src/Ingest.Api/Controllers/AdminSubmissionsController.cs
++++ b/src/Ingest.Api/Controllers/AdminSubmissionsController.cs
+@@ -26,6 +26,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service) : Con
+     /// <param name="serviceId">Restrict the listing to submissions made by the given account.</param>
+     /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
+     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
++    /// <param name="schemaName">Restrict the listing to submissions for the given schema.</param>
+     /// <param name="ct">Cancellation token.</param>
+     /// <response code="200">A page of submissions.</response>
+     [HttpGet]
+@@ -38,10 +39,11 @@ public sealed class AdminSubmissionsController(ISubmissionService service) : Con
+         [FromQuery] Guid? serviceId,
+         [FromQuery] DateTime? from,
+         [FromQuery] DateTime? to,
++        [FromQuery] string? schemaName,
+         CancellationToken ct)
+     {
+         var result = await service.ListAsync(
+-            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, ct);
++            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, schemaName, ct);
+         return Ok(result.Map(SubmissionDto.From));
+     }
+ 
+diff --git a/src/Ingest.Api/Controllers/SubmissionsController.cs b/src/Ingest.Api/Controllers/SubmissionsController.cs
+index 2be04d8..ef10eca 100644
+--- a/src/Ingest.Api/Controllers/SubmissionsController.cs
++++ b/src/Ingest.Api/Controllers/SubmissionsController.cs
+@@ -94,6 +94,7 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
+     /// <param name="sort">Sort hint; <c>createdAt</c> returns newest-first.</param>
+     /// <param name="from">Lower bound on submission timestamp (inclusive). Omit for no lower bound.</param>
+     /// <param name="to">Upper bound on submission timestamp (exclusive). Omit for no upper bound.</param>
++    /// <param name="schemaName">Restrict to submissions for the given schema. Omit for all schemas.</param>
+     /// <param name="ct">Cancellation token.</param>
+     /// <response code="200">A page of submissions.</response>
+     [HttpGet]
+@@ -104,12 +105,13 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
+         [FromQuery] string? sort,
+         [FromQuery] DateTime? from,
+         [FromQuery] DateTime? to,
++        [FromQuery] string? schemaName,
+         CancellationToken ct)
+     {
+         var result = await service.ListMineAsync(
+             User.CurrentAccountId(),
+             RequestHelpers.ToPageRequest(page, pageSize, sort, false),
+-            from, to, ct);
++            from, to, schemaName, ct);
+         return Ok(result.Map(SubmissionDto.From));
+     }
+ }
+diff --git a/src/Ingest.Api/appsettings.Development.json b/src/Ingest.Api/appsettings.Development.json
+index 0c208ae..b564664 100644
+--- a/src/Ingest.Api/appsettings.Development.json
++++ b/src/Ingest.Api/appsettings.Development.json
+@@ -4,5 +4,8 @@
+       "Default": "Information",
+       "Microsoft.AspNetCore": "Warning"
+     }
++  },
++  "ApiKey": {
++    "BootstrapAdminKey": "localdev.local-dev-admin-key-change-me"
+   }
+ }
+diff --git a/src/Ingest.Core/Abstractions/IApiKeyHasher.cs b/src/Ingest.Core/Abstractions/IApiKeyHasher.cs
+index 4139c3f..b6125a6 100644
+--- a/src/Ingest.Core/Abstractions/IApiKeyHasher.cs
++++ b/src/Ingest.Core/Abstractions/IApiKeyHasher.cs
+@@ -11,6 +11,15 @@ public interface IApiKeyHasher
+     /// <returns>A <see cref="GeneratedApiKey"/> whose <c>Plaintext</c> field is the only value the user will ever see.</returns>
+     GeneratedApiKey Generate();
+ 
++    /// <summary>
++    /// Derive the persisted artefacts (id, salt, hash) for a caller-supplied plaintext key — used
++    /// to seed a known key from configuration (e.g. the bootstrap admin key) rather than minting a
++    /// random one. A fresh random salt is generated, exactly as in <see cref="Generate"/>.
++    /// </summary>
++    /// <param name="plaintext">A well-formed <c>{keyId}.{secret}</c> string.</param>
++    /// <returns>The components to persist, or <c>null</c> when <paramref name="plaintext"/> is malformed.</returns>
++    GeneratedApiKey? Import(string plaintext);
++
+     /// <summary>Split a presented key string into its id and secret components.</summary>
+     /// <remarks>
+     /// Intentionally not named <c>TryParse</c>: ASP.NET Core's Minimal API parameter binding
+diff --git a/src/Ingest.Core/Abstractions/IRepositories.cs b/src/Ingest.Core/Abstractions/IRepositories.cs
+index 5c06b28..796e016 100644
+--- a/src/Ingest.Core/Abstractions/IRepositories.cs
++++ b/src/Ingest.Core/Abstractions/IRepositories.cs
+@@ -159,11 +159,12 @@ public interface ISubmissionRepository
+     /// <returns>The submission, or <c>null</c>.</returns>
+     Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default);
+ 
+-    /// <summary>Page through submissions with optional service/date filters.</summary>
++    /// <summary>Page through submissions with optional service/schema/date filters.</summary>
+     /// <param name="request">Paging + sort parameters; <c>IncludeDeleted</c> opts soft-deleted ones in.</param>
+     /// <param name="serviceId">Restrict to a single account when non-null.</param>
+     /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
+     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
++    /// <param name="schemaName">Restrict to submissions containing at least one sample for this schema when non-null.</param>
+     /// <param name="ct">Cancellation token.</param>
+     /// <returns>A page of submissions with the total count.</returns>
+     Task<PagedResult<Submission>> ListAsync(
+@@ -171,6 +172,7 @@ public interface ISubmissionRepository
+         Guid? serviceId = null,
+         DateTime? from = null,
+         DateTime? to = null,
++        string? schemaName = null,
+         CancellationToken ct = default);
+ 
+     /// <summary>Insert a new submission.</summary>
+diff --git a/src/Ingest.Core/Abstractions/ISubmissionService.cs b/src/Ingest.Core/Abstractions/ISubmissionService.cs
+index cf4c769..a888260 100644
+--- a/src/Ingest.Core/Abstractions/ISubmissionService.cs
++++ b/src/Ingest.Core/Abstractions/ISubmissionService.cs
+@@ -55,14 +55,15 @@ public interface ISubmissionService
+     /// <exception cref="ForbiddenException">The submission exists but belongs to a different account.</exception>
+     Task<Submission?> GetMineAsync(Guid callerAccountId, Guid submissionId, CancellationToken ct = default);
+ 
+-    /// <summary>Page through the caller's own submissions, optionally filtered by date range.</summary>
++    /// <summary>Page through the caller's own submissions, optionally filtered by schema and/or date range.</summary>
+     /// <param name="callerAccountId">Account id taken from the bearer credential.</param>
+     /// <param name="request">Paging + sort parameters.</param>
+     /// <param name="from">Lower bound on submission timestamp (inclusive); <c>null</c> for no lower bound.</param>
+     /// <param name="to">Upper bound on submission timestamp (exclusive); <c>null</c> for no upper bound.</param>
++    /// <param name="schemaName">Restrict to submissions for this schema when non-null.</param>
+     /// <param name="ct">Cancellation token.</param>
+     /// <returns>A page of the caller's submissions.</returns>
+-    Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, CancellationToken ct = default);
++    Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default);
+ 
+     // ── Admin-facing ──
+ 
+@@ -71,8 +72,9 @@ public interface ISubmissionService
+     /// <param name="serviceId">When non-null, restrict the listing to a single service.</param>
+     /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
+     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
++    /// <param name="schemaName">When non-null, restrict the listing to submissions for a single schema.</param>
+     /// <param name="ct">Cancellation token.</param>
+-    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, CancellationToken ct = default);
++    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default);
+ 
+     /// <summary>Fetch any submission by id.</summary>
+     /// <param name="submissionId">Submission id.</param>
+diff --git a/src/Ingest.Infrastructure/Mongo/SubmissionRepository.cs b/src/Ingest.Infrastructure/Mongo/SubmissionRepository.cs
+index b75d783..479f3a1 100644
+--- a/src/Ingest.Infrastructure/Mongo/SubmissionRepository.cs
++++ b/src/Ingest.Infrastructure/Mongo/SubmissionRepository.cs
+@@ -30,6 +30,7 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
+         Guid? serviceId = null,
+         DateTime? from = null,
+         DateTime? to = null,
++        string? schemaName = null,
+         CancellationToken ct = default)
+     {
+         var filter = ApplySoftDelete(Builders<Submission>.Filter.Empty, request.IncludeDeleted);
+@@ -39,6 +40,11 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
+             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Gte(s => s.SubmittedAt, DateTime.SpecifyKind(f, DateTimeKind.Utc)));
+         if (to is { } t)
+             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Lt(s => s.SubmittedAt, DateTime.SpecifyKind(t, DateTimeKind.Utc)));
++        // A submission carries samples for (typically) a single schema. Match any submission that
++        // has at least one sample for the requested schema.
++        if (!string.IsNullOrWhiteSpace(schemaName))
++            filter = Builders<Submission>.Filter.And(filter,
++                Builders<Submission>.Filter.ElemMatch(s => s.Samples, Builders<Sample>.Filter.Eq(x => x.SchemaName, schemaName)));
+ 
+         var total = await Collection.CountDocumentsAsync(filter, cancellationToken: ct);
+ 
+diff --git a/src/Ingest.Infrastructure/Security/ApiKeyHasher.cs b/src/Ingest.Infrastructure/Security/ApiKeyHasher.cs
+index 043c1c6..751139a 100644
+--- a/src/Ingest.Infrastructure/Security/ApiKeyHasher.cs
++++ b/src/Ingest.Infrastructure/Security/ApiKeyHasher.cs
+@@ -36,6 +36,16 @@ public sealed class ApiKeyHasher : IApiKeyHasher
+         return new GeneratedApiKey(plaintext, keyId, secret, salt, hash);
+     }
+ 
++    /// <inheritdoc />
++    public GeneratedApiKey? Import(string plaintext)
++    {
++        if (!TrySplit(plaintext, out var keyId, out var secret)) return null;
++        var saltBytes = RandomNumberGenerator.GetBytes(16);
++        var salt = Convert.ToHexString(saltBytes).ToLowerInvariant();
++        var hash = Hash(secret, salt);
++        return new GeneratedApiKey(plaintext, keyId, secret, salt, hash);
++    }
++
+     /// <inheritdoc />
+     public bool TrySplit(string presented, out string keyId, out string secret)
+     {
+diff --git a/src/Ingest.Infrastructure/Security/ApiKeyOptions.cs b/src/Ingest.Infrastructure/Security/ApiKeyOptions.cs
+index f78d0a3..1dcb88e 100644
+--- a/src/Ingest.Infrastructure/Security/ApiKeyOptions.cs
++++ b/src/Ingest.Infrastructure/Security/ApiKeyOptions.cs
+@@ -18,9 +18,17 @@ public sealed class ApiKeyOptions
+     public string Pepper { get; set; } = "change-me-in-prod";
+ 
+     /// <summary>
+-    /// Name of the bootstrap admin account created on first boot when no admin exists. Its API
+-    /// key is logged once at startup so an operator can capture it; subsequent boots leave the
+-    /// account alone.
++    /// Name of the bootstrap admin account created on first boot when no admin exists.
++    /// Subsequent boots leave the account alone.
+     /// </summary>
+     public string BootstrapAdminName { get; set; } = "admin";
++
++    /// <summary>
++    /// Optional plaintext API key (<c>{keyId}.{secret}</c>) used for the bootstrap admin account
++    /// on first boot. When set, an operator knows the admin key up-front and never has to read it
++    /// from the startup logs. When empty (the production default), the bootstrapper falls back to
++    /// generating a random key and logging it once. Set this to a long, unique value — anyone who
++    /// knows it has full admin access until you rotate it.
++    /// </summary>
++    public string BootstrapAdminKey { get; set; } = "";
+ }
+diff --git a/src/Ingest.Infrastructure/Services/SubmissionService.cs b/src/Ingest.Infrastructure/Services/SubmissionService.cs
+index e4e6b72..66ffc96 100644
+--- a/src/Ingest.Infrastructure/Services/SubmissionService.cs
++++ b/src/Ingest.Infrastructure/Services/SubmissionService.cs
+@@ -103,14 +103,14 @@ public sealed class SubmissionService : ISubmissionService
+     }
+ 
+     /// <inheritdoc />
+-    public Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, CancellationToken ct = default) =>
+-        _submissions.ListAsync(request, callerAccountId, from, to, ct);
++    public Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default) =>
++        _submissions.ListAsync(request, callerAccountId, from, to, schemaName, ct);
+ 
+     // ── Admin-facing ──
+ 
+     /// <inheritdoc />
+-    public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, CancellationToken ct = default) =>
+-        _submissions.ListAsync(request, serviceId, from, to, ct);
++    public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default) =>
++        _submissions.ListAsync(request, serviceId, from, to, schemaName, ct);
+ 
+     /// <inheritdoc />
+     public Task<Submission?> GetAsync(Guid submissionId, bool includeDeleted, CancellationToken ct = default) =>
+diff --git a/tests/Ingest.Tests/ApiKeyHasherTests.cs b/tests/Ingest.Tests/ApiKeyHasherTests.cs
+index bbeddab..4cbb531 100644
+--- a/tests/Ingest.Tests/ApiKeyHasherTests.cs
++++ b/tests/Ingest.Tests/ApiKeyHasherTests.cs
+@@ -48,4 +48,27 @@ public class ApiKeyHasherTests
+         var hasher = MakeHasher();
+         Assert.False(hasher.TrySplit(input, out _, out _));
+     }
++
++    [Fact]
++    public void Import_then_verify_succeeds()
++    {
++        var hasher = MakeHasher();
++        var imported = hasher.Import("localdev.local-dev-admin-key-change-me");
++
++        Assert.NotNull(imported);
++        Assert.Equal("localdev", imported!.KeyId);
++        Assert.Equal("local-dev-admin-key-change-me", imported.Secret);
++        // The persisted salt+hash must verify against the secret the caller supplied.
++        Assert.True(hasher.Verify(imported.Secret, imported.Salt, imported.Hash));
++    }
++
++    [Theory]
++    [InlineData("")]
++    [InlineData("nodot")]
++    [InlineData("onlyid.")]
++    public void Import_rejects_malformed(string input)
++    {
++        var hasher = MakeHasher();
++        Assert.Null(hasher.Import(input));
++    }
+ }
+diff --git a/tests/Ingest.Tests/ReportServiceTests.cs b/tests/Ingest.Tests/ReportServiceTests.cs
+index f75c89a..2d9e934 100644
+--- a/tests/Ingest.Tests/ReportServiceTests.cs
++++ b/tests/Ingest.Tests/ReportServiceTests.cs
+@@ -238,7 +238,7 @@ public class ReportServiceTests
+ 
+         public Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) =>
+             Task.FromResult(_store.FirstOrDefault(s => s.Id == id));
+-        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default) =>
++        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, CancellationToken ct = default) =>
+             Task.FromResult(new PagedResult<Submission>(_store.ToList(), _store.Count, 1, _store.Count));
+         public Task AddAsync(Submission submission, CancellationToken ct = default) { _store.Add(submission); return Task.CompletedTask; }
+         public Task UpdateAsync(Submission submission, CancellationToken ct = default) => Task.CompletedTask;
+diff --git a/web/admin/src/api/hooks.ts b/web/admin/src/api/hooks.ts
+index fa8ed8d..bc73bb1 100644
+--- a/web/admin/src/api/hooks.ts
++++ b/web/admin/src/api/hooks.ts
+@@ -12,10 +12,13 @@ import type {
+ export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/api/me') })
+ 
+ export const useAccounts = (
+-  params?: { kind?: string; role?: string; includeDeleted?: boolean },
++  params?: { kind?: string; role?: string; includeDeleted?: boolean; page?: number; pageSize?: number },
+   enabled: boolean = true,
+ ) => {
+-  const search = new URLSearchParams({ pageSize: '200' })
++  // Default to a large page so the many dropdown/count consumers keep getting "everything".
++  // Grids that want real pagination pass an explicit page + pageSize.
++  const search = new URLSearchParams({ pageSize: String(params?.pageSize ?? 200) })
++  if (params?.page) search.set('page', String(params.page))
+   if (params?.kind) search.set('kind', params.kind)
+   if (params?.role) search.set('role', params.role)
+   if (params?.includeDeleted) search.set('includeDeleted', 'true')
+@@ -76,10 +79,13 @@ export const useRevokeApiKey = () => {
+ }
+ 
+ export const useSchemas = (
+-  params?: { includeDeleted?: boolean },
++  params?: { includeDeleted?: boolean; page?: number; pageSize?: number },
+   enabled: boolean = true,
+ ) => {
+-  const search = new URLSearchParams({ pageSize: '200' })
++  // As with accounts: default to "everything" for the dropdown/lookup consumers; grids opt into
++  // real pagination by passing page + pageSize.
++  const search = new URLSearchParams({ pageSize: String(params?.pageSize ?? 200) })
++  if (params?.page) search.set('page', String(params.page))
+   if (params?.includeDeleted) search.set('includeDeleted', 'true')
+   return useQuery({
+     queryKey: ['schemas', params],
+@@ -139,16 +145,17 @@ export const useSchemaHistory = (name?: string) =>
+   })
+ 
+ export const useSubmissions = (
+-  params: { page: number; pageSize: number; serviceId?: string; from?: string; to?: string },
++  params: { page: number; pageSize: number; serviceId?: string; schemaName?: string; from?: string; to?: string },
+   enabled: boolean = true,
+ ) => {
+   const search = new URLSearchParams({
+     page: String(params.page),
+     pageSize: String(params.pageSize),
+   })
+-  if (params.serviceId) search.set('serviceId', params.serviceId)
+-  if (params.from)      search.set('from', params.from)
+-  if (params.to)        search.set('to', params.to)
++  if (params.serviceId)  search.set('serviceId', params.serviceId)
++  if (params.schemaName) search.set('schemaName', params.schemaName)
++  if (params.from)       search.set('from', params.from)
++  if (params.to)         search.set('to', params.to)
+   return useQuery({
+     queryKey: ['submissions', params],
+     queryFn: () => api.get<Paged<Submission>>(`/api/admin/submissions?${search}`),
+@@ -222,13 +229,14 @@ export const useMySchemas = (enabled: boolean = true) =>
+   })
+ 
+ export const useMySubmissions = (
+-  params: { page: number; pageSize: number; from?: string; to?: string },
++  params: { page: number; pageSize: number; schemaName?: string; from?: string; to?: string },
+   enabled: boolean = true,
+ ) => {
+   const search = new URLSearchParams({
+     page: String(params.page),
+     pageSize: String(params.pageSize),
+   })
++  if (params.schemaName) search.set('schemaName', params.schemaName)
+   if (params.from) search.set('from', params.from)
+   if (params.to)   search.set('to', params.to)
+   return useQuery({
+@@ -269,12 +277,19 @@ export const useReplaceMySubmission = () => {
+ 
+ // --- Reports ------------------------------------------------------------------------------
+ 
+-export const useReports = (enabled: boolean = true) =>
+-  useQuery({
+-    queryKey: ['reports'],
+-    queryFn: () => api.get<Paged<Report>>('/api/reports?pageSize=200'),
++export const useReports = (
++  params?: { page?: number; pageSize?: number },
++  enabled: boolean = true,
++) => {
++  // Default to "everything" (TopBar search + other consumers); the grid passes page + pageSize.
++  const search = new URLSearchParams({ pageSize: String(params?.pageSize ?? 200) })
++  if (params?.page) search.set('page', String(params.page))
++  return useQuery({
++    queryKey: ['reports', params],
++    queryFn: () => api.get<Paged<Report>>(`/api/reports?${search}`),
+     enabled,
+   })
++}
+ 
+ export const useReport = (name?: string, enabled: boolean = true) =>
+   useQuery({
+diff --git a/web/admin/src/components/GridPager.tsx b/web/admin/src/components/GridPager.tsx
+new file mode 100644
+index 0000000..93bb69f
+--- /dev/null
++++ b/web/admin/src/components/GridPager.tsx
+@@ -0,0 +1,89 @@
++import type { ReactNode } from 'react'
++import {
++  Button, Dropdown, Option, TableCell, TableRow,
++  makeStyles, tokens,
++} from '@fluentui/react-components'
++
++/** Page-size choices shared by every grid. */
++export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
++
++/** Default page size grids start on. */
++export const DEFAULT_PAGE_SIZE = 25
++
++const useStyles = makeStyles({
++  root: {
++    display: 'flex',
++    gap: '16px',
++    alignItems: 'center',
++    justifyContent: 'flex-end',
++    flexWrap: 'wrap',
++  },
++  group: { display: 'flex', gap: '8px', alignItems: 'center' },
++  label: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
++  info: { color: tokens.colorNeutralForeground2, fontSize: tokens.fontSizeBase200 },
++  sizeDropdown: { minWidth: '76px' },
++})
++
++/**
++ * Shared pagination footer for the admin grids. Owns the rows-per-page selector, the
++ * "x–y of N" summary, and the prev/next buttons; the page/size state itself lives in the parent
++ * so it can flow into the data hook's query key. Changing the page size is the caller's cue to
++ * reset back to page 1 (see `onPageSizeChange`).
++ */
++export function GridPager({
++  page, pageSize, total,
++  onPageChange, onPageSizeChange,
++  pageSizeOptions = PAGE_SIZE_OPTIONS,
++}: {
++  page: number
++  pageSize: number
++  total: number
++  onPageChange: (page: number) => void
++  onPageSizeChange: (pageSize: number) => void
++  pageSizeOptions?: number[]
++}) {
++  const s = useStyles()
++  const totalPages = Math.max(1, Math.ceil(total / pageSize))
++  const from = total === 0 ? 0 : (page - 1) * pageSize + 1
++  const to = Math.min(total, page * pageSize)
++
++  return (
++    <div className={s.root}>
++      <div className={s.group}>
++        <span className={s.label}>Rows per page</span>
++        <Dropdown
++          className={s.sizeDropdown}
++          size="small"
++          selectedOptions={[String(pageSize)]}
++          value={String(pageSize)}
++          onOptionSelect={(_, d) => { if (d.optionValue) onPageSizeChange(Number(d.optionValue)) }}
++        >
++          {pageSizeOptions.map(n => <Option key={n} value={String(n)}>{String(n)}</Option>)}
++        </Dropdown>
++      </div>
++      <span className={s.info}>{total === 0 ? '0 results' : `${from}–${to} of ${total}`}</span>
++      <div className={s.group}>
++        <Button size="small" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
++        <span className={s.info}>Page {page} of {totalPages}</span>
++        <Button size="small" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
++      </div>
++    </div>
++  )
++}
++
++const useRowStyles = makeStyles({
++  cell: { color: tokens.colorNeutralForeground3, paddingTop: '16px', paddingBottom: '16px', textAlign: 'center' },
++})
++
++/**
++ * A single full-width table row used for loading / empty / error placeholders so every grid
++ * renders these states consistently. `colSpan` must match the grid's column count.
++ */
++export function GridMessageRow({ colSpan, children }: { colSpan: number; children: ReactNode }) {
++  const s = useRowStyles()
++  return (
++    <TableRow>
++      <TableCell colSpan={colSpan} className={s.cell}>{children}</TableCell>
++    </TableRow>
++  )
++}
+diff --git a/web/admin/src/components/TopBar.tsx b/web/admin/src/components/TopBar.tsx
+index 8ee2256..003a55e 100644
+--- a/web/admin/src/components/TopBar.tsx
++++ b/web/admin/src/components/TopBar.tsx
+@@ -176,7 +176,7 @@ export function TopBar({ me }: { me?: Me }) {
+   const accountsQuery = useAccounts(undefined, !isService)
+   const schemasQuery = useSchemas(undefined, !isService)
+   // Reports are an operator/admin tool; same gating logic.
+-  const reportsQuery = useReports(!isService)
++  const reportsQuery = useReports(undefined, !isService)
+ 
+   // Memoise the name → label maps so buildBreadcrumbs gets stable inputs and isn't pointlessly
+   // rerun while React Query mutates the parent objects between requests.
+diff --git a/web/admin/src/pages/ReportViewPage.tsx b/web/admin/src/pages/ReportViewPage.tsx
+index 67a9745..ad3d345 100644
+--- a/web/admin/src/pages/ReportViewPage.tsx
++++ b/web/admin/src/pages/ReportViewPage.tsx
+@@ -6,7 +6,7 @@ import {
+   makeStyles, tokens,
+ } from '@fluentui/react-components'
+ import {
+-  ArrowLeft20Regular, ArrowMaximize20Regular, ArrowMinimize20Regular,
++  ArrowDownload20Regular, ArrowLeft20Regular, ArrowMaximize20Regular, ArrowMinimize20Regular,
+   Open20Regular, Play20Regular,
+ } from '@fluentui/react-icons'
+ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+@@ -14,6 +14,7 @@ import { formatApiError } from '../api/client'
+ import {
+   useReport, useRenderReport, useSchemas, useSubmissions, useMySubmissions, useMe,
+ } from '../api/hooks'
++import { downloadText } from '../utils/download'
+ import type { RenderReportRequest, ReportRenderResponse } from '../api/types'
+ 
+ const useStyles = makeStyles({
+@@ -315,6 +316,17 @@ function ReportFrame({
+   rendered, expanded, onToggleExpand,
+ }: { rendered: ReportRenderResponse; expanded: boolean; onToggleExpand: () => void }) {
+   const s = useStyles()
++  // Save the exact HTML we're showing to the user as a standalone file. Done entirely
++  // client-side — the server already shipped the bytes, no need for a download endpoint.
++  // Filename pattern: <reportName>-YYYYMMDDhhmm.html, sanitised so anything weird in a
++  // hand-rolled report name (it shouldn't happen — names are validated server-side — but
++  // belts and braces) doesn't escape into the OS save dialog.
++  const onDownload = () => {
++    const slug = (rendered.reportName || 'report').replace(/[^A-Za-z0-9._-]+/g, '_')
++    const stamp = formatTimestampForFile(new Date())
++    downloadText(`${slug}-${stamp}.html`, rendered.html, 'text/html;charset=utf-8')
++  }
++
+   // `sandbox=""` strips every privilege — no script execution, no top-level navigation, no
+   // form submission, no plugins. Reports render their template-produced HTML purely as
+   // formatted text, which is exactly the threat model we want for admin-uploaded templates.
+@@ -335,6 +347,9 @@ function ReportFrame({
+           <ToolbarButton icon={<ArrowMinimize20Regular />} onClick={onToggleExpand}>
+             Collapse
+           </ToolbarButton>
++          <ToolbarButton icon={<ArrowDownload20Regular />} onClick={onDownload}>
++            Download
++          </ToolbarButton>
+           <Text>{rendered.reportLabel || rendered.reportName}</Text>
+         </Toolbar>
+         {frame}
+@@ -358,8 +373,17 @@ function ReportFrame({
+         >
+           Open in new tab
+         </ToolbarButton>
++        <ToolbarButton icon={<ArrowDownload20Regular />} onClick={onDownload}>
++          Download
++        </ToolbarButton>
+       </Toolbar>
+       {frame}
+     </div>
+   )
+ }
++
++/** Compact, filesystem-safe `YYYYMMDDhhmm` stamp for download filenames. */
++function formatTimestampForFile(d: Date): string {
++  const pad = (n: number) => n.toString().padStart(2, '0')
++  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`
++}
+diff --git a/web/admin/src/pages/ReportsPage.tsx b/web/admin/src/pages/ReportsPage.tsx
+index 588b2bd..4922ef4 100644
+--- a/web/admin/src/pages/ReportsPage.tsx
++++ b/web/admin/src/pages/ReportsPage.tsx
+@@ -4,17 +4,19 @@ import {
+   Avatar, Badge, Button, MessageBarBody, MessageBarTitle,
+   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
+   Title2, Tooltip, Toolbar,
+-  makeStyles, tokens,
++  makeStyles,
+ } from '@fluentui/react-components'
+ import {
+   ArrowUpload20Regular, Delete20Regular, DocumentText20Regular, Open20Regular,
+ } from '@fluentui/react-icons'
+ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+ import { RowActions } from '../components/RowActions'
++import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+ import { useDeleteReport, useMe, useReports, useUploadReport } from '../api/hooks'
+ import { formatApiError } from '../api/client'
+ import { confirmDelete } from '../utils/confirm'
+ import { pickTextFile } from '../utils/download'
++import { formatDate, formatDateTime } from '../utils/format'
+ import type { Report } from '../api/types'
+ 
+ const useStyles = makeStyles({
+@@ -33,6 +35,8 @@ const useStyles = makeStyles({
+   },
+   colType:    { width: '120px' },
+   colTargets: { maxWidth: 0 },
++  colCreated:   { width: '110px' },
++  colCreatedBy: { width: '140px' },
+   colActions: { width: '80px', textAlign: 'right' },
+   actionsHeader: { textAlign: 'right' },
+   actionsCell:   { textAlign: 'right' },
+@@ -54,7 +58,9 @@ export function ReportsPage() {
+   const { data: me } = useMe()
+   const isAdmin = me?.role === 'Admin'
+ 
+-  const { data, isLoading, error } = useReports()
++  const [page, setPage] = useState(1)
++  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
++  const { data, isLoading, error } = useReports({ page, pageSize })
+   const upload = useUploadReport()
+   const del = useDeleteReport()
+ 
+@@ -123,15 +129,15 @@ export function ReportsPage() {
+             <TableHeaderCell>Name</TableHeaderCell>
+             <TableHeaderCell className={s.colType}>Type</TableHeaderCell>
+             <TableHeaderCell className={s.colTargets}>Targets</TableHeaderCell>
++            <TableHeaderCell className={s.colCreated}>Created</TableHeaderCell>
++            <TableHeaderCell className={s.colCreatedBy}>Created by</TableHeaderCell>
+             <TableHeaderCell className={`${s.colActions} ${s.actionsHeader}`}>Actions</TableHeaderCell>
+           </TableRow>
+         </TableHeader>
+         <TableBody>
+-          {isLoading && (
+-            <TableRow><TableCell colSpan={4}>Loading…</TableCell></TableRow>
+-          )}
++          {isLoading && <GridMessageRow colSpan={6}>Loading…</GridMessageRow>}
+           {!isLoading && items.length === 0 && (
+-            <TableRow><TableCell colSpan={4}>No reports yet{isAdmin ? ' — click "Upload report" to add one.' : '.'}</TableCell></TableRow>
++            <GridMessageRow colSpan={6}>No reports yet{isAdmin ? ' — click “Upload report” to add one.' : '.'}</GridMessageRow>
+           )}
+           {items.map(r => (
+             <TableRow
+@@ -140,17 +146,17 @@ export function ReportsPage() {
+               onClick={() => nav(`/reports/${encodeURIComponent(r.name)}`)}
+             >
+               <TableCell className={s.nameCell}>
+-                <TableCellLayout media={<Avatar name={r.label || r.name} icon={<DocumentText20Regular />} color="forest" size={32} />}>
++                <TableCellLayout
++                  media={<Avatar name={r.label || r.name} icon={<DocumentText20Regular />} color="forest" size={32} />}
++                  description={r.description ? (
++                    <Tooltip content={r.description} relationship="description">
++                      <span>{r.description}</span>
++                    </Tooltip>
++                  ) : undefined}
++                >
+                   <Tooltip content={r.label || r.name} relationship="label">
+                     <strong className={s.truncate}>{r.label || r.name}</strong>
+                   </Tooltip>
+-                  {r.description && (
+-                    <Tooltip content={r.description} relationship="description">
+-                      <span className={s.truncate} style={{ color: tokens.colorNeutralForeground3, fontSize: 12 }}>
+-                        {r.description}
+-                      </span>
+-                    </Tooltip>
+-                  )}
+                 </TableCellLayout>
+               </TableCell>
+               <TableCell>
+@@ -161,6 +167,16 @@ export function ReportsPage() {
+               <TableCell className={s.colTargets}>
+                 <TargetChips report={r} />
+               </TableCell>
++              <TableCell className={s.colCreated}>
++                <Tooltip content={formatDateTime(r.createdAt)} relationship="label">
++                  <span className={s.truncate}>{formatDate(r.createdAt)}</span>
++                </Tooltip>
++              </TableCell>
++              <TableCell className={s.colCreatedBy}>
++                <Tooltip content={r.createdBy || '—'} relationship="label">
++                  <span className={s.truncate}>{r.createdBy || '—'}</span>
++                </Tooltip>
++              </TableCell>
+               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
+                 <RowActions
+                   ariaLabel={`Actions for ${r.name}`}
+@@ -176,6 +192,14 @@ export function ReportsPage() {
+           ))}
+         </TableBody>
+       </Table>
++
++      <GridPager
++        page={page}
++        pageSize={pageSize}
++        total={data?.total ?? 0}
++        onPageChange={setPage}
++        onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
++      />
+     </div>
+   )
+ }
+diff --git a/web/admin/src/pages/SchemasPage.tsx b/web/admin/src/pages/SchemasPage.tsx
+index 0db3cee..69ddb9b 100644
+--- a/web/admin/src/pages/SchemasPage.tsx
++++ b/web/admin/src/pages/SchemasPage.tsx
+@@ -24,10 +24,12 @@ import { formatApiError } from '../api/client'
+ import { RowActions } from '../components/RowActions'
+ import { SchemaAvatar } from '../components/Avatars'
+ import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
++import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+ import { LayoutTreeEditor } from '../components/LayoutTreeEditor'
+ import { ValueLabel } from '../components/ValueLabel'
+ import { cadenceLabel } from '../utils/cadence'
+ import { confirmDelete } from '../utils/confirm'
++import { formatDate, formatDateTime } from '../utils/format'
+ import { downloadJson, pickJsonFile } from '../utils/download'
+ import { validateExpression, type ExpressionSyntaxResult } from '../utils/expression'
+ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+@@ -71,6 +73,8 @@ const useStyles = makeStyles({
+   colEnabled:    { width: '110px' },
+   colModifiable: { width: '110px' },
+   colAudience:   { width: '160px' },
++  colCreated:    { width: '110px' },
++  colCreatedBy:  { width: '140px' },
+   colActions:    { width: '80px' },
+   truncate: {
+     display: 'block',
+@@ -171,7 +175,9 @@ export function SchemasPage() {
+   const nav = useNavigate()
+   const { data: me } = useMe()
+   const isAdmin = me?.role === 'Admin'
+-  const { data, isLoading, error } = useSchemas()
++  const [page, setPage] = useState(1)
++  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
++  const { data, isLoading, error } = useSchemas({ page, pageSize })
+   // The audience picker only cares about Service-role accounts (those who submit data); the kind
+   // (User vs Application) is irrelevant here.
+   const services = useAccounts({ role: 'Service' })
+@@ -374,12 +380,15 @@ export function SchemasPage() {
+             <TableHeaderCell className={s.colEnabled}>Enabled</TableHeaderCell>
+             <TableHeaderCell className={s.colModifiable}>Modifiable</TableHeaderCell>
+             <TableHeaderCell className={s.colAudience}>Audience</TableHeaderCell>
++            <TableHeaderCell className={s.colCreated}>Created</TableHeaderCell>
++            <TableHeaderCell className={s.colCreatedBy}>Created by</TableHeaderCell>
+             <TableHeaderCell className={`${s.colActions} ${s.actionsHeader}`}>Actions</TableHeaderCell>
+           </TableRow>
+         </TableHeader>
+         <TableBody>
+-          {isLoading && (
+-            <TableRow><TableCell colSpan={6}>Loading...</TableCell></TableRow>
++          {isLoading && <GridMessageRow colSpan={8}>Loading…</GridMessageRow>}
++          {!isLoading && items.length === 0 && (
++            <GridMessageRow colSpan={8}>No schemas yet — click “New schema” to create one.</GridMessageRow>
+           )}
+           {items.map(sc => (
+             <TableRow
+@@ -402,6 +411,16 @@ export function SchemasPage() {
+               </TableCell>
+               <TableCell>{sc.modifiable ? 'Yes' : 'No'}</TableCell>
+               <TableCell>{sc.isGlobal ? 'Global' : `${sc.serviceIds.length} service(s)`}</TableCell>
++              <TableCell className={s.colCreated}>
++                <Tooltip content={formatDateTime(sc.createdAt)} relationship="label">
++                  <span className={s.truncate}>{formatDate(sc.createdAt)}</span>
++                </Tooltip>
++              </TableCell>
++              <TableCell className={s.colCreatedBy}>
++                <Tooltip content={sc.createdBy || '—'} relationship="label">
++                  <span className={s.truncate}>{sc.createdBy || '—'}</span>
++                </Tooltip>
++              </TableCell>
+               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
+                 <RowActions
+                   ariaLabel={`Actions for ${sc.name}`}
+@@ -427,6 +446,14 @@ export function SchemasPage() {
+         </TableBody>
+       </Table>
+ 
++      <GridPager
++        page={page}
++        pageSize={pageSize}
++        total={data?.total ?? 0}
++        onPageChange={setPage}
++        onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
++      />
++
+       <Drawer
+         type="overlay"
+         separator
+diff --git a/web/admin/src/pages/ServicesPage.tsx b/web/admin/src/pages/ServicesPage.tsx
+index 4fff035..f240c71 100644
+--- a/web/admin/src/pages/ServicesPage.tsx
++++ b/web/admin/src/pages/ServicesPage.tsx
+@@ -16,7 +16,9 @@ import { formatApiError } from '../api/client'
+ import { RowActions } from '../components/RowActions'
+ import { AccountAvatar } from '../components/Avatars'
+ import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
++import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+ import { confirmDelete } from '../utils/confirm'
++import { formatDate, formatDateTime } from '../utils/format'
+ 
+ const useStyles = makeStyles({
+   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
+@@ -67,7 +69,9 @@ const kindHints: Record<AccountKind, string> = {
+ export function ServicesPage() {
+   const s = useStyles()
+   const nav = useNavigate()
+-  const { data, isLoading, error } = useAccounts()
++  const [page, setPage] = useState(1)
++  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
++  const { data, isLoading, error } = useAccounts({ page, pageSize })
+   const create = useCreateAccount()
+   const update = useUpdateAccount()
+   const del = useDeleteAccount()
+@@ -158,11 +162,16 @@ export function ServicesPage() {
+             <TableHeaderCell>Kind</TableHeaderCell>
+             <TableHeaderCell>Role</TableHeaderCell>
+             <TableHeaderCell>Status</TableHeaderCell>
++            <TableHeaderCell>Created</TableHeaderCell>
++            <TableHeaderCell>Created by</TableHeaderCell>
+             <TableHeaderCell className={s.actionsHeader}>Actions</TableHeaderCell>
+           </TableRow>
+         </TableHeader>
+         <TableBody>
+-          {isLoading && <TableRow><TableCell colSpan={5}>Loading...</TableCell></TableRow>}
++          {isLoading && <GridMessageRow colSpan={7}>Loading…</GridMessageRow>}
++          {!isLoading && (data?.items ?? []).length === 0 && (
++            <GridMessageRow colSpan={7}>No accounts yet — click “New account” to add one.</GridMessageRow>
++          )}
+           {(data?.items ?? []).map(a => (
+             <TableRow
+               key={a.id}
+@@ -183,6 +192,12 @@ export function ServicesPage() {
+                   {a.enabled ? 'Enabled' : 'Disabled'}
+                 </Badge>
+               </TableCell>
++              <TableCell>
++                <Tooltip content={formatDateTime(a.createdAt)} relationship="label">
++                  <span>{formatDate(a.createdAt)}</span>
++                </Tooltip>
++              </TableCell>
++              <TableCell>{a.createdBy || '—'}</TableCell>
+               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
+                 <RowActions
+                   ariaLabel={`Actions for ${a.name}`}
+@@ -206,6 +221,14 @@ export function ServicesPage() {
+         </TableBody>
+       </Table>
+ 
++      <GridPager
++        page={page}
++        pageSize={pageSize}
++        total={data?.total ?? 0}
++        onPageChange={setPage}
++        onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
++      />
++
+       <Drawer
+         type="overlay"
+         separator
+diff --git a/web/admin/src/pages/SubmissionsPage.tsx b/web/admin/src/pages/SubmissionsPage.tsx
+index f8a6fec..d0fa68c 100644
+--- a/web/admin/src/pages/SubmissionsPage.tsx
++++ b/web/admin/src/pages/SubmissionsPage.tsx
+@@ -1,10 +1,10 @@
+ import { Fragment, useMemo, useState, type ReactNode } from 'react'
+ import { useNavigate } from 'react-router-dom'
+ import {
+-  Badge, Body1, Button, Drawer, DrawerBody, Dropdown, Field, Input,
++  Badge, Body1, Drawer, DrawerBody, Dropdown, Field, Input,
+   Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, SplitButton,
+   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
+-  Title2, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
++  Title2, Tooltip, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
+ } from '@fluentui/react-components'
+ import { Add20Regular, Delete20Regular, Edit20Regular, Eye20Regular, Open20Regular } from '@fluentui/react-icons'
+ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+@@ -13,8 +13,10 @@ import { useAccounts, useDeleteSubmission, useMe, useMySchemas, useMySubmissions
+ import { RowActions } from '../components/RowActions'
+ import { SubmissionAvatar } from '../components/Avatars'
+ import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
++import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+ import { ValueLabel } from '../components/ValueLabel'
+ import { confirmDelete } from '../utils/confirm'
++import { formatDate, formatDateTime } from '../utils/format'
+ import { walkLayout, type RenderItem } from '../utils/layout'
+ import type { Account, Schema, Submission } from '../api/types'
+ 
+@@ -118,8 +120,9 @@ export function SubmissionsPage() {
+   const isAdmin = me?.role === 'Admin'
+ 
+   const [page, setPage] = useState(1)
+-  const pageSize = 25
++  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+   const [serviceId, setServiceId] = useState<string | undefined>(undefined)
++  const [schemaName, setSchemaName] = useState<string | undefined>(undefined)
+   const [interval, setInterval] = useState<Interval>('all')
+   const [customFrom, setCustomFrom] = useState('')
+   const [customTo, setCustomTo] = useState('')
+@@ -133,8 +136,8 @@ export function SubmissionsPage() {
+   )
+ 
+   const services = useAccounts({ role: 'Service' }, !isService)
+-  const adminSubs = useSubmissions({ page, pageSize, serviceId, from, to }, !isService)
+-  const mySubs = useMySubmissions({ page, pageSize, from, to }, isService)
++  const adminSubs = useSubmissions({ page, pageSize, serviceId, schemaName, from, to }, !isService)
++  const mySubs = useMySubmissions({ page, pageSize, schemaName, from, to }, isService)
+   // Schemas are needed by the read-only view drawer (value labels + units), not by the list itself.
+   // Cached by react-query so the click latency stays close to zero on subsequent opens.
+   const adminSchemas = useSchemas(undefined, !isService)
+@@ -143,12 +146,20 @@ export function SubmissionsPage() {
+ 
+   const submissions = isService ? mySubs : adminSubs
+   const { data, isLoading, error } = submissions
+-
++  // Column count for the loading / empty placeholder rows (Service column is admin-only).
++  const colSpan = isService ? 6 : 7
++
++  // Schemas visible to the current viewer — drives both the read-only drawer's value labels and
++  // the Schema filter dropdown below.
++  const schemaList = useMemo<Schema[]>(
++    () => (isService ? (mySchemas.data ?? []) : (adminSchemas.data?.items ?? [])),
++    [isService, adminSchemas.data, mySchemas.data],
++  )
+   // Pre-index schemas by name once per render — saves us doing the find() per sample in the drawer.
+-  const schemasByName = useMemo(() => {
+-    const list: Schema[] = isService ? (mySchemas.data ?? []) : (adminSchemas.data?.items ?? [])
+-    return new Map(list.map(sc => [sc.name, sc]))
+-  }, [isService, adminSchemas.data, mySchemas.data])
++  const schemasByName = useMemo(
++    () => new Map(schemaList.map(sc => [sc.name, sc])),
++    [schemaList],
++  )
+ 
+   function changeInterval(next: Interval) {
+     setInterval(next)
+@@ -182,6 +193,19 @@ export function SubmissionsPage() {
+             </Dropdown>
+           </Field>
+         )}
++        <Field label="Schema">
++          <Dropdown
++            placeholder="All schemas"
++            selectedOptions={schemaName ? [schemaName] : []}
++            value={schemaName ? (schemasByName.get(schemaName)?.label || schemaName) : ''}
++            onOptionSelect={(_, d) => { setSchemaName(d.optionValue || undefined); setPage(1) }}
++          >
++            <Option value="">All schemas</Option>
++            {schemaList.map(sc => (
++              <Option key={sc.id} value={sc.name}>{sc.label || sc.name}</Option>
++            ))}
++          </Dropdown>
++        </Field>
+         <Field label="Interval">
+           <Dropdown
+             selectedOptions={[interval]}
+@@ -224,12 +248,18 @@ export function SubmissionsPage() {
+           <TableRow>
+             <TableHeaderCell>Submitted at</TableHeaderCell>
+             {!isService && <TableHeaderCell>Service</TableHeaderCell>}
++            <TableHeaderCell>Schema</TableHeaderCell>
+             <TableHeaderCell>Samples</TableHeaderCell>
++            <TableHeaderCell>Created</TableHeaderCell>
++            <TableHeaderCell>Created by</TableHeaderCell>
+             <TableHeaderCell className={s.actionsHeader}></TableHeaderCell>
+           </TableRow>
+         </TableHeader>
+         <TableBody>
+-          {isLoading && <TableRow><TableCell colSpan={isService ? 3 : 4}>Loading...</TableCell></TableRow>}
++          {isLoading && <GridMessageRow colSpan={colSpan}>Loading…</GridMessageRow>}
++          {!isLoading && (data?.items ?? []).length === 0 && (
++            <GridMessageRow colSpan={colSpan}>No submissions match these filters.</GridMessageRow>
++          )}
+           {(data?.items ?? []).map(sub => (
+             <TableRow
+               key={sub.id}
+@@ -237,12 +267,21 @@ export function SubmissionsPage() {
+               onClick={() => setViewing(sub)}
+             >
+               <TableCell>
+-                <TableCellLayout media={<SubmissionAvatar />}>
+-                  {new Date(sub.submittedAt).toLocaleString()}
+-                </TableCellLayout>
++                <Tooltip content={formatDateTime(sub.submittedAt)} relationship="label">
++                  <TableCellLayout media={<SubmissionAvatar />}>
++                    {formatDate(sub.submittedAt)}
++                  </TableCellLayout>
++                </Tooltip>
+               </TableCell>
+-              {!isService && <TableCell>{sub.serviceName}</TableCell>}
++              {!isService && <TableCell>{resolveServiceLabel(sub, isService, me, services.data?.items ?? [])}</TableCell>}
++              <TableCell>{resolveSchemaLabel(sub, schemasByName)}</TableCell>
+               <TableCell>{sub.samples.length}</TableCell>
++              <TableCell>
++                <Tooltip content={formatDateTime(sub.createdAt)} relationship="label">
++                  <span>{formatDate(sub.createdAt)}</span>
++                </Tooltip>
++              </TableCell>
++              <TableCell>{sub.createdBy || '—'}</TableCell>
+               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
+                 <RowActions
+                   ariaLabel={`Actions for submission ${sub.id}`}
+@@ -264,11 +303,13 @@ export function SubmissionsPage() {
+         </TableBody>
+       </Table>
+ 
+-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+-        <Button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
+-        <span>Page {page} of {Math.max(1, Math.ceil((data?.total ?? 0) / pageSize))} · {data?.total ?? 0} total</span>
+-        <Button disabled={(data?.total ?? 0) <= page * pageSize} onClick={() => setPage(p => p + 1)}>Next</Button>
+-      </div>
++      <GridPager
++        page={page}
++        pageSize={pageSize}
++        total={data?.total ?? 0}
++        onPageChange={setPage}
++        onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
++      />
+ 
+       <Drawer
+         type="overlay"
+@@ -364,6 +405,17 @@ function resolveServiceLabel(
+   return acc?.label || acc?.name || submission.serviceName || '—'
+ }
+ 
++/**
++ * Resolve the friendly schema label for a submission. A submission carries at most one schema
++ * (the editor enforces it), so we read the first sample's schemaName and prefer the loaded
++ * schema's label, falling back to the raw name and finally an em-dash.
++ */
++function resolveSchemaLabel(submission: Submission, schemasByName: Map<string, Schema>): string {
++  const schemaName = submission.samples[0]?.schemaName
++  if (!schemaName) return '—'
++  return schemasByName.get(schemaName)?.label || schemaName
++}
++
+ function SubmissionViewBody({
+   submission, serviceLabel, schema,
+ }: {
+diff --git a/web/admin/src/utils/download.ts b/web/admin/src/utils/download.ts
+index b06ded5..c55d7b7 100644
+--- a/web/admin/src/utils/download.ts
++++ b/web/admin/src/utils/download.ts
+@@ -9,7 +9,16 @@
+  * browser has its own copy.
+  */
+ export function downloadJson(filename: string, payload: unknown): void {
+-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
++  downloadText(filename, JSON.stringify(payload, null, 2), 'application/json')
++}
++
++/**
++ * Trigger a browser download for an arbitrary string payload. Same lifecycle as `downloadJson`
++ * but without any JSON shaping — the caller controls the body and the mime type. Used by the
++ * report viewer to save the rendered HTML straight from the SPA, no server round-trip needed.
++ */
++export function downloadText(filename: string, content: string, mimeType: string = 'text/plain'): void {
++  const blob = new Blob([content], { type: mimeType })
+   const url = URL.createObjectURL(blob)
+   const a = document.createElement('a')
+   a.href = url
+diff --git a/web/admin/src/utils/format.ts b/web/admin/src/utils/format.ts
+new file mode 100644
+index 0000000..8914c2c
+--- /dev/null
++++ b/web/admin/src/utils/format.ts
+@@ -0,0 +1,13 @@
++/** Format an ISO timestamp as a locale date (no time). Returns an em-dash for empty/invalid input. */
++export function formatDate(iso?: string | null): string {
++  if (!iso) return '—'
++  const d = new Date(iso)
++  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString()
++}
++
++/** Format an ISO timestamp as a full locale date + time. Returns an em-dash for empty/invalid input. */
++export function formatDateTime(iso?: string | null): string {
++  if (!iso) return '—'
++  const d = new Date(iso)
++  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString()
++}

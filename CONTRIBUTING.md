@@ -47,14 +47,13 @@ dotnet run --project src/Ingest.AppHost
 
 The Aspire dashboard URL is printed in the console; the `admin` resource there links to <http://localhost:5173>.
 
-On first start, look for a `Warning`-level log line from the API:
+The local-dev configuration (`src/Ingest.Api/appsettings.Development.json`) preconfigures a known bootstrap admin key, so on first start you can sign in straight away with:
 
 ```
-warn: Bootstrapped admin API key (shown only this once): abc123.xyz... .
-      Use it in the X-Api-Key header.
+localdev.local-dev-admin-key-change-me
 ```
 
-Copy that value — you only get to see it once. Paste it on the SPA's login screen, then immediately [rotate it](docs/architecture/authentication.md#rotation) and revoke the bootstrap key.
+(That key only exists in the `Development` environment. In `Production` the `ApiKey:BootstrapAdminKey` is empty by default, so the app generates a random key and logs it once — see [the bootstrap admin](docs/architecture/authentication.md#the-bootstrap-admin).) Once you're in you can [rotate it](docs/architecture/authentication.md#rotation) like any other key.
 
 ### Running the SPA standalone (without Aspire)
 
@@ -93,8 +92,11 @@ docker build -t ingest .
 docker run -p 8080:8080 `
   -e ConnectionStrings__ingest="mongodb://host.docker.internal:27017/ingest" `
   -e ApiKey__Pepper="please-change-me" `
+  -e ApiKey__BootstrapAdminKey="localdev.local-dev-admin-key-change-me" `
   ingest
 ```
+
+This run needs a MongoDB reachable at the connection string above; `host.docker.internal` resolves to the host from inside the container on Docker Desktop (Windows/macOS). On Linux, run the container with `--add-host=host.docker.internal:host-gateway` or point the connection string at a Mongo container on a shared Docker network. The easiest no-dependencies path is **`docker compose up --build`** from the repo root — see [docs/setup/quickstart.md](docs/setup/quickstart.md), which starts MongoDB for you.
 
 For real deployments (Azure Container Apps, App Service, AKS, self-hosted) see [docs/setup/hosting.md](docs/setup/hosting.md). For the full set of environment variables you can pass, see [docs/setup/configuration.md](docs/setup/configuration.md).
 

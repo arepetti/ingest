@@ -30,6 +30,7 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
         Guid? serviceId = null,
         DateTime? from = null,
         DateTime? to = null,
+        string? schemaName = null,
         CancellationToken ct = default)
     {
         var filter = ApplySoftDelete(Builders<Submission>.Filter.Empty, request.IncludeDeleted);
@@ -39,6 +40,11 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Gte(s => s.SubmittedAt, DateTime.SpecifyKind(f, DateTimeKind.Utc)));
         if (to is { } t)
             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Lt(s => s.SubmittedAt, DateTime.SpecifyKind(t, DateTimeKind.Utc)));
+        // A submission carries samples for (typically) a single schema. Match any submission that
+        // has at least one sample for the requested schema.
+        if (!string.IsNullOrWhiteSpace(schemaName))
+            filter = Builders<Submission>.Filter.And(filter,
+                Builders<Submission>.Filter.ElemMatch(s => s.Samples, Builders<Sample>.Filter.Eq(x => x.SchemaName, schemaName)));
 
         var total = await Collection.CountDocumentsAsync(filter, cancellationToken: ct);
 

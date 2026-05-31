@@ -26,6 +26,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service) : Con
     /// <param name="serviceId">Restrict the listing to submissions made by the given account.</param>
     /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
+    /// <param name="schemaName">Restrict the listing to submissions for the given schema.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">A page of submissions.</response>
     [HttpGet]
@@ -38,10 +39,11 @@ public sealed class AdminSubmissionsController(ISubmissionService service) : Con
         [FromQuery] Guid? serviceId,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
+        [FromQuery] string? schemaName,
         CancellationToken ct)
     {
         var result = await service.ListAsync(
-            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, ct);
+            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, schemaName, ct);
         return Ok(result.Map(SubmissionDto.From));
     }
 

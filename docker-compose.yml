@@ -1,0 +1,55 @@
+# Try Ingest locally with nothing but Docker installed — no .NET SDK, no Node, no MongoDB.
+# The app image is built straight from the Dockerfile inside Docker, so the only thing you
+# need on your machine is Docker (Desktop or Engine).
+#
+#   docker compose up --build
+#
+# Then open http://localhost:8080 and sign in on the SPA login screen with this API key
+# (it's also the value to send in the X-Api-Key header for API calls):
+#
+#   localdev.local-dev-admin-key-change-me
+#
+# Swagger UI:        http://localhost:8080/swagger
+# Stop + wipe data:  docker compose down -v
+#
+# This stack is for EVALUATION ONLY. The admin key and pepper below are well-known placeholders;
+# never expose this to a network you don't trust. For production, see docs/setup/hosting.md.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - ingest-mongo-data:/data/db
+    healthcheck:
+      # Gate the app's start on Mongo actually answering, not just the container being up.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ingest:local
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__ingest: "mongodb://mongo:27017/ingest"
+      # Hardens stored key hashes. Any value works locally; change it for anything real.
+      ApiKey__Pepper: "local-dev-pepper-change-me"
+      # Known bootstrap admin key so you can log in immediately without scraping the logs.
+      # CHANGE THIS (and the pepper) before using this stack anywhere that matters.
+      ApiKey__BootstrapAdminKey: "localdev.local-dev-admin-key-change-me"
+      ASPNETCORE_ENVIRONMENT: "Production"
+      # Swagger is handy while evaluating; turn it off for real deployments.
+      Ingest__EnableSwagger: "true"
+
+volumes:
+  ingest-mongo-data:

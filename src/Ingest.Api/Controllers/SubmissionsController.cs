@@ -94,6 +94,7 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     /// <param name="sort">Sort hint; <c>createdAt</c> returns newest-first.</param>
     /// <param name="from">Lower bound on submission timestamp (inclusive). Omit for no lower bound.</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive). Omit for no upper bound.</param>
+    /// <param name="schemaName">Restrict to submissions for the given schema. Omit for all schemas.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">A page of submissions.</response>
     [HttpGet]
@@ -104,12 +105,13 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
         [FromQuery] string? sort,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
+        [FromQuery] string? schemaName,
         CancellationToken ct)
     {
         var result = await service.ListMineAsync(
             User.CurrentAccountId(),
             RequestHelpers.ToPageRequest(page, pageSize, sort, false),
-            from, to, ct);
+            from, to, schemaName, ct);
         return Ok(result.Map(SubmissionDto.From));
     }
 }

@@ -16,7 +16,7 @@ The guide is split into focused pages — pick whichever matches the task at han
 ## Signing in
 
 1. Browse to the deployment URL (`/` of the API host) — for example `https://ingest.example.org/`.
-2. Paste the API key in the form. The first one you'll use is the bootstrap admin key printed in the server logs on first start.
+2. Paste the API key in the form. The first one you'll use is the bootstrap admin key: either the value you set in `ApiKey:BootstrapAdminKey`, or — if you left that empty — the random key printed in the server logs on first start (see [the bootstrap admin](../architecture/authentication.md#the-bootstrap-admin)).
 3. Click **Sign in**.
 
 If you paste an **Application**-kind key the login screen rejects it with a clear error: only **User**-kind credentials can sign in. (Services use their keys against the API directly, not the SPA.)
@@ -32,7 +32,7 @@ If you only see a blank screen after signing in, the most likely cause is that t
 
 ## First steps after install
 
-1. **Rotate the bootstrap admin key.**
+1. **Rotate the bootstrap admin key.** This matters most when the bootstrap key came from `ApiKey:BootstrapAdminKey` — that value may be shared (e.g. with a `docker-compose.yml` or quickstart) and is only as secret as your config.
    - Go to **Accounts**, find the bootstrap admin (default name `admin`), open the row menu (`⋮`) and choose **Manage keys**.
    - Click **Generate key**, copy the plaintext shown in the dialog and save it somewhere safe (a password manager).
    - **Revoke** the old (bootstrap) key from the same dialog.

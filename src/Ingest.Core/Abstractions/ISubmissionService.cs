@@ -55,14 +55,15 @@ public interface ISubmissionService
     /// <exception cref="ForbiddenException">The submission exists but belongs to a different account.</exception>
     Task<Submission?> GetMineAsync(Guid callerAccountId, Guid submissionId, CancellationToken ct = default);
 
-    /// <summary>Page through the caller's own submissions, optionally filtered by date range.</summary>
+    /// <summary>Page through the caller's own submissions, optionally filtered by schema and/or date range.</summary>
     /// <param name="callerAccountId">Account id taken from the bearer credential.</param>
     /// <param name="request">Paging + sort parameters.</param>
     /// <param name="from">Lower bound on submission timestamp (inclusive); <c>null</c> for no lower bound.</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive); <c>null</c> for no upper bound.</param>
+    /// <param name="schemaName">Restrict to submissions for this schema when non-null.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A page of the caller's submissions.</returns>
-    Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, CancellationToken ct = default);
+    Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default);
 
     // ── Admin-facing ──
 
@@ -71,8 +72,9 @@ public interface ISubmissionService
     /// <param name="serviceId">When non-null, restrict the listing to a single service.</param>
     /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
+    /// <param name="schemaName">When non-null, restrict the listing to submissions for a single schema.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, CancellationToken ct = default);
+    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default);
 
     /// <summary>Fetch any submission by id.</summary>
     /// <param name="submissionId">Submission id.</param>

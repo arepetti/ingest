@@ -9,7 +9,16 @@
  * browser has its own copy.
  */
 export function downloadJson(filename: string, payload: unknown): void {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  downloadText(filename, JSON.stringify(payload, null, 2), 'application/json')
+}
+
+/**
+ * Trigger a browser download for an arbitrary string payload. Same lifecycle as `downloadJson`
+ * but without any JSON shaping — the caller controls the body and the mime type. Used by the
+ * report viewer to save the rendered HTML straight from the SPA, no server round-trip needed.
+ */
+export function downloadText(filename: string, content: string, mimeType: string = 'text/plain'): void {
+  const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

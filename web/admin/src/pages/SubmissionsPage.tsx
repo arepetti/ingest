@@ -1,10 +1,10 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Badge, Body1, Button, Drawer, DrawerBody, Dropdown, Field, Input,
+  Badge, Body1, Drawer, DrawerBody, Dropdown, Field, Input,
   Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, SplitButton,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
-  Title2, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
+  Title2, Tooltip, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
 import { Add20Regular, Delete20Regular, Edit20Regular, Eye20Regular, Open20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
@@ -13,8 +13,10 @@ import { useAccounts, useDeleteSubmission, useMe, useMySchemas, useMySubmissions
 import { RowActions } from '../components/RowActions'
 import { SubmissionAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
+import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
 import { ValueLabel } from '../components/ValueLabel'
 import { confirmDelete } from '../utils/confirm'
+import { formatDate, formatDateTime } from '../utils/format'
 import { walkLayout, type RenderItem } from '../utils/layout'
 import type { Account, Schema, Submission } from '../api/types'
 
@@ -118,8 +120,9 @@ export function SubmissionsPage() {
   const isAdmin = me?.role === 'Admin'
 
   const [page, setPage] = useState(1)
-  const pageSize = 25
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [serviceId, setServiceId] = useState<string | undefined>(undefined)
+  const [schemaName, setSchemaName] = useState<string | undefined>(undefined)
   const [interval, setInterval] = useState<Interval>('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -133,8 +136,8 @@ export function SubmissionsPage() {
   )
 
   const services = useAccounts({ role: 'Service' }, !isService)
-  const adminSubs = useSubmissions({ page, pageSize, serviceId, from, to }, !isService)
-  const mySubs = useMySubmissions({ page, pageSize, from, to }, isService)
+  const adminSubs = useSubmissions({ page, pageSize, serviceId, schemaName, from, to }, !isService)
+  const mySubs = useMySubmissions({ page, pageSize, schemaName, from, to }, isService)
   // Schemas are needed by the read-only view drawer (value labels + units), not by the list itself.
   // Cached by react-query so the click latency stays close to zero on subsequent opens.
   const adminSchemas = useSchemas(undefined, !isService)
@@ -143,12 +146,20 @@ export function SubmissionsPage() {
 
   const submissions = isService ? mySubs : adminSubs
   const { data, isLoading, error } = submissions
+  // Column count for the loading / empty placeholder rows (Service column is admin-only).
+  const colSpan = isService ? 6 : 7
 
+  // Schemas visible to the current viewer — drives both the read-only drawer's value labels and
+  // the Schema filter dropdown below.
+  const schemaList = useMemo<Schema[]>(
+    () => (isService ? (mySchemas.data ?? []) : (adminSchemas.data?.items ?? [])),
+    [isService, adminSchemas.data, mySchemas.data],
+  )
   // Pre-index schemas by name once per render — saves us doing the find() per sample in the drawer.
-  const schemasByName = useMemo(() => {
-    const list: Schema[] = isService ? (mySchemas.data ?? []) : (adminSchemas.data?.items ?? [])
-    return new Map(list.map(sc => [sc.name, sc]))
-  }, [isService, adminSchemas.data, mySchemas.data])
+  const schemasByName = useMemo(
+    () => new Map(schemaList.map(sc => [sc.name, sc])),
+    [schemaList],
+  )
 
   function changeInterval(next: Interval) {
     setInterval(next)
@@ -182,6 +193,19 @@ export function SubmissionsPage() {
             </Dropdown>
           </Field>
         )}
+        <Field label="Schema">
+          <Dropdown
+            placeholder="All schemas"
+            selectedOptions={schemaName ? [schemaName] : []}
+            value={schemaName ? (schemasByName.get(schemaName)?.label || schemaName) : ''}
+            onOptionSelect={(_, d) => { setSchemaName(d.optionValue || undefined); setPage(1) }}
+          >
+            <Option value="">All schemas</Option>
+            {schemaList.map(sc => (
+              <Option key={sc.id} value={sc.name}>{sc.label || sc.name}</Option>
+            ))}
+          </Dropdown>
+        </Field>
         <Field label="Interval">
           <Dropdown
             selectedOptions={[interval]}
@@ -224,12 +248,18 @@ export function SubmissionsPage() {
           <TableRow>
             <TableHeaderCell>Submitted at</TableHeaderCell>
             {!isService && <TableHeaderCell>Service</TableHeaderCell>}
+            <TableHeaderCell>Schema</TableHeaderCell>
             <TableHeaderCell>Samples</TableHeaderCell>
+            <TableHeaderCell>Created</TableHeaderCell>
+            <TableHeaderCell>Created by</TableHeaderCell>
             <TableHeaderCell className={s.actionsHeader}></TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <TableRow><TableCell colSpan={isService ? 3 : 4}>Loading...</TableCell></TableRow>}
+          {isLoading && <GridMessageRow colSpan={colSpan}>Loading…</GridMessageRow>}
+          {!isLoading && (data?.items ?? []).length === 0 && (
+            <GridMessageRow colSpan={colSpan}>No submissions match these filters.</GridMessageRow>
+          )}
           {(data?.items ?? []).map(sub => (
             <TableRow
               key={sub.id}
@@ -237,12 +267,21 @@ export function SubmissionsPage() {
               onClick={() => setViewing(sub)}
             >
               <TableCell>
-                <TableCellLayout media={<SubmissionAvatar />}>
-                  {new Date(sub.submittedAt).toLocaleString()}
-                </TableCellLayout>
+                <Tooltip content={formatDateTime(sub.submittedAt)} relationship="label">
+                  <TableCellLayout media={<SubmissionAvatar />}>
+                    {formatDate(sub.submittedAt)}
+                  </TableCellLayout>
+                </Tooltip>
               </TableCell>
-              {!isService && <TableCell>{sub.serviceName}</TableCell>}
+              {!isService && <TableCell>{resolveServiceLabel(sub, isService, me, services.data?.items ?? [])}</TableCell>}
+              <TableCell>{resolveSchemaLabel(sub, schemasByName)}</TableCell>
               <TableCell>{sub.samples.length}</TableCell>
+              <TableCell>
+                <Tooltip content={formatDateTime(sub.createdAt)} relationship="label">
+                  <span>{formatDate(sub.createdAt)}</span>
+                </Tooltip>
+              </TableCell>
+              <TableCell>{sub.createdBy || '—'}</TableCell>
               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
                 <RowActions
                   ariaLabel={`Actions for submission ${sub.id}`}
@@ -264,11 +303,13 @@ export function SubmissionsPage() {
         </TableBody>
       </Table>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
-        <Button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-        <span>Page {page} of {Math.max(1, Math.ceil((data?.total ?? 0) / pageSize))} · {data?.total ?? 0} total</span>
-        <Button disabled={(data?.total ?? 0) <= page * pageSize} onClick={() => setPage(p => p + 1)}>Next</Button>
-      </div>
+      <GridPager
+        page={page}
+        pageSize={pageSize}
+        total={data?.total ?? 0}
+        onPageChange={setPage}
+        onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
+      />
 
       <Drawer
         type="overlay"
@@ -362,6 +403,17 @@ function resolveServiceLabel(
   if (isService) return me?.label || me?.name || submission.serviceName || '—'
   const acc = services.find(a => a.id === submission.serviceAccountId)
   return acc?.label || acc?.name || submission.serviceName || '—'
+}
+
+/**
+ * Resolve the friendly schema label for a submission. A submission carries at most one schema
+ * (the editor enforces it), so we read the first sample's schemaName and prefer the loaded
+ * schema's label, falling back to the raw name and finally an em-dash.
+ */
+function resolveSchemaLabel(submission: Submission, schemasByName: Map<string, Schema>): string {
+  const schemaName = submission.samples[0]?.schemaName
+  if (!schemaName) return '—'
+  return schemasByName.get(schemaName)?.label || schemaName
 }
 
 function SubmissionViewBody({

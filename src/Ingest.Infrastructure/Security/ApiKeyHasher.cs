@@ -37,6 +37,16 @@ public sealed class ApiKeyHasher : IApiKeyHasher
     }
 
     /// <inheritdoc />
+    public GeneratedApiKey? Import(string plaintext)
+    {
+        if (!TrySplit(plaintext, out var keyId, out var secret)) return null;
+        var saltBytes = RandomNumberGenerator.GetBytes(16);
+        var salt = Convert.ToHexString(saltBytes).ToLowerInvariant();
+        var hash = Hash(secret, salt);
+        return new GeneratedApiKey(plaintext, keyId, secret, salt, hash);
+    }
+
+    /// <inheritdoc />
     public bool TrySplit(string presented, out string keyId, out string secret)
     {
         keyId = string.Empty;

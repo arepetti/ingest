@@ -103,14 +103,14 @@ public sealed class SubmissionService : ISubmissionService
     }
 
     /// <inheritdoc />
-    public Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, CancellationToken ct = default) =>
-        _submissions.ListAsync(request, callerAccountId, from, to, ct);
+    public Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default) =>
+        _submissions.ListAsync(request, callerAccountId, from, to, schemaName, ct);
 
     // ── Admin-facing ──
 
     /// <inheritdoc />
-    public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, CancellationToken ct = default) =>
-        _submissions.ListAsync(request, serviceId, from, to, ct);
+    public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default) =>
+        _submissions.ListAsync(request, serviceId, from, to, schemaName, ct);
 
     /// <inheritdoc />
     public Task<Submission?> GetAsync(Guid submissionId, bool includeDeleted, CancellationToken ct = default) =>

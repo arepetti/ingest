@@ -4,17 +4,19 @@ import {
   Avatar, Badge, Button, MessageBarBody, MessageBarTitle,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
   Title2, Tooltip, Toolbar,
-  makeStyles, tokens,
+  makeStyles,
 } from '@fluentui/react-components'
 import {
   ArrowUpload20Regular, Delete20Regular, DocumentText20Regular, Open20Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { RowActions } from '../components/RowActions'
+import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
 import { useDeleteReport, useMe, useReports, useUploadReport } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { confirmDelete } from '../utils/confirm'
 import { pickTextFile } from '../utils/download'
+import { formatDate, formatDateTime } from '../utils/format'
 import type { Report } from '../api/types'
 
 const useStyles = makeStyles({
@@ -33,6 +35,8 @@ const useStyles = makeStyles({
   },
   colType:    { width: '120px' },
   colTargets: { maxWidth: 0 },
+  colCreated:   { width: '110px' },
+  colCreatedBy: { width: '140px' },
   colActions: { width: '80px', textAlign: 'right' },
   actionsHeader: { textAlign: 'right' },
   actionsCell:   { textAlign: 'right' },
@@ -54,7 +58,9 @@ export function ReportsPage() {
   const { data: me } = useMe()
   const isAdmin = me?.role === 'Admin'
 
-  const { data, isLoading, error } = useReports()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const { data, isLoading, error } = useReports({ page, pageSize })
   const upload = useUploadReport()
   const del = useDeleteReport()
 
@@ -123,15 +129,15 @@ export function ReportsPage() {
             <TableHeaderCell>Name</TableHeaderCell>
             <TableHeaderCell className={s.colType}>Type</TableHeaderCell>
             <TableHeaderCell className={s.colTargets}>Targets</TableHeaderCell>
+            <TableHeaderCell className={s.colCreated}>Created</TableHeaderCell>
+            <TableHeaderCell className={s.colCreatedBy}>Created by</TableHeaderCell>
             <TableHeaderCell className={`${s.colActions} ${s.actionsHeader}`}>Actions</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && (
-            <TableRow><TableCell colSpan={4}>Loading…</TableCell></TableRow>
-          )}
+          {isLoading && <GridMessageRow colSpan={6}>Loading…</GridMessageRow>}
           {!isLoading && items.length === 0 && (
-            <TableRow><TableCell colSpan={4}>No reports yet{isAdmin ? ' — click "Upload report" to add one.' : '.'}</TableCell></TableRow>
+            <GridMessageRow colSpan={6}>No reports yet{isAdmin ? ' — click “Upload report” to add one.' : '.'}</GridMessageRow>
           )}
           {items.map(r => (
             <TableRow
@@ -140,17 +146,17 @@ export function ReportsPage() {
               onClick={() => nav(`/reports/${encodeURIComponent(r.name)}`)}
             >
               <TableCell className={s.nameCell}>
-                <TableCellLayout media={<Avatar name={r.label || r.name} icon={<DocumentText20Regular />} color="forest" size={32} />}>
+                <TableCellLayout
+                  media={<Avatar name={r.label || r.name} icon={<DocumentText20Regular />} color="forest" size={32} />}
+                  description={r.description ? (
+                    <Tooltip content={r.description} relationship="description">
+                      <span>{r.description}</span>
+                    </Tooltip>
+                  ) : undefined}
+                >
                   <Tooltip content={r.label || r.name} relationship="label">
                     <strong className={s.truncate}>{r.label || r.name}</strong>
                   </Tooltip>
-                  {r.description && (
-                    <Tooltip content={r.description} relationship="description">
-                      <span className={s.truncate} style={{ color: tokens.colorNeutralForeground3, fontSize: 12 }}>
-                        {r.description}
-                      </span>
-                    </Tooltip>
-                  )}
                 </TableCellLayout>
               </TableCell>
               <TableCell>
@@ -160,6 +166,16 @@ export function ReportsPage() {
               </TableCell>
               <TableCell className={s.colTargets}>
                 <TargetChips report={r} />
+              </TableCell>
+              <TableCell className={s.colCreated}>
+                <Tooltip content={formatDateTime(r.createdAt)} relationship="label">
+                  <span className={s.truncate}>{formatDate(r.createdAt)}</span>
+                </Tooltip>
+              </TableCell>
+              <TableCell className={s.colCreatedBy}>
+                <Tooltip content={r.createdBy || '—'} relationship="label">
+                  <span className={s.truncate}>{r.createdBy || '—'}</span>
+                </Tooltip>
               </TableCell>
               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
                 <RowActions
@@ -176,6 +192,14 @@ export function ReportsPage() {
           ))}
         </TableBody>
       </Table>
+
+      <GridPager
+        page={page}
+        pageSize={pageSize}
+        total={data?.total ?? 0}
+        onPageChange={setPage}
+        onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
+      />
     </div>
   )
 }

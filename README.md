@@ -68,12 +68,13 @@ Every change is **audited** (who did it, when) and **soft-deleted** by default �
 
 ### One container, one database
 
-The whole system ships as a single Docker image bundling the API and the admin SPA. Deploy it anywhere that runs a Linux container — the recommended target on Azure is **Container Apps + Cosmos DB for MongoDB (vCore)**, but App Service, AKS, or a self-hosted MongoDB all work. Health probes, structured logging and OpenTelemetry tracing are wired in by default.
+The whole system ships as a single Docker image bundling the API and the admin SPA. Deploy it anywhere that runs a Linux container — the recommended target on Azure is **Container Apps + Cosmos DB for MongoDB (vCore)**, but App Service, AKS, or a self-hosted MongoDB all work. Health probes, structured logging and OpenTelemetry tracing are wired in by default. Want to see it first? `docker compose up --build` runs the whole stack locally — see the [quickstart](docs/setup/quickstart.md).
 
 ## Who it's for
 
 | You are…                                          | …and you get                                                                                                                              | …start here                                                                                                                                  |
 |---------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Just kicking the tyres**                        | The whole thing running locally in a couple of minutes with **only Docker** — no .NET SDK, Node, or MongoDB to install.                      | [docs/setup/quickstart.md](docs/setup/quickstart.md)                                                                                         |
 | A **council administrator** running the catalogue | The web console for managing services, schemas, submissions, and watching status across all services.                                       | [docs/admin-user-guide/](docs/admin-user-guide/README.md)                                                                                    |
 | A **service** sending KPI data                    | A stable REST API that lets a scheduled job or an existing back-office system push KPIs automatically — no more weekly form-filling. A web form is there as a fallback (or for getting started).                                                            | [docs/client/](docs/client/README.md)                                                                                                        |
 | A **data analyst / report author**                | A direct OData feed for Power BI (and equivalents), with examples and refresh-schedule guidance.                                            | [docs/setup/powerbi.md](docs/setup/powerbi.md)                                                                                               |
@@ -86,9 +87,9 @@ A single .NET 10 / ASP.NET Core back-end talks to MongoDB, exposes a REST API fo
 
 ```
 ┌─────────────────┐                 ┌─────────────────┐               ┌────────────┐
-│ Service clients │   API key       │     Ingest      │  MongoDB.     │  MongoDB   │
+│ Service clients │   API key       │     Ingest      │  MongoDB      │  MongoDB   │
 │ (scripts, bots, │ ───────────────►│   (API + SPA,   │ ─────────────►│  (Cosmos / │
-│  schedulers …)  │                 │  single image)  │  Driver       │  hosted)   │
+│  schedulers …)  │                 │  single image)  │  wire protocol│  hosted)   │
 └─────────────────┘                 └─────────────────┘               └────────────┘
                                             ▲
                                             │ OData / REST

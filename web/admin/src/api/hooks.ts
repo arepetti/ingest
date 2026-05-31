@@ -12,10 +12,13 @@ import type {
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/api/me') })
 
 export const useAccounts = (
-  params?: { kind?: string; role?: string; includeDeleted?: boolean },
+  params?: { kind?: string; role?: string; includeDeleted?: boolean; page?: number; pageSize?: number },
   enabled: boolean = true,
 ) => {
-  const search = new URLSearchParams({ pageSize: '200' })
+  // Default to a large page so the many dropdown/count consumers keep getting "everything".
+  // Grids that want real pagination pass an explicit page + pageSize.
+  const search = new URLSearchParams({ pageSize: String(params?.pageSize ?? 200) })
+  if (params?.page) search.set('page', String(params.page))
   if (params?.kind) search.set('kind', params.kind)
   if (params?.role) search.set('role', params.role)
   if (params?.includeDeleted) search.set('includeDeleted', 'true')
@@ -76,10 +79,13 @@ export const useRevokeApiKey = () => {
 }
 
 export const useSchemas = (
-  params?: { includeDeleted?: boolean },
+  params?: { includeDeleted?: boolean; page?: number; pageSize?: number },
   enabled: boolean = true,
 ) => {
-  const search = new URLSearchParams({ pageSize: '200' })
+  // As with accounts: default to "everything" for the dropdown/lookup consumers; grids opt into
+  // real pagination by passing page + pageSize.
+  const search = new URLSearchParams({ pageSize: String(params?.pageSize ?? 200) })
+  if (params?.page) search.set('page', String(params.page))
   if (params?.includeDeleted) search.set('includeDeleted', 'true')
   return useQuery({
     queryKey: ['schemas', params],
@@ -139,16 +145,17 @@ export const useSchemaHistory = (name?: string) =>
   })
 
 export const useSubmissions = (
-  params: { page: number; pageSize: number; serviceId?: string; from?: string; to?: string },
+  params: { page: number; pageSize: number; serviceId?: string; schemaName?: string; from?: string; to?: string },
   enabled: boolean = true,
 ) => {
   const search = new URLSearchParams({
     page: String(params.page),
     pageSize: String(params.pageSize),
   })
-  if (params.serviceId) search.set('serviceId', params.serviceId)
-  if (params.from)      search.set('from', params.from)
-  if (params.to)        search.set('to', params.to)
+  if (params.serviceId)  search.set('serviceId', params.serviceId)
+  if (params.schemaName) search.set('schemaName', params.schemaName)
+  if (params.from)       search.set('from', params.from)
+  if (params.to)         search.set('to', params.to)
   return useQuery({
     queryKey: ['submissions', params],
     queryFn: () => api.get<Paged<Submission>>(`/api/admin/submissions?${search}`),
@@ -222,13 +229,14 @@ export const useMySchemas = (enabled: boolean = true) =>
   })
 
 export const useMySubmissions = (
-  params: { page: number; pageSize: number; from?: string; to?: string },
+  params: { page: number; pageSize: number; schemaName?: string; from?: string; to?: string },
   enabled: boolean = true,
 ) => {
   const search = new URLSearchParams({
     page: String(params.page),
     pageSize: String(params.pageSize),
   })
+  if (params.schemaName) search.set('schemaName', params.schemaName)
   if (params.from) search.set('from', params.from)
   if (params.to)   search.set('to', params.to)
   return useQuery({
@@ -269,12 +277,19 @@ export const useReplaceMySubmission = () => {
 
 // --- Reports ------------------------------------------------------------------------------
 
-export const useReports = (enabled: boolean = true) =>
-  useQuery({
-    queryKey: ['reports'],
-    queryFn: () => api.get<Paged<Report>>('/api/reports?pageSize=200'),
+export const useReports = (
+  params?: { page?: number; pageSize?: number },
+  enabled: boolean = true,
+) => {
+  // Default to "everything" (TopBar search + other consumers); the grid passes page + pageSize.
+  const search = new URLSearchParams({ pageSize: String(params?.pageSize ?? 200) })
+  if (params?.page) search.set('page', String(params.page))
+  return useQuery({
+    queryKey: ['reports', params],
+    queryFn: () => api.get<Paged<Report>>(`/api/reports?${search}`),
     enabled,
   })
+}
 
 export const useReport = (name?: string, enabled: boolean = true) =>
   useQuery({
