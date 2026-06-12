@@ -16,6 +16,9 @@ import type {
   EmailTemplate, UpdateEmailTemplateRequest,
   EmailMessage, EmailStatus, EmailDrainResult, SendAdhocEmailRequest,
   NotificationSettings, UpdateNotificationSettingsRequest, NotificationRunResult,
+  WebhookEndpoint, CreateWebhookEndpointRequest, UpdateWebhookEndpointRequest,
+  WebhookEndpointCreatedResponse, WebhookSecretResponse,
+  WebhookDelivery, WebhookDeliveryStatus, WebhookDrainResult,
 } from './types'
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/api/me') })
@@ -424,6 +427,102 @@ export const useRunNotifications = () => {
   return useMutation({
     mutationFn: () => api.post<NotificationRunResult>('/api/admin/notifications/run', {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['email-outbox'] }),
+  })
+}
+
+// --- Webhooks (admin) ---------------------------------------------------------------------
+
+export const useWebhookEndpoints = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['webhook-endpoints'],
+    queryFn: () => api.get<WebhookEndpoint[]>('/api/admin/webhooks'),
+    enabled,
+  })
+
+export const useCreateWebhookEndpoint = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: CreateWebhookEndpointRequest) =>
+      api.post<WebhookEndpointCreatedResponse>('/api/admin/webhooks', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-endpoints'] }),
+  })
+}
+
+export const useUpdateWebhookEndpoint = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, req }: { id: string; req: UpdateWebhookEndpointRequest }) =>
+      api.put<WebhookEndpoint>(`/api/admin/webhooks/${id}`, req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-endpoints'] }),
+  })
+}
+
+export const useDeleteWebhookEndpoint = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/api/admin/webhooks/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-endpoints'] }),
+  })
+}
+
+/** Mint a fresh signing secret for an endpoint. The plaintext comes back exactly once. */
+export const useRotateWebhookSecret = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post<WebhookSecretResponse>(`/api/admin/webhooks/${id}/rotate-secret`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-endpoints'] }),
+  })
+}
+
+/** Enqueue a `webhook.test` delivery so the operator can verify the wiring end-to-end. */
+export const useSendWebhookTest = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ id: string }>(`/api/admin/webhooks/${id}/test`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-deliveries'] }),
+  })
+}
+
+/** Page through the webhook delivery log, optionally filtered by status and a created-at window. */
+export const useWebhookDeliveries = (
+  params: { page: number; pageSize: number; status?: WebhookDeliveryStatus; from?: string; to?: string },
+  enabled: boolean = true,
+) => {
+  const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize) })
+  if (params.status) search.set('status', params.status)
+  if (params.from)   search.set('from', params.from)
+  if (params.to)     search.set('to', params.to)
+  return useQuery({
+    queryKey: ['webhook-deliveries', params],
+    queryFn: () => api.get<Paged<WebhookDelivery>>(`/api/admin/webhooks/deliveries?${search}`),
+    enabled,
+  })
+}
+
+/** Walk every page of the webhook delivery log for a CSV export (honours the status/period filters). */
+export const fetchAllWebhookDeliveries = (params?: { status?: WebhookDeliveryStatus; from?: string; to?: string }) => {
+  const search = new URLSearchParams()
+  if (params?.status) search.set('status', params.status)
+  if (params?.from)   search.set('from', params.from)
+  if (params?.to)     search.set('to', params.to)
+  return fetchAllPaged<WebhookDelivery>('/api/admin/webhooks/deliveries', search)
+}
+
+/** Requeue a delivery (typically a failed one) for another attempt. */
+export const useRedeliverWebhook = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (deliveryId: string) => api.post<void>(`/api/admin/webhooks/deliveries/${deliveryId}/redeliver`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-deliveries'] }),
+  })
+}
+
+/** Trigger a manual outbox drain (sends pending deliveries now). */
+export const useDrainWebhooks = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<WebhookDrainResult>('/api/admin/webhooks/drain', {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['webhook-deliveries'] }),
   })
 }
 

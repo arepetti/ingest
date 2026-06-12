@@ -73,7 +73,7 @@ Register the callback URL (`…/api/auth/callback/{provider}`) per environment w
 
 ## Email & notifications
 
-> **The entire `Email` section only takes effect when `Email:Enabled` is `true` (the default).** Set it to `false` and the whole feature is inert — no background workers start, the admin **Settings → Email / Email templates / Notifications** tabs and the **Audit → Sent emails** tab disappear, the per-account **Send email** action is hidden, and the email/notification endpoints return 404. This mirrors the SSO master-switch pattern.
+> **The entire `Email` section only takes effect when `Email:Enabled` is `true` (the default).** Set it to `false` and the whole feature is inert — no background workers start, the admin **Settings → Email / Email templates / Notifications** sections and the **Audit → Sent emails** tab disappear, the per-account **Send email** action is hidden, and the email/notification endpoints return 404. This mirrors the SSO master-switch pattern.
 
 The **runtime SMTP connection** (host, port, credentials, from-address) is **stored in the database**, not configuration, so admins can change it without a redeploy (**Settings → Email**). Configuration only provides an optional one-time **seed** used when no settings document exists yet. The SMTP password is encrypted at rest using a key derived from `ApiKey:Pepper`, so there is no extra secret to manage.
 
@@ -98,6 +98,22 @@ The **runtime SMTP connection** (host, port, credentials, from-address) is **sto
 |---------------------------------------|---------|-------|
 | `Notifications:Scheduler:Enabled`     | `true`  | Whether an in-process scheduler runs the notification job on a timer. Set `false` to drive runs from an external scheduler hitting `POST /api/admin/notifications/run`. |
 | `Notifications:Scheduler:PollMinutes` | `15`    | How often the in-process scheduler triggers a run (minutes, floored at 1). |
+
+## Webhooks
+
+> **The entire `Webhooks` section only takes effect when `Webhooks:Enabled` is `true`. It is `false` by default.** When off, the feature is inert — no background worker starts, the admin **Settings → Webhooks** section is hidden, and every `/api/admin/webhooks/*` endpoint returns 404. This mirrors the email/SSO master-switch pattern. See [admin-user-guide/webhooks.md](../admin-user-guide/webhooks.md) for the admin workflow and the delivery/signature contract.
+
+*What* to deliver and *where* (endpoints, subscribed events, per-service filter, signing secret) is admin data stored in the database; configuration only carries the master switch, the worker cadence, and an optional SSRF allow-list. The `window.upcoming` / `window.missed` events are discovered by the **notification scheduler** (`Notifications:Scheduler:*` above), so that job runs whenever a webhook subscribes to them even if the matching email trigger is off.
+
+| Key                              | Default | Notes |
+|----------------------------------|---------|-------|
+| `Webhooks:Enabled`               | `false` | Master switch for the outbound webhooks feature. |
+| `Webhooks:RequestTimeoutSeconds` | `10`    | Per-attempt HTTP timeout for a delivery POST. |
+| `Webhooks:AllowedHostSuffixes`   | `[]`    | Optional SSRF allow-list. When non-empty, an endpoint URL is only delivered if its host ends with one of these suffixes (e.g. `example.org`). Empty = allow any host. |
+| `Webhooks:Worker:Enabled`        | `true`  | Whether an in-process background service drains the delivery outbox on a timer. Set `false` to drive sending from an external scheduler hitting `POST /api/admin/webhooks/drain`. |
+| `Webhooks:Worker:PollSeconds`    | `15`    | How often the in-process drainer wakes up (seconds). |
+| `Webhooks:Worker:MaxAttempts`    | `6`     | Delivery attempts (with exponential backoff) before a delivery is marked permanently `Failed`. |
+| `Webhooks:Worker:BatchSize`      | `25`    | Max deliveries sent per drain pass. |
 
 > **Retention** is the time-based clean-up enforcing GDPR storage limitation. It hard-deletes data once it outlives its window. Off by default; every window is a day count where `0` (or absent) means "keep forever". A manual `POST /api/admin/retention/run` (Admin) works regardless of `Enabled`. See [admin-user-guide/settings.md § Retention](../admin-user-guide/settings.md#retention).
 

@@ -8,6 +8,7 @@ Operations-side documentation: standing up the service and hooking reporting too
 | [hosting.md](hosting.md)              | Step-by-step Azure deployment (Container Apps + Cosmos DB for MongoDB), including a **free ~$0 evaluation tier** (Container Apps free grant + vCore Free Tier + GHCR), plus alternatives (App Service, AKS, self-hosted MongoDB). Operational checklist. |
 | [configuration.md](configuration.md)  | Full reference for every configurable setting — connection string, API-key pepper and header, application behaviour, hosting/observability variables. |
 | [powerbi.md](powerbi.md)              | Connecting Power BI (or any OData v4 client) to the `/odata/samples` feed. Custom-header auth recipe, pre-filtering, data-model tips, refresh schedules. |
+| [excel.md](excel.md)                  | Connecting Excel (Get & Transform / Power Query) to the `/odata/samples` feed — the cheapest analyst on-ramp using existing Microsoft 365. Header recipe, key-in-parameter, flattening, PivotTables, refresh. |
 
 ## Related reading
 

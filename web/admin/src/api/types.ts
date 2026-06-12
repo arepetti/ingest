@@ -372,6 +372,8 @@ export interface Me {
   kind: AccountKind
   /** Whether the email + notification feature is enabled server-side. Drives whether the related UI shows at all. */
   emailEnabled?: boolean
+  /** Whether outbound webhooks are enabled server-side. Drives whether the Webhooks settings section shows. */
+  webhooksEnabled?: boolean
   /** Server application version (from Directory.Build.props), shown in the dashboard footer. */
   version?: string
 }
@@ -559,6 +561,96 @@ export interface RenderReportRequest {
   from?: string | null
   /** Exclusive upper bound. Defaults to "now". */
   to?: string | null
+}
+
+// --- Webhooks ------------------------------------------------------------------------------
+
+/**
+ * The outbound event kinds an endpoint can subscribe to. Wire values are the C# enum names
+ * (the API serialises enums with their member names). The dotted name a consumer actually
+ * receives in the payload (`submission.accepted`, …) is a separate, server-side concern.
+ */
+export type WebhookEventKind =
+  | 'SubmissionAccepted'
+  | 'SubmissionWarnings'
+  | 'WindowUpcoming'
+  | 'WindowMissed'
+
+/** Delivery state of a queued webhook POST. Mirrors the email outbox states. */
+export type WebhookDeliveryStatus = 'Pending' | 'Sending' | 'Sent' | 'Failed'
+
+/** A registered outbound webhook subscription. The signing secret is never returned. */
+export interface WebhookEndpoint {
+  id: string
+  name: string
+  url: string
+  enabled: boolean
+  events: WebhookEventKind[]
+  /** Optional service filter; null = fire for every service. */
+  serviceAccountId?: string | null
+  description?: string | null
+  /** True when a signing secret is set (the value itself is never exposed). */
+  hasSecret: boolean
+  createdAt: string
+  modifiedAt: string
+  modifiedBy?: string | null
+}
+
+/** Body for creating an endpoint. When `generateSecret` is true the secret is returned once. */
+export interface CreateWebhookEndpointRequest {
+  name: string
+  url: string
+  enabled?: boolean
+  events?: WebhookEventKind[]
+  serviceAccountId?: string | null
+  description?: string | null
+  generateSecret?: boolean
+}
+
+/** Body for updating an endpoint. The signing secret is managed via rotate, not here. */
+export interface UpdateWebhookEndpointRequest {
+  name: string
+  url: string
+  enabled: boolean
+  events?: WebhookEventKind[]
+  serviceAccountId?: string | null
+  description?: string | null
+}
+
+/** Response when an endpoint is created. `secret` is non-null only when one was generated. */
+export interface WebhookEndpointCreatedResponse {
+  endpoint: WebhookEndpoint
+  secret?: string | null
+}
+
+/** Response when a signing secret is rotated: carries the plaintext exactly once. */
+export interface WebhookSecretResponse {
+  endpoint: WebhookEndpoint
+  secret: string
+}
+
+/** One row in the webhook delivery log. */
+export interface WebhookDelivery {
+  id: string
+  endpointId: string
+  url: string
+  /** Dotted event name as the consumer sees it (`submission.accepted`, `webhook.test`, …). */
+  event: string
+  eventId: string
+  status: WebhookDeliveryStatus
+  attempts: number
+  lastError?: string | null
+  lastStatusCode?: number | null
+  createdAt: string
+  deliveredAt?: string | null
+  nextAttemptAt?: string | null
+  relatedAccountId?: string | null
+}
+
+/** Result of a manual webhook outbox drain. */
+export interface WebhookDrainResult {
+  sent: number
+  failed: number
 }
 
 /** Response shape returned by the render endpoint. */

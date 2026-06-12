@@ -853,3 +853,113 @@ public sealed record RenderReportRequest(
 /// <param name="FileName">Original file name; used to derive a default <c>name</c> when the front matter doesn't carry one.</param>
 /// <param name="Content">Full document text (front matter + Liquid template).</param>
 public sealed record UploadReportRequest(string FileName, string Content);
+
+/// <summary>Wire shape of a webhook endpoint. The signing secret is write-once: only <see cref="HasSecret"/> is ever returned.</summary>
+/// <param name="Id">Stable identifier.</param>
+/// <param name="Name">Friendly name.</param>
+/// <param name="Url">Destination URL.</param>
+/// <param name="Enabled">Whether the endpoint currently receives deliveries.</param>
+/// <param name="Events">Subscribed event kinds.</param>
+/// <param name="ServiceAccountId">Optional service filter; null = all services.</param>
+/// <param name="Description">Optional human description.</param>
+/// <param name="HasSecret">True when a signing secret is set (the value itself is never exposed).</param>
+/// <param name="CreatedAt">Creation timestamp (UTC).</param>
+/// <param name="ModifiedAt">Last update timestamp (UTC).</param>
+/// <param name="ModifiedBy">Name of the last modifier.</param>
+public sealed record WebhookEndpointDto(
+    Guid Id,
+    string Name,
+    string Url,
+    bool Enabled,
+    List<WebhookEventKind> Events,
+    Guid? ServiceAccountId,
+    string? Description,
+    bool HasSecret,
+    DateTime CreatedAt,
+    DateTime ModifiedAt,
+    string? ModifiedBy)
+{
+    /// <summary>Project the domain entity onto the wire shape, omitting the secret.</summary>
+    public static WebhookEndpointDto From(WebhookEndpoint e) => new(
+        e.Id, e.Name, e.Url, e.Enabled, e.Events, e.ServiceAccountId, e.Description,
+        !string.IsNullOrEmpty(e.SecretCipher), e.CreatedAt, e.ModifiedAt, e.ModifiedBy);
+}
+
+/// <summary>Body for <c>POST /api/admin/webhooks</c>.</summary>
+/// <param name="Name">Friendly name.</param>
+/// <param name="Url">Absolute http(s) destination URL.</param>
+/// <param name="Enabled">Whether the endpoint is active; defaults to true.</param>
+/// <param name="Events">Subscribed event kinds.</param>
+/// <param name="ServiceAccountId">Optional service filter; null = all services.</param>
+/// <param name="Description">Optional human description.</param>
+/// <param name="GenerateSecret">When true, mint a signing secret and return it once in the response.</param>
+public sealed record CreateWebhookEndpointRequest(
+    string Name,
+    string Url,
+    bool Enabled = true,
+    List<WebhookEventKind>? Events = null,
+    Guid? ServiceAccountId = null,
+    string? Description = null,
+    bool GenerateSecret = false);
+
+/// <summary>Body for <c>PUT /api/admin/webhooks/{id}</c>. The signing secret is managed via rotate, not here.</summary>
+/// <param name="Name">Friendly name.</param>
+/// <param name="Url">Absolute http(s) destination URL.</param>
+/// <param name="Enabled">Whether the endpoint is active.</param>
+/// <param name="Events">Subscribed event kinds.</param>
+/// <param name="ServiceAccountId">Optional service filter; null = all services.</param>
+/// <param name="Description">Optional human description.</param>
+public sealed record UpdateWebhookEndpointRequest(
+    string Name,
+    string Url,
+    bool Enabled,
+    List<WebhookEventKind>? Events = null,
+    Guid? ServiceAccountId = null,
+    string? Description = null);
+
+/// <summary>Response when an endpoint is created. <paramref name="Secret"/> is non-null only when a secret was generated, and is shown exactly once.</summary>
+/// <param name="Endpoint">The created endpoint.</param>
+/// <param name="Secret">The plaintext signing secret, or null when none was generated.</param>
+public sealed record WebhookEndpointCreatedResponse(WebhookEndpointDto Endpoint, string? Secret);
+
+/// <summary>Response when a signing secret is rotated: carries the plaintext exactly once.</summary>
+/// <param name="Endpoint">The updated endpoint.</param>
+/// <param name="Secret">The new plaintext signing secret.</param>
+public sealed record WebhookSecretResponse(WebhookEndpointDto Endpoint, string Secret);
+
+/// <summary>Wire shape of one webhook delivery for the admin "Deliveries" panel.</summary>
+/// <param name="Id">Delivery id (also sent to the consumer as the delivery header).</param>
+/// <param name="EndpointId">Target endpoint.</param>
+/// <param name="Url">Destination URL (snapshot).</param>
+/// <param name="Event">Dotted event name as the consumer sees it (e.g. <c>submission.accepted</c>, <c>webhook.test</c>).</param>
+/// <param name="EventId">Deterministic event id / idempotency key.</param>
+/// <param name="Status">Delivery status.</param>
+/// <param name="Attempts">Number of delivery attempts.</param>
+/// <param name="LastError">Last delivery error, if any.</param>
+/// <param name="LastStatusCode">HTTP status of the last attempt, if a response was received.</param>
+/// <param name="CreatedAt">Enqueue timestamp.</param>
+/// <param name="DeliveredAt">Delivery timestamp, if delivered.</param>
+/// <param name="NextAttemptAt">Earliest time the next retry runs, if pending after a failure.</param>
+/// <param name="RelatedAccountId">Related service account, if any.</param>
+public sealed record WebhookDeliveryDto(
+    Guid Id,
+    Guid EndpointId,
+    string Url,
+    string Event,
+    string EventId,
+    WebhookDeliveryStatus Status,
+    int Attempts,
+    string? LastError,
+    int? LastStatusCode,
+    DateTime CreatedAt,
+    DateTime? DeliveredAt,
+    DateTime? NextAttemptAt,
+    Guid? RelatedAccountId)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static WebhookDeliveryDto From(WebhookDelivery d) => new(
+        d.Id, d.EndpointId, d.Url,
+        d.EventId.StartsWith("test:", StringComparison.Ordinal) ? "webhook.test" : d.Kind.ToWire(),
+        d.EventId, d.Status, d.Attempts, d.LastError, d.LastStatusCode,
+        d.CreatedAt, d.DeliveredAt, d.NextAttemptAt, d.RelatedAccountId);
+}

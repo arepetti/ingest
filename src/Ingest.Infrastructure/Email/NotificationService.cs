@@ -28,6 +28,7 @@ public sealed class NotificationService : INotificationService
     private readonly IEmailContentBuilder _content;
     private readonly IEmailQueue _queue;
     private readonly INotificationSettingsService _settingsService;
+    private readonly IWebhookPublisher _webhooks;
     private readonly IAuditContext _audit;
     private readonly ILogger<NotificationService> _logger;
 
@@ -39,6 +40,7 @@ public sealed class NotificationService : INotificationService
         IEmailContentBuilder content,
         IEmailQueue queue,
         INotificationSettingsService settingsService,
+        IWebhookPublisher webhooks,
         IAuditContext audit,
         ILogger<NotificationService> logger)
     {
@@ -48,6 +50,7 @@ public sealed class NotificationService : INotificationService
         _content = content;
         _queue = queue;
         _settingsService = settingsService;
+        _webhooks = webhooks;
         _audit = audit;
         _logger = logger;
     }
@@ -56,7 +59,16 @@ public sealed class NotificationService : INotificationService
     public async Task<NotificationRunResult> RunAsync(CancellationToken ct = default)
     {
         var settings = await _settingsService.GetAsync(ct);
-        if (!settings.Upcoming.Enabled && !settings.Missed.Enabled && !settings.Warnings.Enabled)
+
+        // Window webhooks ride along on the same detection passes as the emails. The passes must
+        // therefore also run when an email rule is off but a webhook endpoint subscribes to that
+        // window event, otherwise the webhook would never fire. (Warnings webhooks are emitted
+        // synchronously at accept time by the submission service, so they're not handled here.)
+        var webhookUpcoming = await WebhookWantsAsync(WebhookEventKind.WindowUpcoming, ct);
+        var webhookMissed = await WebhookWantsAsync(WebhookEventKind.WindowMissed, ct);
+
+        if (!settings.Upcoming.Enabled && !settings.Missed.Enabled && !settings.Warnings.Enabled
+            && !webhookUpcoming && !webhookMissed)
             return new NotificationRunResult(0, 0, 0);
 
         // Service accounts keyed by id, plus the resolved admin/operator recipient addresses.
@@ -64,10 +76,10 @@ public sealed class NotificationService : INotificationService
         var serviceById = services.ToDictionary(a => a.Id);
         var adminRecipients = await ResolveAdminRecipientsAsync(settings, ct);
 
-        var upcoming = settings.Upcoming.Enabled
-            ? await RunUpcomingAsync(settings, services, adminRecipients, ct) : 0;
-        var missed = settings.Missed.Enabled
-            ? await RunMissedAsync(settings, serviceById, adminRecipients, ct) : 0;
+        var upcoming = settings.Upcoming.Enabled || webhookUpcoming
+            ? await RunUpcomingAsync(settings, services, adminRecipients, webhookUpcoming, ct) : 0;
+        var missed = settings.Missed.Enabled || webhookMissed
+            ? await RunMissedAsync(settings, serviceById, adminRecipients, webhookMissed, ct) : 0;
         var warnings = settings.Warnings.Enabled
             ? await RunWarningsAsync(settings, serviceById, adminRecipients, ct) : 0;
 
@@ -78,6 +90,7 @@ public sealed class NotificationService : INotificationService
         NotificationSettings settings,
         IReadOnlyList<Account> services,
         IReadOnlyList<Recipient> adminRecipients,
+        bool webhookWants,
         CancellationToken ct)
     {
         var now = _audit.UtcNow;
@@ -103,6 +116,20 @@ public sealed class NotificationService : INotificationService
                 var key = $"upcoming:{service.Id}:{schema.SchemaName}:{value.ValueName}:{value.PeriodStart:O}";
                 if (!await ReserveAsync(key, NotificationKind.Upcoming, ct)) continue;
 
+                if (webhookWants)
+                    await PublishWebhookAsync(WebhookEventKind.WindowUpcoming, key, new
+                    {
+                        service = ServiceModel(service),
+                        serviceId = service.Id,
+                        schema = schema.SchemaName,
+                        value = value.ValueName,
+                        valueLabel = value.Label ?? value.ValueName,
+                        cadence = value.Cadence.ToString(),
+                        periodStart = value.PeriodStart,
+                        periodEnd = value.PeriodEnd,
+                    }, service.Id, ct);
+
+                if (!settings.Upcoming.Enabled) continue;
                 items.Add(new
                 {
                     schema = schema.SchemaName,
@@ -125,6 +152,7 @@ public sealed class NotificationService : INotificationService
         NotificationSettings settings,
         IReadOnlyDictionary<Guid, Account> serviceById,
         IReadOnlyList<Recipient> adminRecipients,
+        bool webhookWants,
         CancellationToken ct)
     {
         IReadOnlyList<MissingByCadence> missing;
@@ -139,6 +167,22 @@ public sealed class NotificationService : INotificationService
             var key = $"missed:{entry.ServiceId}:{entry.SchemaName}:{bucket.PeriodStart:O}";
             if (!await ReserveAsync(key, NotificationKind.Missed, ct)) continue;
 
+            if (webhookWants)
+                await PublishWebhookAsync(WebhookEventKind.WindowMissed, key, new
+                {
+                    serviceId = entry.ServiceId,
+                    serviceName = entry.ServiceName,
+                    serviceLabel = entry.ServiceLabel,
+                    schema = entry.SchemaName,
+                    schemaLabel = entry.SchemaLabel,
+                    cadence = bucket.Cadence.ToString(),
+                    missingCount = entry.MissingRequiredCount,
+                    totalCount = entry.TotalRequiredCount,
+                    periodStart = bucket.PeriodStart,
+                    periodEnd = bucket.PeriodEnd,
+                }, entry.ServiceId, ct);
+
+            if (!settings.Missed.Enabled) continue;
             if (!perService.TryGetValue(entry.ServiceId, out var list))
                 perService[entry.ServiceId] = list = new List<object>();
             list.Add(new
@@ -248,6 +292,24 @@ public sealed class NotificationService : INotificationService
             .GroupBy(r => r.Email, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First())
             .ToList();
+    }
+
+    /// <summary>True when at least one enabled endpoint subscribes to the given webhook event kind.</summary>
+    private async Task<bool> WebhookWantsAsync(WebhookEventKind kind, CancellationToken ct)
+    {
+        var fb = Builders<WebhookEndpoint>.Filter;
+        var filter = fb.And(
+            fb.Eq(e => e.IsDeleted, false),
+            fb.Eq(e => e.Enabled, true),
+            fb.AnyEq(e => e.Events, kind));
+        return await _ctx.WebhookEndpoints.Find(filter).AnyAsync(ct);
+    }
+
+    /// <summary>Publish a window webhook, isolating failures so they never abort the notification run.</summary>
+    private async Task PublishWebhookAsync(WebhookEventKind kind, string eventId, object data, Guid? serviceId, CancellationToken ct)
+    {
+        try { await _webhooks.PublishAsync(kind, eventId, data, serviceId, ct); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Webhook publish failed for {Kind} {EventId}.", kind.ToWire(), eventId); }
     }
 
     /// <summary>Insert a dedupe marker; returns false if one already exists for this event.</summary>

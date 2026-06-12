@@ -1,12 +1,17 @@
 # Settings
 
-**Settings** is an admin-only hub (it doesn't appear for operators or services). It's organised into tabs. When the **email feature is enabled** (`Email:Enabled`, on by default — see [setup/configuration.md → Email & notifications](../setup/configuration.md#email--notifications)) you get **Email**, **Email templates** and **Notifications** tabs. **Backup & restore** is always present.
+**Settings** is an admin-only hub (it doesn't appear for operators or services). It uses a master-detail layout — a vertical list of **sections** on the left, the selected section's content on the right (much like VS Code's settings). The sections shown depend on which features are enabled:
 
-> When `Email:Enabled` is `false`, the three email/notification tabs disappear, along with the **Audit → Sent emails** tab and the per-account **Send email** action. Everything below the Backup section then simply doesn't apply.
+- When the **email feature is enabled** (`Email:Enabled`, on by default — see [setup/configuration.md → Email & notifications](../setup/configuration.md#email--notifications)) you get **Email**, **Email templates** and **Notifications**.
+- When **webhooks are enabled** (`Webhooks:Enabled`, **off** by default) you get a **Webhooks** section — documented separately in [webhooks.md](webhooks.md).
+
+> When `Email:Enabled` is `false`, the three email/notification sections disappear, along with the **Audit → Sent emails** tab and the per-account **Send email** action. If neither email nor webhooks is enabled, the Settings page shows a short "nothing to configure" notice.
+
+> **Backup & restore moved.** It isn't really a setting, so it now lives on the **Tools** page (in the sidebar, directly above Settings) — see [tools.md](tools.md).
 
 ## Email (SMTP)
 
-The **Email** tab holds the SMTP connection used for every outgoing message. It's stored in the database (not config), so you can change it any time without a redeploy. A badge shows whether it's **Configured** (host + from-address present) or **Not configured**.
+The **Email** section holds the SMTP connection used for every outgoing message. It's stored in the database (not config), so you can change it any time without a redeploy. A badge shows whether it's **Configured** (host + from-address present) or **Not configured**.
 
 Fields:
 
@@ -21,7 +26,7 @@ If the SMTP settings are missing or wrong, queued emails don't vanish — they'r
 
 ## Email templates
 
-Notification emails are built from **Liquid templates** stored in the database. The **Email templates** tab lists the built-in templates; pick one to edit its **Subject**, **Text body** and optional **HTML body**. Liquid is validated on save, so a typo is rejected with a message rather than breaking delivery later. If you leave the HTML body blank, a plain-text email is sent.
+Notification emails are built from **Liquid templates** stored in the database. The **Email templates** section lists the built-in templates; pick one to edit its **Subject**, **Text body** and optional **HTML body**. Liquid is validated on save, so a typo is rejected with a message rather than breaking delivery later. If you leave the HTML body blank, a plain-text email is sent.
 
 The built-in templates and the model each one is rendered against:
 
@@ -35,7 +40,7 @@ Reference fields with the usual Liquid syntax, e.g. `{{ service.label }}` or `{%
 
 ## Notifications
 
-The **Notifications** tab controls *which events generate emails* and *who receives them*. There are three independent triggers:
+The **Notifications** section controls *which events generate emails* and *who receives them*. There are three independent triggers:
 
 - **Upcoming submission reminder** — a required value's cadence window is about to close and nothing has been submitted yet. Set the **lead time** (hours before the window closes) to control when it fires.
 - **Missed submission alert** — a required value's *previous* window closed without a submission (the deadline passed).
@@ -44,7 +49,7 @@ The **Notifications** tab controls *which events generate emails* and *who recei
 For each trigger you choose the recipients (additive):
 
 - **Notify the service account** — sends to the contact **email on the service account** the event is about. (Set those on [accounts.md](accounts.md).)
-- **Notify the admin/operator list** — sends to the shared **recipient list** at the bottom of the tab (operator/admin accounts that have an email).
+- **Notify the admin/operator list** — sends to the shared **recipient list** at the bottom of the section (operator/admin accounts that have an email).
 
 **Run now** triggers the job immediately (it also runs on a timer — `Notifications:Scheduler:PollMinutes`). Each event is **deduplicated**: the same window/submission is notified at most once, no matter how often the job runs. Enabling a trigger never floods recipients with a backlog — "upcoming" only looks at windows inside the lead time, "missed" only at the just-closed window, and "warnings" only at submissions from the last few days.
 
@@ -56,26 +61,7 @@ Operators and admins can send a one-off plain-text email to any account that has
 
 ## Backup & restore
 
-A convenience tool to export the whole registry to one JSON file, or restore it from one.
-
-> **This is not your primary backup.** It's meant for **small** deployments and for copying data between environments (e.g. seeding a test instance from production-like data). For real backups, take a **database-level** backup — see [setup/hosting.md → Backups](../setup/hosting.md#backups).
-
-### Export
-
-Click **Download backup**. Your browser downloads `ingest-backup-<timestamp>.json` containing every collection — accounts (with their hashed API keys), schemas, submissions, the derived samples read model, reports, and the audit log. Because hashed keys are included, a restored backup keeps existing API keys working.
-
-> The whole database is loaded into memory to build the file, so this is only practical for small databases. On a large database, use a database-level backup instead.
-
-### Restore
-
-Click **Restore from file…**, pick a backup JSON, and confirm the warning.
-
-- **Restore replaces all current data.** Every collection in the file is emptied and repopulated from the backup. Anything currently in the database that isn't in the file is gone.
-- **It is not transactional.** If the restore fails part-way (e.g. a malformed file slips past the format check), the database can be left partially restored. Take a fresh backup before restoring.
-- **The file is validated first.** A file that isn't an Ingest backup, is the wrong version, or isn't valid JSON is rejected before anything is touched.
-- **Lock-out caution.** Because accounts and keys are part of the snapshot, restoring an *old* backup can revert your own account/keys to their state at backup time. Make sure you still hold a valid key (or SSO link) for an enabled admin account that exists *in the backup* before you restore.
-
-On success the tool reports how many documents were written into each collection.
+Backup & restore has moved to the **Tools** page (sidebar, directly above Settings) — it's an operational utility rather than a configuration screen. See [tools.md](tools.md).
 
 ## Retention
 

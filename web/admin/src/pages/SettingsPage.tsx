@@ -1,25 +1,29 @@
 import { useState } from 'react'
 import {
   Avatar, Badge, Body1, Button, Card, Checkbox, Dropdown, Drawer, DrawerBody, Field, Input, Option, Spinner,
-  Switch, Tab, TabList,
+  Switch,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
-  Text, Textarea, Title2, Title3,
+  Textarea, Title3,
   MessageBarBody, makeStyles, tokens,
 } from '@fluentui/react-components'
-import { ArrowDownload20Regular, ArrowUpload20Regular, Mail20Regular } from '@fluentui/react-icons'
+import {
+  Alert24Regular, DocumentText24Regular, Mail20Regular, Mail24Regular, PlugConnected24Regular,
+} from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
+import { SectionedLayout } from '../components/SectionedLayout'
+import type { LayoutSection } from '../components/SectionedLayout'
+import { WebhooksSection } from '../components/WebhooksSection'
 import { clickableRowProps } from '../utils/a11y'
 import {
-  backupExportUrl, useImportBackup, useMe, useAccounts,
+  useMe, useAccounts,
   useEmailSettings, useUpdateEmailSettings,
   useEmailTemplates, useUpdateEmailTemplate,
   useNotificationSettings, useUpdateNotificationSettings, useRunNotifications,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
-import { downloadFromUrl, pickTextFile } from '../utils/download'
 import type {
-  BackupImportResult, EmailSettings, EmailTemplate, NotificationSettings, NotificationRule,
+  EmailSettings, EmailTemplate, NotificationSettings, NotificationRule,
 } from '../api/types'
 
 const useStyles = makeStyles({
@@ -37,15 +41,6 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground2,
   },
   ruleChildren: { display: 'flex', gap: '20px', flexWrap: 'wrap', paddingLeft: '6px' },
-  warn: {
-    borderLeft: `3px solid ${tokens.colorPaletteDarkOrangeBorderActive}`,
-    backgroundColor: tokens.colorNeutralBackground2,
-    padding: '10px 14px',
-    borderRadius: tokens.borderRadiusMedium,
-    color: tokens.colorNeutralForeground2,
-    fontSize: tokens.fontSizeBase200,
-  },
-  counts: { margin: '4px 0 0', paddingLeft: '18px' },
   mono: { fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200 },
   table: { tableLayout: 'fixed', width: '100%' },
   tableRow: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
@@ -61,12 +56,8 @@ const useStyles = makeStyles({
   drawerForm: { display: 'flex', flexDirection: 'column', gap: '12px' },
 })
 
-type SettingsTab = 'backup' | 'email' | 'templates' | 'notifications'
-
 export function SettingsPage() {
-  const s = useStyles()
   const { data: me, isLoading } = useMe()
-  const [tab, setTab] = useState<SettingsTab>('backup')
 
   if (isLoading) return <Spinner label="Loading…" />
   if (me?.role !== 'Admin') {
@@ -78,23 +69,31 @@ export function SettingsPage() {
   }
 
   const emailEnabled = me?.emailEnabled === true
+  const webhooksEnabled = me?.webhooksEnabled === true
 
-  return (
-    <div className={s.root}>
-      <Title2>Settings</Title2>
-      <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as SettingsTab)}>
-        {emailEnabled && <Tab value="email">Email</Tab>}
-        {emailEnabled && <Tab value="templates">Email templates</Tab>}
-        {emailEnabled && <Tab value="notifications">Notifications</Tab>}
-        <Tab value="backup">Backup &amp; restore</Tab>
-      </TabList>
+  const sections: LayoutSection[] = [
+    ...(emailEnabled ? [
+      { id: 'email', label: 'Email', icon: <Mail24Regular />, render: () => <EmailSettingsSection /> },
+      { id: 'templates', label: 'Email templates', icon: <DocumentText24Regular />, render: () => <EmailTemplatesSection /> },
+      { id: 'notifications', label: 'Notifications', icon: <Alert24Regular />, render: () => <NotificationsSection /> },
+    ] as LayoutSection[] : []),
+    ...(webhooksEnabled ? [
+      { id: 'webhooks', label: 'Webhooks', icon: <PlugConnected24Regular />, render: () => <WebhooksSection /> },
+    ] as LayoutSection[] : []),
+  ]
 
-      {tab === 'email' && emailEnabled && <EmailSettingsSection />}
-      {tab === 'templates' && emailEnabled && <EmailTemplatesSection />}
-      {tab === 'notifications' && emailEnabled && <NotificationsSection />}
-      {tab === 'backup' && <BackupRestoreSection />}
-    </div>
-  )
+  if (sections.length === 0) {
+    return (
+      <AutoScrollMessageBar intent="info">
+        <MessageBarBody>
+          No configurable settings are enabled. Turn on email or webhooks in the server
+          configuration to manage them here.
+        </MessageBarBody>
+      </AutoScrollMessageBar>
+    )
+  }
+
+  return <SectionedLayout title="Settings" sections={sections} />
 }
 
 // --- Email (SMTP) settings ----------------------------------------------------------------
@@ -472,112 +471,5 @@ function RuleEditor({ title, rule, onChange }: {
         </div>
       )}
     </div>
-  )
-}
-
-// --- Backup / restore (admin convenience tool) --------------------------------------------
-
-function BackupRestoreSection() {
-  const s = useStyles()
-  const importer = useImportBackup()
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<BackupImportResult | null>(null)
-
-  async function onExport() {
-    setError(null)
-    setBusy(true)
-    try {
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-      await downloadFromUrl(backupExportUrl(), `ingest-backup-${stamp}.json`)
-    } catch (e) {
-      setError(formatApiError(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function onImport() {
-    setError(null)
-    setResult(null)
-    let parsed: unknown
-    try {
-      const { content } = await pickTextFile('.json,application/json')
-      parsed = JSON.parse(content)
-    } catch (e) {
-      // A cancelled picker rejects too; only surface real read/parse failures.
-      const msg = e instanceof Error ? e.message : String(e)
-      if (!/no file selected/i.test(msg)) setError(`Could not read the backup file: ${msg}`)
-      return
-    }
-
-    const ok = window.confirm(
-      'Restore from this backup?\n\n' +
-      'This REPLACES all current data (accounts, keys, schemas, submissions, reports, audit log) ' +
-      'with the contents of the file. It cannot be undone. Make sure you have a current backup first.',
-    )
-    if (!ok) return
-
-    try {
-      const res = await importer.mutateAsync(parsed)
-      setResult(res)
-    } catch (e) {
-      setError(formatApiError(e))
-    }
-  }
-
-  return (
-    <Card className={s.card}>
-      <div>
-        <Title3 className={s.sectionTitle}>Backup &amp; restore</Title3>
-        <Body1 className={s.help}>
-          Export the entire registry to a single JSON file, or restore it from one.
-        </Body1>
-      </div>
-
-      <div className={s.warn}>
-        This is a convenience tool for <strong>small</strong> deployments and moving data between
-        environments — <strong>not</strong> the primary backup mechanism. For real backups, take a
-        database-level snapshot (<code>mongodump</code> or your hosting provider&apos;s backup). A
-        restore <strong>replaces all current data</strong> and is not transactional.
-      </div>
-
-      {error && (
-        <AutoScrollMessageBar intent="error">
-          <MessageBarBody>{error}</MessageBarBody>
-        </AutoScrollMessageBar>
-      )}
-
-      {result && (
-        <AutoScrollMessageBar intent="success">
-          <MessageBarBody>
-            Restore complete.
-            <ul className={s.counts}>
-              {Object.entries(result.restored).map(([name, n]) => (
-                <li key={name}><Text weight="semibold">{name}</Text>: {n}</li>
-              ))}
-            </ul>
-          </MessageBarBody>
-        </AutoScrollMessageBar>
-      )}
-
-      <div className={s.actions}>
-        <Button
-          appearance="primary"
-          icon={busy ? <Spinner size="tiny" /> : <ArrowDownload20Regular />}
-          disabled={busy || importer.isPending}
-          onClick={onExport}
-        >
-          {busy ? 'Preparing…' : 'Download backup'}
-        </Button>
-        <Button
-          icon={importer.isPending ? <Spinner size="tiny" /> : <ArrowUpload20Regular />}
-          disabled={busy || importer.isPending}
-          onClick={onImport}
-        >
-          {importer.isPending ? 'Restoring…' : 'Restore from file…'}
-        </Button>
-      </div>
-    </Card>
   )
 }

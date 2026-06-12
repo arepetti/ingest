@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { Board24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Warning24Regular } from '@fluentui/react-icons'
+import { Board24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Toolbox24Regular, Warning24Regular } from '@fluentui/react-icons'
 import { useMe } from '../api/hooks'
 import { TopBar } from '../components/TopBar'
 import type { ReactNode } from 'react'
@@ -122,8 +122,11 @@ export function Shell() {
     // The audit trail is an admin-only oversight tool; operators and services have no access
     // to the backing endpoint (it would 403), so the entry only appears for admins.
     { to: '/audit',       label: 'Audit',       icon: <History24Regular />,            show: me?.role === 'Admin' },
-    // Admin-only configuration hub (backup/restore today; more tabs to come). Pinned to the bottom.
-    { to: '/settings',    label: 'Settings',    icon: <Settings24Regular />,           show: me?.role === 'Admin', bottom: true },
+    // Admin-only operational utilities (backup/restore today). Pinned to the bottom, directly
+    // above Settings. `marginTop: auto` on the first bottom entry pushes the whole bottom group down.
+    { to: '/tools',       label: 'Tools',       icon: <Toolbox24Regular />,            show: me?.role === 'Admin', bottom: true },
+    // Admin-only configuration hub (email, notifications, webhooks).
+    { to: '/settings',    label: 'Settings',    icon: <Settings24Regular />,           show: me?.role === 'Admin' },
   ]
 
   return (

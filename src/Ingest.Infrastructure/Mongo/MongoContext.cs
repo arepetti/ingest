@@ -49,6 +49,12 @@ public sealed class MongoContext
     /// <summary><c>notificationLogs</c> collection — dedupe markers so an event is notified at most once.</summary>
     public IMongoCollection<NotificationLog> NotificationLogs => Database.GetCollection<NotificationLog>("notificationLogs");
 
+    /// <summary><c>webhookEndpoints</c> collection — admin-registered outbound HTTP subscriptions.</summary>
+    public IMongoCollection<WebhookEndpoint> WebhookEndpoints => Database.GetCollection<WebhookEndpoint>("webhookEndpoints");
+
+    /// <summary><c>webhookDeliveries</c> collection — the durable queue of webhook POSTs to send / already sent.</summary>
+    public IMongoCollection<WebhookDelivery> WebhookDeliveries => Database.GetCollection<WebhookDelivery>("webhookDeliveries");
+
     /// <summary>Create a new <see cref="MongoContext"/>.</summary>
     /// <param name="client">Mongo client supplied by the container.</param>
     /// <param name="databaseName">Name of the database to use.</param>

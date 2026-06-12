@@ -170,6 +170,16 @@ if (emailOptions.Enabled)
     if (notificationOptions.Scheduler.Enabled) builder.Services.AddHostedService<NotificationSchedulerWorker>();
 }
 
+// Outbound webhooks. Gated by the Webhooks:Enabled master switch (mirrors email): when off, the
+// admin endpoints 404, the publisher is never invoked, and the dispatcher worker doesn't run. The
+// typed HttpClient picks up the Aspire standard resilience handler (retry/timeout/circuit-breaker)
+// configured in ServiceDefaults. The worker is independently toggleable so delivery can be driven
+// by an external scheduler hitting POST /api/admin/webhooks/drain instead.
+var webhookOptions = builder.Configuration.GetSection("Webhooks").Get<Ingest.Infrastructure.Webhooks.WebhookOptions>() ?? new Ingest.Infrastructure.Webhooks.WebhookOptions();
+builder.Services.AddHttpClient(Ingest.Infrastructure.Webhooks.WebhookDispatchService.HttpClientName);
+if (webhookOptions.Enabled && webhookOptions.Worker.Enabled)
+    builder.Services.AddHostedService<WebhookOutboxWorker>();
+
 // Retention purge (GDPR storage limitation). Off by default; the in-process worker only runs when
 // Retention:Enabled is on. The manual POST /api/admin/retention/run trigger works regardless, so
 // the schedule can be driven externally instead.

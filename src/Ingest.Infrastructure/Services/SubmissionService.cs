@@ -2,6 +2,9 @@ using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.Core.Validation;
+using Ingest.Infrastructure.Webhooks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Ingest.Infrastructure.Services;
 
@@ -20,6 +23,9 @@ public sealed class SubmissionService : ISubmissionService
     private readonly IAccountRepository _accounts;
     private readonly TimeProvider _time;
     private readonly IAuditLogService _audit;
+    private readonly IWebhookPublisher _webhooks;
+    private readonly bool _webhooksEnabled;
+    private readonly ILogger<SubmissionService> _logger;
 
     /// <summary>Create a new <see cref="SubmissionService"/>.</summary>
     /// <param name="submissions">Submission repository.</param>
@@ -29,6 +35,9 @@ public sealed class SubmissionService : ISubmissionService
     /// <param name="accounts">Account repository for owner/service lookups.</param>
     /// <param name="time">Clock used to evaluate cadence windows on replacement.</param>
     /// <param name="audit">Audit log used to record create/edit/delete changes.</param>
+    /// <param name="webhooks">Publisher used to push submission events to subscribed webhook endpoints.</param>
+    /// <param name="webhookOptions">Bound webhook options (only the master switch is read, to skip work when off).</param>
+    /// <param name="logger">Logger; webhook publishing failures are logged but never fail an accepted write.</param>
     public SubmissionService(
         ISubmissionRepository submissions,
         ISampleRepository samples,
@@ -36,7 +45,10 @@ public sealed class SubmissionService : ISubmissionService
         ISubmissionValidator validator,
         IAccountRepository accounts,
         TimeProvider time,
-        IAuditLogService audit)
+        IAuditLogService audit,
+        IWebhookPublisher webhooks,
+        IOptions<WebhookOptions> webhookOptions,
+        ILogger<SubmissionService> logger)
     {
         _submissions = submissions;
         _samples = samples;
@@ -45,6 +57,9 @@ public sealed class SubmissionService : ISubmissionService
         _accounts = accounts;
         _time = time;
         _audit = audit;
+        _webhooks = webhooks;
+        _webhooksEnabled = webhookOptions.Value.Enabled;
+        _logger = logger;
     }
 
     // ── Service-facing ──
@@ -242,6 +257,52 @@ public sealed class SubmissionService : ISubmissionService
             submission.Id,
             submission.ServiceName,
             ct);
+
+        await PublishAcceptedAsync(submission, isReplacement, ct);
+    }
+
+    /// <summary>
+    /// Push <c>submission.accepted</c> (and <c>submission.warnings</c> when warnings are present) to
+    /// any subscribed webhook endpoints. Best-effort and isolated: the submission is already
+    /// persisted, so a webhook hiccup must never turn an accepted write into an error.
+    /// </summary>
+    private async Task PublishAcceptedAsync(Submission submission, bool isReplacement, CancellationToken ct)
+    {
+        if (!_webhooksEnabled) return;
+
+        try
+        {
+            // The repository stamps SubmittedAt/ReplacedAt on the entity during PersistAsync, so a
+            // deterministic per-write id is available here for dedupe + idempotency.
+            var writtenAt = (isReplacement ? submission.ReplacedAt : submission.SubmittedAt) ?? submission.SubmittedAt;
+            var data = new
+            {
+                submissionId = submission.Id,
+                serviceAccountId = submission.ServiceAccountId,
+                serviceName = submission.ServiceName,
+                isReplacement,
+                submittedAt = submission.SubmittedAt,
+                replacedAt = submission.ReplacedAt,
+                sampleCount = submission.Samples.Count,
+                schemas = submission.Samples.Select(s => s.SchemaName).Distinct().ToList(),
+                warnings = submission.Warnings,
+            };
+
+            await _webhooks.PublishAsync(
+                WebhookEventKind.SubmissionAccepted,
+                $"accepted:{submission.Id}:{writtenAt:o}",
+                data, submission.ServiceAccountId, ct);
+
+            if (submission.Warnings.Count > 0)
+                await _webhooks.PublishAsync(
+                    WebhookEventKind.SubmissionWarnings,
+                    $"warnings:{submission.Id}:{writtenAt:o}",
+                    data, submission.ServiceAccountId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Webhook publish failed for submission {Id}; the submission was still accepted.", submission.Id);
+        }
     }
 
     /// <summary>

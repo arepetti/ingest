@@ -1,6 +1,7 @@
 using Ingest.Api.Auth;
 using Ingest.Api.Common;
 using Ingest.Infrastructure.Email;
+using Ingest.Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -27,10 +28,16 @@ public sealed class MeController : ControllerBase
         ?? "0.0.0";
 
     private readonly EmailOptions _email;
+    private readonly WebhookOptions _webhooks;
 
     /// <summary>Create a new <see cref="MeController"/>.</summary>
     /// <param name="email">Bound email options (only the master switch is read, to expose it to the SPA).</param>
-    public MeController(IOptions<EmailOptions> email) => _email = email.Value;
+    /// <param name="webhooks">Bound webhook options (only the master switch is read, to expose it to the SPA).</param>
+    public MeController(IOptions<EmailOptions> email, IOptions<WebhookOptions> webhooks)
+    {
+        _email = email.Value;
+        _webhooks = webhooks.Value;
+    }
 
     /// <summary>
     /// Returns the identity claims attached to the API key used for this request.
@@ -58,6 +65,7 @@ public sealed class MeController : ControllerBase
             role = User.FindFirst(ClaimTypes.Role)?.Value,
             kind = User.FindFirst(AuthConstants.KindClaim)?.Value,
             emailEnabled = _email.Enabled,
+            webhooksEnabled = _webhooks.Enabled,
             version = AppVersion,
         });
     }

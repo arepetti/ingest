@@ -11,17 +11,26 @@ import { ArrowClockwise20Regular, ArrowDownload20Regular, MoreHorizontal20Regula
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
 import { PeriodFilter } from '../components/PeriodFilter'
+import { RowActions } from '../components/RowActions'
 import { usePeriodFilter, type PeriodFilterState } from '../utils/usePeriodFilter'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
-import { auditExportUrl, fetchAllEmailOutbox, useAuditLog, useMe, useEmailOutbox, useDrainEmail } from '../api/hooks'
+import {
+  auditExportUrl, fetchAllEmailOutbox, fetchAllWebhookDeliveries,
+  useAuditLog, useMe, useEmailOutbox, useDrainEmail,
+  useWebhookDeliveries, useRedeliverWebhook, useDrainWebhooks,
+} from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { downloadFromUrl } from '../utils/download'
 import { formatDateTime } from '../utils/format'
-import type { AuditChangeType, AuditTargetType, AuditLog, EmailStatus, EmailMessage } from '../api/types'
+import type {
+  AuditChangeType, AuditTargetType, AuditLog, EmailStatus, EmailMessage,
+  WebhookDelivery, WebhookDeliveryStatus,
+} from '../api/types'
 
 const CHANGE_TYPES: AuditChangeType[] = ['Create', 'Edit', 'Delete']
 const TARGET_TYPES: AuditTargetType[] = ['User', 'Account', 'Schema', 'ApiKey', 'Submission', 'Report']
 const EMAIL_STATUSES: EmailStatus[] = ['Pending', 'Sending', 'Sent', 'Failed']
+const WEBHOOK_STATUSES: WebhookDeliveryStatus[] = ['Pending', 'Sending', 'Sent', 'Failed']
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -38,6 +47,7 @@ const useStyles = makeStyles({
   colTarget: { width: '120px' },
   colStatus: { width: '110px' },
   colAttempts: { width: '90px' },
+  colActions: { width: '52px' },
   cellId:    { maxWidth: 0 },
   mono:      { fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
 })
@@ -53,13 +63,25 @@ const EMAIL_EXPORT_COLUMNS: ExportColumn<EmailMessage>[] = [
   { header: 'Sent', value: m => m.sentAt ?? '' },
 ]
 
-type AuditTab = 'changes' | 'emails'
+const WEBHOOK_EXPORT_COLUMNS: ExportColumn<WebhookDelivery>[] = [
+  { header: 'Created', value: d => d.createdAt },
+  { header: 'Event', value: d => d.event },
+  { header: 'URL', value: d => d.url },
+  { header: 'Status', value: d => d.status },
+  { header: 'Attempts', value: d => d.attempts },
+  { header: 'Delivered', value: d => d.deliveredAt ?? '' },
+  { header: 'Last status code', value: d => d.lastStatusCode ?? '' },
+  { header: 'Last error', value: d => d.lastError ?? '' },
+]
+
+type AuditTab = 'changes' | 'emails' | 'webhooks'
 
 export function AuditPage() {
   const s = useStyles()
   const { data: me } = useMe()
   const [tab, setTab] = useState<AuditTab>('changes')
   const emailEnabled = me?.emailEnabled === true
+  const webhooksEnabled = me?.webhooksEnabled === true
 
   // Filter state is lifted out of the tabs so the single actions menu in the title row can act on
   // whichever tab is showing (export honours the active filters; the dropdowns still live in the
@@ -67,22 +89,33 @@ export function AuditPage() {
   const [change, setChange] = useState<AuditChangeType | undefined>(undefined)
   const [targetType, setTargetType] = useState<AuditTargetType | undefined>(undefined)
   const [status, setStatus] = useState<EmailStatus | undefined>(undefined)
+  const [webhookStatus, setWebhookStatus] = useState<WebhookDeliveryStatus | undefined>(undefined)
   const changesPeriod = usePeriodFilter()
   const emailsPeriod = usePeriodFilter()
+  const webhooksPeriod = usePeriodFilter()
   const queryClient = useQueryClient()
 
   // Refetch the active tab's list, keeping the current filters (react-query refetches with the
   // existing query params).
-  const onRefresh = () =>
-    queryClient.invalidateQueries({ queryKey: [tab === 'emails' ? 'email-outbox' : 'audit'] })
+  const onRefresh = () => {
+    const key = tab === 'emails' ? 'email-outbox' : tab === 'webhooks' ? 'webhook-deliveries' : 'audit'
+    queryClient.invalidateQueries({ queryKey: [key] })
+  }
 
   const [pageError, setPageError] = useState<string | null>(null)
   const [changesExporting, setChangesExporting] = useState(false)
   const drain = useDrainEmail()
+  const webhookDrain = useDrainWebhooks()
   const emailsExport = useCsvExport({
     filename: 'sent-emails.csv',
     columns: EMAIL_EXPORT_COLUMNS,
     fetchAll: () => fetchAllEmailOutbox({ status, from: emailsPeriod.from, to: emailsPeriod.to }),
+    onError: setPageError,
+  })
+  const webhooksExport = useCsvExport({
+    filename: 'webhook-deliveries.csv',
+    columns: WEBHOOK_EXPORT_COLUMNS,
+    fetchAll: () => fetchAllWebhookDeliveries({ status: webhookStatus, from: webhooksPeriod.from, to: webhooksPeriod.to }),
     onError: setPageError,
   })
 
@@ -107,6 +140,15 @@ export function AuditPage() {
     setPageError(null)
     try {
       await drain.mutateAsync()
+    } catch (e) {
+      setPageError(formatApiError(e))
+    }
+  }
+
+  async function onWebhookDrain() {
+    setPageError(null)
+    try {
+      await webhookDrain.mutateAsync()
     } catch (e) {
       setPageError(formatApiError(e))
     }
@@ -147,6 +189,20 @@ export function AuditPage() {
                   </MenuItem>
                 </>
               )}
+              {tab === 'webhooks' && webhooksEnabled && (
+                <>
+                  <MenuItem
+                    icon={<ArrowDownload20Regular />}
+                    disabled={webhooksExport.exporting}
+                    onClick={webhooksExport.exportList}
+                  >
+                    {webhooksExport.exporting ? 'Exporting…' : 'Export CSV'}
+                  </MenuItem>
+                  <MenuItem icon={<Send20Regular />} disabled={webhookDrain.isPending} onClick={onWebhookDrain}>
+                    {webhookDrain.isPending ? 'Sending…' : 'Send pending now'}
+                  </MenuItem>
+                </>
+              )}
             </MenuList>
           </MenuPopover>
         </Menu>
@@ -155,6 +211,7 @@ export function AuditPage() {
       <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as AuditTab)}>
         <Tab value="changes">Changes</Tab>
         {emailEnabled && <Tab value="emails">Sent emails</Tab>}
+        {webhooksEnabled && <Tab value="webhooks">Webhook deliveries</Tab>}
       </TabList>
 
       {pageError && (
@@ -177,6 +234,9 @@ export function AuditPage() {
       )}
       {tab === 'emails' && emailEnabled && (
         <SentEmailsTab status={status} setStatus={setStatus} period={emailsPeriod} />
+      )}
+      {tab === 'webhooks' && webhooksEnabled && (
+        <WebhookDeliveriesTab status={webhookStatus} setStatus={setWebhookStatus} period={webhooksPeriod} setError={setPageError} />
       )}
     </div>
   )
@@ -381,6 +441,137 @@ function SentEmailsTab({
       />
     </>
   )
+}
+
+function WebhookDeliveriesTab({
+  status, setStatus, period, setError,
+}: {
+  status?: WebhookDeliveryStatus
+  setStatus: (value: WebhookDeliveryStatus | undefined) => void
+  period: PeriodFilterState
+  setError: (message: string | null) => void
+}) {
+  const s = useStyles()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+
+  const { data, isLoading, error } = useWebhookDeliveries({ page, pageSize, status, from: period.from, to: period.to })
+  const redeliver = useRedeliverWebhook()
+
+  const items = data?.items ?? []
+
+  async function onRedeliver(id: string) {
+    setError(null)
+    try {
+      await redeliver.mutateAsync(id)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  return (
+    <>
+      <div className={s.filters}>
+        <div className={s.field}>
+          <span className={s.fieldLabel}>Status</span>
+          <Dropdown
+            className={s.filterDropdown}
+            size="small"
+            selectedOptions={[status ?? ALL]}
+            value={status ?? 'All'}
+            onOptionSelect={(_, d) => {
+              setStatus(d.optionValue === ALL ? undefined : (d.optionValue as WebhookDeliveryStatus))
+              setPage(1)
+            }}
+          >
+            <Option value={ALL}>All</Option>
+            {WEBHOOK_STATUSES.map(st => <Option key={st} value={st}>{st}</Option>)}
+          </Dropdown>
+        </div>
+        <PeriodFilter state={period} onChange={() => setPage(1)} />
+      </div>
+
+      {error && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>
+            <MessageBarTitle>Failed to load</MessageBarTitle>
+            {formatApiError(error)}
+          </MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      <Table size="small" className={s.table}>
+        <TableHeader>
+          <TableRow>
+            <TableHeaderCell className={s.colTime}>Created</TableHeaderCell>
+            <TableHeaderCell>Event</TableHeaderCell>
+            <TableHeaderCell>URL</TableHeaderCell>
+            <TableHeaderCell className={s.colStatus}>Status</TableHeaderCell>
+            <TableHeaderCell className={s.colAttempts}>Attempts</TableHeaderCell>
+            <TableHeaderCell className={s.colTime}>Delivered</TableHeaderCell>
+            <TableHeaderCell className={s.colActions} aria-label="Actions" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <GridMessageRow colSpan={7}>Loading…</GridMessageRow>}
+          {!isLoading && items.length === 0 && (
+            <GridMessageRow colSpan={7}>No deliveries recorded.</GridMessageRow>
+          )}
+          {items.map(d => (
+            <TableRow key={d.id} className={s.row}>
+              <TableCell className={s.colTime}>
+                <span className={s.truncate}>{formatDateTime(d.createdAt)}</span>
+              </TableCell>
+              <TableCell className={s.cellId}><span className={`${s.truncate} ${s.mono}`}>{d.event}</span></TableCell>
+              <TableCell className={s.cellId}>
+                <Tooltip content={d.url} relationship="label">
+                  <span className={`${s.truncate} ${s.mono}`}>{d.url}</span>
+                </Tooltip>
+              </TableCell>
+              <TableCell className={s.colStatus}><WebhookStatusBadge delivery={d} /></TableCell>
+              <TableCell className={s.colAttempts}>{d.attempts}</TableCell>
+              <TableCell className={s.colTime}>
+                <span className={s.truncate}>{d.deliveredAt ? formatDateTime(d.deliveredAt) : '—'}</span>
+              </TableCell>
+              <TableCell className={s.colActions} onClick={ev => ev.stopPropagation()}>
+                <RowActions
+                  ariaLabel={`Actions for delivery ${d.id}`}
+                  actions={[
+                    {
+                      key: 'redeliver', label: 'Redeliver', icon: <Send20Regular />,
+                      disabled: redeliver.isPending || d.status === 'Sending',
+                      onClick: () => onRedeliver(d.id),
+                    },
+                  ]}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      <GridPager
+        page={page}
+        pageSize={pageSize}
+        total={data?.total ?? 0}
+        onPageChange={setPage}
+        onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
+      />
+    </>
+  )
+}
+
+function WebhookStatusBadge({ delivery }: { delivery: WebhookDelivery }) {
+  const color = delivery.status === 'Sent' ? 'success'
+    : delivery.status === 'Failed' ? 'danger'
+    : delivery.status === 'Sending' ? 'brand'
+    : 'warning'
+  const badge = <Badge appearance="outline" color={color}>{delivery.status}</Badge>
+  if (delivery.lastError) {
+    const detail = delivery.lastStatusCode ? `HTTP ${delivery.lastStatusCode}: ${delivery.lastError}` : delivery.lastError
+    return <Tooltip content={detail} relationship="label">{badge}</Tooltip>
+  }
+  return badge
 }
 
 function EmailStatusBadge({ message }: { message: EmailMessage }) {

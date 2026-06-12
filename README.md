@@ -72,44 +72,69 @@ The whole system ships as a single Docker image bundling the API and the admin S
 
 ## Who it's for
 
-| You are…                                          | …and you get                                                                                                                              | …start here                                                                                                                                  |
-|---------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Just kicking the tyres**                        | The whole thing running locally in a couple of minutes with **only Docker** — no .NET SDK, Node, or MongoDB to install.                      | [docs/setup/quickstart.md](docs/setup/quickstart.md)                                                                                         |
-| A **council administrator** running the catalogue | The web console for managing services, schemas, submissions, and watching status across all services.                                       | [docs/admin-user-guide/](docs/admin-user-guide/README.md)                                                                                    |
-| A **service** sending KPI data                    | A stable REST API that lets a scheduled job or an existing back-office system push KPIs automatically — no more weekly form-filling. A web form is there as a fallback (or for getting started).                                                            | [docs/client/](docs/client/README.md)                                                                                                        |
-| A **data analyst / report author**                | A direct OData feed for Power BI (and equivalents), with examples and refresh-schedule guidance.                                            | [docs/setup/powerbi.md](docs/setup/powerbi.md)                                                                                               |
-| A **DevOps / SRE** rolling it out                 | A step-by-step Azure deployment, an exhaustive configuration reference, and an operational checklist.                                       | [docs/setup/](docs/setup/README.md)                                                                                                          |
-| A **developer / contributor**                     | Clean-architecture-ish layering, full XML doc comments, a focused test suite, and Aspire-driven local dev.                                | [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/architecture/](docs/architecture/README.md)                                                     |
 
-## At a glance
+| You are…                                          | …and you get                                                                                                                                                                                     | …start here                                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| **Just kicking the tyres**                        | The whole thing running locally in a couple of minutes with **only Docker** — no .NET SDK, Node, or MongoDB to install.                                                                          | [docs/setup/quickstart.md](docs/setup/quickstart.md)                                     |
+| A **council administrator** running the catalogue | The web console for managing services, schemas, submissions, and watching status across all services.                                                                                            | [docs/admin-user-guide/](docs/admin-user-guide/README.md)                                |
+| A **service** sending KPI data                    | A stable REST API that lets a scheduled job or an existing back-office system push KPIs automatically — no more weekly form-filling. A web form is there as a fallback (or for getting started). | [docs/client/](docs/client/README.md)                                                    |
+| A **data analyst / report author**                | A direct OData feed for Power BI (and equivalents), with examples and refresh-schedule guidance.                                                                                                 | [docs/setup/powerbi.md](docs/setup/powerbi.md)                                           |
+| A **DevOps / SRE** rolling it out                 | A step-by-step Azure deployment, an exhaustive configuration reference, and an operational checklist.                                                                                            | [docs/setup/](docs/setup/README.md)                                                      |
+| A **developer / contributor**                     | Clean-architecture-ish layering, full XML doc comments, a focused test suite, and Aspire-driven local dev.                                                                                       | [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/architecture/](docs/architecture/README.md) |
 
-A single .NET 10 / ASP.NET Core back-end talks to MongoDB, exposes a REST API for services, an admin REST API for the console, and an OData feed for reporting. The React admin SPA is served from the same origin in production. Everything else — telemetry, health, configuration — is standard ASP.NET Core, so it slots into whatever observability and secret-management stack you already run.
-
-```
-┌─────────────────┐                 ┌─────────────────┐               ┌────────────┐
-│ Service clients │   API key       │     Ingest      │  MongoDB      │  MongoDB   │
-│ (scripts, bots, │ ───────────────►│   (API + SPA,   │ ─────────────►│  (Cosmos / │
-│  schedulers …)  │                 │  single image)  │  wire protocol│  hosted)   │
-└─────────────────┘                 └─────────────────┘               └────────────┘
-                                            ▲
-                                            │ OData / REST
-                                     ┌──────┴──────┐
-                                     │   Power BI  │
-                                     │ / dashboards│
-                                     └─────────────┘
-```
-
-The deeper view — domain model, request flow, validation pipeline, auth lifecycle — lives in [docs/architecture/](docs/architecture/README.md).
 
 ## Documentation
 
-Long-form docs live under [`docs/`](docs/README.md) and are split by audience:
+Long-form docs live under `[docs/](docs/README.md)` and are split by audience:
 
-- [**admin-user-guide/**](docs/admin-user-guide/README.md) — the day-to-day operator's manual.
-- [**client/**](docs/client/README.md) — how a service obtains a key and uses the API.
-- [**setup/**](docs/setup/README.md) — deployment, configuration, and reporting integration.
-- [**architecture/**](docs/architecture/README.md) — system design and the auth model in depth.
+- **[admin-user-guide/](docs/admin-user-guide/README.md)** — the day-to-day operator's manual.
+- **[client/](docs/client/README.md)** — how a service obtains a key and uses the API.
+- **[setup/](docs/setup/README.md)** — deployment, configuration, and reporting integration.
+- **[architecture/](docs/architecture/README.md)** — system design and the auth model in depth.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev environment, tests, and where the source lives.
+
+## Feature highlights
+
+Everything Ingest does, in one place:
+
+**Data collection & modelling**
+
+- **Code-free schemas** — define KPI packages with per-value type, unit, reporting cadence, and required/optional flags through a form.
+- **Seven cadences** — daily, weekly, fortnightly (Monday-anchored), monthly, quarterly, semi-annually, and yearly; values in the same schema can differ.
+- **Per-service visibility** — services only ever see the schemas they're entitled to submit against.
+- **Schema versioning** — track changes over time, with a "new value" indicator in the editor.
+
+**Validation that runs before data lands**
+
+- **Shape checks** — type, min/max, string length, and regex constraints.
+- **Custom business rules** — a small expression language for cross-field logic, with plain yes/no or friendly custom error messages.
+- **Conditional fields** — hide or disable values that don't apply in context (`Enabled if` / `Visible if`).
+- **Soft warnings** — flag unusual-but-legal values without rejecting them.
+- **Cadence enforcement** — at most one submission per period, per service, per KPI; silent duplicates are rejected.
+
+**Admin web console (Fluent UI)**
+
+- Manage services and accounts, issue/rotate/revoke API keys, disable accounts.
+- Author schemas and their validation rules — no editor or redeploy.
+- Browse and filter submissions; create or edit data **on behalf of** a service; bulk-import history from JSON/CSV.
+- A status dashboard and **missing-submissions** analytics — who's up to date, who's behind, per KPI per period.
+- One-click historical plotting and HTML + Liquid **reports** (single-submission or period roll-ups).
+
+**Integration & reporting**
+
+- **Full REST API** — every console action is a documented HTTP endpoint, so a cron job, Azure Function, or integration platform can submit automatically.
+- **OData v4 feed** at `/odata/samples` — Power BI talks to it out of the box; also reachable as paged JSON.
+- **Outbound webhooks** — signed (HMAC-SHA256), durably queued, auto-retrying HTTP pushes on `submission.accepted` / `submission.warnings` / `window.upcoming` / `window.missed`, to wire into Teams, Power Automate, or your own service without polling.
+- **Email notifications** — upcoming-reminder, missed-alert, and submission-warning emails with editable Liquid templates and configurable recipients.
+
+**Security, governance & operations**
+
+- **API-key auth** with zero-downtime rotation and individual revocation; **three roles** (Service / Operator / Admin).
+- **Optional SSO** (Microsoft / Google) layered on top of API keys.
+- **Full audit log** and **soft-delete** by default — nothing important is destroyed silently.
+- **GDPR built in** — right-to-erasure (anonymise or delete), per-subject data export, and configurable time-based retention.
+- **Backup & restore** convenience tool for small deployments and environment seeding.
+- **One container, one database** — health probes, structured logging, and OpenTelemetry tracing wired in; Aspire-driven local dev.
 
 ## License
 

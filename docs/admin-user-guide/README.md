@@ -10,7 +10,9 @@ The guide is split into focused pages — pick whichever matches the task at han
 | [schemas.md](schemas.md)                      | Designing schemas: per-value type/cadence flags, multi-line validation rules, conditional display (`Enabled if` / `Visible if`), warnings, historical-data view. |
 | [submissions.md](submissions.md)              | Browsing submissions with filters, editing/creating on behalf of a service, bulk-importing history from JSON/CSV, deleting submissions. |
 | [reports.md](reports.md)                      | Uploading HTML+Liquid report templates, what data they receive, the viewer's filter bar. |
-| [settings.md](settings.md)                    | Admin-only settings hub: email (SMTP) settings, editable notification templates, notification triggers & recipients, ad-hoc email send, and backup & restore (a convenience tool, *not* the primary backup). |
+| [settings.md](settings.md)                    | Admin-only settings hub: email (SMTP) settings, editable notification templates, notification triggers & recipients, ad-hoc email send, and retention policy. |
+| [webhooks.md](webhooks.md)                    | Outbound webhooks: registering signed endpoints, subscribing to submission/window events, signature verification, retries and the delivery log. |
+| [tools.md](tools.md)                          | Admin-only operational utilities — currently backup & restore (a convenience tool, *not* the primary backup). |
 | [validation.md](validation.md)                | Writing custom validation rules — operators, conditionals, helpers, recipes. The companion to schemas.md when you start using the rule fields. |
 | [troubleshooting.md](troubleshooting.md)      | Common error messages and what they mean.                                      |
 
@@ -32,7 +34,7 @@ If your deployment has [SSO](../architecture/authentication.md#single-sign-on-op
 
 Once logged in:
 
-- The left sidebar carries **Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Missing**, **Reports**, and (admins only) **Audit** and **Settings**.
+- The left sidebar carries **Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Missing**, **Reports**, and (admins only) **Audit**, **Tools** and **Settings**.
 - Service-role users see a stripped-down sidebar (Dashboard + Submissions only) — Schemas, Accounts and Reports call admin endpoints.
 - Your friendly **label** (or **name** as a fallback) and role show at the bottom.
 - **Sign out** is the icon next to your name.

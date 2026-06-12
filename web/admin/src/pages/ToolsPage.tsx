@@ -1,0 +1,157 @@
+import { useState } from 'react'
+import {
+  Body1, Button, Card, MessageBarBody, Spinner, Text, Title3, makeStyles, tokens,
+} from '@fluentui/react-components'
+import { ArrowDownload20Regular, ArrowUpload20Regular, DatabaseArrowDownRegular } from '@fluentui/react-icons'
+import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+import { SectionedLayout } from '../components/SectionedLayout'
+import type { LayoutSection } from '../components/SectionedLayout'
+import { backupExportUrl, useImportBackup, useMe } from '../api/hooks'
+import { formatApiError } from '../api/client'
+import { downloadFromUrl, pickTextFile } from '../utils/download'
+import type { BackupImportResult } from '../api/types'
+
+const useStyles = makeStyles({
+  card: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', maxWidth: '760px' },
+  sectionTitle: { display: 'block', marginBottom: '2px' },
+  help: { color: tokens.colorNeutralForeground3 },
+  actions: { display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' },
+  warn: {
+    borderLeft: `3px solid ${tokens.colorPaletteDarkOrangeBorderActive}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    padding: '10px 14px',
+    borderRadius: tokens.borderRadiusMedium,
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+  counts: { margin: '4px 0 0', paddingLeft: '18px' },
+})
+
+/**
+ * Admin "Tools" hub: operational utilities that aren't really configuration. Today it hosts
+ * Backup &amp; restore (moved off the Settings page); future maintenance tools slot in as extra
+ * sections. Uses the same master-detail layout as Settings.
+ */
+export function ToolsPage() {
+  const { data: me, isLoading } = useMe()
+
+  if (isLoading) return <Spinner label="Loading…" />
+  if (me?.role !== 'Admin') {
+    return (
+      <AutoScrollMessageBar intent="error">
+        <MessageBarBody>Tools are available to administrators only.</MessageBarBody>
+      </AutoScrollMessageBar>
+    )
+  }
+
+  const sections: LayoutSection[] = [
+    { id: 'backup', label: 'Backup & restore', icon: <DatabaseArrowDownRegular fontSize={24} />, render: () => <BackupRestoreSection /> },
+  ]
+
+  return <SectionedLayout title="Tools" sections={sections} />
+}
+
+function BackupRestoreSection() {
+  const s = useStyles()
+  const importer = useImportBackup()
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<BackupImportResult | null>(null)
+
+  async function onExport() {
+    setError(null)
+    setBusy(true)
+    try {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+      await downloadFromUrl(backupExportUrl(), `ingest-backup-${stamp}.json`)
+    } catch (e) {
+      setError(formatApiError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onImport() {
+    setError(null)
+    setResult(null)
+    let parsed: unknown
+    try {
+      const { content } = await pickTextFile('.json,application/json')
+      parsed = JSON.parse(content)
+    } catch (e) {
+      // A cancelled picker rejects too; only surface real read/parse failures.
+      const msg = e instanceof Error ? e.message : String(e)
+      if (!/no file selected/i.test(msg)) setError(`Could not read the backup file: ${msg}`)
+      return
+    }
+
+    const ok = window.confirm(
+      'Restore from this backup?\n\n' +
+      'This REPLACES all current data (accounts, keys, schemas, submissions, reports, audit log) ' +
+      'with the contents of the file. It cannot be undone. Make sure you have a current backup first.',
+    )
+    if (!ok) return
+
+    try {
+      const res = await importer.mutateAsync(parsed)
+      setResult(res)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  return (
+    <Card className={s.card}>
+      <div>
+        <Title3 className={s.sectionTitle}>Backup &amp; restore</Title3>
+        <Body1 className={s.help}>
+          Export the entire registry to a single JSON file, or restore it from one.
+        </Body1>
+      </div>
+
+      <div className={s.warn}>
+        This is a convenience tool for <strong>small</strong> deployments and moving data between
+        environments — <strong>not</strong> the primary backup mechanism. For real backups, take a
+        database-level snapshot (<code>mongodump</code> or your hosting provider&apos;s backup). A
+        restore <strong>replaces all current data</strong> and is not transactional.
+      </div>
+
+      {error && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      {result && (
+        <AutoScrollMessageBar intent="success">
+          <MessageBarBody>
+            Restore complete.
+            <ul className={s.counts}>
+              {Object.entries(result.restored).map(([name, n]) => (
+                <li key={name}><Text weight="semibold">{name}</Text>: {n}</li>
+              ))}
+            </ul>
+          </MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      <div className={s.actions}>
+        <Button
+          appearance="primary"
+          icon={busy ? <Spinner size="tiny" /> : <ArrowDownload20Regular />}
+          disabled={busy || importer.isPending}
+          onClick={onExport}
+        >
+          {busy ? 'Preparing…' : 'Download backup'}
+        </Button>
+        <Button
+          icon={importer.isPending ? <Spinner size="tiny" /> : <ArrowUpload20Regular />}
+          disabled={busy || importer.isPending}
+          onClick={onImport}
+        >
+          {importer.isPending ? 'Restoring…' : 'Restore from file…'}
+        </Button>
+      </div>
+    </Card>
+  )
+}

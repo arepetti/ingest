@@ -130,6 +130,23 @@ public static class MongoSetup
                 new CreateIndexOptions { Unique = true, Name = "uniq_key" }),
             cancellationToken: ct);
 
+        await ctx.WebhookDeliveries.Indexes.CreateManyAsync(new[]
+        {
+            // At-most-once enqueue: one delivery per (event, endpoint). The publisher relies on the
+            // duplicate-key error to dedupe, exactly like the notification log.
+            new CreateIndexModel<WebhookDelivery>(
+                Builders<WebhookDelivery>.IndexKeys.Ascending(d => d.EventId).Ascending(d => d.EndpointId),
+                new CreateIndexOptions { Unique = true, Name = "uniq_event_endpoint" }),
+            // The dispatcher drains pending deliveries oldest-first.
+            new CreateIndexModel<WebhookDelivery>(
+                Builders<WebhookDelivery>.IndexKeys.Ascending(d => d.Status).Ascending(d => d.CreatedAt),
+                new CreateIndexOptions { Name = "by_status_created" }),
+            // The admin "Deliveries" panel browses newest-first.
+            new CreateIndexModel<WebhookDelivery>(
+                Builders<WebhookDelivery>.IndexKeys.Descending(d => d.CreatedAt),
+                new CreateIndexOptions { Name = "by_created" }),
+        }, cancellationToken: ct);
+
         await ctx.Samples.Indexes.CreateManyAsync(new[]
         {
             new CreateIndexModel<SampleProjection>(

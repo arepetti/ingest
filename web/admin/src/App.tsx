@@ -15,6 +15,7 @@ import { ReportsPage } from './pages/ReportsPage'
 import { ReportViewPage } from './pages/ReportViewPage'
 import { AuditPage } from './pages/AuditPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { ToolsPage } from './pages/ToolsPage'
 import { RequireAuth } from './pages/RequireAuth'
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/reports/:name" element={<ReportViewPage />} />
         <Route path="/audit" element={<AuditPage />} />
+        <Route path="/tools" element={<ToolsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

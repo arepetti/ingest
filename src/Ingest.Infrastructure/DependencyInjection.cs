@@ -5,6 +5,7 @@ using Ingest.Infrastructure.Reports;
 using Ingest.Infrastructure.Security;
 using Ingest.Infrastructure.Services;
 using Ingest.Infrastructure.Validation;
+using Ingest.Infrastructure.Webhooks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
@@ -36,6 +37,7 @@ public static class DependencyInjection
         services.Configure<ApiKeyOptions>(configuration.GetSection("ApiKey"));
         services.Configure<EmailOptions>(configuration.GetSection("Email"));
         services.Configure<NotificationOptions>(configuration.GetSection("Notifications"));
+        services.Configure<WebhookOptions>(configuration.GetSection("Webhooks"));
         services.Configure<Retention.RetentionOptions>(configuration.GetSection("Retention"));
 
         services.AddSingleton<MongoContext>(sp =>
@@ -105,6 +107,16 @@ public static class DependencyInjection
         services.AddScoped<IEmailDispatchService, EmailDispatchService>();
         services.AddScoped<INotificationSettingsService, NotificationSettingsService>();
         services.AddScoped<INotificationService, NotificationService>();
+
+        // Outbound webhooks. Like email these are always registered (cheap); behaviour is gated by
+        // Webhooks:Enabled (controllers 404, the dispatcher worker only registers when enabled, and
+        // the publisher finds no endpoints when none are configured). The typed HttpClient the
+        // dispatcher uses is registered by the host (Program.cs) so Aspire resilience applies.
+        services.AddSingleton<ISecretProtector, WebhookSecretProtector>();
+        services.AddScoped<IWebhookPublisher, WebhookPublisher>();
+        services.AddScoped<IWebhookEndpointService, WebhookEndpointService>();
+        services.AddScoped<IWebhookDeliveryRepository, WebhookDeliveryRepository>();
+        services.AddScoped<IWebhookDispatchService, WebhookDispatchService>();
 
         return services;
     }
