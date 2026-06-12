@@ -7,9 +7,22 @@ import type {
   Submission, AdminSubmissionInput, SampleInput, ServiceStatus, Me, Paged,
   SubmissionWriteResponse, MissingByCadence,
   Report, RenderReportRequest, ReportRenderResponse,
+  AuthProvider,
 } from './types'
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/api/me') })
+
+/**
+ * Enabled SSO providers. Returns [] when SSO is disabled server-side, in which case the UI shows
+ * no SSO buttons and no account-linking field — i.e. it looks exactly like the API-key-only build.
+ * Never throws into the UI: a failure resolves to [] so the API-key login still works.
+ */
+export const useAuthProviders = () =>
+  useQuery({
+    queryKey: ['auth-providers'],
+    queryFn: () => api.get<AuthProvider[]>('/api/auth/providers').catch(() => [] as AuthProvider[]),
+    staleTime: 5 * 60 * 1000,
+  })
 
 export const useAccounts = (
   params?: { kind?: string; role?: string; includeDeleted?: boolean; page?: number; pageSize?: number },

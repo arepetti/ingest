@@ -1,34 +1,31 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { getApiKey, setApiKey } from '../api/client'
+import { setApiKey } from '../api/client'
 import { useMe } from '../api/hooks'
 import type { PropsWithChildren } from 'react'
 
 /**
  * Route guard for the authenticated section of the app.
  *
- * Two layers:
- *  1. No API key in storage → bounce to /login.
- *  2. Key present but resolves to an Application-kind account → drop the key and bounce to
- *     /login with an error. This covers the case where someone pasted an Application key
- *     directly into localStorage, or a credential's kind was changed server-side after sign-in.
+ * Authentication is whatever `/api/me` accepts — either an API key in storage (the X-Api-Key
+ * header) or an SSO session cookie. We no longer gate on a key being present locally, because an
+ * SSO session lives in an HttpOnly cookie the SPA can't read. So:
+ *  1. `/api/me` resolves → signed in. The `Kind == 'Application'` guard still applies (defence in
+ *     depth: a credential whose kind changed server-side, or an Application key pasted into
+ *     storage, can't use the UI).
+ *  2. `/api/me` 401s/errors → bounce to /login, clearing any stale local key.
  *
- * While /api/me is still resolving on first load we render nothing rather than flashing the
- * shell briefly — same effect users get for any normal slow first request.
+ * While `/api/me` is resolving on first load we render nothing rather than flashing the shell.
  */
 export function RequireAuth({ children }: PropsWithChildren) {
   const location = useLocation()
-  const hasKey = !!getApiKey()
   const { data: me, isLoading, isError } = useMe()
 
-  if (!hasKey) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+  if (isLoading) {
+    return null
   }
-  if (isError) {
+  if (isError || !me) {
     setApiKey(null)
     return <Navigate to="/login" state={{ from: location }} replace />
-  }
-  if (isLoading || !me) {
-    return null
   }
   if (me.kind === 'Application') {
     setApiKey(null)

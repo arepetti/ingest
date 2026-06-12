@@ -31,6 +31,46 @@ When passing nested keys through environment variables, replace `:` with `__` (d
 | `ApiKey:BootstrapAdminName`  | `admin`                  | Name of the account the bootstrapper creates on first start. Change it later only if you want to bootstrap a *second* admin account (e.g. to recover from a lost key). |
 | `ApiKey:BootstrapAdminKey`   | *(empty)*                | Plaintext key (`{keyId}.{secret}`, e.g. `localdev.local-dev-admin-key-change-me`) assigned to the bootstrap admin on first start, so you don't have to read it from the logs. **When empty (the production default), the app generates a random key and logs it once.** Set this to a long, unique value if you use it — anyone who knows it has admin access until you rotate it. Changing it after the admin already has a key has no effect (rotate via the SPA/API instead). |
 
+## Single sign-on (SSO)
+
+> **The entire `Sso` section only takes effect when `Sso:EnableSso` is `true`.** It is `false` by default, and with it off none of the keys below have any effect, `GET /api/auth/providers` returns `[]`, and the login screen is the API-key-only form. SSO is an *addition* to API keys — API keys keep working regardless.
+
+| Key                              | Default            | Notes |
+|----------------------------------|--------------------|-------|
+| `Sso:EnableSso`                  | `false`            | Master switch. Off → the feature is completely inert (no cookie/OIDC schemes registered). |
+| `Sso:CookieName`                 | `ingest.session`   | Name of the `HttpOnly` session cookie issued after a successful SSO login. |
+| `Sso:Providers:N:Id`             | —                  | Stable provider id; drives the route `/api/auth/login/{Id}` and the callback `/api/auth/callback/{Id}`. E.g. `Microsoft`, `Google`. |
+| `Sso:Providers:N:DisplayName`    | falls back to `Id` | Label on the SPA's "Continue with …" button. |
+| `Sso:Providers:N:Authority`      | —                  | OIDC issuer. Microsoft: `https://login.microsoftonline.com/<tenant>/v2.0`. Google: `https://accounts.google.com`. |
+| `Sso:Providers:N:ClientId`       | *(blank)*          | OAuth client id. **Blank in `appsettings.json` by design** — supply it from a secret source (see below). |
+| `Sso:Providers:N:ClientSecret`   | *(blank)*          | OAuth client secret. **Blank in `appsettings.json` by design** — supply it from a secret source (see below). |
+| `Sso:Providers:N:Scopes`         | `openid profile email` | Scopes requested at the authorize endpoint. The default is the minimum needed to resolve a verified email. |
+
+`appsettings.json` ships the *structure* (provider ids, display names, authorities) with **blank** `ClientId`/`ClientSecret` and `EnableSso:false`. A provider whose id/authority/client-id/secret aren't all filled is ignored, so a half-filled config can't accidentally light up. The `N` is the **zero-based array index**; in env-var form the `:` becomes `__`, so `Sso:Providers:0:ClientId` is `Sso__Providers__0__ClientId`.
+
+### Where the client id / secret come from
+
+`ClientId`/`ClientSecret` are never committed. Layer them in per environment using the standard precedence:
+
+| Environment | How to supply the secrets |
+|-------------|----------------------------|
+| **Local dev (Aspire)** | Set `Sso:EnableSso=true` in the **AppHost's** configuration and add the parameters `dotnet user-secrets set Parameters:MicrosoftClientId <id>` / `Parameters:MicrosoftClientSecret <secret>` in `src/Ingest.AppHost`. The AppHost projects them onto the API as `Sso__EnableSso` / `Sso__Providers__0__ClientId` / `Sso__Providers__0__ClientSecret` (see `AppHost.cs`). The non-secret provider shape stays in the API's `appsettings.json`. |
+| **Local dev (no Aspire)** | `dotnet user-secrets` on `Ingest.Api`: `Sso:EnableSso=true`, `Sso:Providers:0:ClientId=…`, `Sso:Providers:0:ClientSecret=…`. |
+| **Production** | Env vars or orchestrator secrets, e.g. Azure Container Apps secret refs: `Sso__EnableSso=true`, `Sso__Providers__0__ClientId=secretref:ms-client-id`, `Sso__Providers__0__ClientSecret=secretref:ms-client-secret` (see [hosting.md](hosting.md)). |
+| **Docker** | `__`-delimited env vars on the `ingest` service in `docker-compose.yml`; prefer `${MS_CLIENT_SECRET}` interpolation from a git-ignored `.env` file over inline literals. |
+
+### Redirect URIs to register with the IdP
+
+Register the callback URL (`…/api/auth/callback/{provider}`) per environment with the Entra app registration / Google OAuth client:
+
+| Environment | Redirect URI |
+|-------------|--------------|
+| Local dev (Vite proxy) | `http://localhost:5173/api/auth/callback/Microsoft` |
+| Docker eval stack | `http://localhost:8080/api/auth/callback/Microsoft` |
+| Production | `https://<host>/api/auth/callback/Microsoft` |
+
+(Use the matching id for other providers, e.g. `.../api/auth/callback/Google`.)
+
 ## Application behaviour
 
 | Key                                | Default                       | Notes |
@@ -59,6 +99,7 @@ The strongly-typed options classes that read these sections live in:
 | `Mongo`     | `MongoOptions`   | `src/Ingest.Infrastructure/Mongo/MongoOptions.cs`          |
 | `ApiKey`    | `ApiKeyOptions`  | `src/Ingest.Infrastructure/Security/ApiKeyOptions.cs`      |
 | `Ingest`    | `IngestOptions`  | `src/Ingest.Api/Options/IngestOptions.cs`                  |
+| `Sso`       | `SsoOptions`     | `src/Ingest.Api/Options/SsoOptions.cs`                     |
 
 If you add a new option, follow the same pattern: add the property, bind it from `IConfiguration` in `Program.cs`, and document the key here.
 

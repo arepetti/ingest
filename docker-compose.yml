@@ -50,6 +50,17 @@ services:
       ASPNETCORE_ENVIRONMENT: "Production"
       # Swagger is handy while evaluating; turn it off for real deployments.
       Ingest__EnableSwagger: "true"
+      # --- Optional: single sign-on (Microsoft / Google). Disabled by default. ---
+      # Uncomment and fill in to enable SSO. The provider id/authority below ship in the image's
+      # appsettings.json; here you only need the master switch and the client id/secret. Source the
+      # secret from a git-ignored .env file (e.g. ${MS_CLIENT_SECRET}) rather than inlining it.
+      # Register this redirect URI with the IdP for the eval stack:
+      #   http://localhost:8080/api/auth/callback/Microsoft
+      # Sso__EnableSso: "true"
+      # Sso__Providers__0__Id: "Microsoft"
+      # Sso__Providers__0__Authority: "https://login.microsoftonline.com/<tenant>/v2.0"
+      # Sso__Providers__0__ClientId: "${MS_CLIENT_ID}"
+      # Sso__Providers__0__ClientSecret: "${MS_CLIENT_SECRET}"
 
 volumes:
   ingest-mongo-data:

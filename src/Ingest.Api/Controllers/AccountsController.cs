@@ -83,6 +83,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
             Kind = req.Kind,
             Role = req.Role,
             Enabled = req.Enabled,
+            ExternalLogins = ToExternalLogins(req.ExternalLogins) ?? new(),
         }, ct);
         return Created($"/api/admin/accounts/{created.Id}", AccountDto.From(created));
     }
@@ -103,9 +104,13 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateAccountRequest req, CancellationToken ct)
     {
-        var updated = await service.UpdateAsync(id, new AccountUpdate(req.Label, req.Description, req.Role, req.Enabled), ct);
+        var updated = await service.UpdateAsync(id, new AccountUpdate(req.Label, req.Description, req.Role, req.Enabled, ToExternalLogins(req.ExternalLogins)), ct);
         return updated is null ? NotFound() : Ok(AccountDto.From(updated));
     }
+
+    /// <summary>Map the wire SSO links onto domain entities. Returns <c>null</c> when none were supplied so the service can tell "leave untouched" from "clear".</summary>
+    private static List<ExternalLogin>? ToExternalLogins(List<ExternalLoginDto>? dtos) =>
+        dtos?.Select(d => new ExternalLogin { Provider = d.Provider, Email = d.Email }).ToList();
 
     /// <summary>Soft-delete an account.</summary>
     /// <remarks>

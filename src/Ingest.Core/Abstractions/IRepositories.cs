@@ -24,6 +24,17 @@ public interface IAccountRepository
     /// <returns>The account, or <c>null</c> if no match.</returns>
     Task<Account?> GetByNameAsync(string name, bool includeDeleted = false, CancellationToken ct = default);
 
+    /// <summary>
+    /// Find a live account carrying an external login link for the given provider + email.
+    /// Matching is case-insensitive on the email. Soft-deleted accounts are never returned.
+    /// Used by the SSO callback to resolve an incoming identity to a pre-linked account.
+    /// </summary>
+    /// <param name="provider">Provider id (e.g. <c>"Microsoft"</c>).</param>
+    /// <param name="email">Verified email from the identity provider.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The owning account, or <c>null</c> if no live account links that identity.</returns>
+    Task<Account?> GetByExternalLoginAsync(string provider, string email, CancellationToken ct = default);
+
     /// <summary>Page through accounts, optionally restricted by kind/role.</summary>
     /// <param name="request">Paging + sort parameters.</param>
     /// <param name="kind">Filter by kind when set.</param>

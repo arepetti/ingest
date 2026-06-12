@@ -251,6 +251,8 @@ public class ReportServiceTests
             Task.FromResult<Account?>(new Account { Id = id, Name = "fake", Label = "Fake" });
         public Task<Account?> GetByNameAsync(string name, bool includeDeleted = false, CancellationToken ct = default) =>
             Task.FromResult<Account?>(new Account { Name = name, Label = name });
+        public Task<Account?> GetByExternalLoginAsync(string provider, string email, CancellationToken ct = default) =>
+            Task.FromResult<Account?>(null);
         public Task<PagedResult<Account>> ListAsync(PageRequest request, AccountKind? kind = null, AccountRole? role = null, CancellationToken ct = default) =>
             Task.FromResult(new PagedResult<Account>(Array.Empty<Account>(), 0, 1, 0));
         public Task AddAsync(Account account, CancellationToken ct = default) => Task.CompletedTask;

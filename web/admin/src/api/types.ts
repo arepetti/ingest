@@ -22,6 +22,12 @@ export interface Paged<T> {
   pageSize: number
 }
 
+/** An SSO identity link on an account (provider id + verified email). Relevant only when SSO is enabled. */
+export interface ExternalLogin {
+  provider: string
+  email: string
+}
+
 export interface Account {
   id: string
   name: string
@@ -35,6 +41,8 @@ export interface Account {
   modifiedAt: string
   modifiedBy?: string | null
   isDeleted: boolean
+  /** SSO identity links. Only ever populated for User-kind accounts; empty otherwise. */
+  externalLogins?: ExternalLogin[]
 }
 
 export interface CreateAccountRequest {
@@ -44,6 +52,8 @@ export interface CreateAccountRequest {
   kind: AccountKind
   role: AccountRole
   enabled?: boolean
+  /** SSO identity links. Only valid for User-kind accounts. */
+  externalLogins?: ExternalLogin[]
 }
 
 export interface UpdateAccountRequest {
@@ -51,6 +61,15 @@ export interface UpdateAccountRequest {
   description?: string | null
   role: AccountRole
   enabled: boolean
+  /** Replacement set of SSO identity links. Omit to leave links untouched; pass [] to clear. */
+  externalLogins?: ExternalLogin[]
+}
+
+/** One SSO provider the SPA can render a "Continue with …" button for. Empty list ⇒ SSO disabled. */
+export interface AuthProvider {
+  id: string
+  displayName: string
+  loginUrl: string
 }
 
 export interface ApiKey {

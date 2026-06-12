@@ -27,6 +27,25 @@ Use the row menu's **Edit** action. Name and Kind are **immutable** — to chang
 
 Toggling **Enabled** off immediately invalidates every key for this account; toggling it back on re-enables the existing keys.
 
+## Linking an SSO identity (only when SSO is enabled)
+
+> This section applies **only when single sign-on is enabled** for the deployment (`Sso:EnableSso=true` with at least one configured provider — see [architecture/authentication.md § Single sign-on](../architecture/authentication.md#single-sign-on-optional-second-scheme)). **When SSO is disabled (the default), the SSO sign-in field below does not appear** in the account editor and there is nothing to configure here.
+
+When SSO is enabled, the account editor shows an **SSO sign-in** section for **User**-kind accounts. This is how you "add a user with SSO": create (or edit) a `User` account, then link the identity they'll sign in with.
+
+1. Edit (or create) a **User**-kind account. The **SSO sign-in** section appears below *Enabled*. (It is hidden for `Application` accounts — only `User` accounts can sign in interactively.)
+2. Click **Add SSO link**, pick the **provider** (e.g. Microsoft or Google) and type the user's **verified email** at that provider (e.g. their work email).
+3. **Save.** From now on that person can click **Continue with {provider}** on the login screen and be signed in *as this account* — inheriting this account's **role**.
+
+Notes and rules:
+
+- **Pre-provisioning only.** SSO never creates accounts. An identity that isn't linked to a live, enabled `User` account is rejected at sign-in.
+- **The role comes from the linked account.** There is no group-to-role mapping; whatever role you give the account is what the SSO user gets.
+- **Uniqueness.** A given `(provider, email)` pair can be linked to only one account; the server rejects a duplicate with a clear message.
+- **User-kind only.** Trying to add a link to an `Application` account is rejected.
+- **Revoking SSO access.** Remove the link (the **🗑** button next to the row, then *Save*) or disable/delete the account. Either immediately stops that identity from signing in.
+- API keys on the same account keep working independently — linking SSO doesn't change anything about keys.
+
 ## Viewing the read-only details
 
 Clicking a row opens a side drawer with a read-only summary, including audit info (who created/modified it, when). The drawer also has a toolbar replicating the row menu actions so you can edit or manage keys without closing the drawer first.

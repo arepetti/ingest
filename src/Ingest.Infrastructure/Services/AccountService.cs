@@ -50,6 +50,8 @@ public sealed class AccountService : IAccountService
             await _accounts.HardDeleteAsync(collision.Id, ct);
         }
 
+        input.ExternalLogins = await NormalizeAndValidateLinksAsync(input.Id, input.Kind, input.ExternalLogins, preserveSubjectsFrom: null, ct);
+
         await _accounts.AddAsync(input, ct);
         return input;
     }
@@ -65,8 +67,72 @@ public sealed class AccountService : IAccountService
         existing.Role = update.Role;
         existing.Enabled = update.Enabled;
 
+        // A null list means "leave links as they are"; a (possibly empty) list replaces them.
+        // Surviving links keep any subject bound by a previous successful SSO login.
+        if (update.ExternalLogins is not null)
+            existing.ExternalLogins = await NormalizeAndValidateLinksAsync(existing.Id, existing.Kind, update.ExternalLogins, preserveSubjectsFrom: existing.ExternalLogins, ct);
+
         await _accounts.UpdateAsync(existing, ct);
         return existing;
+    }
+
+    /// <summary>
+    /// Normalise (trim provider, lower-case email), validate and de-duplicate a set of SSO links.
+    /// Enforces the two business rules from the plan: only <see cref="AccountKind.User"/> accounts
+    /// may hold links, and a (provider, email) pair must be unique across every account. When
+    /// <paramref name="preserveSubjectsFrom"/> is supplied, subjects already bound to the same
+    /// (provider, email) pair are carried over so an edit doesn't drop the binding.
+    /// </summary>
+    private async Task<List<ExternalLogin>> NormalizeAndValidateLinksAsync(
+        Guid accountId,
+        AccountKind kind,
+        IEnumerable<ExternalLogin>? links,
+        IReadOnlyList<ExternalLogin>? preserveSubjectsFrom,
+        CancellationToken ct)
+    {
+        var input = (links ?? Enumerable.Empty<ExternalLogin>()).ToList();
+        if (input.Count == 0) return new List<ExternalLogin>();
+
+        if (kind != AccountKind.User)
+            throw new ValidationException(new[] { "Only User-kind accounts can have SSO sign-in links." });
+
+        var errors = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<ExternalLogin>();
+
+        foreach (var link in input)
+        {
+            var provider = (link.Provider ?? string.Empty).Trim();
+            var email = (link.Email ?? string.Empty).Trim().ToLowerInvariant();
+
+            if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(email))
+            {
+                errors.Add("Each SSO link needs both a provider and an email.");
+                continue;
+            }
+
+            var dedupeKey = $"{provider}|{email}";
+            if (!seen.Add(dedupeKey))
+            {
+                errors.Add($"Duplicate SSO link for {provider} / {email}.");
+                continue;
+            }
+
+            // Uniqueness across accounts: the pair may only be claimed by this account.
+            var owner = await _accounts.GetByExternalLoginAsync(provider, email, ct);
+            if (owner is not null && owner.Id != accountId)
+                errors.Add($"The {provider} identity '{email}' is already linked to another account.");
+
+            var subject = link.Subject
+                ?? preserveSubjectsFrom?.FirstOrDefault(p =>
+                        string.Equals(p.Provider, provider, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(p.Email, email, StringComparison.OrdinalIgnoreCase))?.Subject;
+
+            result.Add(new ExternalLogin { Provider = provider, Email = email, Subject = subject });
+        }
+
+        if (errors.Count > 0) throw new ValidationException(errors);
+        return result;
     }
 
     /// <inheritdoc />

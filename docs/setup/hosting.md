@@ -276,6 +276,32 @@ What this does:
 
 If you didn't use Key Vault, replace the `--secrets` block with plain literals (`"mongo-cs=mongodb+srv://…"`). If you'd rather not pre-set an admin key at all, drop the `bootstrap-admin-key` secret and the `ApiKey__BootstrapAdminKey` env var — the app then generates a random key and logs it once (Step 10 covers that path).
 
+### Optional — enable single sign-on (Microsoft / Google)
+
+SSO is **off by default**; the app deploys and runs identically whether or not you set the keys below (see [architecture/authentication.md § Single sign-on](../architecture/authentication.md#single-sign-on-optional-second-scheme)). To turn it on, store the OAuth client id/secret as Key Vault secrets and project them onto the app — the non-secret provider shape (id, authority, scopes) already ships in the image's `appsettings.json`:
+
+```powershell
+az keyvault secret set --vault-name $Vault --name "ms-client-id"     --value "<entra-app-client-id>"
+az keyvault secret set --vault-name $Vault --name "ms-client-secret" --value "<entra-app-client-secret>"
+
+az containerapp update --name $App --resource-group $Rg `
+    --set-secrets `
+        "ms-client-id=keyvaultref:https://$Vault.vault.azure.net/secrets/ms-client-id,identityref:$Identity" `
+        "ms-client-secret=keyvaultref:https://$Vault.vault.azure.net/secrets/ms-client-secret,identityref:$Identity" `
+    --set-env-vars `
+        "Sso__EnableSso=true" `
+        "Sso__Providers__0__ClientId=secretref:ms-client-id" `
+        "Sso__Providers__0__ClientSecret=secretref:ms-client-secret"
+```
+
+Then **register the production redirect URI** with the Entra app registration (or Google OAuth client):
+
+```text
+https://<host>/api/auth/callback/Microsoft
+```
+
+(`<host>` is the app FQDN from Step 9, or your custom domain. Use the matching provider id for others, e.g. `.../api/auth/callback/Google`.) Link each user's verified email to a `User`-kind account from the SPA before they can sign in — see [the admin user guide](../admin-user-guide/accounts.md).
+
 ## Step 9 — Grab the FQDN
 
 ```powershell
@@ -580,4 +606,5 @@ Before you call it "production":
 - [ ] Liveness/readiness probes are wired.
 - [ ] Logs flow to Log Analytics or Application Insights.
 - [ ] You've validated PowerBI can connect with an Operator-role key (see [powerbi.md](powerbi.md)).
+- [ ] **If using SSO:** `Sso__EnableSso=true`, the client id/secret are sourced from Key Vault (not inline), the production redirect URI is registered with each IdP, and at least one admin's identity is linked to a `User` account (so you're not locked out if a key is lost).
 - [ ] A backup of `mongo-cs` (your Mongo connection string) is stored somewhere you can find without logging into Azure.

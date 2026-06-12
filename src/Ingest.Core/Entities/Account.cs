@@ -57,4 +57,28 @@ public sealed class Account : AuditedEntity
 
     /// <summary>When false, every API key attached to this account is invalid for new requests.</summary>
     public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// External identity-provider links that let this account sign in via SSO. Only
+    /// <see cref="AccountKind.User"/> accounts may hold links (enforced by the account service).
+    /// Empty for API-only accounts and whenever SSO isn't used.
+    /// </summary>
+    public List<ExternalLogin> ExternalLogins { get; set; } = new();
+}
+
+/// <summary>
+/// A link between an <see cref="Account"/> and an external identity-provider identity. An admin
+/// pre-registers the <see cref="Provider"/> + <see cref="Email"/> pair; the OIDC callback matches
+/// on it (case-insensitively) and binds <see cref="Subject"/> on the first successful login.
+/// </summary>
+public sealed class ExternalLogin
+{
+    /// <summary>Provider id this link belongs to (matches an <c>Sso:Providers:*:Id</c>, e.g. <c>"Microsoft"</c> or <c>"Google"</c>).</summary>
+    public required string Provider { get; set; }
+
+    /// <summary>Verified email used to match the incoming identity. Stored lower-cased for case-insensitive lookups.</summary>
+    public required string Email { get; set; }
+
+    /// <summary>The provider's stable subject (<c>sub</c>) claim, bound on first successful login. Null until then.</summary>
+    public string? Subject { get; set; }
 }

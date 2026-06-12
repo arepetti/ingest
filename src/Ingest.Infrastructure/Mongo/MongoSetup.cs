@@ -43,11 +43,20 @@ public static class MongoSetup
     /// <param name="ct">Cancellation token.</param>
     public static async Task EnsureIndexesAsync(MongoContext ctx, CancellationToken ct = default)
     {
-        await ctx.Accounts.Indexes.CreateOneAsync(
+        await ctx.Accounts.Indexes.CreateManyAsync(new[]
+        {
             new CreateIndexModel<Account>(
                 Builders<Account>.IndexKeys.Ascending(a => a.Name),
                 new CreateIndexOptions { Unique = true, Name = "uniq_name" }),
-            cancellationToken: ct);
+            // Multikey lookup index backing GetByExternalLoginAsync. Not unique — uniqueness of
+            // (provider, email) pairs across accounts is enforced in the account service so we
+            // can return a friendly conflict rather than a raw duplicate-key error.
+            new CreateIndexModel<Account>(
+                Builders<Account>.IndexKeys
+                    .Ascending("externalLogins.provider")
+                    .Ascending("externalLogins.email"),
+                new CreateIndexOptions { Name = "by_external_login", Sparse = true }),
+        }, cancellationToken: ct);
 
         await ctx.ApiKeys.Indexes.CreateManyAsync(new[]
         {

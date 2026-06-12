@@ -232,6 +232,9 @@ public class StatusServiceMissingTests
         public Task<Account?> GetByNameAsync(string name, bool includeDeleted = false, CancellationToken ct = default) =>
             Task.FromResult(_accounts.FirstOrDefault(a => a.Name == name));
 
+        public Task<Account?> GetByExternalLoginAsync(string provider, string email, CancellationToken ct = default) =>
+            Task.FromResult<Account?>(null);
+
         public Task<PagedResult<Account>> ListAsync(PageRequest request, AccountKind? kind = null, AccountRole? role = null, CancellationToken ct = default)
         {
             var filtered = _accounts

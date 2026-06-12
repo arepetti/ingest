@@ -55,6 +55,137 @@ public class AccountServiceTests
         Assert.Contains("already exists", ex.Message);
     }
 
+    // ── SSO external-login linking ──────────────────────────────────────────────────────────
+
+    private static Account NewUser(string name) => new()
+    {
+        Name = name,
+        Kind = AccountKind.User,
+        Role = AccountRole.Operator,
+        Enabled = true,
+    };
+
+    [Fact]
+    public async Task Create_lowercases_and_keeps_external_logins_for_user_accounts()
+    {
+        var svc = NewService(out _, out _);
+        var user = NewUser("jane");
+        user.ExternalLogins.Add(new ExternalLogin { Provider = "Microsoft", Email = "Jane@Example.COM" });
+
+        var created = await svc.CreateAsync(user);
+
+        var link = Assert.Single(created.ExternalLogins);
+        Assert.Equal("Microsoft", link.Provider);
+        Assert.Equal("jane@example.com", link.Email); // normalised to lower-case
+    }
+
+    [Fact]
+    public async Task Create_rejects_external_logins_on_application_accounts()
+    {
+        var svc = NewService(out _, out _);
+        var app = NewAccount(name: "robot"); // Application kind
+        app.ExternalLogins.Add(new ExternalLogin { Provider = "Google", Email = "robot@example.com" });
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(app));
+        Assert.Contains("User-kind", ex.Message);
+    }
+
+    [Fact]
+    public async Task Create_rejects_a_pair_already_linked_to_another_account()
+    {
+        var svc = NewService(out _, out _);
+        var first = NewUser("jane");
+        first.ExternalLogins.Add(new ExternalLogin { Provider = "Microsoft", Email = "shared@example.com" });
+        await svc.CreateAsync(first);
+
+        var second = NewUser("john");
+        second.ExternalLogins.Add(new ExternalLogin { Provider = "microsoft", Email = "SHARED@example.com" }); // case variants
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(second));
+        Assert.Contains("already linked", ex.Message);
+    }
+
+    [Fact]
+    public async Task Update_with_null_links_leaves_existing_links_untouched()
+    {
+        var svc = NewService(out _, out _);
+        var user = NewUser("jane");
+        user.ExternalLogins.Add(new ExternalLogin { Provider = "Microsoft", Email = "jane@example.com" });
+        var created = await svc.CreateAsync(user);
+
+        var updated = await svc.UpdateAsync(created.Id, new AccountUpdate("Jane", null, AccountRole.Admin, true, ExternalLogins: null));
+
+        Assert.NotNull(updated);
+        Assert.Single(updated!.ExternalLogins);
+    }
+
+    [Fact]
+    public async Task Update_with_empty_list_clears_links()
+    {
+        var svc = NewService(out _, out _);
+        var user = NewUser("jane");
+        user.ExternalLogins.Add(new ExternalLogin { Provider = "Microsoft", Email = "jane@example.com" });
+        var created = await svc.CreateAsync(user);
+
+        var updated = await svc.UpdateAsync(created.Id, new AccountUpdate("Jane", null, AccountRole.Operator, true, ExternalLogins: Array.Empty<ExternalLogin>()));
+
+        Assert.NotNull(updated);
+        Assert.Empty(updated!.ExternalLogins);
+    }
+
+    [Fact]
+    public async Task Update_preserves_subject_already_bound_to_a_surviving_link()
+    {
+        var svc = NewService(out var accounts, out _);
+        var user = NewUser("jane");
+        user.ExternalLogins.Add(new ExternalLogin { Provider = "Microsoft", Email = "jane@example.com" });
+        var created = await svc.CreateAsync(user);
+
+        // Simulate a first successful SSO login binding the subject.
+        created.ExternalLogins[0].Subject = "sub-123";
+        await accounts.UpdateAsync(created);
+
+        // Admin re-saves the same link (no subject on the incoming DTO) — the binding must survive.
+        var updated = await svc.UpdateAsync(created.Id, new AccountUpdate("Jane", null, AccountRole.Operator, true,
+            ExternalLogins: new[] { new ExternalLogin { Provider = "Microsoft", Email = "jane@example.com" } }));
+
+        Assert.Equal("sub-123", updated!.ExternalLogins.Single().Subject);
+    }
+
+    [Fact]
+    public async Task GetByExternalLogin_matches_case_insensitively_and_skips_deleted()
+    {
+        var svc = NewService(out var accounts, out _);
+        var user = NewUser("jane");
+        user.ExternalLogins.Add(new ExternalLogin { Provider = "Microsoft", Email = "jane@example.com" });
+        var created = await svc.CreateAsync(user);
+
+        // Case-insensitive provider + email match.
+        Assert.NotNull(await accounts.GetByExternalLoginAsync("microsoft", "JANE@EXAMPLE.COM"));
+
+        // Soft-deleted accounts are invisible to the SSO lookup.
+        await accounts.SoftDeleteAsync(created.Id);
+        Assert.Null(await accounts.GetByExternalLoginAsync("Microsoft", "jane@example.com"));
+    }
+
+    // ── SSO sign-in eligibility (the OnTokenValidated rejection matrix) ──────────────────────
+
+    [Fact]
+    public void IsEligibleAccount_accepts_a_live_enabled_user()
+    {
+        var account = new Account { Name = "jane", Kind = AccountKind.User, Enabled = true };
+        Assert.True(Ingest.Api.Auth.SsoSignIn.IsEligibleAccount(account));
+    }
+
+    [Fact]
+    public void IsEligibleAccount_rejects_unknown_disabled_deleted_and_application()
+    {
+        Assert.False(Ingest.Api.Auth.SsoSignIn.IsEligibleAccount(null)); // unknown identity
+        Assert.False(Ingest.Api.Auth.SsoSignIn.IsEligibleAccount(new Account { Name = "j", Kind = AccountKind.User, Enabled = false }));
+        Assert.False(Ingest.Api.Auth.SsoSignIn.IsEligibleAccount(new Account { Name = "j", Kind = AccountKind.User, Enabled = true, IsDeleted = true }));
+        Assert.False(Ingest.Api.Auth.SsoSignIn.IsEligibleAccount(new Account { Name = "j", Kind = AccountKind.Application, Enabled = true }));
+    }
+
     // ── Delete guard ────────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -122,6 +253,15 @@ public class AccountServiceTests
         {
             var hit = _store.FirstOrDefault(a =>
                 string.Equals(a.Name, name, StringComparison.Ordinal) && (includeDeleted || !a.IsDeleted));
+            return Task.FromResult(hit);
+        }
+
+        public Task<Account?> GetByExternalLoginAsync(string provider, string email, CancellationToken ct = default)
+        {
+            var normalized = (email ?? string.Empty).Trim().ToLowerInvariant();
+            var hit = _store.FirstOrDefault(a => !a.IsDeleted && a.ExternalLogins.Any(l =>
+                string.Equals(l.Provider, provider, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(l.Email, normalized, StringComparison.OrdinalIgnoreCase)));
             return Task.FromResult(hit);
         }
 

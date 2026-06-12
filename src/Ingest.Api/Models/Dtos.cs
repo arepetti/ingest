@@ -15,6 +15,7 @@ namespace Ingest.Api.Models;
 /// <param name="ModifiedAt">Last update timestamp (UTC).</param>
 /// <param name="ModifiedBy">Name of the last modifier.</param>
 /// <param name="IsDeleted">Soft-deletion flag.</param>
+/// <param name="ExternalLogins">SSO identity links (provider + email). Only ever populated for <see cref="AccountKind.User"/> accounts; relevant only when SSO is enabled.</param>
 public sealed record AccountDto(
     Guid Id,
     string Name,
@@ -27,12 +28,23 @@ public sealed record AccountDto(
     string? CreatedBy,
     DateTime ModifiedAt,
     string? ModifiedBy,
-    bool IsDeleted)
+    bool IsDeleted,
+    List<ExternalLoginDto> ExternalLogins)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static AccountDto From(Account a) => new(
         a.Id, a.Name, a.Label, a.Description, a.Kind, a.Role, a.Enabled,
-        a.CreatedAt, a.CreatedBy, a.ModifiedAt, a.ModifiedBy, a.IsDeleted);
+        a.CreatedAt, a.CreatedBy, a.ModifiedAt, a.ModifiedBy, a.IsDeleted,
+        a.ExternalLogins.Select(ExternalLoginDto.From).ToList());
+}
+
+/// <summary>Wire representation of an SSO identity link on an account. The provider's subject is intentionally not exposed.</summary>
+/// <param name="Provider">Provider id (e.g. <c>"Microsoft"</c>), matching an <c>Sso:Providers:*:Id</c>.</param>
+/// <param name="Email">The verified email that signs this account in via the provider.</param>
+public sealed record ExternalLoginDto(string Provider, string Email)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExternalLoginDto From(ExternalLogin e) => new(e.Provider, e.Email);
 }
 
 /// <summary>Body for <c>POST /api/admin/accounts</c>.</summary>
@@ -42,14 +54,16 @@ public sealed record AccountDto(
 /// <param name="Kind">UI-capable vs API-only.</param>
 /// <param name="Role">Authorisation tier.</param>
 /// <param name="Enabled">Initial enabled state; defaults to <c>true</c>.</param>
-public sealed record CreateAccountRequest(string Name, string? Label, string? Description, AccountKind Kind, AccountRole Role, bool Enabled = true);
+/// <param name="ExternalLogins">Optional SSO identity links. Only valid for <see cref="AccountKind.User"/> accounts; each (provider, email) pair must be unique across accounts.</param>
+public sealed record CreateAccountRequest(string Name, string? Label, string? Description, AccountKind Kind, AccountRole Role, bool Enabled = true, List<ExternalLoginDto>? ExternalLogins = null);
 
 /// <summary>Body for <c>PUT /api/admin/accounts/{id}</c>. Only the mutable fields are accepted.</summary>
 /// <param name="Label">New friendly label.</param>
 /// <param name="Description">New description.</param>
 /// <param name="Role">New authorisation tier.</param>
 /// <param name="Enabled">New enabled state.</param>
-public sealed record UpdateAccountRequest(string? Label, string? Description, AccountRole Role, bool Enabled);
+/// <param name="ExternalLogins">Replacement set of SSO identity links. <c>null</c> leaves the existing links untouched; an empty list clears them.</param>
+public sealed record UpdateAccountRequest(string? Label, string? Description, AccountRole Role, bool Enabled, List<ExternalLoginDto>? ExternalLogins = null);
 
 /// <summary>Wire representation of an API key. <b>Never</b> carries the plaintext secret.</summary>
 /// <param name="Id">Key id (primary key of the row).</param>

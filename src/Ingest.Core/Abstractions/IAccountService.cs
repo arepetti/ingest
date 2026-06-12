@@ -11,7 +11,8 @@ namespace Ingest.Core.Abstractions;
 /// <param name="Description">New free-text description.</param>
 /// <param name="Role">New role assignment.</param>
 /// <param name="Enabled">New enabled flag. Disabling an account immediately invalidates its API keys.</param>
-public sealed record AccountUpdate(string? Label, string? Description, AccountRole Role, bool Enabled);
+/// <param name="ExternalLogins">Replacement set of SSO identity links, or <c>null</c> to leave the existing links untouched. An empty list clears them. Subjects already bound to surviving links are preserved by the service.</param>
+public sealed record AccountUpdate(string? Label, string? Description, AccountRole Role, bool Enabled, IReadOnlyList<ExternalLogin>? ExternalLogins = null);
 
 /// <summary>
 /// Domain service that owns the lifecycle rules for <see cref="Account"/> aggregates: enforces the

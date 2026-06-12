@@ -10,8 +10,8 @@ import {
 import { Add20Regular, ArrowRotateClockwise20Regular, Delete20Regular, Edit20Regular, Key20Regular, Status20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { useNavigate } from 'react-router-dom'
-import { useAccounts, useApiKeys, useCreateAccount, useDeleteAccount, useRevokeApiKey, useRotateApiKey, useUpdateAccount } from '../api/hooks'
-import type { Account, AccountKind, AccountRole, CreateAccountRequest, UpdateAccountRequest } from '../api/types'
+import { useAccounts, useApiKeys, useAuthProviders, useCreateAccount, useDeleteAccount, useRevokeApiKey, useRotateApiKey, useUpdateAccount } from '../api/hooks'
+import type { Account, AccountKind, AccountRole, AuthProvider, CreateAccountRequest, ExternalLogin, UpdateAccountRequest } from '../api/types'
 import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
 import { AccountAvatar } from '../components/Avatars'
@@ -26,6 +26,8 @@ const useStyles = makeStyles({
   drawer: { width: 'max(600px, 50vw)' },
   drawerForm: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
+  hint: { color: tokens.colorNeutralForeground3, fontSize: '12px', marginBottom: '4px' },
+  linkRow: { display: 'grid', gridTemplateColumns: '160px 1fr auto', gap: '8px', alignItems: 'end', marginBottom: '8px' },
   sectionLabel: {
     color: tokens.colorNeutralForeground3,
     fontWeight: 600,
@@ -59,6 +61,14 @@ const useStyles = makeStyles({
 const roles: AccountRole[] = ['Service', 'Operator', 'Admin']
 const kinds: AccountKind[] = ['User', 'Application']
 
+// Drop blank rows and trim emails before sending. The server lower-cases and de-duplicates, so we
+// only need to filter out half-filled rows here.
+function cleanLogins(links?: ExternalLogin[]): ExternalLogin[] {
+  return (links ?? [])
+    .map(l => ({ provider: l.provider, email: (l.email ?? '').trim() }))
+    .filter(l => l.provider && l.email)
+}
+
 // Friendly one-liners for the Kind dropdown — Application is the default for service credentials,
 // User is for humans who'll also log in to this admin console.
 const kindHints: Record<AccountKind, string> = {
@@ -72,6 +82,8 @@ export function ServicesPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const { data, isLoading, error } = useAccounts({ page, pageSize })
+  const { data: providers } = useAuthProviders()
+  const hasSso = (providers?.length ?? 0) > 0
   const create = useCreateAccount()
   const update = useUpdateAccount()
   const del = useDeleteAccount()
@@ -111,6 +123,8 @@ export function ServicesPage() {
     if (!editing) return
     setSubmitError(null)
     const a = editing.account
+    // Only User-kind accounts can hold SSO links; never send them for Application accounts.
+    const logins = a.kind === 'User' ? cleanLogins(a.externalLogins) : []
     try {
       if (editing.kind === 'create') {
         const req: CreateAccountRequest = {
@@ -120,6 +134,8 @@ export function ServicesPage() {
           kind: a.kind ?? 'Application',
           role: a.role ?? 'Service',
           enabled: a.enabled ?? true,
+          // Only include when SSO is on so an API-key-only deployment never touches this field.
+          ...(hasSso ? { externalLogins: logins } : {}),
         }
         await create.mutateAsync(req)
       } else {
@@ -128,6 +144,8 @@ export function ServicesPage() {
           description: a.description,
           role: a.role ?? 'Service',
           enabled: a.enabled ?? true,
+          // Omit entirely when SSO is off (undefined ⇒ "leave links untouched" server-side).
+          ...(hasSso ? { externalLogins: logins } : {}),
         }
         await update.mutateAsync({ id: a.id!, req })
       }
@@ -281,6 +299,14 @@ export function ServicesPage() {
               </Field>
               <Checkbox label="Enabled" checked={editing.account.enabled ?? true} onChange={(_, d) => setEditing({ ...editing, account: { ...editing.account, enabled: !!d.checked } })} />
 
+              {hasSso && (editing.account.kind ?? 'Application') === 'User' && (
+                <ExternalLoginsEditor
+                  providers={providers ?? []}
+                  links={editing.account.externalLogins ?? []}
+                  onChange={(next) => setEditing({ ...editing, account: { ...editing.account, externalLogins: next } })}
+                />
+              )}
+
               {submitError && (
                 <AutoScrollMessageBar intent="error">
                   <MessageBarBody>{submitError}</MessageBarBody>
@@ -331,8 +357,65 @@ export function ServicesPage() {
   )
 }
 
+// Per-account SSO identity links editor. Only rendered for User-kind accounts when SSO is enabled.
+// Each row pairs a provider (chosen from the configured set) with the user's verified email.
+function ExternalLoginsEditor({
+  providers, links, onChange,
+}: {
+  providers: AuthProvider[]
+  links: ExternalLogin[]
+  onChange: (next: ExternalLogin[]) => void
+}) {
+  const s = useStyles()
+  const defaultProvider = providers[0]?.id ?? ''
+
+  function update(i: number, patch: Partial<ExternalLogin>) {
+    onChange(links.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  }
+  function remove(i: number) {
+    onChange(links.filter((_, idx) => idx !== i))
+  }
+  function add() {
+    onChange([...links, { provider: defaultProvider, email: '' }])
+  }
+
+  return (
+    <div>
+      <div className={s.sectionLabel}>SSO sign-in</div>
+      <div className={s.hint}>
+        Link an identity-provider account so this user can sign in with “Continue with …”. Matched on
+        the provider and the user’s verified email.
+      </div>
+      {links.map((link, i) => (
+        <div key={i} className={s.linkRow}>
+          <Field label={i === 0 ? 'Provider' : undefined}>
+            <Dropdown
+              selectedOptions={[link.provider]}
+              value={providers.find(p => p.id === link.provider)?.displayName ?? link.provider}
+              onOptionSelect={(_, d) => update(i, { provider: d.optionValue as string })}
+            >
+              {providers.map(p => <Option key={p.id} value={p.id}>{p.displayName}</Option>)}
+            </Dropdown>
+          </Field>
+          <Field label={i === 0 ? 'Email' : undefined}>
+            <Input
+              type="email"
+              value={link.email}
+              placeholder="user@example.com"
+              onChange={(_, v) => update(i, { email: v.value })}
+            />
+          </Field>
+          <Button appearance="subtle" icon={<Delete20Regular />} aria-label="Remove SSO link" onClick={() => remove(i)} />
+        </div>
+      ))}
+      <Button appearance="secondary" icon={<Add20Regular />} onClick={add}>Add SSO link</Button>
+    </div>
+  )
+}
+
 function AccountViewBody({ account }: { account: Account }) {
   const s = useStyles()
+  const links = account.externalLogins ?? []
   return (
     <div className={s.drawerForm}>
       <div className={s.twoCol}>
@@ -346,6 +429,16 @@ function AccountViewBody({ account }: { account: Account }) {
         <Field label="Role"><Body1>{account.role}</Body1></Field>
       </div>
       <Field label="Enabled"><Body1>{account.enabled ? 'Yes' : 'No'}</Body1></Field>
+
+      {links.length > 0 && (
+        <Field label="SSO sign-in">
+          <div>
+            {links.map((l, i) => (
+              <Body1 key={i} block>{l.provider}: {l.email}</Body1>
+            ))}
+          </div>
+        </Field>
+      )}
 
       {/* Deleted is the only state not already spelled out as a field, so surface it as a badge
           when (and only when) it applies. */}

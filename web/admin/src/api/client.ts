@@ -131,6 +131,9 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   const res = await fetch(url, {
     method,
     headers,
+    // Send the SSO session cookie when present. Same-origin in prod and through the Vite dev
+    // proxy, so this is safe and a no-op for the API-key-only path.
+    credentials: 'include',
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!res.ok) {

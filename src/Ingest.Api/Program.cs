@@ -6,6 +6,8 @@ using Ingest.Api.Options;
 using Ingest.Core.Common;
 using Ingest.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OData;
 using Microsoft.Extensions.FileProviders;
@@ -27,18 +29,83 @@ builder.Services.AddSingleton<IAuditContext, HttpAuditContext>();
 
 builder.Services.AddIngestInfrastructure(builder.Configuration);
 
-builder.Services.AddAuthentication(AuthConstants.Scheme)
+// SSO is an *optional second* authentication path that sits behind a single master switch.
+// When off (the default) we register nothing here beyond the API-key scheme, so no cookie/OIDC
+// code runs and the system behaves exactly as the API-key-only build.
+builder.Services.Configure<SsoOptions>(builder.Configuration.GetSection("Sso"));
+var ssoOptions = builder.Configuration.GetSection("Sso").Get<SsoOptions>() ?? new SsoOptions();
+var ssoActive = ssoOptions.IsActive;
+
+var authBuilder = builder.Services.AddAuthentication(AuthConstants.Scheme)
     .AddScheme<ApiKeyAuthSchemeOptions, ApiKeyAuthenticationHandler>(AuthConstants.Scheme, _ => { });
 
+if (ssoActive)
+{
+    // Session cookie issued after a successful OIDC sign-in. API-style: never redirect to a login
+    // page — emit 401/403 so the SPA's fetch layer handles it like any other auth failure.
+    authBuilder.AddCookie(AuthConstants.SessionScheme, o =>
+    {
+        o.Cookie.Name = ssoOptions.CookieName;
+        o.Cookie.HttpOnly = true;
+        o.Cookie.SameSite = SameSiteMode.Lax;
+        o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        o.SlidingExpiration = true;
+        o.ExpireTimeSpan = TimeSpan.FromHours(8);
+        o.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
+        o.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
+    });
+
+    // One OIDC handler per fully-configured provider. The generic handler covers Microsoft, Google
+    // and any other standard OpenID Connect provider. The callback path is under /api so the Vite
+    // dev proxy forwards it to the backend unchanged.
+    foreach (var provider in ssoOptions.ActiveProviders)
+    {
+        var providerId = provider.Id;
+        authBuilder.AddOpenIdConnect(AuthConstants.OidcScheme(providerId), o =>
+        {
+            o.SignInScheme = AuthConstants.SessionScheme;
+            o.Authority = provider.Authority;
+            o.ClientId = provider.ClientId;
+            o.ClientSecret = provider.ClientSecret;
+            o.ResponseType = "code";
+            o.UsePkce = true;
+            o.SaveTokens = false;
+            o.GetClaimsFromUserInfoEndpoint = true;
+            o.CallbackPath = $"/api/auth/callback/{providerId}";
+            o.Scope.Clear();
+            foreach (var scope in provider.Scopes) o.Scope.Add(scope);
+            o.Events = new OpenIdConnectEvents
+            {
+                OnTokenValidated = ctx => SsoSignIn.HandleTokenValidatedAsync(providerId, ctx),
+                OnRemoteFailure = ctx =>
+                {
+                    ctx.Response.Redirect("/login?sso_error=remote");
+                    ctx.HandleResponse();
+                    return Task.CompletedTask;
+                },
+            };
+        });
+    }
+}
+
+// Policies name both schemes. When SSO is off the IngestSession scheme is simply never
+// registered/never authenticates, so the policies still behave exactly as today (API key only).
+var authSchemes = ssoActive
+    ? new[] { AuthConstants.Scheme, AuthConstants.SessionScheme }
+    : new[] { AuthConstants.Scheme };
+
 builder.Services.AddAuthorizationBuilder()
-    .AddPolicy(AuthConstants.ServicePolicy, p => p.RequireAuthenticatedUser())
-    .AddPolicy(AuthConstants.OperatorPolicy, p => p.RequireRole("Operator", "Admin"))
-    .AddPolicy(AuthConstants.AdminPolicy, p => p.RequireRole("Admin"));
+    .SetDefaultPolicy(new AuthorizationPolicyBuilder(authSchemes).RequireAuthenticatedUser().Build())
+    .AddPolicy(AuthConstants.ServicePolicy, p => { p.AddAuthenticationSchemes(authSchemes); p.RequireAuthenticatedUser(); })
+    .AddPolicy(AuthConstants.OperatorPolicy, p => { p.AddAuthenticationSchemes(authSchemes); p.RequireRole("Operator", "Admin"); })
+    .AddPolicy(AuthConstants.AdminPolicy, p => { p.AddAuthenticationSchemes(authSchemes); p.RequireRole("Admin"); });
 
 builder.Services.AddCors(o => o.AddPolicy("dev", p =>
 {
     var origins = builder.Configuration.GetSection("Ingest:CorsDevOrigins").Get<string[]>() ?? new[] { "http://localhost:5173" };
-    p.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod();
+    // AllowCredentials is required for the session cookie to flow cross-origin in dev. It's only
+    // valid alongside explicit origins (never with AllowAnyOrigin), which is exactly what we use.
+    p.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
 }));
 
 // Serialize all enums as their string names (e.g. "Service" instead of 0) for both Minimal API and MVC/OData endpoints.

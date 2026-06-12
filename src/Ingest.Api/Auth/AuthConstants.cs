@@ -10,6 +10,16 @@ public static class AuthConstants
     /// <summary>Name of the API-key authentication scheme registered with ASP.NET Core.</summary>
     public const string Scheme = "ApiKey";
 
+    /// <summary>
+    /// Name of the cookie scheme issued after a successful SSO login. Only registered when
+    /// <c>Sso:EnableSso</c> is on; the policies always name it, so when SSO is off it simply
+    /// never authenticates anyone and behaviour is unchanged.
+    /// </summary>
+    public const string SessionScheme = "IngestSession";
+
+    /// <summary>Builds the per-provider OpenIdConnect scheme name from a provider id (e.g. <c>oidc:Microsoft</c>).</summary>
+    public static string OidcScheme(string providerId) => $"oidc:{providerId}";
+
     /// <summary>Policy that authorises any role at or above <see cref="Core.Entities.AccountRole.Service"/> (i.e. everyone).</summary>
     public const string ServicePolicy = "Service";
 

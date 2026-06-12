@@ -21,6 +21,14 @@ The guide is split into focused pages — pick whichever matches the task at han
 
 If you paste an **Application**-kind key the login screen rejects it with a clear error: only **User**-kind credentials can sign in. (Services use their keys against the API directly, not the SPA.)
 
+### Signing in with single sign-on (only when SSO is enabled)
+
+If your deployment has [SSO](../architecture/authentication.md#single-sign-on-optional-second-scheme) turned on (`Sso:EnableSso=true` with at least one configured provider), the login screen also shows **Continue with Microsoft / Google** buttons above the API-key field. Click one to sign in with your organisation account instead of pasting a key.
+
+- This works only if an administrator has **linked your verified email** to a **User**-kind account first (see [accounts.md → Linking an SSO identity](accounts.md)). If it hasn't been linked, the sign-in is rejected with a message asking you to contact an administrator.
+- API keys still work exactly as before — SSO is an *additional* way in, not a replacement.
+- **When SSO is disabled (the default), none of these buttons appear** and the screen is the API-key-only form described above.
+
 Once logged in:
 
 - The left sidebar carries **Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Reports**.

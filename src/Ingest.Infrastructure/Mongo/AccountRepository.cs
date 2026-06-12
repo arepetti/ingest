@@ -32,6 +32,23 @@ public sealed class AccountRepository : RepositoryBase<Account>, IAccountReposit
     }
 
     /// <inheritdoc />
+    public Task<Account?> GetByExternalLoginAsync(string provider, string email, CancellationToken ct = default)
+    {
+        // Emails are persisted lower-cased (see AccountService) so a plain equality match is
+        // effectively case-insensitive without a regex. Provider ids are stored as-is but are
+        // a fixed small vocabulary, so match them case-insensitively to be forgiving.
+        var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
+        var normalizedProvider = (provider ?? string.Empty).Trim();
+        var elem = Builders<Account>.Filter.ElemMatch(
+            a => a.ExternalLogins,
+            Builders<ExternalLogin>.Filter.And(
+                Builders<ExternalLogin>.Filter.Regex(e => e.Provider, new MongoDB.Bson.BsonRegularExpression($"^{System.Text.RegularExpressions.Regex.Escape(normalizedProvider)}$", "i")),
+                Builders<ExternalLogin>.Filter.Eq(e => e.Email, normalizedEmail)));
+        var filter = ApplySoftDelete(elem, includeDeleted: false);
+        return Collection.Find(filter).FirstOrDefaultAsync(ct)!;
+    }
+
+    /// <inheritdoc />
     public async Task<PagedResult<Account>> ListAsync(PageRequest request, AccountKind? kind = null, AccountRole? role = null, CancellationToken ct = default)
     {
         var filter = ApplySoftDelete(Builders<Account>.Filter.Empty, request.IncludeDeleted);

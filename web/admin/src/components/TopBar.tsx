@@ -6,7 +6,7 @@ import {
   Text, Tooltip, makeStyles, tokens,
 } from '@fluentui/react-components'
 import { ChevronDown16Regular, SignOut20Regular } from '@fluentui/react-icons'
-import { setApiKey } from '../api/client'
+import { api, setApiKey } from '../api/client'
 import { useAccounts, useReports, useSchemas } from '../api/hooks'
 import type { Me } from '../api/types'
 
@@ -196,7 +196,12 @@ export function TopBar({ me }: { me?: Me }) {
     return { accounts, schemas, reports }
   }, [accountsQuery.data, schemasQuery.data, reportsQuery.data])
 
-  function logout() {
+  async function logout() {
+    // Clear the SSO session cookie server-side (no-op when SSO is off / no cookie), then drop any
+    // local API key and bounce to the login screen. Best-effort: navigate even if the call fails.
+    try {
+      await api.post<void>('/api/auth/logout')
+    } catch { /* ignore — we're signing out regardless */ }
     setApiKey(null)
     nav('/login', { replace: true })
   }
