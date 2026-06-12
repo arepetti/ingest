@@ -20,7 +20,7 @@ src/
   Ingest.Core/            Pure domain model + abstractions. No I/O, no framework.
   Ingest.Infrastructure/  Mongo repos, hashing, NCalc, services.
 web/admin/                React + Vite + Fluent UI admin SPA.
-tests/Ingest.Tests/       PoC test suite (happy paths only).
+tests/Ingest.Tests/       Test suite.
 docs/                     Long-form documentation. Index: docs/README.md.
 Dockerfile                Multi-stage build: SPA + API into a single image.
 ```
@@ -73,7 +73,7 @@ When run outside Aspire, the Vite proxy falls back to `http://localhost:5000`. S
 dotnet test
 ```
 
-The PoC suite covers happy paths only:
+The suite focuses on the core domain logic:
 
 - API-key hashing roundtrip.
 - NCalc evaluator semantics (boolean, string-message, null-safe).
@@ -114,7 +114,7 @@ The OpenAPI document is also available at `/swagger/v1/swagger.json`; feed it to
 
 ## Submitting changes
 
-This is a PoC — branching strategy and PR review process aren't formalised. Keep changes small and focused; if a change touches the public API or the admin SPA, update the relevant doc under `docs/` in the same change.
+The project keeps process lightweight by design — branching strategy and PR review process aren't heavily formalised. Keep changes small and focused; if a change touches the public API or the admin SPA, update the relevant doc under `docs/` in the same change.
 
 Before pushing:
 

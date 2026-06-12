@@ -7,7 +7,7 @@ import { cadenceLabel } from '../utils/cadence'
 import { Link } from 'react-router-dom'
 
 const useStyles = makeStyles({
-  root: { display: 'flex', flexDirection: 'column', gap: '24px' },
+  root: { display: 'flex', flexDirection: 'column', gap: '24px', minHeight: '100%' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' },
   // Missing-submission cards need more room for the inline list, so they live in a wider grid.
   missingGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' },
@@ -15,7 +15,11 @@ const useStyles = makeStyles({
   big: { fontSize: '32px', fontWeight: 700, color: tokens.colorBrandForeground1 },
   sub: { color: tokens.colorNeutralForeground3, fontSize: '12px' },
   missingHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' },
-  missingCount: { fontSize: '28px', fontWeight: 700, color: tokens.colorPaletteRedForeground1 },
+  missingCount: { fontSize: '28px', fontWeight: 700 },
+  // Current period is still open → amber/warning; the previous (closed) period is overdue → red.
+  missingCountCurrent: { color: tokens.colorStatusWarningForeground1 },
+  missingCountPrevious: { color: tokens.colorStatusDangerForeground1 },
+  sectionHeaderRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' },
   missingList: {
     display: 'flex',
     flexDirection: 'column',
@@ -41,6 +45,13 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  },
+  footer: {
+    marginTop: 'auto',
+    paddingTop: '16px',
+    textAlign: 'center',
+    color: tokens.colorNeutralForeground4,
+    fontSize: '11px',
   },
 })
 
@@ -128,14 +139,16 @@ export function Dashboard() {
         buckets={missing.data}
         styles={s}
       />}
+
+      <div className={s.footer}>Ingest{me?.version ? ` v${me.version}` : ''}</div>
     </div>
   )
 }
 
 /**
- * Operator-only cluster of cards summarising required submissions that aren't in yet, one card
- * per cadence the server reports has unsatisfied entries. Renders nothing when the report is
- * still loading and nothing when everything is up to date — both signals are useful but neither
+ * Operator-only cluster of cards summarising required submissions that aren't in yet, split into
+ * the current (still-open) window and the previous (closed, overdue) window. Renders nothing
+ * while loading and nothing when everything is up to date — both signals are useful but neither
  * warrants chrome on a clean dashboard.
  */
 function MissingSubmissionsSection({
@@ -150,12 +163,65 @@ function MissingSubmissionsSection({
   if (loading) return null
   if (!buckets || buckets.length === 0) return null
 
+  const current = buckets.filter((b) => b.period === 'Current')
+  const previous = buckets.filter((b) => b.period === 'Previous')
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <Subtitle2>Missing submissions</Subtitle2>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className={styles.sectionHeaderRow}>
+        <Subtitle2>Missing submissions</Subtitle2>
+        <Link to="/missing" style={{ color: tokens.colorBrandForeground1, fontSize: 13 }}>
+          View by period →
+        </Link>
+      </div>
+
+      {previous.length > 0 && (
+        <MissingPeriodGroup
+          title="Overdue — previous period"
+          subtitle="These submission windows have closed."
+          buckets={previous}
+          tone="previous"
+          styles={styles}
+        />
+      )}
+
+      {current.length > 0 && (
+        <MissingPeriodGroup
+          title="This period"
+          subtitle="Still within the submission window."
+          buckets={current}
+          tone="current"
+          styles={styles}
+        />
+      )}
+    </div>
+  )
+}
+
+type MissingTone = 'current' | 'previous'
+
+function MissingPeriodGroup({
+  title,
+  subtitle,
+  buckets,
+  tone,
+  styles,
+}: {
+  title: string
+  subtitle: string
+  buckets: MissingByCadence[]
+  tone: MissingTone
+  styles: ReturnType<typeof useStyles>
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div>
+        <Text weight="semibold">{title}</Text>
+        <div className={styles.sub}>{subtitle}</div>
+      </div>
       <div className={styles.missingGrid}>
         {buckets.map((b) => (
-          <MissingCadenceCard key={b.cadence} bucket={b} styles={styles} />
+          <MissingCadenceCard key={`${tone}-${b.cadence}`} bucket={b} tone={tone} styles={styles} />
         ))}
       </div>
     </div>
@@ -164,30 +230,35 @@ function MissingSubmissionsSection({
 
 function MissingCadenceCard({
   bucket,
+  tone,
   styles,
 }: {
   bucket: MissingByCadence
+  tone: MissingTone
   styles: ReturnType<typeof useStyles>
 }) {
+  const countClass = tone === 'previous'
+    ? `${styles.missingCount} ${styles.missingCountPrevious}`
+    : `${styles.missingCount} ${styles.missingCountCurrent}`
   return (
     <Card className={styles.card}>
       <CardHeader
         header={
           <div className={styles.missingHeaderRow}>
             <Text weight="semibold">{cadenceLabel(bucket.cadence)}</Text>
-            <Badge appearance="outline" color="informative">
+            <Badge appearance="outline" color={tone === 'previous' ? 'danger' : 'warning'}>
               {windowLabel(bucket.periodStart, bucket.periodEnd)}
             </Badge>
           </div>
         }
       />
-      <div className={styles.missingCount}>{bucket.entries.length}</div>
+      <div className={countClass}>{bucket.entries.length}</div>
       <div className={styles.sub}>
         {bucket.entries.length === 1 ? 'service short on submissions' : 'services short on submissions'}
       </div>
       <div className={styles.missingList}>
         {bucket.entries.map((e) => (
-          <MissingEntryRow key={`${e.serviceId}-${e.schemaName}`} entry={e} styles={styles} />
+          <MissingEntryRow key={`${e.serviceId}-${e.schemaName}`} entry={e} tone={tone} styles={styles} />
         ))}
       </div>
     </Card>
@@ -196,9 +267,11 @@ function MissingCadenceCard({
 
 function MissingEntryRow({
   entry,
+  tone,
   styles,
 }: {
   entry: MissingSubmissionEntry
+  tone: MissingTone
   styles: ReturnType<typeof useStyles>
 }) {
   const serviceLabel = entry.serviceLabel || entry.serviceName
@@ -217,7 +290,7 @@ function MissingEntryRow({
           {label}
         </Link>
       </Tooltip>
-      <Badge appearance="outline" color="severe">
+      <Badge appearance="outline" color={tone === 'previous' ? 'danger' : 'warning'}>
         {entry.missingRequiredCount}/{entry.totalRequiredCount}
       </Badge>
     </div>

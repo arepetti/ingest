@@ -40,6 +40,40 @@ public static class CadenceCalculator
         };
     }
 
+    /// <summary>
+    /// Return the cadence bucket immediately preceding the one containing
+    /// <paramref name="timestampUtc"/>. Convenience wrapper over <see cref="BucketAtOffset"/>
+    /// with an offset of <c>-1</c>; the returned bucket's <c>End</c> always equals the current
+    /// bucket's <c>Start</c> (buckets are contiguous).
+    /// </summary>
+    /// <param name="cadence">Cadence to align to.</param>
+    /// <param name="timestampUtc">Reference timestamp; treated as UTC.</param>
+    /// <returns>The inclusive start and exclusive end of the previous bucket.</returns>
+    public static (DateTime Start, DateTime End) PreviousBucketFor(Cadence cadence, DateTime timestampUtc)
+        => BucketAtOffset(cadence, timestampUtc, -1);
+
+    /// <summary>
+    /// Return the cadence bucket at a signed <paramref name="offset"/> from the bucket containing
+    /// <paramref name="timestampUtc"/>. Offset <c>0</c> is the current bucket, <c>-1</c> the
+    /// previous one, <c>+1</c> the next, and so on. Because buckets are contiguous half-open
+    /// intervals, stepping is done by nudging one tick past the relevant boundary.
+    /// </summary>
+    /// <param name="cadence">Cadence to align to.</param>
+    /// <param name="timestampUtc">Reference timestamp; treated as UTC.</param>
+    /// <param name="offset">Signed number of buckets to move (negative = past, positive = future).</param>
+    /// <returns>The inclusive start and exclusive end of the offset bucket.</returns>
+    public static (DateTime Start, DateTime End) BucketAtOffset(Cadence cadence, DateTime timestampUtc, int offset)
+    {
+        var (start, end) = BucketFor(cadence, timestampUtc);
+        if (offset < 0)
+            for (int i = 0; i < -offset; i++)
+                (start, end) = BucketFor(cadence, start.AddTicks(-1));
+        else if (offset > 0)
+            for (int i = 0; i < offset; i++)
+                (start, end) = BucketFor(cadence, end); // `end` is exclusive → first instant of the next bucket
+        return (start, end);
+    }
+
     private static (DateTime Start, DateTime End) WeekBucket(DateTime t)
     {
         int diff = ((int)t.DayOfWeek + 6) % 7;

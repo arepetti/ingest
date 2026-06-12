@@ -22,6 +22,7 @@ public sealed class ReportService : IReportService
     private readonly IAccountRepository _accounts;
     private readonly IReportRenderer _renderer;
     private readonly IAuditContext _audit;
+    private readonly IAuditLogService _auditLog;
 
     /// <summary>Create a new <see cref="ReportService"/>.</summary>
     /// <param name="reports">Report repository.</param>
@@ -31,6 +32,7 @@ public sealed class ReportService : IReportService
     /// <param name="accounts">Account repository (denormalised service label/name on Single renders).</param>
     /// <param name="renderer">The Liquid renderer.</param>
     /// <param name="audit">Audit context (clock).</param>
+    /// <param name="auditLog">Audit log used to record create/delete changes.</param>
     public ReportService(
         IReportRepository reports,
         ISchemaRepository schemas,
@@ -38,7 +40,8 @@ public sealed class ReportService : IReportService
         ISampleRepository samples,
         IAccountRepository accounts,
         IReportRenderer renderer,
-        IAuditContext audit)
+        IAuditContext audit,
+        IAuditLogService auditLog)
     {
         _reports = reports;
         _schemas = schemas;
@@ -47,6 +50,7 @@ public sealed class ReportService : IReportService
         _accounts = accounts;
         _renderer = renderer;
         _audit = audit;
+        _auditLog = auditLog;
     }
 
     /// <inheritdoc />
@@ -89,12 +93,18 @@ public sealed class ReportService : IReportService
         };
 
         await _reports.AddAsync(report, ct);
+        await _auditLog.RecordAsync(AuditTargetType.Report, AuditChangeType.Create, report.Id, report.Name, ct);
         return report;
     }
 
     /// <inheritdoc />
-    public Task DeleteAsync(Guid id, CancellationToken ct = default) =>
-        _reports.SoftDeleteAsync(id, ct);
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var existing = await _reports.GetByIdAsync(id, ct: ct);
+        await _reports.SoftDeleteAsync(id, ct);
+        if (existing is not null)
+            await _auditLog.RecordAsync(AuditTargetType.Report, AuditChangeType.Delete, existing.Id, existing.Name, ct);
+    }
 
     /// <inheritdoc />
     public async Task<ReportRenderResult> RenderAsync(string name, ReportRenderRequest request, CancellationToken ct = default)

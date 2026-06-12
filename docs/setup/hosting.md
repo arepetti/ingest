@@ -12,36 +12,39 @@ The Ingest container is single-image: it bundles the compiled API **and** the bu
 
 ## TL;DR
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ Resource Group "rg-ingest-prod"                              │
-│                                                              │
-│   ┌──────────────────────┐    ┌─────────────────────────┐    │
-│   │ Azure Container      │    │ Cosmos DB for MongoDB   │    │
-│   │ Registry (ACR)       │    │ (vCore)                 │    │
-│   │  - image: ingest:1.x │    │  - cluster: ingest-db   │    │
-│   └──────────┬───────────┘    │  - db:      ingest      │    │
-│              │                 └────────────┬────────────┘   │
-│              │ pull (managed identity)      │                │
-│              ▼                              │ MongoDB wire   │
-│   ┌──────────────────────────────────────┐  │ protocol       │
-│   │ Container Apps Environment           │  │                │
-│   │  ┌─────────────────────────────────┐ │  │                │
-│   │  │ App: ingest (HTTPS ingress)     │ │◄─┘                │
-│   │  │  - secret: api-key-pepper       │ │                   │
-│   │  │  - secret: mongo-cs             │ │                   │
-│   │  │  - liveness: /alive             │ │                   │
-│   │  │  - readiness: /health           │ │                   │
-│   │  └─────────────────────────────────┘ │                   │
-│   └──────────────────────────────────────┘                   │
-│                                                              │
-│   ┌──────────────────────┐                                   │
-│   │ Key Vault            │ ← actual secret store, surfaced   │
-│   │  - api-key-pepper    │   to Container App via secretref  │
-│   │  - mongo-cs          │   (optional, recommended)         │
-│   └──────────────────────┘                                   │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph RG["Resource Group: rg-ingest-prod"]
+        ACR["Azure Container Registry (ACR)<br/>image: ingest:1.x"]
+        KV["Key Vault<br/>api-key-pepper · mongo-cs<br/>(optional, recommended)"]
+
+        subgraph CAE["Container Apps Environment"]
+            subgraph APP["App: ingest — single image, HTTPS ingress<br/>secrets: api-key-pepper, mongo-cs · liveness /alive · readiness /health"]
+                API["API + admin SPA"]
+                OUTBOX["Email outbox sender<br/>(in-process worker —<br/>Email:Worker:Enabled)"]
+                SCHED["Notification scheduler<br/>(in-process worker —<br/>Notifications:Scheduler:Enabled)"]
+            end
+        end
+
+        subgraph COSMOS["Cosmos DB for MongoDB (vCore)<br/>cluster: ingest-db · db: ingest"]
+            CORE[("submissions, accounts,<br/>schemas, reports, audit, …")]
+            EMAILCOL[("emailOutbox · emailSettings<br/>· emailTemplates")]
+            NOTIFCOL[("notificationSettings<br/>· notificationLogs")]
+        end
+    end
+
+    SMTP["SMTP server<br/>(external — configured in Settings → Email)"]
+
+    ACR -- "pull (managed identity)" --> APP
+    KV -. "secretref" .-> APP
+    APP -- "MongoDB wire protocol" --> COSMOS
+    SCHED -- "evaluate triggers,<br/>dedupe & enqueue" --> NOTIFCOL
+    SCHED -- "enqueue email" --> EMAILCOL
+    OUTBOX -- "drain queue" --> EMAILCOL
+    OUTBOX == "send mail (STARTTLS)" ==> SMTP
 ```
+
+> The **email outbox sender** and **notification scheduler** run *in-process* inside the same container by default. They can be turned off (`Email__Worker__Enabled=false`, `Notifications__Scheduler__Enabled=false`) and driven externally instead — see [§ Optional — email & notifications](#optional--email--notifications). The SMTP server is the only new *external* dependency, and it's configured at runtime from the SPA (**Settings → Email**), not as Azure infrastructure.
 
 ## Before you begin
 
@@ -302,6 +305,16 @@ https://<host>/api/auth/callback/Microsoft
 
 (`<host>` is the app FQDN from Step 9, or your custom domain. Use the matching provider id for others, e.g. `.../api/auth/callback/Google`.) Link each user's verified email to a `User`-kind account from the SPA before they can sign in — see [the admin user guide](../admin-user-guide/accounts.md).
 
+### Optional — email & notifications
+
+Email is **on by default** (`Email:Enabled=true`) but does nothing until an admin configures the SMTP server from **Settings → Email** in the SPA — there's no required configuration to deploy. The SMTP connection (including the password, encrypted at rest with a key derived from `ApiKey:Pepper`) lives in the database, so it survives restarts and needs no Key Vault wiring.
+
+Things you can tune per deployment via env vars (all optional — see [configuration.md → Email & notifications](configuration.md#email--notifications)):
+
+- Set `Email__Enabled=false` to switch the whole feature (settings tabs, sent-emails audit, ad-hoc send, notification scheduler) off.
+- The in-process **outbox sender** and **notification scheduler** run inside the app by default. To drive them from an external scheduler instead (e.g. a cron job hitting `POST /api/admin/email/drain` and `POST /api/admin/notifications/run` with an admin key), set `Email__Worker__Enabled=false` and/or `Notifications__Scheduler__Enabled=false`. This is the seam for later splitting sending/scheduling into their own services.
+- On a brand-new deployment you can pre-seed the SMTP settings with `Email__Smtp__*` env vars; they're used only until the settings document exists.
+
 ## Step 9 — Grab the FQDN
 
 ```powershell
@@ -417,6 +430,16 @@ The settings the deployment commands above pass — and every other knob you can
 - **Required in any production deployment:** `ConnectionStrings__ingest` and `ApiKey__Pepper`.
 - **Recommended behind any reverse proxy:** `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`.
 - **Optional but useful:** the OpenTelemetry / Application Insights variables for telemetry.
+
+## Network controls
+
+Ingest authenticates every request with an API key, but it deliberately does **not** implement request/rate limiting or IP allow-listing in-app. These are network-layer concerns and belong in the platform that fronts the container — its ingress, an API gateway, or a reverse proxy. Handle them where you deploy:
+
+- **HTTPS / TLS:** terminate TLS at the platform and only expose the app over HTTPS. On Azure Container Apps the external ingress is HTTPS by default; behind your own proxy (Nginx, Caddy, App Gateway) redirect HTTP to HTTPS there.
+- **Rate / request limiting:** throttle at the edge. Azure Container Apps / Front Door support rate-limit rules (WAF custom rules); API Management has rate-limit and quota policies; Nginx uses `limit_req`; Caddy has `rate_limit`.
+- **IP allow-listing:** restrict who can reach the app at the ingress. Azure Container Apps supports inbound IP restrictions (`az containerapp ingress access-restriction set`); App Gateway / Front Door use WAF rules; Nginx uses `allow`/`deny`; Kubernetes ingress controllers expose `whitelist-source-range` annotations.
+
+Keeping these at the hosting layer means they apply uniformly to every entry point (REST, OData, SPA) and can be tuned without redeploying the application.
 
 ## Free tier - a $0 evaluation deployment
 
@@ -585,6 +608,17 @@ If your org standardises on AKS, the `Dockerfile` produces an image that runs an
 
 If you prefer running MongoDB yourself (replica set on Azure VMs, MongoDB Atlas, …) point `ConnectionStrings:ingest` at it. The schema and indexes are managed by the app on startup (`MongoSetup.EnsureIndexesAsync`).
 
+## Backups
+
+**Backups are a database-level, DevOps responsibility.** The app stores everything in MongoDB, so a backup is whatever your MongoDB hosting gives you:
+
+- **Managed Mongo (Cosmos DB vCore, Atlas, …):** enable the provider's automated backups / continuous backup + point-in-time restore. This is the recommended path for any real deployment.
+- **Self-hosted:** schedule `mongodump` (or filesystem/volume snapshots of a consistent replica) and store the archives off-box. Restore with `mongorestore`.
+
+The application does not need to be quiesced for a backup; it's stateless apart from MongoDB. After a restore the app re-creates indexes on startup (`MongoSetup.EnsureIndexesAsync`), so an index-less `mongorestore --noIndexRestore` is fine too.
+
+> **In-app export/import is *not* the backup mechanism.** The admin SPA has a **Settings → Backup & restore** tool that exports the whole registry to a single JSON file and restores it. It exists for **small** deployments and for copying data between environments. It loads everything into memory, a restore **replaces all current data**, and it is **not transactional**. Do not rely on it for production backups or large databases — use the database-level options above. See [admin-user-guide/settings.md](../admin-user-guide/settings.md).
+
 ## Tearing it down
 
 Cosmos DB vCore keeps billing whether or not anyone's using it, so delete everything when you're done evaluating. The simplest hammer is to drop the whole resource group:
@@ -604,7 +638,9 @@ Before you call it "production":
 - [ ] Cosmos DB shard-node-ha is **on** if you can't tolerate planned maintenance.
 - [ ] `Ingest:EnableSwagger` is `false`.
 - [ ] Liveness/readiness probes are wired.
+- [ ] Rate limiting and (if needed) IP allow-listing are configured at the ingress / proxy — see [Network controls](#network-controls).
 - [ ] Logs flow to Log Analytics or Application Insights.
 - [ ] You've validated PowerBI can connect with an Operator-role key (see [powerbi.md](powerbi.md)).
 - [ ] **If using SSO:** `Sso__EnableSso=true`, the client id/secret are sourced from Key Vault (not inline), the production redirect URI is registered with each IdP, and at least one admin's identity is linked to a `User` account (so you're not locked out if a key is lost).
 - [ ] A backup of `mongo-cs` (your Mongo connection string) is stored somewhere you can find without logging into Azure.
+- [ ] **Database backups** are configured at the MongoDB layer (provider automated backups or scheduled `mongodump`) — see [Backups](#backups). The in-app export/import is *not* a substitute.

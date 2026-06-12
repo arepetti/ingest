@@ -85,6 +85,19 @@ function buildBreadcrumbs(pathname: string, labels: LabelLookups): Crumb[] {
 
     { re: /^\/schemas$/, build: () => [home, { label: 'Schemas' }] },
     {
+      re: /^\/schemas\/new$/,
+      build: () => [home, { label: 'Schemas', to: '/schemas' }, { label: 'New' }],
+    },
+    {
+      re: /^\/schemas\/([^/]+)\/edit$/,
+      build: (m) => [
+        home,
+        { label: 'Schemas', to: '/schemas' },
+        { label: schemaLabel(m[1]) },
+        { label: 'Edit' },
+      ],
+    },
+    {
       re: /^\/schemas\/([^/]+)\/history$/,
       build: (m) => [
         home,
@@ -142,6 +155,8 @@ function buildBreadcrumbs(pathname: string, labels: LabelLookups): Crumb[] {
         { label: reportLabel(m[1]) },
       ],
     },
+
+    { re: /^\/audit$/, build: () => [home, { label: 'Audit' }] },
   ]
 
   for (const r of rules) {

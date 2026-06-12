@@ -4,7 +4,7 @@ import {
   Avatar, Badge, Button, MessageBarBody, MessageBarTitle,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
   Title2, Tooltip, Toolbar,
-  makeStyles,
+  makeStyles, tokens,
 } from '@fluentui/react-components'
 import {
   ArrowUpload20Regular, Delete20Regular, DocumentText20Regular, Open20Regular,
@@ -17,6 +17,7 @@ import { formatApiError } from '../api/client'
 import { confirmDelete } from '../utils/confirm'
 import { pickTextFile } from '../utils/download'
 import { formatDate, formatDateTime } from '../utils/format'
+import { clickableRowProps } from '../utils/a11y'
 import type { Report } from '../api/types'
 
 const useStyles = makeStyles({
@@ -40,7 +41,10 @@ const useStyles = makeStyles({
   colActions: { width: '80px', textAlign: 'right' },
   actionsHeader: { textAlign: 'right' },
   actionsCell:   { textAlign: 'right' },
-  rowClickable: { cursor: 'pointer' },
+  rowClickable: {
+    cursor: 'pointer',
+    ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '-2px' },
+  },
   // The targets cell hosts a horizontal chip strip; allow it to scroll within its column
   // instead of wrapping to a second line which would inflate row height across the grid.
   chipStrip: {
@@ -143,7 +147,7 @@ export function ReportsPage() {
             <TableRow
               key={r.id}
               className={`${s.row} ${s.rowClickable}`}
-              onClick={() => nav(`/reports/${encodeURIComponent(r.name)}`)}
+              {...clickableRowProps(() => nav(`/reports/${encodeURIComponent(r.name)}`), `Open report ${r.label || r.name}`)}
             >
               <TableCell className={s.nameCell}>
                 <TableCellLayout

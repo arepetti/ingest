@@ -2,6 +2,7 @@
  * Tiny helpers for the "download as JSON" and "upload JSON" affordances used by the schema
  * import/export workflow. Kept dependency-free so they're usable from any page.
  */
+import { getApiKey } from '../api/client'
 
 /**
  * Trigger a browser download for `payload`, JSON-stringified with two-space indentation. The
@@ -27,6 +28,29 @@ export function downloadText(filename: string, content: string, mimeType: string
   a.click()
   document.body.removeChild(a)
   setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/**
+ * Trigger a download of a server endpoint that streams a file (e.g. the audit-log CSV export).
+ * Fetches the URL with the same auth the rest of the SPA uses (X-Api-Key header when present,
+ * plus the SSO session cookie via `credentials: 'include'`), then saves the response body as a
+ * Blob. Throws when the server responds with a non-2xx status so callers can surface it inline.
+ */
+export async function downloadFromUrl(url: string, filename: string): Promise<void> {
+  const headers: Record<string, string> = {}
+  const key = getApiKey()
+  if (key) headers['X-Api-Key'] = key
+  const res = await fetch(url, { headers, credentials: 'include' })
+  if (!res.ok) throw new Error(`Download failed (${res.status}).`)
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
 }
 
 /**

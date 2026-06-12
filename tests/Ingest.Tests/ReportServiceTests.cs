@@ -168,7 +168,7 @@ public class ReportServiceTests
         var samples = new FakeSamples();
         var renderer = new FluidReportRenderer();
         var audit = new FixedClock(FixedNow);
-        return (new ReportService(repo, schemas, submissions, samples, accounts, renderer, audit),
+        return (new ReportService(repo, schemas, submissions, samples, accounts, renderer, audit, new NoopAuditLogService()),
             repo, schemas, submissions, accounts, samples);
     }
 
@@ -208,6 +208,8 @@ public class ReportServiceTests
             if (hit is not null) hit.IsDeleted = true;
             return Task.CompletedTask;
         }
+
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 
     private sealed class FakeSchemas : ISchemaRepository, System.Collections.IEnumerable
@@ -228,6 +230,7 @@ public class ReportServiceTests
         public Task UpdateAsync(Schema schema, CancellationToken ct = default) => Task.CompletedTask;
         public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
         public Task HardDeleteAsync(Guid id, CancellationToken ct = default) { _store.RemoveAll(s => s.Id == id); return Task.CompletedTask; }
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 
     private sealed class FakeSubmissions : ISubmissionRepository, System.Collections.IEnumerable
@@ -243,6 +246,10 @@ public class ReportServiceTests
         public Task AddAsync(Submission submission, CancellationToken ct = default) { _store.Add(submission); return Task.CompletedTask; }
         public Task UpdateAsync(Submission submission, CancellationToken ct = default) => Task.CompletedTask;
         public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<IReadOnlyList<Submission>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Submission>>(_store.Where(s => s.ServiceAccountId == serviceId && (includeDeleted || !s.IsDeleted)).ToList());
+        public Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 
     private sealed class FakeAccounts : IAccountRepository
@@ -259,6 +266,7 @@ public class ReportServiceTests
         public Task UpdateAsync(Account account, CancellationToken ct = default) => Task.CompletedTask;
         public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
         public Task HardDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 
     private sealed class FakeSamples : ISampleRepository, System.Collections.IEnumerable
@@ -271,6 +279,8 @@ public class ReportServiceTests
             Task.FromResult(new PagedResult<SampleProjection>(_store.ToList(), _store.Count, 1, _store.Count));
         public Task<SampleProjection?> GetLatestAsync(Guid serviceId, string schemaName, string valueName, CancellationToken ct = default) =>
             Task.FromResult<SampleProjection?>(null);
+        public Task<bool> ExistsInWindowAsync(Guid serviceId, string schemaName, string valueName, DateTime start, DateTime end, CancellationToken ct = default) =>
+            Task.FromResult(_store.Any(s => s.ServiceAccountId == serviceId && s.SchemaName == schemaName && s.ValueName == valueName && s.Timestamp >= start && s.Timestamp < end));
         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<SampleProjection>>(_store.Where(s => string.Equals(s.SchemaName, schemaName, StringComparison.OrdinalIgnoreCase)).ToList());
         public Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default) => Task.CompletedTask;
@@ -280,5 +290,10 @@ public class ReportServiceTests
         public Task<bool> IsAccountInUseAsync(Guid serviceAccountId, CancellationToken ct = default) =>
             Task.FromResult(_store.Any(s => s.ServiceAccountId == serviceAccountId));
         public IQueryable<SampleProjection> AsQueryable() => _store.AsQueryable();
+        public Task<IReadOnlyList<SampleProjection>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<SampleProjection>>(_store.Where(s => s.ServiceAccountId == serviceId && (includeDeleted || !s.IsDeleted)).ToList());
+        public Task<long> RedactByServiceAsync(Guid serviceId, string pseudonym, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 }

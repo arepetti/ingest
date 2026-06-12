@@ -2,12 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
 import type {
   Account, CreateAccountRequest, UpdateAccountRequest,
+  ErasureMode, ErasureResult,
   ApiKey, GeneratedApiKey,
+  Cadence,
   Schema, SchemaHistory, UpsertSchemaRequest,
   Submission, AdminSubmissionInput, SampleInput, ServiceStatus, Me, Paged,
-  SubmissionWriteResponse, MissingByCadence,
+  SubmissionWriteResponse, BulkImportRequest, BulkImportResult, BackupImportResult,
+  MissingByCadence, MissingPeriodReport, MissingHistory,
   Report, RenderReportRequest, ReportRenderResponse,
   AuthProvider,
+  AuditLog, AuditChangeType, AuditTargetType,
+  EmailSettings, UpdateEmailSettingsRequest,
+  EmailTemplate, UpdateEmailTemplateRequest,
+  EmailMessage, EmailStatus, EmailDrainResult, SendAdhocEmailRequest,
+  NotificationSettings, UpdateNotificationSettingsRequest, NotificationRunResult,
 } from './types'
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/api/me') })
@@ -67,6 +75,22 @@ export const useDeleteAccount = () => {
   })
 }
 
+/**
+ * GDPR right-to-erasure for one account. Anonymise keeps statistical KPI values; Delete removes
+ * everything. Affects many collections, so the whole cache is invalidated on success.
+ */
+export const useEraseAccount = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, mode }: { id: string; mode: ErasureMode }) =>
+      api.post<ErasureResult>(`/api/admin/accounts/${id}/erase`, { mode }),
+    onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
+/** Relative URL for the per-subject DSAR export download (authenticated via downloadFromUrl). */
+export const personalDataExportUrl = (id: string) => `/api/admin/accounts/${id}/personal-data/export`
+
 export const useApiKeys = (accountId?: string) =>
   useQuery({
     queryKey: ['keys', accountId],
@@ -77,8 +101,9 @@ export const useApiKeys = (accountId?: string) =>
 export const useRotateApiKey = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (accountId: string) => api.post<GeneratedApiKey>(`/api/admin/accounts/${accountId}/keys`),
-    onSuccess: (_d, accountId) => qc.invalidateQueries({ queryKey: ['keys', accountId] }),
+    mutationFn: ({ accountId, expiresAt }: { accountId: string; expiresAt?: string | null }) =>
+      api.post<GeneratedApiKey>(`/api/admin/accounts/${accountId}/keys`, { expiresAt: expiresAt ?? null }),
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['keys', v.accountId] }),
   })
 }
 
@@ -212,6 +237,178 @@ export const useDeleteSubmission = () => {
   })
 }
 
+/**
+ * Admin-only bulk import of historical submissions for one service from a JSON/CSV file. The file
+ * is read client-side and its text posted as `content`. A 4xx means the file couldn't be parsed at
+ * all; a 200 returns a per-group report (some groups may still have failed validation).
+ */
+export const useBulkImport = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: BulkImportRequest) =>
+      api.post<BulkImportResult>('/api/admin/submissions/import', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['submissions'] }),
+  })
+}
+
+// --- Backup / restore (admin convenience tool) --------------------------------------------
+
+/** Relative URL for the full-registry backup download (authenticated via downloadFromUrl). */
+export const backupExportUrl = () => '/api/admin/backup/export'
+
+/**
+ * Restore the whole registry from a backup file. The parsed JSON is posted as-is; the server
+ * validates the format/version and then replaces every collection. Invalidates everything on
+ * success because, by definition, all data has just changed.
+ */
+export const useImportBackup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (backup: unknown) => api.post<BackupImportResult>('/api/admin/backup/import', backup),
+    onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
+// --- Email + notifications (admin) --------------------------------------------------------
+
+export const useEmailSettings = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['email-settings'],
+    queryFn: () => api.get<EmailSettings>('/api/admin/email/settings'),
+    enabled,
+  })
+
+export const useUpdateEmailSettings = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: UpdateEmailSettingsRequest) => api.put<EmailSettings>('/api/admin/email/settings', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['email-settings'] }),
+  })
+}
+
+export const useEmailTemplates = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['email-templates'],
+    queryFn: () => api.get<EmailTemplate[]>('/api/admin/email/templates'),
+    enabled,
+  })
+
+export const useUpdateEmailTemplate = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ key, req }: { key: string; req: UpdateEmailTemplateRequest }) =>
+      api.put<EmailTemplate>(`/api/admin/email/templates/${encodeURIComponent(key)}`, req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['email-templates'] }),
+  })
+}
+
+/** Page through the outbox (audit "Sent emails" tab), optionally filtered by delivery status. */
+export const useEmailOutbox = (
+  params: { page: number; pageSize: number; status?: EmailStatus },
+  enabled: boolean = true,
+) => {
+  const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize) })
+  if (params.status) search.set('status', params.status)
+  return useQuery({
+    queryKey: ['email-outbox', params],
+    queryFn: () => api.get<Paged<EmailMessage>>(`/api/admin/email/outbox?${search}`),
+    enabled,
+  })
+}
+
+/** Trigger a manual outbox drain (sends pending mail now). */
+export const useDrainEmail = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<EmailDrainResult>('/api/admin/email/drain', {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['email-outbox'] }),
+  })
+}
+
+/** Send an ad-hoc plain-text email to one account (operators + admins). */
+export const useSendAdhocEmail = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: SendAdhocEmailRequest) => api.post<{ id: string }>('/api/admin/email/send', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['email-outbox'] }),
+  })
+}
+
+export const useNotificationSettings = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['notification-settings'],
+    queryFn: () => api.get<NotificationSettings>('/api/admin/notifications/settings'),
+    enabled,
+  })
+
+export const useUpdateNotificationSettings = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: UpdateNotificationSettingsRequest) =>
+      api.put<NotificationSettings>('/api/admin/notifications/settings', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notification-settings'] }),
+  })
+}
+
+/** Run the notification job now (internal trigger; the scheduler also runs it on a timer). */
+export const useRunNotifications = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<NotificationRunResult>('/api/admin/notifications/run', {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['email-outbox'] }),
+  })
+}
+
+// --- Audit log ----------------------------------------------------------------------------
+
+/**
+ * Page through the audit log (admin-only), newest change first. The optional change/target
+ * filters map straight onto the server query params; `name` filtering is intentionally not
+ * exposed here (it is reachable only by calling the export endpoint directly).
+ */
+export const useAuditLog = (
+  params: { page: number; pageSize: number; change?: AuditChangeType; targetType?: AuditTargetType },
+  enabled: boolean = true,
+) => {
+  const search = new URLSearchParams({
+    page: String(params.page),
+    pageSize: String(params.pageSize),
+  })
+  if (params.change)     search.set('change', params.change)
+  if (params.targetType) search.set('targetType', params.targetType)
+  return useQuery({
+    queryKey: ['audit', params],
+    queryFn: () => api.get<Paged<AuditLog>>(`/api/admin/audit?${search}`),
+    enabled,
+  })
+}
+
+/** Build the relative URL for the server-side CSV export, honouring the current change/target filters. */
+export const auditExportUrl = (params: { change?: AuditChangeType; targetType?: AuditTargetType }) => {
+  const search = new URLSearchParams()
+  if (params.change)     search.set('change', params.change)
+  if (params.targetType) search.set('targetType', params.targetType)
+  const qs = search.toString()
+  return qs ? `/api/admin/audit/export?${qs}` : '/api/admin/audit/export'
+}
+
+/** Page through the change history recorded for a single submission, newest first. */
+export const useSubmissionHistory = (
+  id: string | undefined,
+  params: { page: number; pageSize: number },
+  enabled: boolean = true,
+) => {
+  const search = new URLSearchParams({
+    page: String(params.page),
+    pageSize: String(params.pageSize),
+  })
+  return useQuery({
+    queryKey: ['submission-history', id, params],
+    queryFn: () => api.get<Paged<AuditLog>>(`/api/admin/submissions/${id}/history?${search}`),
+    enabled: !!id && enabled,
+  })
+}
+
 export const useServiceStatus = (name?: string, period: string = 'week') =>
   useQuery({
     queryKey: ['service-status', name, period],
@@ -228,6 +425,31 @@ export const useMissingSubmissions = (enabled: boolean = true) =>
   useQuery({
     queryKey: ['missing-submissions'],
     queryFn: () => api.get<MissingByCadence[]>('/api/admin/status/missing'),
+    enabled,
+  })
+
+/**
+ * Detailed missing-submissions report for a single cadence and a single window, addressed by
+ * `offset` (0 = current, -1 = previous, -N = N periods ago). Powers the per-period analytics
+ * page's table and per-service bar chart.
+ */
+export const useMissingPeriod = (cadence: Cadence, offset: number, enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['missing-period', cadence, offset],
+    queryFn: () =>
+      api.get<MissingPeriodReport>(`/api/admin/status/missing/period?cadence=${cadence}&offset=${offset}`),
+    enabled,
+  })
+
+/**
+ * "Missing submissions over time" trend for a single cadence: total missing required values for
+ * each of the last `periods` windows, oldest first. Powers the analytics page's trend chart.
+ */
+export const useMissingHistory = (cadence: Cadence, periods: number = 12, enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['missing-history', cadence, periods],
+    queryFn: () =>
+      api.get<MissingHistory>(`/api/admin/status/missing/history?cadence=${cadence}&periods=${periods}`),
     enabled,
   })
 

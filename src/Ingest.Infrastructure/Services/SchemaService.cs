@@ -24,14 +24,17 @@ public sealed class SchemaService : ISchemaService
 
     private readonly ISchemaRepository _schemas;
     private readonly ISampleRepository _samples;
+    private readonly IAuditLogService _audit;
 
     /// <summary>Create a new <see cref="SchemaService"/>.</summary>
     /// <param name="schemas">Schema repository.</param>
     /// <param name="samples">Sample projection repository (used only by the history aggregation).</param>
-    public SchemaService(ISchemaRepository schemas, ISampleRepository samples)
+    /// <param name="audit">Audit log used to record create/edit/delete changes.</param>
+    public SchemaService(ISchemaRepository schemas, ISampleRepository samples, IAuditLogService audit)
     {
         _schemas = schemas;
         _samples = samples;
+        _audit = audit;
     }
 
     /// <inheritdoc />
@@ -83,6 +86,7 @@ public sealed class SchemaService : ISchemaService
         input.VersionModifiedAt = DateTime.UtcNow;
 
         await _schemas.AddAsync(input, ct);
+        await _audit.RecordAsync(AuditTargetType.Schema, AuditChangeType.Create, input.Id, input.Name, ct);
         return input;
     }
 
@@ -134,6 +138,7 @@ public sealed class SchemaService : ISchemaService
         ValidateStructure(existing);
 
         await _schemas.UpdateAsync(existing, ct);
+        await _audit.RecordAsync(AuditTargetType.Schema, AuditChangeType.Edit, existing.Id, existing.Name, ct);
         return existing;
     }
 
@@ -153,6 +158,7 @@ public sealed class SchemaService : ISchemaService
                 "Disable it instead to stop accepting new data while keeping the history intact.");
 
         await _schemas.SoftDeleteAsync(id, ct);
+        await _audit.RecordAsync(AuditTargetType.Schema, AuditChangeType.Delete, existing.Id, existing.Name, ct);
     }
 
     /// <inheritdoc />
@@ -182,6 +188,7 @@ public sealed class SchemaService : ISchemaService
         };
 
         await _schemas.AddAsync(clone, ct);
+        await _audit.RecordAsync(AuditTargetType.Schema, AuditChangeType.Create, clone.Id, clone.Name, ct);
         return clone;
     }
 

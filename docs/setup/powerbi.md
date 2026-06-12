@@ -1,5 +1,7 @@
 # PowerBI integration
 
+> **This is the recommended, primary way to explore Ingest data.** The admin SPA's dashboard and the built-in reports are deliberately basic (a health check and a developer-authored convenience respectively). For real analysis — filtering, slicing, trends, charts, large datasets — connect a BI tool to the OData feed described here.
+
 Ingest exposes its sample data as an **OData feed** at `/odata/samples`. Any OData v4 client can consume it; this guide walks through the most common case — Microsoft Power BI Desktop.
 
 ## What you get

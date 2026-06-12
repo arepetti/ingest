@@ -499,6 +499,7 @@ X-Api-Key: ...
     { "schemaName": "monthly_kpis", "valueName": "tonnes",         "value": 127.5, "timestamp": "2026-05-12T08:00:00Z", "note": "…" },
     { "schemaName": "monthly_kpis", "valueName": "downtime_hours", "value": 4,     "timestamp": "2026-05-12T08:00:00Z", "note": null }
   ],
+  "warnings": [],
   "submittedAt": "2026-05-12T09:01:33Z",
   "replacedAt":  null,
   "createdAt":   "2026-05-12T09:01:33Z",
@@ -508,6 +509,8 @@ X-Api-Key: ...
   "isDeleted":   false
 }
 ```
+
+The `warnings` array is **persisted with the submission** and reflects whatever the validator produced at the last write (create or replace). It is always present; an empty array means "no warnings" — including for legacy submissions created before warnings were stored. This is the same content the write endpoints return (see [Warnings](#warnings)), kept on the record so it can be reviewed later.
 
 **Status codes**
 
@@ -558,6 +561,8 @@ If you author or maintain the schemas yourself, the full **rule-authoring guide*
 ## Warnings
 
 Both `POST /api/submissions` and `PUT /api/submissions/{id}` return a `warnings: string[]` array in addition to the submission `id`. Warnings are **non-blocking** — the submission has already been accepted and persisted — but a well-behaved client should surface them to the operator, log them, or both. The array is always present and is empty when nothing of note happened.
+
+The same warnings are **stored on the submission** and returned by `GET /api/submissions/{id}` (and the admin equivalents), so operators and admins can review them when inspecting a submission later — they are not just a one-off on the write response. Submissions created before this field existed report an empty array.
 
 Warnings come from two places:
 

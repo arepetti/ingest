@@ -67,6 +67,8 @@ A few authoring rules of thumb:
 
 `Visible if` and `Enabled if` are *server-equivalent* — they both discard the sample with a warning. The difference is purely cosmetic in the UI: hide vs grey out. Pick whichever feels right.
 
+Any warnings these rules produce are **stored on the submission**, not just shown once at submit time. They appear as a count in the Submissions grid and as a list in the submission view (see [submissions.md](submissions.md)), so operators and admins can review them whenever they revisit a record.
+
 The full syntax, operators, helpers and recipes are in [validation.md](validation.md). The submission editor evaluates the same expressions live so admins can see hide/grey/warning behaviour as they type test data.
 
 ## Multi-line expression authoring

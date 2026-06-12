@@ -1,58 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
-  Accordion, AccordionHeader, AccordionItem, AccordionPanel,
   Badge, Body1, Button, Drawer, DrawerBody,
-  Field, Input, Textarea, Dropdown, Option, Checkbox, Title2, Tooltip,
+  Field, Title2, Tooltip,
   Menu, MenuTrigger, MenuList, MenuItem, MenuPopover, SplitButton,
   makeStyles, MessageBar, MessageBarBody, MessageBarTitle,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
-  Toolbar, ToolbarButton, Divider, tokens, Card, CardHeader,
+  Toolbar, ToolbarButton, Divider, tokens,
 } from '@fluentui/react-components'
 import {
   Add20Regular, ArrowDownload20Regular, ArrowUpload20Regular, ChartMultiple20Regular,
-  Copy20Regular, Delete20Regular, Dismiss16Regular, Edit20Regular,
+  Copy20Regular, Delete20Regular, Edit20Regular,
 } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
-import type {
-  Account, Cadence, Schema, SchemaLayoutNode, SchemaValue, SchemaValueType, UpsertSchemaRequest,
-} from '../api/types'
+import type { Account, Schema, UpsertSchemaRequest } from '../api/types'
 import {
-  fetchSchemaExample, useAccounts, useCloneSchema, useCreateSchema,
-  useDeleteSchema, useMe, useSchemas, useUpdateSchema,
+  fetchSchemaExample, useAccounts, useCloneSchema,
+  useDeleteSchema, useMe, useSchemas,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
 import { SchemaAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
-import { LayoutTreeEditor } from '../components/LayoutTreeEditor'
 import { ValueLabel } from '../components/ValueLabel'
 import { cadenceLabel } from '../utils/cadence'
 import { confirmDelete } from '../utils/confirm'
 import { formatDate, formatDateTime } from '../utils/format'
+import { clickableRowProps } from '../utils/a11y'
 import { downloadJson, pickJsonFile } from '../utils/download'
-import { validateExpression, type ExpressionSyntaxResult } from '../utils/expression'
+import { emptySchema, toRequest } from '../utils/schema'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
-
-/**
- * C-style identifier rule mirrored on the server (`SchemaService.ValidateStructure`). A schema
- * value name must work as a plain NCalc identifier (so it can be referenced directly in rules)
- * and as a C# / JavaScript identifier (so it shows up cleanly across the stack). It also has to
- * stay out of the `<name>.minimum` / `<name>.maximum` bound namespace, which means no `.` etc.
- */
-const VALUE_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
-
-function isValidValueName(name: string | null | undefined): boolean {
-  return !!name && VALUE_NAME_RE.test(name)
-}
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
   toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   drawer: { width: 'max(600px, 50vw)' },
   drawerForm: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' },
-  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
-  threeCol: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' },
+  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'start' },
+  threeCol: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', alignItems: 'start' },
   flagsRow: { display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' },
   sectionLabel: { color: tokens.colorNeutralForeground3, fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginTop: '12px' },
   valueCard: { padding: '12px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '6px' },
@@ -86,7 +71,10 @@ const useStyles = makeStyles({
   actionsHeader: { textAlign: 'right' },
   actionsCell:   { textAlign: 'right' },
   // Hint at row-click interactivity.
-  rowClickable: { cursor: 'pointer' },
+  rowClickable: {
+    cursor: 'pointer',
+    ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '-2px' },
+  },
   // Drawer-level toolbar shown above the read-only body — same actions as the row menu.
   // width:100% + border-box so the bottom border spans the full drawer instead of just the
   // ToolbarButtons' intrinsic width.
@@ -108,68 +96,6 @@ const useStyles = makeStyles({
   preBlock: { whiteSpace: 'pre-wrap', margin: 0 },
 })
 
-const types: SchemaValueType[] = ['String', 'Integer', 'Number', 'Date', 'Boolean']
-// Ordered from short to long so the dropdown reads as a natural progression.
-const cadences: Cadence[] = ['Daily', 'Weekly', 'Fortnightly', 'Monthly', 'Quarterly', 'SemiAnnually', 'Yearly']
-
-function emptySchema(): UpsertSchemaRequest {
-  return {
-    name: '',
-    label: '',
-    description: '',
-    notes: '',
-    modifiable: true,
-    enabled: true,
-    submissionValidations: [],
-    isGlobal: true,
-    serviceIds: [],
-    values: [],
-    layout: [],
-    version: 1,
-  }
-}
-
-function emptyValue(): SchemaValue {
-  return {
-    name: '',
-    label: '',
-    description: '',
-    notes: '',
-    caption: '',
-    type: 'Number',
-    unit: '',
-    cadence: 'Weekly',
-    required: true,
-    modifiable: true,
-    enabled: true,
-    min: null,
-    max: null,
-    minDate: null,
-    maxDate: null,
-    minLength: null,
-    maxLength: null,
-    regexPattern: '',
-    valueValidation: '',
-    enabledIf: '',
-    visibleIf: '',
-    warning: '',
-    sinceVersion: null,
-  }
-}
-
-function toRequest(s: Schema): UpsertSchemaRequest {
-  // Audit / server-managed fields aren't part of the upsert payload; strip them so the
-  // server doesn't reject the body (and so the version-timestamp logic stays server-side).
-  const {
-    id: _id,
-    createdAt: _c, createdBy: _cb,
-    modifiedAt: _m, modifiedBy: _mb,
-    versionModifiedAt: _vma,
-    ...rest
-  } = s
-  return rest
-}
-
 export function SchemasPage() {
   const s = useStyles()
   const nav = useNavigate()
@@ -181,29 +107,24 @@ export function SchemasPage() {
   // The audience picker only cares about Service-role accounts (those who submit data); the kind
   // (User vs Application) is irrelevant here.
   const services = useAccounts({ role: 'Service' })
-  const create = useCreateSchema()
-  const update = useUpdateSchema()
   const del = useDeleteSchema()
   const clone = useCloneSchema()
 
-  const [editing, setEditing] = useState<{ id?: string; req: UpsertSchemaRequest } | null>(null)
   const [viewing, setViewing] = useState<Schema | null>(null)
-  const [submitError, setSubmitError] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
-  // Per-drawer expanded state so the edit and view drawers can be enlarged independently.
-  const [editorExpanded, setEditorExpanded] = useState(false)
+  // Surfaces failures from the row/drawer actions that no longer have an inline editor to host
+  // their errors (clone, "download example").
+  const [actionError, setActionError] = useState<string | null>(null)
   const [viewerExpanded, setViewerExpanded] = useState(false)
 
   const items = useMemo(() => data?.items ?? [], [data])
 
+  // Create/edit now live on their own page (see SchemaEditPage); the listing just routes there.
   function openCreate() {
-    setEditing({ req: emptySchema() })
-    setSubmitError(null)
+    nav('/schemas/new')
   }
   function openEdit(sc: Schema) {
-    const req = toRequest(sc)
-    setEditing({ id: sc.id, req })
-    setSubmitError(null)
+    nav(`/schemas/${encodeURIComponent(sc.name)}/edit`)
   }
   function editFromView(sc: Schema) {
     setViewing(null)
@@ -224,75 +145,17 @@ export function SchemasPage() {
     del.mutate(sc.id)
   }
 
-  function patchReq(patch: Partial<UpsertSchemaRequest>) {
-    if (!editing) return
-    setEditing({ ...editing, req: { ...editing.req, ...patch } })
-  }
-
-  function patchValue(index: number, patch: Partial<SchemaValue>) {
-    if (!editing) return
-    const values = editing.req.values.map((v, i) => i === index ? { ...v, ...patch } : v)
-    patchReq({ values })
-  }
-
-  function addValue() {
-    if (!editing) return
-    patchReq({ values: [...editing.req.values, emptyValue()] })
-  }
-
-  function removeValue(index: number) {
-    if (!editing) return
-    patchReq({ values: editing.req.values.filter((_, i) => i !== index) })
-  }
-
-  function patchValidation(index: number, text: string) {
-    if (!editing) return
-    patchReq({
-      submissionValidations: editing.req.submissionValidations.map((v, i) => i === index ? text : v),
-    })
-  }
-  function addValidation() {
-    if (!editing) return
-    patchReq({ submissionValidations: [...editing.req.submissionValidations, ''] })
-  }
-  function removeValidation(index: number) {
-    if (!editing) return
-    patchReq({ submissionValidations: editing.req.submissionValidations.filter((_, i) => i !== index) })
-  }
-
-  async function onSave() {
-    if (!editing) return
-    setSubmitError(null)
-    // Drop completely-blank rules but keep formatting (newlines, indentation) for the rest.
-    const req: UpsertSchemaRequest = {
-      ...editing.req,
-      submissionValidations: editing.req.submissionValidations.filter(v => v.trim().length > 0),
-    }
-    try {
-      if (editing.id) await update.mutateAsync({ id: editing.id, req })
-      else await create.mutateAsync(req)
-      setEditing(null)
-      setEditorExpanded(false)
-    } catch (e) {
-      setSubmitError(formatApiError(e))
-    }
-  }
-
-  function patchLayout(layout: SchemaLayoutNode[]) {
-    patchReq({ layout })
-  }
-
   async function onUploadSchema() {
     setImportError(null)
     try {
       const parsed = await pickJsonFile()
       if (!parsed || typeof parsed !== 'object') throw new Error('JSON root must be an object.')
       // Fill in the required defaults so the server's UpsertSchemaRequest contract is
-      // satisfied even for slimmer files (e.g. exported from an older version).
+      // satisfied even for slimmer files (e.g. exported from an older version), then hand the
+      // prefilled payload to the editor page via router state.
       const base = emptySchema()
       const req: UpsertSchemaRequest = { ...base, ...(parsed as Partial<UpsertSchemaRequest>) }
-      // Server stamps versionModifiedAt itself — drop anything the uploader might have set.
-      setEditing({ req })
+      nav('/schemas/new', { state: { initialSchema: req } })
     } catch (e) {
       // Cancelled picker arrives as "No file selected" — silent for that one case.
       const msg = String(e instanceof Error ? e.message : e)
@@ -310,7 +173,7 @@ export function SchemasPage() {
       const example = await fetchSchemaExample(sc.name)
       downloadJson(`${sc.name}.example.json`, example)
     } catch (e) {
-      setSubmitError(formatApiError(e))
+      setActionError(formatApiError(e))
     }
   }
 
@@ -318,7 +181,7 @@ export function SchemasPage() {
     try {
       await clone.mutateAsync(sc.id)
     } catch (e) {
-      setSubmitError(formatApiError(e))
+      setActionError(formatApiError(e))
     }
   }
 
@@ -372,6 +235,16 @@ export function SchemasPage() {
         </AutoScrollMessageBar>
       )}
 
+      {actionError && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>
+            {actionError}
+            {' '}
+            <Button appearance="transparent" size="small" onClick={() => setActionError(null)}>Dismiss</Button>
+          </MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
       <Table size="small" className={s.table}>
         <TableHeader>
           <TableRow>
@@ -394,7 +267,7 @@ export function SchemasPage() {
             <TableRow
               key={sc.id}
               className={`${s.row} ${s.rowClickable}`}
-              onClick={() => setViewing(sc)}
+              {...clickableRowProps(() => setViewing(sc), `View schema ${sc.label || sc.name}`)}
             >
               <TableCell className={s.nameCell}>
                 <TableCellLayout media={<SchemaAvatar schema={sc} />}>
@@ -453,196 +326,6 @@ export function SchemasPage() {
         onPageChange={setPage}
         onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
       />
-
-      <Drawer
-        type="overlay"
-        separator
-        open={!!editing}
-        onOpenChange={(_, d) => { if (!d.open) { setEditing(null); setEditorExpanded(false) } }}
-        position="end"
-        className={s.drawer}
-        style={editorExpanded ? { width: DRAWER_EXPANDED_WIDTH } : undefined}
-      >
-        <DrawerHeaderWithClose
-          title={editing?.id ? 'Edit schema' : 'New schema'}
-          onClose={() => { setEditing(null); setEditorExpanded(false) }}
-          expanded={editorExpanded}
-          onToggleExpand={() => setEditorExpanded(e => !e)}
-        />
-        <DrawerBody>
-          {editing && (
-            <div className={s.drawerForm}>
-              <div className={s.twoCol}>
-                <Field label="Name" required>
-                  <Input value={editing.req.name} onChange={(_, v) => patchReq({ name: v.value })} />
-                </Field>
-                <Field label="Label">
-                  <Input value={editing.req.label ?? ''} onChange={(_, v) => patchReq({ label: v.value })} />
-                </Field>
-              </div>
-
-              <Field label="Description">
-                <Textarea value={editing.req.description ?? ''} onChange={(_, v) => patchReq({ description: v.value })} />
-              </Field>
-
-              <div className={s.flagsRow}>
-                <Checkbox label="Enabled" checked={editing.req.enabled} onChange={(_, d) => patchReq({ enabled: !!d.checked })} />
-                <Checkbox label="Modifiable" checked={editing.req.modifiable} onChange={(_, d) => patchReq({ modifiable: !!d.checked })} />
-              </div>
-
-              <Field
-                label="Version"
-                hint="Bump when introducing new values. Cannot decrease. Each value's 'Since version' must be ≤ this."
-              >
-                <Input
-                  type="number"
-                  value={String(editing.req.version ?? 1)}
-                  onChange={(_, v) => {
-                    const n = v.value === '' ? 1 : Math.max(0, Math.floor(Number(v.value) || 0))
-                    patchReq({ version: n })
-                  }}
-                />
-              </Field>
-
-              <div className={s.sectionLabel}>Audience</div>
-              <Checkbox label="Global (visible to all services)" checked={editing.req.isGlobal} onChange={(_, d) => patchReq({ isGlobal: !!d.checked })} />
-              {!editing.req.isGlobal && (
-                <Field label="Visible to services">
-                  <Dropdown
-                    multiselect
-                    selectedOptions={editing.req.serviceIds}
-                    value={(services.data?.items ?? []).filter(a => editing.req.serviceIds.includes(a.id)).map(a => a.label || a.name).join(', ')}
-                    onOptionSelect={(_, d) => patchReq({ serviceIds: d.selectedOptions })}
-                  >
-                    {(services.data?.items ?? []).map(a => (
-                      <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
-                    ))}
-                  </Dropdown>
-                </Field>
-              )}
-
-              <div className={s.sectionLabel}>Submission validations</div>
-              <Field hint="Each rule runs once per submission against every value in the schema. Add several to enforce multiple cross-value invariants.">
-                <div className={s.rulesList}>
-                  {editing.req.submissionValidations.length === 0 && (
-                    <Body1 style={{ color: tokens.colorNeutralForeground3, fontSize: 12 }}>
-                      No rules yet. Use “Add rule” to create one.
-                    </Body1>
-                  )}
-                  {editing.req.submissionValidations.map((rule, i) => (
-                    <div key={i} className={s.ruleRow}>
-                      <Textarea
-                        className={s.ruleTextarea}
-                        rows={3}
-                        value={rule}
-                        placeholder="e.g. if(expenses > revenue, 'expenses cannot exceed revenue', null)"
-                        onChange={(_, v) => patchValidation(i, v.value)}
-                      />
-                      <Tooltip content="Remove rule" relationship="label">
-                        <Button
-                          appearance="subtle"
-                          icon={<Dismiss16Regular />}
-                          onClick={() => removeValidation(i)}
-                          aria-label="Remove rule"
-                        />
-                      </Tooltip>
-                    </div>
-                  ))}
-                  <div>
-                    <Button appearance="subtle" icon={<Add20Regular />} size="small" onClick={addValidation}>
-                      Add rule
-                    </Button>
-                  </div>
-                </div>
-              </Field>
-
-              <Field label="Notes">
-                <Textarea value={editing.req.notes ?? ''} onChange={(_, v) => patchReq({ notes: v.value })} />
-              </Field>
-
-              <Divider />
-
-              <div className={s.toolbar}>
-                <div className={s.sectionLabel} style={{ marginTop: 0 }}>Values</div>
-                <Button appearance="primary" icon={<Add20Regular />} size="small" onClick={addValue}>Add value</Button>
-              </div>
-
-              {editing.req.values.length === 0 && (
-                <MessageBar intent="info">
-                  <MessageBarBody>A schema needs at least one value to be useful.</MessageBarBody>
-                </MessageBar>
-              )}
-
-              <Accordion multiple collapsible>
-                {editing.req.values.map((v, i) => (
-                  <AccordionItem key={i} value={String(i)}>
-                    <AccordionHeader>
-                      <div className={s.valueHeader}>
-                        <span>
-                          <strong>{v.label || v.name || `(value #${i + 1})`}</strong>
-                          {v.name && <span style={{ color: '#888' }}> · {v.name}</span>}
-                          {' '}<Badge appearance="outline" color={v.enabled ? 'success' : 'subtle'} size="small">{v.type}</Badge>
-                          {' '}<Badge appearance="outline" color="informative" size="small">{cadenceLabel(v.cadence)}</Badge>
-                          {v.required && <> <Badge appearance="outline" color="severe" size="small">required</Badge></>}
-                        </span>
-                      </div>
-                    </AccordionHeader>
-                    <AccordionPanel>
-                      <ValueEditor
-                        value={v}
-                        schemaVersion={editing.req.version ?? 1}
-                        onChange={patch => patchValue(i, patch)}
-                        onRemove={() => removeValue(i)}
-                      />
-                    </AccordionPanel>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-
-              <Divider />
-
-              <div className={s.sectionLabel}>Layout (UI grouping)</div>
-              <Field hint="Drag values into sections to group them. This affects the submission form layout only — the server treats submissions as flat lists.">
-                <LayoutTreeEditor
-                  schema={{
-                    // Synthesise just enough of a Schema for the editor's needs. Pulling the
-                    // actual entity in would force us to round-trip through the server for IDs
-                    // we don't need at edit time.
-                    id: editing.id ?? '',
-                    name: editing.req.name,
-                    label: editing.req.label,
-                    description: editing.req.description,
-                    notes: editing.req.notes,
-                    modifiable: editing.req.modifiable,
-                    enabled: editing.req.enabled,
-                    submissionValidations: editing.req.submissionValidations,
-                    isGlobal: editing.req.isGlobal,
-                    serviceIds: editing.req.serviceIds,
-                    values: editing.req.values,
-                    layout: editing.req.layout ?? [],
-                    version: editing.req.version ?? 1,
-                    versionModifiedAt: null,
-                    createdAt: '', modifiedAt: '',
-                  }}
-                  onChange={patchLayout}
-                />
-              </Field>
-
-              {submitError && (
-                <AutoScrollMessageBar intent="error">
-                  <MessageBarBody>{submitError}</MessageBarBody>
-                </AutoScrollMessageBar>
-              )}
-
-              <Divider />
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <Button onClick={() => setEditing(null)}>Cancel</Button>
-                <Button appearance="primary" onClick={onSave}>Save</Button>
-              </div>
-            </div>
-          )}
-        </DrawerBody>
-      </Drawer>
 
       <Drawer
         type="overlay"
@@ -802,218 +485,3 @@ function SchemaViewBody({ schema, services }: { schema: Schema; services: Accoun
   )
 }
 
-function ValueEditor({ value, schemaVersion, onChange, onRemove }: {
-  value: SchemaValue
-  /** Parent schema's current `version` — used to bound the "Since version" input. */
-  schemaVersion: number
-  onChange: (patch: Partial<SchemaValue>) => void
-  onRemove: () => void
-}) {
-  const s = useStyles()
-  return (
-    <Card className={s.valueCard}>
-      <CardHeader
-        header={<strong>Value details</strong>}
-        action={<Button appearance="subtle" icon={<Delete20Regular />} size="small" onClick={onRemove}>Remove</Button>}
-      />
-
-      <div className={s.twoCol}>
-        <Field
-          label="Name"
-          required
-          hint="Used as the identifier in validation rules. Must start with a letter or underscore and contain only letters, digits, and underscores."
-          validationState={isValidValueName(value.name) ? 'none' : 'error'}
-          validationMessage={isValidValueName(value.name) ? undefined : 'Must be a valid identifier: letters, digits and underscores only; cannot start with a digit.'}
-        >
-          <Input value={value.name} onChange={(_, v) => onChange({ name: v.value })} />
-        </Field>
-        <Field label="Label">
-          <Input value={value.label ?? ''} onChange={(_, v) => onChange({ label: v.value })} />
-        </Field>
-      </div>
-
-      <Field label="Description">
-        <Textarea value={value.description ?? ''} onChange={(_, v) => onChange({ description: v.value })} />
-      </Field>
-
-      <Field
-        label="Caption"
-        hint="Optional heading rendered above this value in the submission form and view (think section title). Display-only; clients ignore it."
-      >
-        <Input value={value.caption ?? ''} onChange={(_, v) => onChange({ caption: v.value })} />
-      </Field>
-
-      <Field
-        label="Since version"
-        hint={`Optional. When set and equal to the schema's current version (${schemaVersion}), the SPA shows a "New" tag next to this value for one cadence period. Leave empty for "always present".`}
-      >
-        <Input
-          type="number"
-          value={value.sinceVersion === null || value.sinceVersion === undefined ? '' : String(value.sinceVersion)}
-          onChange={(_, v) => {
-            if (v.value === '') return onChange({ sinceVersion: null })
-            const n = Math.max(0, Math.floor(Number(v.value) || 0))
-            onChange({ sinceVersion: Math.min(n, schemaVersion) })
-          }}
-        />
-      </Field>
-
-      <div className={s.twoCol}>
-        <Field label="Type">
-          <Dropdown value={value.type} selectedOptions={[value.type]} onOptionSelect={(_, d) => onChange({ type: d.optionValue as SchemaValueType })}>
-            {types.map(t => <Option key={t} value={t}>{t}</Option>)}
-          </Dropdown>
-        </Field>
-        <Field label="Cadence">
-          <Dropdown value={value.cadence} selectedOptions={[value.cadence]} onOptionSelect={(_, d) => onChange({ cadence: d.optionValue as Cadence })}>
-            {cadences.map(c => <Option key={c} value={c} text={cadenceLabel(c)}>{cadenceLabel(c)}</Option>)}
-          </Dropdown>
-        </Field>
-      </div>
-
-      <Field label="Unit">
-        <Input value={value.unit ?? ''} onChange={(_, v) => onChange({ unit: v.value })} />
-      </Field>
-
-      <div className={s.flagsRow}>
-        <Checkbox label="Required" checked={value.required} onChange={(_, d) => onChange({ required: !!d.checked })} />
-        <Checkbox label="Modifiable" checked={value.modifiable} onChange={(_, d) => onChange({ modifiable: !!d.checked })} />
-        <Checkbox label="Enabled" checked={value.enabled} onChange={(_, d) => onChange({ enabled: !!d.checked })} />
-      </div>
-
-      {(value.type === 'Integer' || value.type === 'Number') && (
-        <>
-          <div className={s.sectionLabel}>Numeric constraints</div>
-          <div className={s.twoCol}>
-            <Field label="Min">
-              <Input type="number" value={value.min?.toString() ?? ''} onChange={(_, v) => onChange({ min: v.value === '' ? null : Number(v.value) })} />
-            </Field>
-            <Field label="Max">
-              <Input type="number" value={value.max?.toString() ?? ''} onChange={(_, v) => onChange({ max: v.value === '' ? null : Number(v.value) })} />
-            </Field>
-          </div>
-        </>
-      )}
-
-      {value.type === 'Date' && (
-        <>
-          <div className={s.sectionLabel}>Date constraints</div>
-          <div className={s.twoCol}>
-            <Field label="Min date (ISO)">
-              <Input value={value.minDate ?? ''} onChange={(_, v) => onChange({ minDate: v.value || null })} />
-            </Field>
-            <Field label="Max date (ISO)">
-              <Input value={value.maxDate ?? ''} onChange={(_, v) => onChange({ maxDate: v.value || null })} />
-            </Field>
-          </div>
-        </>
-      )}
-
-      {value.type === 'String' && (
-        <>
-          <div className={s.sectionLabel}>String constraints</div>
-          <div className={s.twoCol}>
-            <Field label="Min length">
-              <Input type="number" value={value.minLength?.toString() ?? ''} onChange={(_, v) => onChange({ minLength: v.value === '' ? null : Number(v.value) })} />
-            </Field>
-            <Field label="Max length">
-              <Input type="number" value={value.maxLength?.toString() ?? ''} onChange={(_, v) => onChange({ maxLength: v.value === '' ? null : Number(v.value) })} />
-            </Field>
-          </div>
-          <Field label="Regex pattern">
-            <Input value={value.regexPattern ?? ''} onChange={(_, v) => onChange({ regexPattern: v.value })} />
-          </Field>
-        </>
-      )}
-
-      <div className={s.sectionLabel}>Validation</div>
-      <RuleTextarea
-        label="Value validation"
-        hint="Runs against the submitted sample. Vars include value, minimum, maximum. Whitespace and line breaks are ignored."
-        rows={3}
-        value={value.valueValidation ?? ''}
-        onChange={(v) => onChange({ valueValidation: v })}
-      />
-      <RuleTextarea
-        label="Warning"
-        hint="Optional rule that produces a non-blocking warning when true or when it returns a non-empty string."
-        rows={3}
-        value={value.warning ?? ''}
-        onChange={(v) => onChange({ warning: v })}
-      />
-
-      <div className={s.sectionLabel}>Conditional display</div>
-      <RuleTextarea
-        label="Enabled if"
-        hint="When false (or null) the value is disabled in the UI and a submitted sample is dropped with a warning. Empty = always enabled."
-        rows={2}
-        value={value.enabledIf ?? ''}
-        onChange={(v) => onChange({ enabledIf: v })}
-      />
-      <RuleTextarea
-        label="Visible if"
-        hint="When false (or null) the value is hidden in the UI. Server-side behaves like Enabled if. Empty = always visible."
-        rows={2}
-        value={value.visibleIf ?? ''}
-        onChange={(v) => onChange({ visibleIf: v })}
-      />
-
-      <Field label="Notes">
-        <Textarea value={value.notes ?? ''} onChange={(_, v) => onChange({ notes: v.value })} />
-      </Field>
-    </Card>
-  )
-}
-
-/**
- * Textarea that asks the server to syntax-check the entered expression on every change
- * (debounced) and surfaces the result inline. Empty input is treated as "no rule" and never
- * flagged. The component is intentionally tolerant of network hiccups — a transport failure
- * just clears the indicator rather than nagging the user with red squiggles for transient
- * issues.
- */
-function RuleTextarea({
-  label, hint, rows, value, onChange,
-}: {
-  label: string
-  hint?: string
-  rows?: number
-  value: string
-  onChange: (next: string) => void
-}) {
-  const [status, setStatus] = useState<'idle' | 'checking' | ExpressionSyntaxResult>('idle')
-
-  useEffect(() => {
-    const trimmed = value.trim()
-    if (!trimmed) { setStatus('idle'); return }
-    setStatus('checking')
-    let cancelled = false
-    // Small debounce so we don't translate-validate on every keystroke.
-    const t = window.setTimeout(() => {
-      validateExpression(trimmed).then((r) => { if (!cancelled) setStatus(r) })
-    }, 250)
-    return () => { cancelled = true; window.clearTimeout(t) }
-  }, [value])
-
-  // Fluent UI's `Field` decides which glyph to render based on `validationState`. If we pass
-  // `validationMessage` without a state it defaults to "error", which is why "Valid syntax"
-  // used to appear next to a red ✕ — the message text and the icon disagreed. Mirror the
-  // server's verdict here so the glyph and the message always tell the same story.
-  let validationState: 'success' | 'error' | 'none' = 'none'
-  let validationMessage: string | undefined
-  if (status !== 'idle' && status !== 'checking') {
-    if (status.ok) {
-      validationState = 'success'
-      validationMessage = 'Valid syntax'
-    } else {
-      validationState = 'error'
-      validationMessage = `Syntax error: ${status.error}`
-    }
-  }
-
-  return (
-    <Field label={label} hint={hint} validationState={validationState} validationMessage={validationMessage}>
-      <Textarea rows={rows} value={value} onChange={(_, v) => onChange(v.value)} />
-    </Field>
-  )
-}

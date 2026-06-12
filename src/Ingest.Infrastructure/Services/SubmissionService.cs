@@ -19,6 +19,7 @@ public sealed class SubmissionService : ISubmissionService
     private readonly ISubmissionValidator _validator;
     private readonly IAccountRepository _accounts;
     private readonly TimeProvider _time;
+    private readonly IAuditLogService _audit;
 
     /// <summary>Create a new <see cref="SubmissionService"/>.</summary>
     /// <param name="submissions">Submission repository.</param>
@@ -27,13 +28,15 @@ public sealed class SubmissionService : ISubmissionService
     /// <param name="validator">Validator that runs the full rule pipeline.</param>
     /// <param name="accounts">Account repository for owner/service lookups.</param>
     /// <param name="time">Clock used to evaluate cadence windows on replacement.</param>
+    /// <param name="audit">Audit log used to record create/edit/delete changes.</param>
     public SubmissionService(
         ISubmissionRepository submissions,
         ISampleRepository samples,
         ISchemaRepository schemas,
         ISubmissionValidator validator,
         IAccountRepository accounts,
-        TimeProvider time)
+        TimeProvider time,
+        IAuditLogService audit)
     {
         _submissions = submissions;
         _samples = samples;
@@ -41,6 +44,7 @@ public sealed class SubmissionService : ISubmissionService
         _validator = validator;
         _accounts = accounts;
         _time = time;
+        _audit = audit;
     }
 
     // ── Service-facing ──
@@ -59,6 +63,7 @@ public sealed class SubmissionService : ISubmissionService
         // associated warnings are already in validation.Warnings; the surviving samples are
         // what gets persisted and projected.
         submission.Samples = FilterDiscarded(submission.Samples, validation.DiscardedSamples);
+        submission.Warnings = validation.Warnings.ToList();
 
         await PersistAsync(submission, visible, isReplacement: false, ct);
         return new SubmissionWriteResult(submission, validation.Warnings);
@@ -88,6 +93,7 @@ public sealed class SubmissionService : ISubmissionService
         var validation = await ValidateOrThrow(account, replacement, isReplacement: true, existing, ct);
 
         existing.Samples = FilterDiscarded(replacement.Samples, validation.DiscardedSamples);
+        existing.Warnings = validation.Warnings.ToList();
         await PersistAsync(existing, visible, isReplacement: true, ct);
         return new SubmissionWriteResult(existing, validation.Warnings);
     }
@@ -127,6 +133,7 @@ public sealed class SubmissionService : ISubmissionService
         var validation = await ValidateOrThrow(service, submission, isReplacement: false, existing: null, ct);
 
         submission.Samples = FilterDiscarded(submission.Samples, validation.DiscardedSamples);
+        submission.Warnings = validation.Warnings.ToList();
         await PersistAsync(submission, visible, isReplacement: false, ct);
         return new SubmissionWriteResult(submission, validation.Warnings);
     }
@@ -147,6 +154,7 @@ public sealed class SubmissionService : ISubmissionService
         var validation = await ValidateOrThrow(service, replacement, isReplacement: true, existing, ct);
 
         existing.Samples = FilterDiscarded(replacement.Samples, validation.DiscardedSamples);
+        existing.Warnings = validation.Warnings.ToList();
         await PersistAsync(existing, visible, isReplacement: true, ct);
         return new SubmissionWriteResult(existing, validation.Warnings);
     }
@@ -154,8 +162,11 @@ public sealed class SubmissionService : ISubmissionService
     /// <inheritdoc />
     public async Task DeleteAsync(Guid submissionId, CancellationToken ct = default)
     {
+        var existing = await _submissions.GetByIdAsync(submissionId, ct: ct);
         await _submissions.SoftDeleteAsync(submissionId, ct);
         await _samples.SoftDeleteForSubmissionAsync(submissionId, ct);
+        if (existing is not null)
+            await _audit.RecordAsync(AuditTargetType.Submission, AuditChangeType.Delete, existing.Id, existing.ServiceName, ct);
     }
 
     // ── Internals ──
@@ -224,6 +235,13 @@ public sealed class SubmissionService : ISubmissionService
 
         var projections = SampleProjectionBuilder.Build(submission, visible);
         await _samples.ReplaceForSubmissionAsync(submission.Id, projections, ct);
+
+        await _audit.RecordAsync(
+            AuditTargetType.Submission,
+            isReplacement ? AuditChangeType.Edit : AuditChangeType.Create,
+            submission.Id,
+            submission.ServiceName,
+            ct);
     }
 
     /// <summary>

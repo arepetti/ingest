@@ -15,33 +15,42 @@ public sealed class ApiKeyService : IApiKeyService
     private readonly IApiKeyRepository _keys;
     private readonly IApiKeyHasher _hasher;
     private readonly IAuditContext _audit;
+    private readonly IAuditLogService _auditLog;
 
     /// <summary>Create a new <see cref="ApiKeyService"/>.</summary>
     /// <param name="accounts">Account repository for the parent-existence check.</param>
     /// <param name="keys">API-key repository.</param>
     /// <param name="hasher">Hasher used to generate fresh keys.</param>
     /// <param name="audit">Audit context for the revocation timestamp.</param>
+    /// <param name="auditLog">Audit log used to record key creation/revocation.</param>
     public ApiKeyService(
         IAccountRepository accounts,
         IApiKeyRepository keys,
         IApiKeyHasher hasher,
-        IAuditContext audit)
+        IAuditContext audit,
+        IAuditLogService auditLog)
     {
         _accounts = accounts;
         _keys = keys;
         _hasher = hasher;
         _audit = audit;
+        _auditLog = auditLog;
     }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<ApiKey>> ListAsync(Guid accountId, CancellationToken ct = default) =>
         _keys.ListByAccountAsync(accountId, ct);
 
+    /// <summary>Largest lifetime an API key may be given at creation time.</summary>
+    public const int MaxLifetimeYears = 2;
+
     /// <inheritdoc />
-    public async Task<RotatedApiKey> RotateAsync(Guid accountId, CancellationToken ct = default)
+    public async Task<RotatedApiKey> RotateAsync(Guid accountId, DateTime? expiresAt = null, CancellationToken ct = default)
     {
         var account = await _accounts.GetByIdAsync(accountId, ct: ct)
             ?? throw new NotFoundException($"Account '{accountId}'");
+
+        var normalizedExpiry = NormalizeAndValidateExpiry(expiresAt);
 
         var generated = _hasher.Generate();
         var entity = new ApiKey
@@ -50,9 +59,37 @@ public sealed class ApiKeyService : IApiKeyService
             KeyId = generated.KeyId,
             Hash = generated.Hash,
             Salt = generated.Salt,
+            ExpiresAt = normalizedExpiry,
         };
         await _keys.AddAsync(entity, ct);
+        await _auditLog.RecordAsync(AuditTargetType.ApiKey, AuditChangeType.Create, entity.Id, entity.KeyId, ct);
         return new RotatedApiKey(entity, generated.Plaintext);
+    }
+
+    /// <summary>
+    /// Coerce a caller-supplied expiry to UTC and enforce the lifecycle rules: it must be in the
+    /// future and no more than <see cref="MaxLifetimeYears"/> years out. A <c>null</c> expiry (the
+    /// key never expires) is returned untouched.
+    /// </summary>
+    private DateTime? NormalizeAndValidateExpiry(DateTime? expiresAt)
+    {
+        if (expiresAt is not { } value) return null;
+
+        var utc = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
+
+        var now = _audit.UtcNow;
+        if (utc <= now)
+            throw new ValidationException(new[] { "API key expiry must be in the future." });
+
+        if (utc > now.AddYears(MaxLifetimeYears))
+            throw new ValidationException(new[] { $"API key expiry cannot be more than {MaxLifetimeYears} years in the future." });
+
+        return utc;
     }
 
     /// <inheritdoc />
@@ -69,6 +106,9 @@ public sealed class ApiKeyService : IApiKeyService
         {
             key.RevokedAt = _audit.UtcNow;
             await _keys.UpdateAsync(key, ct);
+            // API keys have no delete; a revoke is the closest lifecycle equivalent, so it is
+            // logged as a Delete of the key.
+            await _auditLog.RecordAsync(AuditTargetType.ApiKey, AuditChangeType.Delete, key.Id, key.KeyId, ct);
         }
         return key;
     }

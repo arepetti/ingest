@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Shared MSBuild properties for every project in the solution. The single source of truth for
+    the application version lives here; it flows into each assembly and is surfaced to the SPA via
+    GET /api/me (shown in the dashboard footer).
+  -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <Product>Ingest</Product>
+  </PropertyGroup>
+</Project>

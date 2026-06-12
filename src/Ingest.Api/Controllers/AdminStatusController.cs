@@ -2,6 +2,7 @@ using Ingest.Api.Auth;
 using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -35,5 +36,39 @@ public sealed class AdminStatusController(IStatusService statuses) : ControllerB
     {
         var report = await statuses.GetMissingAsync(ct);
         return Ok(StatusMapper.ToDto(report));
+    }
+
+    /// <summary>
+    /// Detailed missing-submissions report for a single cadence and a single window. The window
+    /// is addressed by <paramref name="offset"/> (0 = current, -1 = previous, -N = N periods
+    /// ago), letting the analytics page page back through history.
+    /// </summary>
+    /// <param name="cadence">Cadence to evaluate (e.g. <c>Monthly</c>).</param>
+    /// <param name="offset">Signed bucket offset from "now". Defaults to -1 (the previous, overdue, window).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The per-period missing report. <see cref="MissingPeriodReportDto"/>.</response>
+    [HttpGet("missing/period")]
+    [ProducesResponseType(typeof(MissingPeriodReportDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMissingPeriod([FromQuery] Cadence cadence, [FromQuery] int offset, CancellationToken ct)
+    {
+        var report = await statuses.GetMissingForPeriodAsync(cadence, offset, ct);
+        return Ok(StatusMapper.ToDto(report));
+    }
+
+    /// <summary>
+    /// "Missing submissions over time" trend for a single cadence: the total count of missing
+    /// required values for each of the last <paramref name="periods"/> windows, oldest first and
+    /// ending with the current window.
+    /// </summary>
+    /// <param name="cadence">Cadence to evaluate (e.g. <c>Monthly</c>).</param>
+    /// <param name="periods">Number of windows to include (clamped server-side; defaults to 12).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The trend. <see cref="MissingHistoryDto"/>.</response>
+    [HttpGet("missing/history")]
+    [ProducesResponseType(typeof(MissingHistoryDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMissingHistory([FromQuery] Cadence cadence, [FromQuery] int periods, CancellationToken ct)
+    {
+        var history = await statuses.GetMissingHistoryAsync(cadence, periods <= 0 ? 12 : periods, ct);
+        return Ok(StatusMapper.ToDto(history));
     }
 }

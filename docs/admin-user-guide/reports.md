@@ -1,14 +1,18 @@
 # Reports
 
+> **Reports are not the way operators explore the data.** They're a deliberately simple, developer/contributor-oriented feature: a quick way for someone comfortable writing a bit of HTML + Liquid to add a *basic*, fixed summary (a printable submission page, a small period roll-up). They are **not** an analytics tool, have no ad-hoc querying, charting or pivoting, and aren't meant to be the place operators answer questions about the data.
+>
+> **The primary way to explore the data is PowerBI (or any similar BI/OData client) pointed at the OData feed** — see [setup/powerbi.md](../setup/powerbi.md). That's where filtering, slicing, charts, and large datasets belong. Reach for reports only when you specifically want a small, canned, server-rendered page; reach for PowerBI for everything else.
+
 The reporting feature lets admins upload HTML files that get rendered against either a **single submission** or an **aggregated period of submissions** for one of your schemas. Operators (and admins) can then view the rendered HTML in the admin SPA and tweak the period to re-render. There is no in-app editor — reports are content you author externally, drop into the catalogue, and re-upload if you want to change them.
 
-Use them for:
+Good fits for a report:
 
 - One-page summaries of a specific submission (think "what did service X submit today?").
-- Period roll-ups across services for a single schema (think "this month's tonnage across every collection round").
+- Small period roll-ups across services for a single schema (think "this month's tonnage across every collection round").
 - Lightweight printable views you can hand to a non-technical colleague who doesn't have an account.
 
-If you want serious analytics, point PowerBI at the OData feed (see [setup/powerbi.md](../setup/powerbi.md)). Reports are deliberately simpler — text, tables and a couple of summary cards rendered against curated server-side data.
+Anything beyond that — exploring trends, cross-schema analysis, anything interactive or large — belongs in PowerBI against the OData feed, not in a report.
 
 ## Authoring a report
 

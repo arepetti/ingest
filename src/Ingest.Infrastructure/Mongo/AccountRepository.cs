@@ -93,4 +93,8 @@ public sealed class AccountRepository : RepositoryBase<Account>, IAccountReposit
     /// <inheritdoc />
     public Task HardDeleteAsync(Guid id, CancellationToken ct = default) =>
         Collection.DeleteOneAsync(a => a.Id == id, ct);
+
+    /// <inheritdoc />
+    public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) =>
+        PurgeSoftDeletedCoreAsync(olderThanUtc, ct);
 }

@@ -166,6 +166,129 @@ public class StatusServiceMissingTests
         Assert.Equal(Cadence.Monthly, report[2].Cadence);
     }
 
+    [Fact]
+    public async Task Report_flags_previous_period_for_pre_existing_schema_and_service()
+    {
+        // Service + schema both predate the previous weekly window and nothing was ever submitted,
+        // so the same required value is missing in both the current and the previous window.
+        var old = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var svc = BuildService(
+            accounts: new[] { Service("alpha", "Alpha", enabled: true, createdAt: old) },
+            schemas: new[]
+            {
+                Schema("kpi", values: new[]
+                {
+                    new SchemaValue { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Required = true },
+                }, createdAt: old),
+            },
+            samples: Array.Empty<SampleProjection>());
+
+        var report = await svc.GetMissingAsync();
+
+        var current = Assert.Single(report, b => b.Period == MissingPeriodKind.Current);
+        var previous = Assert.Single(report, b => b.Period == MissingPeriodKind.Previous);
+        Assert.Equal(Cadence.Weekly, current.Cadence);
+        Assert.Equal(Cadence.Weekly, previous.Cadence);
+        // Previous window sits immediately before the current one.
+        Assert.Equal(current.PeriodStart, previous.PeriodEnd);
+        Assert.Equal("alpha", previous.Entries[0].ServiceName);
+    }
+
+    [Fact]
+    public async Task Report_omits_previous_period_for_freshly_created_schema()
+    {
+        // The schema was created inside the current week, so it never existed during the previous
+        // window — it should appear in the current bucket but never in a previous one.
+        var old = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var svc = BuildService(
+            accounts: new[] { Service("alpha", "Alpha", enabled: true, createdAt: old) },
+            schemas: new[]
+            {
+                Schema("kpi", values: new[]
+                {
+                    new SchemaValue { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Required = true },
+                }, createdAt: FixedNow.AddDays(-1)),
+            },
+            samples: Array.Empty<SampleProjection>());
+
+        var report = await svc.GetMissingAsync();
+
+        Assert.Single(report, b => b.Period == MissingPeriodKind.Current);
+        Assert.DoesNotContain(report, b => b.Period == MissingPeriodKind.Previous);
+    }
+
+    [Fact]
+    public async Task Report_treats_previous_period_satisfied_when_sample_lands_in_it()
+    {
+        // A sample submitted in the previous week satisfies the previous window; the current
+        // window is still missing it. Only the current bucket should remain.
+        var old = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var svc = BuildService(
+            accounts: new[] { Service("alpha", "Alpha", enabled: true, createdAt: old) },
+            schemas: new[]
+            {
+                Schema("kpi", values: new[]
+                {
+                    new SchemaValue { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Required = true },
+                }, createdAt: old),
+            },
+            // 2026-05-20 falls in the previous weekly bucket (Mon 2026-05-18 .. Mon 2026-05-25).
+            samples: new[] { SampleAt("alpha", "kpi", "a", new DateTime(2026, 5, 20, 12, 0, 0, DateTimeKind.Utc)) });
+
+        var report = await svc.GetMissingAsync();
+
+        Assert.Single(report, b => b.Period == MissingPeriodKind.Current);
+        Assert.DoesNotContain(report, b => b.Period == MissingPeriodKind.Previous);
+    }
+
+    [Fact]
+    public async Task GetMissingForPeriod_returns_entries_for_the_requested_offset()
+    {
+        var old = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var svc = BuildService(
+            accounts: new[] { Service("alpha", "Alpha", enabled: true, createdAt: old) },
+            schemas: new[]
+            {
+                Schema("kpi", values: new[]
+                {
+                    new SchemaValue { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Required = true },
+                }, createdAt: old),
+            },
+            samples: Array.Empty<SampleProjection>());
+
+        var report = await svc.GetMissingForPeriodAsync(Cadence.Weekly, -1);
+
+        Assert.Equal(-1, report.Offset);
+        var entry = Assert.Single(report.Entries);
+        Assert.Equal("alpha", entry.ServiceName);
+        Assert.Equal(1, entry.MissingRequiredCount);
+    }
+
+    [Fact]
+    public async Task GetMissingHistory_returns_oldest_first_ending_with_current()
+    {
+        var old = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var svc = BuildService(
+            accounts: new[] { Service("alpha", "Alpha", enabled: true, createdAt: old) },
+            schemas: new[]
+            {
+                Schema("kpi", values: new[]
+                {
+                    new SchemaValue { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Required = true },
+                }, createdAt: old),
+            },
+            samples: Array.Empty<SampleProjection>());
+
+        var history = await svc.GetMissingHistoryAsync(Cadence.Weekly, 3);
+
+        Assert.Equal(Cadence.Weekly, history.Cadence);
+        Assert.Equal(3, history.Points.Count);
+        // Oldest first, current last.
+        Assert.Equal(-2, history.Points[0].Offset);
+        Assert.Equal(0, history.Points[2].Offset);
+        Assert.All(history.Points, p => Assert.Equal(1, p.TotalMissing));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────────────────────
 
     private static StatusService BuildService(
@@ -174,22 +297,28 @@ public class StatusServiceMissingTests
         IEnumerable<SampleProjection> samples) =>
         new(new FakeSchemaRepo(schemas), new FakeSampleRepo(samples), new FakeAccountRepo(accounts), new FixedClock(FixedNow));
 
-    private static Account Service(string name, string label, bool enabled) => new()
+    // CreatedAt defaults to "now" so these fixtures are treated as brand-new: the previous-period
+    // guard (CreatedAt < previousPeriodEnd) excludes them, leaving GetMissingAsync to report only
+    // the current window. Tests that exercise the previous (overdue) window seed older CreatedAt
+    // values explicitly via the optional parameter.
+    private static Account Service(string name, string label, bool enabled, DateTime? createdAt = null) => new()
     {
         Name = name,
         Label = label,
         Kind = AccountKind.Application,
         Role = AccountRole.Service,
         Enabled = enabled,
+        CreatedAt = createdAt ?? FixedNow,
     };
 
-    private static Schema Schema(string name, IEnumerable<SchemaValue> values) => new()
+    private static Schema Schema(string name, IEnumerable<SchemaValue> values, DateTime? createdAt = null) => new()
     {
         Name = name,
         Label = name + " Label",
         IsGlobal = true,
         Enabled = true,
         Values = values.ToList(),
+        CreatedAt = createdAt ?? FixedNow,
     };
 
     private static SampleProjection SampleAt(string serviceName, string schemaName, string valueName, DateTime ts) => new()
@@ -249,6 +378,7 @@ public class StatusServiceMissingTests
         public Task UpdateAsync(Account account, CancellationToken ct = default) => Task.CompletedTask;
         public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
         public Task HardDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 
     private sealed class FakeSchemaRepo(IEnumerable<Schema> seed) : ISchemaRepository
@@ -276,6 +406,7 @@ public class StatusServiceMissingTests
         public Task UpdateAsync(Schema schema, CancellationToken ct = default) => Task.CompletedTask;
         public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
         public Task HardDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 
     private sealed class FakeSampleRepo(IEnumerable<SampleProjection> seed) : ISampleRepository
@@ -290,6 +421,14 @@ public class StatusServiceMissingTests
                 .FirstOrDefault();
             return Task.FromResult<SampleProjection?>(hit);
         }
+
+        public Task<bool> ExistsInWindowAsync(Guid serviceId, string schemaName, string valueName, DateTime start, DateTime end, CancellationToken ct = default) =>
+            Task.FromResult(_samples.Any(s =>
+                s.ServiceAccountId == serviceId &&
+                s.SchemaName == schemaName &&
+                s.ValueName == valueName &&
+                s.Timestamp >= start &&
+                s.Timestamp < end));
 
         public Task<PagedResult<SampleProjection>> QueryAsync(SampleQuery query, CancellationToken ct = default) =>
             Task.FromResult(new PagedResult<SampleProjection>(Array.Empty<SampleProjection>(), 0, 1, 0));
@@ -310,5 +449,11 @@ public class StatusServiceMissingTests
             Task.FromResult(_samples.Any(s => s.ServiceAccountId == serviceAccountId && !s.IsDeleted));
 
         public IQueryable<SampleProjection> AsQueryable() => _samples.AsQueryable();
+
+        public Task<IReadOnlyList<SampleProjection>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<SampleProjection>>(_samples.Where(s => s.ServiceAccountId == serviceId && (includeDeleted || !s.IsDeleted)).ToList());
+        public Task<long> RedactByServiceAsync(Guid serviceId, string pseudonym, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 }

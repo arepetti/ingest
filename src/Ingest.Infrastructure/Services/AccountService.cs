@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
@@ -13,15 +14,22 @@ public sealed class AccountService : IAccountService
 {
     private readonly IAccountRepository _accounts;
     private readonly ISampleRepository _samples;
+    private readonly IAuditLogService _audit;
 
     /// <summary>Create a new <see cref="AccountService"/>.</summary>
     /// <param name="accounts">Account repository.</param>
     /// <param name="samples">Sample projection repository (used by the delete guard to detect accounts that already own historical data).</param>
-    public AccountService(IAccountRepository accounts, ISampleRepository samples)
+    /// <param name="audit">Audit log used to record create/edit/delete changes.</param>
+    public AccountService(IAccountRepository accounts, ISampleRepository samples, IAuditLogService audit)
     {
         _accounts = accounts;
         _samples = samples;
+        _audit = audit;
     }
+
+    /// <summary>An account row maps to a <see cref="AuditTargetType.User"/> or <see cref="AuditTargetType.Account"/> audit target depending on its kind.</summary>
+    private static AuditTargetType TargetTypeFor(Account account) =>
+        account.Kind == AccountKind.User ? AuditTargetType.User : AuditTargetType.Account;
 
     /// <inheritdoc />
     public Task<PagedResult<Account>> ListAsync(PageRequest request, AccountKind? kind, AccountRole? role, CancellationToken ct = default) =>
@@ -50,9 +58,11 @@ public sealed class AccountService : IAccountService
             await _accounts.HardDeleteAsync(collision.Id, ct);
         }
 
+        input.Email = NormalizeAndValidateEmail(input.Email);
         input.ExternalLogins = await NormalizeAndValidateLinksAsync(input.Id, input.Kind, input.ExternalLogins, preserveSubjectsFrom: null, ct);
 
         await _accounts.AddAsync(input, ct);
+        await _audit.RecordAsync(TargetTypeFor(input), AuditChangeType.Create, input.Id, input.Name, ct);
         return input;
     }
 
@@ -64,6 +74,7 @@ public sealed class AccountService : IAccountService
 
         existing.Label = update.Label;
         existing.Description = update.Description;
+        existing.Email = NormalizeAndValidateEmail(update.Email);
         existing.Role = update.Role;
         existing.Enabled = update.Enabled;
 
@@ -73,7 +84,24 @@ public sealed class AccountService : IAccountService
             existing.ExternalLogins = await NormalizeAndValidateLinksAsync(existing.Id, existing.Kind, update.ExternalLogins, preserveSubjectsFrom: existing.ExternalLogins, ct);
 
         await _accounts.UpdateAsync(existing, ct);
+        await _audit.RecordAsync(TargetTypeFor(existing), AuditChangeType.Edit, existing.Id, existing.Name, ct);
         return existing;
+    }
+
+    /// <summary>
+    /// Trim + lower-case the contact email and validate its shape. Blank/null is allowed (returns
+    /// <c>null</c>) so legacy accounts and the bootstrap admin can have none; a non-empty value
+    /// that isn't a valid address is rejected with a friendly <see cref="ValidationException"/>.
+    /// </summary>
+    private static string? NormalizeAndValidateEmail(string? email)
+    {
+        var trimmed = email?.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return null;
+
+        if (!MailAddress.TryCreate(trimmed, out _))
+            throw new ValidationException(new[] { $"'{trimmed}' is not a valid email address." });
+
+        return trimmed.ToLowerInvariant();
     }
 
     /// <summary>
@@ -151,5 +179,6 @@ public sealed class AccountService : IAccountService
                 "Disable it instead to revoke access while keeping the history intact.");
 
         await _accounts.SoftDeleteAsync(id, ct);
+        await _audit.RecordAsync(TargetTypeFor(existing), AuditChangeType.Delete, existing.Id, existing.Name, ct);
     }
 }

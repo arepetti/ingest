@@ -61,4 +61,8 @@ public sealed class ReportRepository : RepositoryBase<Report>, IReportRepository
 
     /// <inheritdoc />
     public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => SoftDeleteCoreAsync(id, ct);
+
+    /// <inheritdoc />
+    public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) =>
+        PurgeSoftDeletedCoreAsync(olderThanUtc, ct);
 }

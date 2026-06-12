@@ -75,4 +75,21 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
 
     /// <inheritdoc />
     public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => SoftDeleteCoreAsync(id, ct);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Submission>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default)
+    {
+        var filter = ApplySoftDelete(Builders<Submission>.Filter.Eq(s => s.ServiceAccountId, serviceId), includeDeleted);
+        return await Collection.Find(filter)
+            .Sort(Builders<Submission>.Sort.Descending(s => s.SubmittedAt))
+            .ToListAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default) =>
+        HardDeleteManyCoreAsync(Builders<Submission>.Filter.Eq(s => s.ServiceAccountId, serviceId), ct);
+
+    /// <inheritdoc />
+    public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) =>
+        PurgeSoftDeletedCoreAsync(olderThanUtc, ct);
 }

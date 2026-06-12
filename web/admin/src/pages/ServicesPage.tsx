@@ -3,15 +3,17 @@ import {
   Badge, Body1, Button, Drawer, DrawerBody,
   Dropdown, Option, Field, Input, Textarea, Checkbox,
   Dialog, DialogSurface, DialogTitle, DialogBody, DialogContent, DialogActions, DialogTrigger,
+  RadioGroup, Radio,
   Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TableCellLayout,
   Title2, Tooltip, makeStyles, MessageBarBody, MessageBarTitle,
   Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowRotateClockwise20Regular, Delete20Regular, Edit20Regular, Key20Regular, Status20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, Delete20Regular, Edit20Regular, Key20Regular, Mail20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { useNavigate } from 'react-router-dom'
-import { useAccounts, useApiKeys, useAuthProviders, useCreateAccount, useDeleteAccount, useRevokeApiKey, useRotateApiKey, useUpdateAccount } from '../api/hooks'
-import type { Account, AccountKind, AccountRole, AuthProvider, CreateAccountRequest, ExternalLogin, UpdateAccountRequest } from '../api/types'
+import { useAccounts, useApiKeys, useAuthProviders, useCreateAccount, useDeleteAccount, useEraseAccount, useMe, useRevokeApiKey, useRotateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
+import type { Account, AccountKind, AccountRole, AuthProvider, CreateAccountRequest, ErasureMode, ErasureResult, ExternalLogin, UpdateAccountRequest } from '../api/types'
+import { downloadFromUrl } from '../utils/download'
 import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
 import { AccountAvatar } from '../components/Avatars'
@@ -19,6 +21,7 @@ import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/Draw
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
 import { confirmDelete } from '../utils/confirm'
 import { formatDate, formatDateTime } from '../utils/format'
+import { clickableRowProps } from '../utils/a11y'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -49,7 +52,10 @@ const useStyles = makeStyles({
   },
   actionsHeader: { textAlign: 'right' },
   actionsCell:   { textAlign: 'right' },
-  rowClickable: { cursor: 'pointer' },
+  rowClickable: {
+    cursor: 'pointer',
+    ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '-2px' },
+  },
   drawerToolbar: {
     width: '100%',
     boxSizing: 'border-box',
@@ -83,7 +89,9 @@ export function ServicesPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const { data, isLoading, error } = useAccounts({ page, pageSize })
   const { data: providers } = useAuthProviders()
+  const { data: me } = useMe()
   const hasSso = (providers?.length ?? 0) > 0
+  const emailEnabled = me?.emailEnabled === true
   const create = useCreateAccount()
   const update = useUpdateAccount()
   const del = useDeleteAccount()
@@ -92,6 +100,9 @@ export function ServicesPage() {
   const [viewing, setViewing] = useState<Account | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [keyDialogFor, setKeyDialogFor] = useState<Account | null>(null)
+  const [emailDialogFor, setEmailDialogFor] = useState<Account | null>(null)
+  const [eraseDialogFor, setEraseDialogFor] = useState<Account | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [rotatedPlaintext, setRotatedPlaintext] = useState<string | null>(null)
   // Per-drawer "expanded" state so the edit and view drawers can be enlarged independently
   // (e.g. expand the view to read a long description without losing the editor state).
@@ -99,7 +110,7 @@ export function ServicesPage() {
   const [viewerExpanded, setViewerExpanded] = useState(false)
 
   function openCreate() {
-    setEditing({ kind: 'create', account: { name: '', label: '', description: '', kind: 'Application', role: 'Service', enabled: true } })
+    setEditing({ kind: 'create', account: { name: '', label: '', description: '', email: '', kind: 'Application', role: 'Service', enabled: true } })
     setSubmitError(null)
   }
   function openEdit(a: Account) {
@@ -108,6 +119,7 @@ export function ServicesPage() {
   }
   function editFromView(a: Account) { setViewing(null); openEdit(a) }
   function keysFromView(a: Account) { setViewing(null); setKeyDialogFor(a) }
+  function emailFromView(a: Account) { setViewing(null); setEmailDialogFor(a) }
   function statusFromView(a: Account) { setViewing(null); nav(`/services/${encodeURIComponent(a.name)}/status`) }
   function deleteFromView(a: Account) {
     if (!confirmDelete('account', a.label || a.name)) return
@@ -118,11 +130,26 @@ export function ServicesPage() {
     if (!confirmDelete('account', a.label || a.name)) return
     del.mutate(a.id)
   }
+  function eraseFromView(a: Account) { setViewing(null); setEraseDialogFor(a) }
+  async function exportPersonalData(a: Account) {
+    setActionError(null)
+    const stamp = new Date().toISOString().slice(0, 10)
+    try {
+      await downloadFromUrl(personalDataExportUrl(a.id), `personal-data-${a.name}-${stamp}.json`)
+    } catch (e) {
+      setActionError(formatApiError(e))
+    }
+  }
 
   async function onSave() {
     if (!editing) return
     setSubmitError(null)
     const a = editing.account
+    const email = (a.email ?? '').trim()
+    // Email is required for new accounts; existing accounts may keep an empty email (legacy data),
+    // so editing doesn't force one. A non-empty value must still look like an address.
+    if (editing.kind === 'create' && !email) { setSubmitError('Email is required.'); return }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setSubmitError('Enter a valid email address.'); return }
     // Only User-kind accounts can hold SSO links; never send them for Application accounts.
     const logins = a.kind === 'User' ? cleanLogins(a.externalLogins) : []
     try {
@@ -131,6 +158,7 @@ export function ServicesPage() {
           name: a.name ?? '',
           label: a.label,
           description: a.description,
+          email,
           kind: a.kind ?? 'Application',
           role: a.role ?? 'Service',
           enabled: a.enabled ?? true,
@@ -142,6 +170,7 @@ export function ServicesPage() {
         const req: UpdateAccountRequest = {
           label: a.label,
           description: a.description,
+          email,
           role: a.role ?? 'Service',
           enabled: a.enabled ?? true,
           // Omit entirely when SSO is off (undefined ⇒ "leave links untouched" server-side).
@@ -173,6 +202,15 @@ export function ServicesPage() {
         </AutoScrollMessageBar>
       )}
 
+      {actionError && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>
+            <MessageBarTitle>Action failed</MessageBarTitle>
+            {actionError}
+          </MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
       <Table size="small">
         <TableHeader>
           <TableRow>
@@ -194,7 +232,7 @@ export function ServicesPage() {
             <TableRow
               key={a.id}
               className={`${s.row} ${s.rowClickable}`}
-              onClick={() => setViewing(a)}
+              {...clickableRowProps(() => setViewing(a), `View account ${a.label || a.name}`)}
             >
               <TableCell className={s.nameCell}>
                 <TableCellLayout media={<AccountAvatar account={a} />} description={a.description ?? ''}>
@@ -222,6 +260,9 @@ export function ServicesPage() {
                   actions={[
                     { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => openEdit(a) },
                     { key: 'keys', label: 'API keys', icon: <Key20Regular />, onClick: () => setKeyDialogFor(a) },
+                    ...(emailEnabled && a.email
+                      ? [{ key: 'email', label: 'Send email', icon: <Mail20Regular />, onClick: () => setEmailDialogFor(a) }]
+                      : []),
                     ...(a.role === 'Service'
                       ? [{
                           key: 'status',
@@ -230,6 +271,8 @@ export function ServicesPage() {
                           onClick: () => nav(`/services/${encodeURIComponent(a.name)}/status`),
                         }]
                       : []),
+                    { key: 'export', label: 'Export personal data', icon: <ArrowDownload20Regular />, onClick: () => exportPersonalData(a) },
+                    { key: 'erase', label: 'Erase (GDPR)', icon: <ShieldPerson20Regular />, destructive: true, onClick: () => setEraseDialogFor(a) },
                     { key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(a) },
                   ]}
                 />
@@ -277,6 +320,14 @@ export function ServicesPage() {
               </Field>
               <Field label="Description">
                 <Textarea value={editing.account.description ?? ''} onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, description: v.value } })} />
+              </Field>
+              <Field label="Email" required={editing.kind === 'create'} hint="Used for email notifications and ad-hoc messages.">
+                <Input
+                  type="email"
+                  value={editing.account.email ?? ''}
+                  placeholder="user@example.com"
+                  onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, email: v.value } })}
+                />
               </Field>
               <Field label="Kind" hint={kindHints[(editing.account.kind ?? 'Application') as AccountKind]}>
                 <Dropdown
@@ -341,9 +392,14 @@ export function ServicesPage() {
           <Toolbar className={s.drawerToolbar}>
             <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>Edit</ToolbarButton>
             <ToolbarButton icon={<Key20Regular />} onClick={() => keysFromView(viewing)}>API keys</ToolbarButton>
+            {emailEnabled && viewing.email && (
+              <ToolbarButton icon={<Mail20Regular />} onClick={() => emailFromView(viewing)}>Send email</ToolbarButton>
+            )}
             {viewing.role === 'Service' && (
               <ToolbarButton icon={<Status20Regular />} onClick={() => statusFromView(viewing)}>View status</ToolbarButton>
             )}
+            <ToolbarButton icon={<ArrowDownload20Regular />} onClick={() => exportPersonalData(viewing)}>Export data</ToolbarButton>
+            <ToolbarButton icon={<ShieldPerson20Regular />} onClick={() => eraseFromView(viewing)}>Erase (GDPR)</ToolbarButton>
             <ToolbarButton icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>Delete</ToolbarButton>
           </Toolbar>
         )}
@@ -353,7 +409,154 @@ export function ServicesPage() {
       </Drawer>
 
       <KeysDialog account={keyDialogFor} onClose={() => { setKeyDialogFor(null); setRotatedPlaintext(null) }} rotated={rotatedPlaintext} onRotated={setRotatedPlaintext} />
+
+      <SendEmailDialog account={emailDialogFor} onClose={() => setEmailDialogFor(null)} />
+
+      <EraseDialog account={eraseDialogFor} onClose={() => setEraseDialogFor(null)} />
     </div>
+  )
+}
+
+// GDPR right-to-erasure. The admin picks anonymise (keep statistical KPI values, strip identity) or
+// full delete (remove everything). The destructive action is gated behind an explicit acknowledgement
+// because both modes are irreversible and bypass the ordinary "account has data" delete guard.
+function EraseDialog({ account, onClose }: { account: Account | null; onClose: () => void }) {
+  const erase = useEraseAccount()
+  const [mode, setMode] = useState<ErasureMode>('Anonymise')
+  const [ack, setAck] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<ErasureResult | null>(null)
+
+  async function onErase() {
+    if (!account) return
+    setError(null)
+    try {
+      const r = await erase.mutateAsync({ id: account.id, mode })
+      setResult(r)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  function handleClose() {
+    setMode('Anonymise'); setAck(false); setError(null); setResult(null)
+    onClose()
+  }
+
+  return (
+    <Dialog open={!!account} onOpenChange={(_, d) => !d.open && handleClose()}>
+      <DialogSurface style={{ minWidth: 560 }}>
+        <DialogBody>
+          <DialogTitle>Erase {account?.label || account?.name}</DialogTitle>
+          <DialogContent>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
+              {result ? (
+                <AutoScrollMessageBar intent="success">
+                  <MessageBarBody>
+                    <MessageBarTitle>
+                      {result.mode === 'Delete' ? 'Account deleted.' : 'Account anonymised.'}
+                    </MessageBarTitle>
+                    Pseudonym <code>{result.pseudonym}</code> · {result.submissionsAffected} submission(s),
+                    {' '}{result.samplesAffected} sample(s), {result.emailsRemoved} email(s),
+                    {' '}{result.auditEntriesAffected} audit entr(ies), {result.apiKeysRemoved} key(s).
+                  </MessageBarBody>
+                </AutoScrollMessageBar>
+              ) : (
+                <>
+                  <Body1>
+                    This satisfies a right-to-erasure request. It is <strong>irreversible</strong> and
+                    bypasses the usual “account has submitted data” protection.
+                  </Body1>
+                  <Field label="Mode">
+                    <RadioGroup value={mode} onChange={(_, d) => setMode(d.value as ErasureMode)}>
+                      <Radio value="Anonymise" label="Anonymise — keep numeric/date KPI values for reporting, strip all identity (pseudonymise the account, redact free-text, drop keys & emails)." />
+                      <Radio value="Delete" label="Delete — permanently remove the account and everything tied to it (submissions, samples, emails, audit trail)." />
+                    </RadioGroup>
+                  </Field>
+                  <Checkbox
+                    label="I understand this cannot be undone."
+                    checked={ack}
+                    onChange={(_, d) => setAck(!!d.checked)}
+                  />
+                </>
+              )}
+            </div>
+          </DialogContent>
+          <DialogActions>
+            {!result && (
+              <Button
+                appearance="primary"
+                icon={<ShieldPerson20Regular />}
+                disabled={!ack || erase.isPending}
+                onClick={onErase}
+              >
+                {erase.isPending ? 'Erasing…' : (mode === 'Delete' ? 'Delete everything' : 'Anonymise')}
+              </Button>
+            )}
+            <Button appearance="secondary" onClick={handleClose}>{result ? 'Close' : 'Cancel'}</Button>
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
+  )
+}
+
+// Ad-hoc plain-text email to a single account. The message is queued into the outbox and delivered
+// by the email sender like any other; success here just means "accepted into the queue".
+function SendEmailDialog({ account, onClose }: { account: Account | null; onClose: () => void }) {
+  const send = useSendAdhocEmail()
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [sent, setSent] = useState(false)
+
+  async function onSend() {
+    if (!account) return
+    setError(null)
+    if (!subject.trim()) { setError('Subject is required.'); return }
+    try {
+      await send.mutateAsync({ accountId: account.id, subject: subject.trim(), body })
+      setSent(true)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  function handleClose() {
+    setSubject(''); setBody(''); setError(null); setSent(false)
+    onClose()
+  }
+
+  return (
+    <Dialog open={!!account} onOpenChange={(_, d) => !d.open && handleClose()}>
+      <DialogSurface style={{ minWidth: 560 }}>
+        <DialogBody>
+          <DialogTitle>Send email to {account?.label || account?.name}</DialogTitle>
+          <DialogContent>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Body1>To: {account?.email}</Body1>
+              {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
+              {sent && <AutoScrollMessageBar intent="success"><MessageBarBody>Email queued for delivery.</MessageBarBody></AutoScrollMessageBar>}
+              <Field label="Subject" required>
+                <Input value={subject} onChange={(_, d) => setSubject(d.value)} disabled={sent} />
+              </Field>
+              <Field label="Message">
+                <Textarea value={body} onChange={(_, d) => setBody(d.value)} rows={8} resize="vertical" disabled={sent} />
+              </Field>
+            </div>
+          </DialogContent>
+          <DialogActions>
+            {!sent && (
+              <Button appearance="primary" icon={<Mail20Regular />} disabled={send.isPending} onClick={onSend}>
+                {send.isPending ? 'Sending…' : 'Send'}
+              </Button>
+            )}
+            <Button appearance="secondary" onClick={handleClose}>{sent ? 'Close' : 'Cancel'}</Button>
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
   )
 }
 
@@ -424,6 +627,8 @@ function AccountViewBody({ account }: { account: Account }) {
       </div>
       {account.description && <Field label="Description"><Body1>{account.description}</Body1></Field>}
 
+      <Field label="Email"><Body1>{account.email || '—'}</Body1></Field>
+
       <div className={s.twoCol}>
         <Field label="Kind"><Body1>{account.kind}</Body1></Field>
         <Field label="Role"><Body1>{account.role}</Body1></Field>
@@ -467,16 +672,38 @@ function AccountViewBody({ account }: { account: Account }) {
   )
 }
 
+/** A date (yyyy-mm-dd) offset from today by the given number of years, for the expiry input bounds. */
+function dateInputOffset(years: number, days = 0): string {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() + years)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account | null; onClose: () => void; rotated: string | null; onRotated: (v: string) => void }) {
   const s = useStyles()
   const keys = useApiKeys(account?.id)
   const rotate = useRotateApiKey()
   const revoke = useRevokeApiKey()
+  const [expiry, setExpiry] = useState('')
+
+  // The server caps a new key's lifetime at two years; mirror that on the input.
+  const minExpiry = dateInputOffset(0, 1)
+  const maxExpiry = dateInputOffset(2)
 
   async function doRotate() {
     if (!account) return
-    const generated = await rotate.mutateAsync(account.id)
+    // Treat the chosen day as expiring at end of day (UTC) so picking today still lands in the future.
+    const expiresAt = expiry ? new Date(`${expiry}T23:59:59.000Z`).toISOString() : null
+    const generated = await rotate.mutateAsync({ accountId: account.id, expiresAt })
+    setExpiry('')
     onRotated(generated.plaintext)
+  }
+
+  function keyStatus(k: { revokedAt?: string | null; expiresAt?: string | null }) {
+    if (k.revokedAt) return <Badge color="danger">Revoked</Badge>
+    if (k.expiresAt && new Date(k.expiresAt) <= new Date()) return <Badge color="danger">Expired</Badge>
+    return <Badge color="success">Active</Badge>
   }
 
   return (
@@ -499,6 +726,7 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                   <TableRow>
                     <TableHeaderCell>Key ID</TableHeaderCell>
                     <TableHeaderCell>Created</TableHeaderCell>
+                    <TableHeaderCell>Expires</TableHeaderCell>
                     <TableHeaderCell>Status</TableHeaderCell>
                     <TableHeaderCell></TableHeaderCell>
                   </TableRow>
@@ -508,9 +736,8 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                     <TableRow key={k.id}>
                       <TableCell><code>{k.keyId}</code></TableCell>
                       <TableCell>{new Date(k.createdAt).toLocaleString()}</TableCell>
-                      <TableCell>
-                        {k.revokedAt ? <Badge color="danger">Revoked</Badge> : <Badge color="success">Active</Badge>}
-                      </TableCell>
+                      <TableCell>{k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : 'Never'}</TableCell>
+                      <TableCell>{keyStatus(k)}</TableCell>
                       <TableCell>
                         {!k.revokedAt && (
                           <Button size="small" onClick={() => revoke.mutate({ accountId: k.accountId, keyId: k.id })}>Revoke</Button>
@@ -520,6 +747,9 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                   ))}
                 </TableBody>
               </Table>
+              <Field label="Expiry for the next key (optional)" hint="Leave blank for a key that never expires. Maximum two years from today.">
+                <Input type="date" value={expiry} min={minExpiry} max={maxExpiry} onChange={(_, d) => setExpiry(d.value)} />
+              </Field>
             </div>
           </DialogContent>
           <DialogActions>

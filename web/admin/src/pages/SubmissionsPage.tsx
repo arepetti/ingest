@@ -6,8 +6,9 @@ import {
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
   Title2, Tooltip, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, Delete20Regular, Edit20Regular, Eye20Regular, Open20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowUpload20Regular, Delete20Regular, Edit20Regular, Eye20Regular, Open20Regular, Warning20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+import { BulkImportDialog } from '../components/BulkImportDialog'
 import { formatApiError } from '../api/client'
 import { useAccounts, useDeleteSubmission, useMe, useMySchemas, useMySubmissions, useSchemas, useSubmissions } from '../api/hooks'
 import { RowActions } from '../components/RowActions'
@@ -18,6 +19,7 @@ import { ValueLabel } from '../components/ValueLabel'
 import { confirmDelete } from '../utils/confirm'
 import { formatDate, formatDateTime } from '../utils/format'
 import { walkLayout, type RenderItem } from '../utils/layout'
+import { clickableRowProps } from '../utils/a11y'
 import type { Account, Schema, Submission } from '../api/types'
 
 /**
@@ -37,7 +39,10 @@ const useStyles = makeStyles({
   row: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
   actionsHeader: { textAlign: 'right' },
   actionsCell:   { textAlign: 'right' },
-  rowClickable: { cursor: 'pointer' },
+  rowClickable: {
+    cursor: 'pointer',
+    ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '-2px' },
+  },
   drawer: { width: 'max(600px, 50vw)' },
   drawerForm: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' },
   drawerToolbar: {
@@ -80,6 +85,14 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground2,
     fontWeight: tokens.fontWeightRegular,
     fontSize: tokens.fontSizeBase200,
+  },
+  warningsList: {
+    margin: 0,
+    paddingLeft: '18px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    color: tokens.colorNeutralForeground1,
   },
 })
 
@@ -128,6 +141,7 @@ export function SubmissionsPage() {
   const [customTo, setCustomTo] = useState('')
   const [viewing, setViewing] = useState<Submission | null>(null)
   const [viewerExpanded, setViewerExpanded] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   // Recompute the from/to pair whenever the interval changes so React Query gets a stable cache key.
   const { from, to } = useMemo(
@@ -147,7 +161,7 @@ export function SubmissionsPage() {
   const submissions = isService ? mySubs : adminSubs
   const { data, isLoading, error } = submissions
   // Column count for the loading / empty placeholder rows (Service column is admin-only).
-  const colSpan = isService ? 6 : 7
+  const colSpan = isService ? 7 : 8
 
   // Schemas visible to the current viewer — drives both the read-only drawer's value labels and
   // the Schema filter dropdown below.
@@ -171,6 +185,16 @@ export function SubmissionsPage() {
       <div className={s.toolbar}>
         <Title2>{isService ? 'My submissions' : 'Submissions'}</Title2>
         <Toolbar>
+          {!isService && (
+            <ToolbarButton icon={<Warning20Regular />} onClick={() => nav('/missing')}>
+              Missing by period
+            </ToolbarButton>
+          )}
+          {isAdmin && (
+            <ToolbarButton icon={<ArrowUpload20Regular />} onClick={() => setImportOpen(true)}>
+              Import
+            </ToolbarButton>
+          )}
           <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={() => nav('/submissions/new')}>
             New submission
           </ToolbarButton>
@@ -250,6 +274,7 @@ export function SubmissionsPage() {
             {!isService && <TableHeaderCell>Service</TableHeaderCell>}
             <TableHeaderCell>Schema</TableHeaderCell>
             <TableHeaderCell>Samples</TableHeaderCell>
+            <TableHeaderCell>Warnings</TableHeaderCell>
             <TableHeaderCell>Created</TableHeaderCell>
             <TableHeaderCell>Created by</TableHeaderCell>
             <TableHeaderCell className={s.actionsHeader}></TableHeaderCell>
@@ -264,7 +289,7 @@ export function SubmissionsPage() {
             <TableRow
               key={sub.id}
               className={`${s.row} ${s.rowClickable}`}
-              onClick={() => setViewing(sub)}
+              {...clickableRowProps(() => setViewing(sub), `View submission from ${submissionLabel(sub)}`)}
             >
               <TableCell>
                 <Tooltip content={formatDateTime(sub.submittedAt)} relationship="label">
@@ -276,6 +301,11 @@ export function SubmissionsPage() {
               {!isService && <TableCell>{resolveServiceLabel(sub, isService, me, services.data?.items ?? [])}</TableCell>}
               <TableCell>{resolveSchemaLabel(sub, schemasByName)}</TableCell>
               <TableCell>{sub.samples.length}</TableCell>
+              <TableCell>
+                {(sub.warnings?.length ?? 0) > 0
+                  ? <Badge appearance="tint" color="warning">{sub.warnings.length}</Badge>
+                  : '—'}
+              </TableCell>
               <TableCell>
                 <Tooltip content={formatDateTime(sub.createdAt)} relationship="label">
                   <span>{formatDate(sub.createdAt)}</span>
@@ -385,6 +415,14 @@ export function SubmissionsPage() {
           )}
         </DrawerBody>
       </Drawer>
+
+      {isAdmin && (
+        <BulkImportDialog
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          services={services.data?.items ?? []}
+        />
+      )}
     </div>
   )
 }
@@ -437,8 +475,6 @@ function SubmissionViewBody({
         <Field label="Samples"><Body1>{submission.samples.length}</Body1></Field>
       </div>
 
-      <Field label="Submitted at"><Body1>{new Date(submission.submittedAt).toLocaleString()}</Body1></Field>
-
       <div className={s.sectionLabel}>Audit</div>
       <div className={s.twoCol}>
         <Field label="Created">
@@ -447,6 +483,7 @@ function SubmissionViewBody({
             {submission.createdBy ? ` · by ${submission.createdBy}` : ''}
           </Body1>
         </Field>
+        <Field label="Submitted at"><Body1>{new Date(submission.submittedAt).toLocaleString()}</Body1></Field>
         <Field label="Modified">
           <Body1>
             {new Date(submission.modifiedAt).toLocaleString()}
@@ -459,6 +496,19 @@ function SubmissionViewBody({
       )}
       {submission.isDeleted && (
         <Badge appearance="outline" color="danger">Deleted</Badge>
+      )}
+
+      {(submission.warnings?.length ?? 0) > 0 && (
+        <>
+          <div className={s.sectionLabel}>Warnings ({submission.warnings.length})</div>
+          <AutoScrollMessageBar intent="warning">
+            <MessageBarBody>
+              <ul className={s.warningsList}>
+                {submission.warnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </MessageBarBody>
+          </AutoScrollMessageBar>
+        </>
       )}
 
       <div className={s.sectionLabel}>Values</div>

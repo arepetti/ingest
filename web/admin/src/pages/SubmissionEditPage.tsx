@@ -161,6 +161,8 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
 
   // For services the service is always "me" — pin it.
   useEffect(() => {
+    // Pin once `me` resolves (async); not available during the initial render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isService && me?.id && !serviceId) setServiceId(me.id)
   }, [isService, me?.id, serviceId])
 
@@ -180,12 +182,15 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
   // When the schema changes, build a fresh row per declared value (preserving anything already in `rows`
   // so users don't lose work if they bounce between schemas while editing).
   useEffect(() => {
+    // Rebuild/merge the row set when the chosen schema changes, preserving in-progress edits.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!schema) { setRows([]); return }
     setRows(prev => {
       const byName = new Map(prev.map(r => [r.name, r] as const))
       return schema.values.map(v => byName.get(v.name) ?? { name: v.name, def: v, value: null, note: '' })
     })
     setMissingRequired([])
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [schema])
 
   // Ask the server to translate every per-value rule on this schema into JavaScript. The
@@ -211,6 +216,8 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
     const data = existing.data
     if (!data) return
 
+    // One-time hydration from the loaded submission (async). Guarded by `prefilled`.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setServiceId(data.serviceAccountId)
     // The current model allows a submission to mix multiple schemas; for editing we lock to the one
     // most of its samples belong to (with a soft warning shown in the UI for the multi-schema case).
@@ -218,6 +225,7 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
     if (firstSchema) setSchemaName(firstSchema)
     if (data.samples[0]?.timestamp) setTimestamp(data.samples[0].timestamp)
     setPrefilled(true)
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [isEdit, prefilled, existing.data])
 
   // Once we've prefilled and the schema is resolved, fill the row values from the existing samples.
@@ -228,12 +236,14 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
         .filter(s => s.schemaName === schema.name)
         .map(s => [s.valueName, s] as const),
     )
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRows(prev => prev.map(r => {
       const ex = samplesByValue.get(r.name)
       if (!ex) return r
       return { ...r, value: ex.value, note: ex.note ?? '' }
     }))
   // We deliberately key on schema.name (not the object identity) so swapping schemas re-runs this.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, prefilled, schema?.name, existing.data])
 
   function patchRow(name: string, patch: Partial<ValueRow>) {

@@ -87,6 +87,49 @@ public static class MongoSetup
                 new CreateIndexOptions { Unique = true, Name = "uniq_name" }),
             cancellationToken: ct);
 
+        await ctx.AuditLogs.Indexes.CreateManyAsync(new[]
+        {
+            // Primary browse order for the audit page: newest change first.
+            new CreateIndexModel<AuditLog>(
+                Builders<AuditLog>.IndexKeys.Descending(a => a.Timestamp),
+                new CreateIndexOptions { Name = "by_timestamp" }),
+            // Backs the per-object history tab (and any "what happened to X" lookup).
+            new CreateIndexModel<AuditLog>(
+                Builders<AuditLog>.IndexKeys.Ascending(a => a.TargetId).Descending(a => a.Timestamp),
+                new CreateIndexOptions { Name = "by_target_time" }),
+            // Backs the change-type / target-type filters on the audit page.
+            new CreateIndexModel<AuditLog>(
+                Builders<AuditLog>.IndexKeys
+                    .Ascending(a => a.TargetType)
+                    .Ascending(a => a.Change)
+                    .Descending(a => a.Timestamp),
+                new CreateIndexOptions { Name = "by_type_change_time" }),
+        }, cancellationToken: ct);
+
+        await ctx.EmailOutbox.Indexes.CreateManyAsync(new[]
+        {
+            // The sender drains pending messages oldest-first.
+            new CreateIndexModel<EmailMessage>(
+                Builders<EmailMessage>.IndexKeys.Ascending(m => m.Status).Ascending(m => m.CreatedAt),
+                new CreateIndexOptions { Name = "by_status_created" }),
+            // The audit "Sent emails" tab browses newest-first.
+            new CreateIndexModel<EmailMessage>(
+                Builders<EmailMessage>.IndexKeys.Descending(m => m.CreatedAt),
+                new CreateIndexOptions { Name = "by_created" }),
+        }, cancellationToken: ct);
+
+        await ctx.EmailTemplates.Indexes.CreateOneAsync(
+            new CreateIndexModel<EmailTemplate>(
+                Builders<EmailTemplate>.IndexKeys.Ascending(t => t.Key),
+                new CreateIndexOptions { Unique = true, Name = "uniq_key" }),
+            cancellationToken: ct);
+
+        await ctx.NotificationLogs.Indexes.CreateOneAsync(
+            new CreateIndexModel<NotificationLog>(
+                Builders<NotificationLog>.IndexKeys.Ascending(n => n.Key),
+                new CreateIndexOptions { Unique = true, Name = "uniq_key" }),
+            cancellationToken: ct);
+
         await ctx.Samples.Indexes.CreateManyAsync(new[]
         {
             new CreateIndexModel<SampleProjection>(

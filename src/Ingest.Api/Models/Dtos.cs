@@ -1,3 +1,4 @@
+using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
 
 namespace Ingest.Api.Models;
@@ -7,6 +8,7 @@ namespace Ingest.Api.Models;
 /// <param name="Name">Machine-style unique name.</param>
 /// <param name="Label">Friendly UI label (may be null).</param>
 /// <param name="Description">Free-form description.</param>
+/// <param name="Email">Contact email used by the email/notification features. May be null for legacy accounts.</param>
 /// <param name="Kind">UI-capable (<see cref="AccountKind.User"/>) vs API-only (<see cref="AccountKind.Application"/>).</param>
 /// <param name="Role">Authorisation tier.</param>
 /// <param name="Enabled">Whether the account currently authenticates.</param>
@@ -21,6 +23,7 @@ public sealed record AccountDto(
     string Name,
     string? Label,
     string? Description,
+    string? Email,
     AccountKind Kind,
     AccountRole Role,
     bool Enabled,
@@ -33,7 +36,7 @@ public sealed record AccountDto(
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static AccountDto From(Account a) => new(
-        a.Id, a.Name, a.Label, a.Description, a.Kind, a.Role, a.Enabled,
+        a.Id, a.Name, a.Label, a.Description, a.Email, a.Kind, a.Role, a.Enabled,
         a.CreatedAt, a.CreatedBy, a.ModifiedAt, a.ModifiedBy, a.IsDeleted,
         a.ExternalLogins.Select(ExternalLoginDto.From).ToList());
 }
@@ -51,19 +54,21 @@ public sealed record ExternalLoginDto(string Provider, string Email)
 /// <param name="Name">Unique machine-style name.</param>
 /// <param name="Label">Friendly label.</param>
 /// <param name="Description">Free-form description.</param>
+/// <param name="Email">Contact email for the email/notification features. Optional server-side (blank accepted); the admin UI asks for it.</param>
 /// <param name="Kind">UI-capable vs API-only.</param>
 /// <param name="Role">Authorisation tier.</param>
 /// <param name="Enabled">Initial enabled state; defaults to <c>true</c>.</param>
 /// <param name="ExternalLogins">Optional SSO identity links. Only valid for <see cref="AccountKind.User"/> accounts; each (provider, email) pair must be unique across accounts.</param>
-public sealed record CreateAccountRequest(string Name, string? Label, string? Description, AccountKind Kind, AccountRole Role, bool Enabled = true, List<ExternalLoginDto>? ExternalLogins = null);
+public sealed record CreateAccountRequest(string Name, string? Label, string? Description, string? Email, AccountKind Kind, AccountRole Role, bool Enabled = true, List<ExternalLoginDto>? ExternalLogins = null);
 
 /// <summary>Body for <c>PUT /api/admin/accounts/{id}</c>. Only the mutable fields are accepted.</summary>
 /// <param name="Label">New friendly label.</param>
 /// <param name="Description">New description.</param>
+/// <param name="Email">New contact email (blank accepted to clear it).</param>
 /// <param name="Role">New authorisation tier.</param>
 /// <param name="Enabled">New enabled state.</param>
 /// <param name="ExternalLogins">Replacement set of SSO identity links. <c>null</c> leaves the existing links untouched; an empty list clears them.</param>
-public sealed record UpdateAccountRequest(string? Label, string? Description, AccountRole Role, bool Enabled, List<ExternalLoginDto>? ExternalLogins = null);
+public sealed record UpdateAccountRequest(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, List<ExternalLoginDto>? ExternalLogins = null);
 
 /// <summary>Wire representation of an API key. <b>Never</b> carries the plaintext secret.</summary>
 /// <param name="Id">Key id (primary key of the row).</param>
@@ -83,6 +88,18 @@ public sealed record ApiKeyDto(
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static ApiKeyDto From(ApiKey k) => new(k.Id, k.AccountId, k.KeyId, k.CreatedAt, k.ExpiresAt, k.RevokedAt);
 }
+
+/// <summary>Optional request body when minting a new API key.</summary>
+/// <param name="ExpiresAt">Absolute expiry for the new key. <c>null</c> (or an omitted body) means the key never expires; when supplied it must be in the future and no more than two years out.</param>
+public sealed record GenerateApiKeyRequest(DateTime? ExpiresAt = null);
+
+/// <summary>Body for <c>POST /api/admin/accounts/{id}/erase</c> — a GDPR right-to-erasure request.</summary>
+/// <param name="Mode">
+/// <c>Anonymise</c> keeps the statistical KPI values but strips identity (pseudonymises the
+/// account, redacts free-text, drops keys/emails, rewrites the audit trail). <c>Delete</c> removes
+/// everything tied to the subject. Defaults to <c>Anonymise</c>.
+/// </param>
+public sealed record EraseAccountRequest(ErasureMode Mode = ErasureMode.Anonymise);
 
 /// <summary>Response body when a new API key is minted: carries the plaintext exactly once.</summary>
 /// <param name="Key">The stored metadata for the new key.</param>
@@ -302,6 +319,7 @@ public sealed record SampleDto(string SchemaName, string ValueName, object? Valu
 /// <param name="ServiceAccountId">Owning service.</param>
 /// <param name="ServiceName">Service name snapshot, copied at write time.</param>
 /// <param name="Samples">The samples in this batch.</param>
+/// <param name="Warnings">Non-blocking warnings recorded at the last write (fired <c>Warning</c> rules, <c>EnabledIf</c> / <c>VisibleIf</c> discards). Empty for legacy submissions that predate warning persistence.</param>
 /// <param name="SubmittedAt">First-accepted timestamp.</param>
 /// <param name="ReplacedAt">Last-replaced timestamp, or null.</param>
 /// <param name="CreatedAt">Creation timestamp.</param>
@@ -314,6 +332,7 @@ public sealed record SubmissionDto(
     Guid ServiceAccountId,
     string? ServiceName,
     List<SampleDto> Samples,
+    List<string> Warnings,
     DateTime SubmittedAt,
     DateTime? ReplacedAt,
     DateTime CreatedAt,
@@ -326,6 +345,7 @@ public sealed record SubmissionDto(
     public static SubmissionDto From(Submission s) => new(
         s.Id, s.ServiceAccountId, s.ServiceName,
         s.Samples.Select(x => new SampleDto(x.SchemaName, x.ValueName, x.Value, x.Timestamp, x.Note)).ToList(),
+        s.Warnings ?? new(),
         s.SubmittedAt, s.ReplacedAt, s.CreatedAt, s.CreatedBy, s.ModifiedAt, s.ModifiedBy, s.IsDeleted);
 }
 
@@ -341,6 +361,178 @@ public sealed record SubmissionDto(
 /// had nothing to report.
 /// </param>
 public sealed record SubmissionWriteResponse(Guid Id, IReadOnlyList<string> Warnings);
+
+/// <summary>Body for <c>POST /api/admin/submissions/import</c>: bulk import historical submissions for one service.</summary>
+/// <param name="ServiceAccountId">The service account every imported submission is attributed to.</param>
+/// <param name="Format">Whether <paramref name="Content"/> is <c>Json</c> or <c>Csv</c>.</param>
+/// <param name="Content">The raw file text (the admin SPA reads the chosen file and posts its contents here).</param>
+public sealed record BulkImportRequest(Guid ServiceAccountId, BulkImportFormat Format, string Content);
+
+/// <summary>Wire shape of the SMTP settings. The password is write-only: it is never returned, only a flag saying whether one is set.</summary>
+/// <param name="Host">SMTP host.</param>
+/// <param name="Port">SMTP port.</param>
+/// <param name="UseStartTls">Whether STARTTLS is negotiated.</param>
+/// <param name="Username">SMTP username (null = anonymous).</param>
+/// <param name="FromAddress">From address.</param>
+/// <param name="FromName">From display name.</param>
+/// <param name="HasPassword">True when a password is stored (the value itself is never exposed).</param>
+/// <param name="Configured">True when enough is set to attempt a send (host + from address).</param>
+public sealed record EmailSettingsDto(
+    string Host,
+    int Port,
+    bool UseStartTls,
+    string? Username,
+    string FromAddress,
+    string? FromName,
+    bool HasPassword,
+    bool Configured)
+{
+    /// <summary>Project the domain entity onto the wire shape, omitting the password.</summary>
+    public static EmailSettingsDto From(EmailSettings s) => new(
+        s.Host, s.Port, s.UseStartTls, s.Username, s.FromAddress, s.FromName,
+        !string.IsNullOrEmpty(s.PasswordCipher), s.IsConfigured);
+}
+
+/// <summary>Body for <c>PUT /api/admin/email/settings</c>.</summary>
+/// <param name="Host">SMTP host.</param>
+/// <param name="Port">SMTP port.</param>
+/// <param name="UseStartTls">Whether to negotiate STARTTLS.</param>
+/// <param name="Username">SMTP username (null/blank = anonymous).</param>
+/// <param name="FromAddress">From address (validated).</param>
+/// <param name="FromName">From display name.</param>
+/// <param name="UpdatePassword">When false the stored password is kept. When true it is replaced with <paramref name="Password"/> (blank clears it).</param>
+/// <param name="Password">New password; honoured only when <paramref name="UpdatePassword"/> is true.</param>
+public sealed record UpdateEmailSettingsRequest(
+    string Host,
+    int Port,
+    bool UseStartTls,
+    string? Username,
+    string FromAddress,
+    string? FromName,
+    bool UpdatePassword = false,
+    string? Password = null);
+
+/// <summary>Wire shape of an editable email template.</summary>
+/// <param name="Key">Stable lookup key (immutable).</param>
+/// <param name="Name">Friendly name.</param>
+/// <param name="Description">When the template is used.</param>
+/// <param name="Subject">Liquid subject.</param>
+/// <param name="HtmlBody">Optional Liquid HTML body.</param>
+/// <param name="TextBody">Liquid text body.</param>
+/// <param name="ModifiedAt">Last update timestamp (UTC).</param>
+/// <param name="ModifiedBy">Name of the last modifier.</param>
+public sealed record EmailTemplateDto(
+    string Key,
+    string Name,
+    string? Description,
+    string Subject,
+    string? HtmlBody,
+    string TextBody,
+    DateTime ModifiedAt,
+    string? ModifiedBy)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static EmailTemplateDto From(EmailTemplate t) => new(
+        t.Key, t.Name, t.Description, t.Subject, t.HtmlBody, t.TextBody, t.ModifiedAt, t.ModifiedBy);
+}
+
+/// <summary>Body for <c>PUT /api/admin/email/templates/{key}</c>. The key is immutable.</summary>
+/// <param name="Name">Friendly name.</param>
+/// <param name="Description">When the template is used.</param>
+/// <param name="Subject">Liquid subject (validated).</param>
+/// <param name="HtmlBody">Optional Liquid HTML body (validated when present).</param>
+/// <param name="TextBody">Liquid text body (validated).</param>
+public sealed record UpdateEmailTemplateRequest(
+    string Name,
+    string? Description,
+    string Subject,
+    string? HtmlBody,
+    string TextBody);
+
+/// <summary>Wire shape of one outbox message for the audit "Sent emails" tab. Bodies are omitted to keep the list light.</summary>
+/// <param name="Id">Message id.</param>
+/// <param name="ToAddress">Recipient address.</param>
+/// <param name="ToName">Recipient display name.</param>
+/// <param name="Subject">Rendered subject.</param>
+/// <param name="Status">Delivery status.</param>
+/// <param name="Attempts">Number of delivery attempts.</param>
+/// <param name="LastError">Last delivery error, if any.</param>
+/// <param name="CreatedAt">Enqueue timestamp.</param>
+/// <param name="SentAt">Delivery timestamp, if delivered.</param>
+/// <param name="Category">Audit category, e.g. <c>adhoc</c> or <c>notification:missed</c>.</param>
+/// <param name="RelatedAccountId">Related account, if any.</param>
+public sealed record EmailMessageDto(
+    Guid Id,
+    string ToAddress,
+    string? ToName,
+    string Subject,
+    EmailStatus Status,
+    int Attempts,
+    string? LastError,
+    DateTime CreatedAt,
+    DateTime? SentAt,
+    string Category,
+    Guid? RelatedAccountId)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static EmailMessageDto From(EmailMessage m) => new(
+        m.Id, m.ToAddress, m.ToName, m.Subject, m.Status, m.Attempts, m.LastError,
+        m.CreatedAt, m.SentAt, m.Category, m.RelatedAccountId);
+}
+
+/// <summary>Body for <c>POST /api/admin/email/send</c>: an ad-hoc plain-text email to one account.</summary>
+/// <param name="AccountId">Recipient account; must have a contact email set.</param>
+/// <param name="Subject">Subject line.</param>
+/// <param name="Body">Plain-text body.</param>
+public sealed record SendAdhocEmailRequest(Guid AccountId, string Subject, string Body);
+
+/// <summary>Wire shape of a single notification trigger.</summary>
+/// <param name="Enabled">Master switch.</param>
+/// <param name="NotifyServiceAccount">Copy the service account's contact email.</param>
+/// <param name="NotifyAdminList">Copy the admin/operator recipient list.</param>
+public sealed record NotificationRuleDto(bool Enabled, bool NotifyServiceAccount, bool NotifyAdminList)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static NotificationRuleDto From(NotificationRule r) => new(r.Enabled, r.NotifyServiceAccount, r.NotifyAdminList);
+
+    /// <summary>Convert to the service-layer patch.</summary>
+    public NotificationRuleUpdate ToUpdate() => new(Enabled, NotifyServiceAccount, NotifyAdminList);
+}
+
+/// <summary>Wire shape of the notification configuration.</summary>
+/// <param name="Upcoming">Upcoming-reminder rule.</param>
+/// <param name="Missed">Missed-alert rule.</param>
+/// <param name="Warnings">Warnings-notice rule.</param>
+/// <param name="UpcomingLeadHours">Lead time (hours) before a window closes that an upcoming reminder fires.</param>
+/// <param name="AdminRecipientAccountIds">Accounts that receive the admin-list copy.</param>
+public sealed record NotificationSettingsDto(
+    NotificationRuleDto Upcoming,
+    NotificationRuleDto Missed,
+    NotificationRuleDto Warnings,
+    int UpcomingLeadHours,
+    List<Guid> AdminRecipientAccountIds)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static NotificationSettingsDto From(NotificationSettings s) => new(
+        NotificationRuleDto.From(s.Upcoming),
+        NotificationRuleDto.From(s.Missed),
+        NotificationRuleDto.From(s.Warnings),
+        s.UpcomingLeadHours,
+        s.AdminRecipientAccountIds);
+}
+
+/// <summary>Body for <c>PUT /api/admin/notifications/settings</c>.</summary>
+/// <param name="Upcoming">Upcoming-reminder rule.</param>
+/// <param name="Missed">Missed-alert rule.</param>
+/// <param name="Warnings">Warnings-notice rule.</param>
+/// <param name="UpcomingLeadHours">Lead time (hours, clamped 1..720).</param>
+/// <param name="AdminRecipientAccountIds">Accounts that receive the admin-list copy.</param>
+public sealed record UpdateNotificationSettingsRequest(
+    NotificationRuleDto Upcoming,
+    NotificationRuleDto Missed,
+    NotificationRuleDto Warnings,
+    int UpcomingLeadHours,
+    List<Guid>? AdminRecipientAccountIds = null);
 
 /// <summary>Request body for <c>POST /api/expressions/translate</c> and <c>POST /api/expressions/validate</c>.</summary>
 /// <param name="Expression">The validation expression to translate or validate. The translate endpoint selects the target language through the <c>Accept</c> header; validate ignores it (response is always JSON).</param>
@@ -363,6 +555,30 @@ public sealed record ValidateExpressionResponse(bool Ok, string? Error = null, i
 /// <param name="Page">1-based page number.</param>
 /// <param name="PageSize">Page size.</param>
 public sealed record PagedResponse<T>(IReadOnlyList<T> Items, long Total, int Page, int PageSize);
+
+/// <summary>Wire representation of a single audit-log entry.</summary>
+/// <param name="Id">Stable identifier of the log entry.</param>
+/// <param name="Timestamp">UTC time the change occurred.</param>
+/// <param name="TargetType">Type of object that changed (lets the UI resolve the id without scanning every collection).</param>
+/// <param name="TargetId">Id of the changed object.</param>
+/// <param name="TargetName">Name of the changed object when it has one; otherwise <c>null</c>.</param>
+/// <param name="Change">The kind of change (Create, Edit or Delete).</param>
+/// <param name="ActorId">Id of the account that made the change, or <c>null</c>.</param>
+/// <param name="ActorName">Machine name of the account that made the change, or <c>null</c>.</param>
+public sealed record AuditLogDto(
+    Guid Id,
+    DateTime Timestamp,
+    AuditTargetType TargetType,
+    Guid TargetId,
+    string? TargetName,
+    AuditChangeType Change,
+    Guid? ActorId,
+    string? ActorName)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static AuditLogDto From(AuditLog a) => new(
+        a.Id, a.Timestamp, a.TargetType, a.TargetId, a.TargetName, a.Change, a.ActorId, a.ActorName);
+}
 
 /// <summary>Body for the admin sample-query endpoint. Each filter is optional and ANDed.</summary>
 /// <param name="ServiceIds">Restrict to these services.</param>
@@ -493,14 +709,47 @@ public sealed record MissingSubmissionEntryDto(
 
 /// <summary>One cadence-shaped bucket of the "missing submissions" report. Buckets are returned only when they have at least one entry.</summary>
 /// <param name="Cadence">Cadence the bucket covers.</param>
-/// <param name="PeriodStart">Inclusive start of the current cadence window.</param>
-/// <param name="PeriodEnd">Exclusive end of the current cadence window.</param>
+/// <param name="PeriodStart">Inclusive start of the cadence window.</param>
+/// <param name="PeriodEnd">Exclusive end of the cadence window.</param>
+/// <param name="Period">Whether the window is the current (still-open) one or the previous (overdue) one.</param>
 /// <param name="Entries">Rows sorted by service label then schema label.</param>
 public sealed record MissingByCadenceDto(
     Cadence Cadence,
     DateTime PeriodStart,
     DateTime PeriodEnd,
+    MissingPeriodKind Period,
     List<MissingSubmissionEntryDto> Entries);
+
+/// <summary>Detailed missing-submissions report for a single cadence and a single (possibly historical) window addressed by <paramref name="Offset"/>.</summary>
+/// <param name="Cadence">Cadence the window belongs to.</param>
+/// <param name="Offset">Signed bucket offset from "now" (0 = current, negative = past).</param>
+/// <param name="PeriodStart">Inclusive start of the window.</param>
+/// <param name="PeriodEnd">Exclusive end of the window.</param>
+/// <param name="Entries">Rows sorted by service label then schema label.</param>
+public sealed record MissingPeriodReportDto(
+    Cadence Cadence,
+    int Offset,
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    List<MissingSubmissionEntryDto> Entries);
+
+/// <summary>One point on the "missing submissions over time" trend for a single cadence.</summary>
+/// <param name="Offset">Signed bucket offset from "now" (0 = current, negative = past).</param>
+/// <param name="PeriodStart">Inclusive start of the window.</param>
+/// <param name="PeriodEnd">Exclusive end of the window.</param>
+/// <param name="TotalMissing">Total number of missing required values across every service and schema in the window.</param>
+public sealed record MissingHistoryPointDto(
+    int Offset,
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    int TotalMissing);
+
+/// <summary>The "missing submissions over time" trend for a single cadence, oldest period first.</summary>
+/// <param name="Cadence">Cadence the trend covers.</param>
+/// <param name="Points">One point per period, ordered oldest → current.</param>
+public sealed record MissingHistoryDto(
+    Cadence Cadence,
+    List<MissingHistoryPointDto> Points);
 
 /// <summary>One time bucket of aggregated numeric samples for a schema value.</summary>
 /// <param name="PeriodStart">Bucket start (inclusive).</param>

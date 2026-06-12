@@ -35,4 +35,13 @@ public interface IReportRepository
     /// <param name="id">Report id.</param>
     /// <param name="ct">Cancellation token.</param>
     Task SoftDeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Permanently remove soft-deleted reports whose deletion timestamp is older than the cutoff.
+    /// Backs the retention sweep.
+    /// </summary>
+    /// <param name="olderThanUtc">Rows soft-deleted before this instant are purged.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of rows removed.</returns>
+    Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default);
 }

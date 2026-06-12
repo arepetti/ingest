@@ -16,7 +16,7 @@ namespace Ingest.Api.Controllers;
 [ApiController]
 [Route("api/admin/submissions")]
 [Authorize(Policy = AuthConstants.OperatorPolicy)]
-public sealed class AdminSubmissionsController(ISubmissionService service) : ControllerBase
+public sealed class AdminSubmissionsController(ISubmissionService service, IAuditLogService auditLog, IBulkImportService bulkImport) : ControllerBase
 {
     /// <summary>List submissions across all services, optionally filtered by service and/or date range.</summary>
     /// <param name="page">1-based page number; defaults to 1.</param>
@@ -62,6 +62,24 @@ public sealed class AdminSubmissionsController(ISubmissionService service) : Con
         return s is null ? NotFound() : Ok(SubmissionDto.From(s));
     }
 
+    /// <summary>Page through the change history (create/edit/delete) recorded for a single submission, newest first.</summary>
+    /// <param name="id">Submission id.</param>
+    /// <param name="page">1-based page number; defaults to 1.</param>
+    /// <param name="pageSize">Page size; defaults to 50.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">A page of audit entries for the submission.</response>
+    [HttpGet("{id:guid}/history")]
+    [ProducesResponseType(typeof(PagedResponse<AuditLogDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> History(
+        Guid id,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        CancellationToken ct)
+    {
+        var result = await auditLog.ListByTargetAsync(id, RequestHelpers.ToPageRequest(page, pageSize, null, false), ct);
+        return Ok(result.Map(AuditLogDto.From));
+    }
+
     /// <summary>Soft-delete a submission.</summary>
     /// <remarks>
     /// The OData/PowerBI projection is rebuilt asynchronously so the deleted samples disappear
@@ -105,6 +123,32 @@ public sealed class AdminSubmissionsController(ISubmissionService service) : Con
         var written = await service.AdminCreateAsync(input, ct);
         return Created($"/api/admin/submissions/{written.Submission.Id}",
             new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
+    }
+
+    /// <summary>Bulk-import historical submissions for a single service from a JSON or CSV file.</summary>
+    /// <remarks>
+    /// Admin-only convenience for back-filling history. Parsing is strict — a file that can't be
+    /// parsed (bad JSON/CSV, missing columns, unparseable timestamps) is rejected as a whole with
+    /// <c>400</c> before anything is written. Once parsing succeeds the import is <b>best-effort and
+    /// not transactional</b>: each submission group is validated and persisted independently, and the
+    /// returned report lists exactly which groups succeeded or failed (with their warnings/errors).
+    /// Re-running a file therefore re-imports the groups that previously succeeded, so fix the
+    /// reported failures and re-upload only those.
+    /// </remarks>
+    /// <param name="request">The target service, the file format, and the raw file content.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The file parsed; the body reports per-group success/failure.</response>
+    /// <response code="400">The file could not be parsed, or contained no submissions.</response>
+    /// <response code="403">Caller is not an Admin.</response>
+    [HttpPost("import")]
+    [Authorize(Policy = AuthConstants.AdminPolicy)]
+    [ProducesResponseType(typeof(BulkImportResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Import([FromBody] BulkImportRequest request, CancellationToken ct)
+    {
+        var result = await bulkImport.ImportAsync(request.ServiceAccountId, request.Format, request.Content, ct);
+        return Ok(result);
     }
 
     /// <summary>Replace any submission in-place, without cadence constraints.</summary>

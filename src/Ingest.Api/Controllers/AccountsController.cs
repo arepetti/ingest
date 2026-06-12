@@ -80,6 +80,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
             Name = req.Name,
             Label = req.Label,
             Description = req.Description,
+            Email = req.Email,
             Kind = req.Kind,
             Role = req.Role,
             Enabled = req.Enabled,
@@ -104,7 +105,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateAccountRequest req, CancellationToken ct)
     {
-        var updated = await service.UpdateAsync(id, new AccountUpdate(req.Label, req.Description, req.Role, req.Enabled, ToExternalLogins(req.ExternalLogins)), ct);
+        var updated = await service.UpdateAsync(id, new AccountUpdate(req.Label, req.Description, req.Email, req.Role, req.Enabled, ToExternalLogins(req.ExternalLogins)), ct);
         return updated is null ? NotFound() : Ok(AccountDto.From(updated));
     }
 

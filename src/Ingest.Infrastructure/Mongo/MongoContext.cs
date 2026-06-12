@@ -31,6 +31,24 @@ public sealed class MongoContext
     /// <summary><c>reports</c> collection (Liquid templates with their parsed metadata).</summary>
     public IMongoCollection<Report> Reports => Database.GetCollection<Report>("reports");
 
+    /// <summary><c>auditLogs</c> collection (append-only create/edit/delete change log).</summary>
+    public IMongoCollection<AuditLog> AuditLogs => Database.GetCollection<AuditLog>("auditLogs");
+
+    /// <summary><c>emailSettings</c> collection — singleton SMTP configuration.</summary>
+    public IMongoCollection<EmailSettings> EmailSettings => Database.GetCollection<EmailSettings>("emailSettings");
+
+    /// <summary><c>emailOutbox</c> collection — the durable queue of emails to send / already sent.</summary>
+    public IMongoCollection<EmailMessage> EmailOutbox => Database.GetCollection<EmailMessage>("emailOutbox");
+
+    /// <summary><c>emailTemplates</c> collection — editable Liquid templates keyed by <see cref="EmailTemplate.Key"/>.</summary>
+    public IMongoCollection<EmailTemplate> EmailTemplates => Database.GetCollection<EmailTemplate>("emailTemplates");
+
+    /// <summary><c>notificationSettings</c> collection — singleton notification configuration.</summary>
+    public IMongoCollection<NotificationSettings> NotificationSettings => Database.GetCollection<NotificationSettings>("notificationSettings");
+
+    /// <summary><c>notificationLogs</c> collection — dedupe markers so an event is notified at most once.</summary>
+    public IMongoCollection<NotificationLog> NotificationLogs => Database.GetCollection<NotificationLog>("notificationLogs");
+
     /// <summary>Create a new <see cref="MongoContext"/>.</summary>
     /// <param name="client">Mongo client supplied by the container.</param>
     /// <param name="databaseName">Name of the database to use.</param>

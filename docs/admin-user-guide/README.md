@@ -8,8 +8,9 @@ The guide is split into focused pages — pick whichever matches the task at han
 |-----------------------------------------------|--------------------------------------------------------------------------------|
 | [accounts.md](accounts.md)                    | Creating people and applications, editing them, issuing & rotating API keys, disabling vs deleting, viewing a service's status. |
 | [schemas.md](schemas.md)                      | Designing schemas: per-value type/cadence flags, multi-line validation rules, conditional display (`Enabled if` / `Visible if`), warnings, historical-data view. |
-| [submissions.md](submissions.md)              | Browsing submissions with filters, editing/creating on behalf of a service, deleting submissions. |
+| [submissions.md](submissions.md)              | Browsing submissions with filters, editing/creating on behalf of a service, bulk-importing history from JSON/CSV, deleting submissions. |
 | [reports.md](reports.md)                      | Uploading HTML+Liquid report templates, what data they receive, the viewer's filter bar. |
+| [settings.md](settings.md)                    | Admin-only settings hub: email (SMTP) settings, editable notification templates, notification triggers & recipients, ad-hoc email send, and backup & restore (a convenience tool, *not* the primary backup). |
 | [validation.md](validation.md)                | Writing custom validation rules — operators, conditionals, helpers, recipes. The companion to schemas.md when you start using the rule fields. |
 | [troubleshooting.md](troubleshooting.md)      | Common error messages and what they mean.                                      |
 
@@ -31,12 +32,21 @@ If your deployment has [SSO](../architecture/authentication.md#single-sign-on-op
 
 Once logged in:
 
-- The left sidebar carries **Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Reports**.
+- The left sidebar carries **Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Missing**, **Reports**, and (admins only) **Audit** and **Settings**.
 - Service-role users see a stripped-down sidebar (Dashboard + Submissions only) — Schemas, Accounts and Reports call admin endpoints.
 - Your friendly **label** (or **name** as a fallback) and role show at the bottom.
 - **Sign out** is the icon next to your name.
 
 If you only see a blank screen after signing in, the most likely cause is that the API key was for a soft-deleted/disabled account. Clear `localStorage` and try a fresh key.
+
+## Accessibility
+
+The admin SPA is built to be usable without a mouse:
+
+- **Skip link.** Press <kbd>Tab</kbd> once after a page loads to reveal a **Skip to main content** link that jumps past the sidebar straight to the page body.
+- **Keyboard-operable grids.** Data-grid rows that open a detail drawer or page on click are in the tab order and activate with <kbd>Enter</kbd> or <kbd>Space</kbd>; a visible focus ring shows where you are. The per-row **⋮** actions menu and any links/buttons inside a row keep their own focus and keyboard behaviour.
+- **Landmarks & labels.** The sidebar is a labelled navigation landmark, the page body is the `main` landmark (the skip link's target), and icon-only buttons (close, expand, row actions, account menu) carry descriptive labels for screen readers.
+- **Announcements.** Notices that appear after an action — a failed save, a successful import — are live regions, so screen readers announce them (errors interrupt; everything else is announced politely). Motion respects your system **reduce-motion** setting.
 
 ## First steps after install
 
@@ -55,7 +65,7 @@ The dashboard greets you by **label** (or **name**) and surfaces a few at-a-glan
 - For Admins / Operators: total counts of services, schemas and submissions, plus a **Missing submissions** section showing one card per cadence (Daily / Weekly / Fortnightly / Monthly / Quarterly / Semi-annually / Yearly) that currently has work outstanding. Each card lists the affected `service • schema` rows with a `missing/total` count, and each row links straight to that service's status page so you can drill in. Cadences with nothing missing are simply omitted — if the whole section is gone, everyone is up to date for the current windows.
 - For Services: their own status (same data as `/api/me/status`).
 
-It's intentionally lightweight — for serious analytics, point PowerBI at the OData feed (see [setup/powerbi.md](../setup/powerbi.md)) or hit `/api/admin/query` from a custom dashboard.
+The dashboard is intentionally lightweight — a health check, not an analytics surface. The **primary way to explore the data is PowerBI** (or any similar BI/OData client) pointed at the OData feed — see [setup/powerbi.md](../setup/powerbi.md) — or `/api/admin/query` from a custom dashboard. The built-in [reports](reports.md) are likewise a basic, developer-authored convenience, **not** an operator analytics tool. Use PowerBI for real exploration, slicing and charting.
 
 ## Services console (Service-role users)
 
@@ -73,3 +83,4 @@ This is meant for services that don't (yet) have an automated submitter and pref
 - For the API surface a Service account hits programmatically, see [client/api.md](../client/api.md).
 - For the auth model and how API keys are issued/verified, see [architecture/authentication.md](../architecture/authentication.md).
 - For the OData feed used by PowerBI and similar tools, see [setup/powerbi.md](../setup/powerbi.md).
+- For data-subject rights and retention (EU GDPR; UK GDPR / DPA 2018 apply the same), see [gdpr.md](../gdpr.md).

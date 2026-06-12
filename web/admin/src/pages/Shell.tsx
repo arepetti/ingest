@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { Board24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular } from '@fluentui/react-icons'
+import { Board24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Warning24Regular } from '@fluentui/react-icons'
 import { useMe } from '../api/hooks'
 import { TopBar } from '../components/TopBar'
 import type { ReactNode } from 'react'
@@ -11,6 +11,23 @@ const useStyles = makeStyles({
     gridTemplateColumns: '240px 1fr',
     height: '100vh',
     backgroundColor: tokens.colorNeutralBackground1,
+    position: 'relative',
+  },
+  // Off-screen until focused, then pinned top-left so keyboard users can jump straight to the
+  // page body without tabbing through the whole sidebar on every navigation.
+  skipLink: {
+    position: 'absolute',
+    left: '8px',
+    top: '-48px',
+    zIndex: 1000,
+    padding: '8px 12px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    color: tokens.colorBrandForeground1,
+    border: `1px solid ${tokens.colorBrandStroke1}`,
+    borderRadius: tokens.borderRadiusMedium,
+    textDecoration: 'none',
+    transition: 'top 0.1s ease-in',
+    ':focus': { top: '8px' },
   },
   side: {
     backgroundColor: tokens.colorNeutralBackground3,
@@ -34,6 +51,8 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   nav: { display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 },
+  // Pushes an entry (Settings) to the bottom of the sidebar, away from the main group.
+  navItemBottom: { marginTop: 'auto' },
   navItem: {
     display: 'flex',
     alignItems: 'center',
@@ -74,6 +93,8 @@ interface NavEntry {
   /** When false, the entry is hidden for the current role. */
   show: boolean
   end?: boolean
+  /** When true, the entry is pinned to the bottom of the sidebar. */
+  bottom?: boolean
 }
 
 export function Shell() {
@@ -88,27 +109,40 @@ export function Shell() {
   const isService = me?.role === 'Service'
   const navEntries: NavEntry[] = [
     { to: '/',            label: 'Dashboard',   icon: <Board24Regular />,              show: true, end: true },
-    { to: '/schemas',     label: 'Schemas',     icon: <DataTreemap24Regular />,        show: !isService },
-    // Route stays /services for URL stability (/services/{name}/status still resolves); the label
-    // is "Accounts" because the page lists every account (any kind, any role), not only services.
-    { to: '/services',    label: 'Accounts',    icon: <PeopleTeam24Regular />,         show: !isService },
     { to: '/submissions', label: 'Submissions', icon: <DocumentBulletList24Regular />, show: true },
+    // Cross-service "what's overdue" analytics; relies on admin endpoints so it's hidden for services.
+    { to: '/missing',     label: 'Missing',     icon: <Warning24Regular />,            show: !isService },
     // Reports are an operator/admin tool; service-role users would get a 403 for the catalogue
     // and have no reason to use them anyway.
     { to: '/reports',     label: 'Reports',     icon: <DocumentText24Regular />,       show: !isService },
+    // Route stays /services for URL stability (/services/{name}/status still resolves); the label
+    // is "Accounts" because the page lists every account (any kind, any role), not only services.
+    { to: '/services',    label: 'Accounts',    icon: <PeopleTeam24Regular />,         show: !isService },
+    { to: '/schemas',     label: 'Schemas',     icon: <DataTreemap24Regular />,        show: !isService },
+    // The audit trail is an admin-only oversight tool; operators and services have no access
+    // to the backing endpoint (it would 403), so the entry only appears for admins.
+    { to: '/audit',       label: 'Audit',       icon: <History24Regular />,            show: me?.role === 'Admin' },
+    // Admin-only configuration hub (backup/restore today; more tabs to come). Pinned to the bottom.
+    { to: '/settings',    label: 'Settings',    icon: <Settings24Regular />,           show: me?.role === 'Admin', bottom: true },
   ]
 
   return (
     <div className={s.root}>
-      <aside className={s.side}>
+      <a href="#main-content" className={s.skipLink}>Skip to main content</a>
+      <aside className={s.side} aria-label="Primary">
         <Link to="/" className={s.brand}>
           <span className={s.brandTitle}>Ingest</span>
           <span className={s.brandSub}>{isService ? 'Service console' : 'Admin console'}</span>
         </Link>
 
-        <nav className={s.nav}>
+        <nav className={s.nav} aria-label="Main navigation">
           {navEntries.filter(e => e.show).map(e => (
-            <NavLink key={e.to} to={e.to} end={e.end} className={cls}>
+            <NavLink
+              key={e.to}
+              to={e.to}
+              end={e.end}
+              className={state => mergeClasses(cls(state), e.bottom ? s.navItemBottom : undefined)}
+            >
               {e.icon} {e.label}
             </NavLink>
           ))}
@@ -118,7 +152,7 @@ export function Shell() {
       </aside>
       <div className={s.mainColumn}>
         <TopBar me={me} />
-        <main className={s.body}>
+        <main id="main-content" className={s.body} tabIndex={-1}>
           <Outlet />
         </main>
       </div>

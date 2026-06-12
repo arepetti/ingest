@@ -39,8 +39,13 @@ export function AutoScrollMessageBar({ children, ...rest }: MessageBarProps) {
   // Wrapping in a div keeps the call site identical to a plain MessageBar (no ref-forwarding
   // assumptions) and gives us a stable element to call scrollIntoView on. The wrapper has no
   // box-model styling so flex/grid parents still control spacing via their own `gap`.
+  //
+  // The wrapper is also the live region: because these bars mount/update in response to an
+  // action (a failed save, a successful import), a screen reader otherwise wouldn't announce
+  // them. Errors interrupt (`assertive`); everything else waits its turn (`polite`).
+  const live = rest.intent === 'error' ? 'assertive' : 'polite'
   return (
-    <div ref={ref} className={s.wrap}>
+    <div ref={ref} className={s.wrap} role={rest.intent === 'error' ? 'alert' : 'status'} aria-live={live}>
       <MessageBar {...rest}>{children}</MessageBar>
     </div>
   )

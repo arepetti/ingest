@@ -15,14 +15,14 @@ public class SchemaServiceTests
     private static SchemaService NewService(out FakeSchemaRepo repo)
     {
         repo = new FakeSchemaRepo();
-        return new SchemaService(repo, new FakeEmptySampleRepo());
+        return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService());
     }
 
     private static SchemaService NewService(out FakeSchemaRepo repo, out FakeEmptySampleRepo samples)
     {
         repo = new FakeSchemaRepo();
         samples = new FakeEmptySampleRepo();
-        return new SchemaService(repo, samples);
+        return new SchemaService(repo, samples, new NoopAuditLogService());
     }
 
     private static Schema NewSchema(string name = "demo", int version = 1) => new()
@@ -538,6 +538,8 @@ public class SchemaServiceTests
             _store.RemoveAll(s => s.Id == id);
             return Task.CompletedTask;
         }
+
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 
     /// <summary>
@@ -554,6 +556,9 @@ public class SchemaServiceTests
 
         public Task<SampleProjection?> GetLatestAsync(Guid serviceId, string schemaName, string valueName, CancellationToken ct = default) =>
             Task.FromResult<SampleProjection?>(null);
+
+        public Task<bool> ExistsInWindowAsync(Guid serviceId, string schemaName, string valueName, DateTime start, DateTime end, CancellationToken ct = default) =>
+            Task.FromResult(false);
 
         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
@@ -572,5 +577,11 @@ public class SchemaServiceTests
 
         public IQueryable<SampleProjection> AsQueryable() =>
             Array.Empty<SampleProjection>().AsQueryable();
+
+        public Task<IReadOnlyList<SampleProjection>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
+        public Task<long> RedactByServiceAsync(Guid serviceId, string pseudonym, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 }

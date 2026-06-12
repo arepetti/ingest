@@ -72,4 +72,35 @@ public abstract class RepositoryBase<T> where T : AuditedEntity
             .Set(e => e.ModifiedBy, Audit.UserName);
         await Collection.UpdateOneAsync(e => e.Id == id, update, cancellationToken: ct);
     }
+
+    /// <summary>
+    /// Permanently delete every row matching <paramref name="filter"/>. Unlike
+    /// <see cref="SoftDeleteCoreAsync"/> this is irreversible — used by the GDPR erasure and
+    /// retention paths, never by ordinary delete endpoints.
+    /// </summary>
+    /// <param name="filter">Filter selecting the rows to remove.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of documents removed.</returns>
+    protected async Task<long> HardDeleteManyCoreAsync(FilterDefinition<T> filter, CancellationToken ct)
+    {
+        var result = await Collection.DeleteManyAsync(filter, ct);
+        return result.DeletedCount;
+    }
+
+    /// <summary>
+    /// Permanently delete every soft-deleted row whose <see cref="AuditedEntity.DeletedAt"/> is
+    /// strictly older than <paramref name="olderThanUtc"/>. Backs the retention "storage
+    /// limitation" sweep so soft-deleted data does not linger forever. Rows without a
+    /// <c>DeletedAt</c> are never matched (Mongo range filters are type-bracketed).
+    /// </summary>
+    /// <param name="olderThanUtc">Cutoff: rows deleted before this instant are purged.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of documents removed.</returns>
+    protected Task<long> PurgeSoftDeletedCoreAsync(DateTime olderThanUtc, CancellationToken ct)
+    {
+        var filter = Builders<T>.Filter.And(
+            Builders<T>.Filter.Eq(e => e.IsDeleted, true),
+            Builders<T>.Filter.Lt(e => e.DeletedAt, olderThanUtc));
+        return HardDeleteManyCoreAsync(filter, ct);
+    }
 }

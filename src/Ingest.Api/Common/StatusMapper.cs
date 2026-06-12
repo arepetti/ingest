@@ -28,12 +28,33 @@ internal static class StatusMapper
             b.Cadence,
             b.PeriodStart,
             b.PeriodEnd,
-            b.Entries.Select(e => new MissingSubmissionEntryDto(
-                e.ServiceId,
-                e.ServiceName,
-                e.ServiceLabel,
-                e.SchemaName,
-                e.SchemaLabel,
-                e.MissingRequiredCount,
-                e.TotalRequiredCount)).ToList())).ToList();
+            b.Period,
+            b.Entries.Select(ToDto).ToList())).ToList();
+
+    /// <summary>Project a single-window detailed missing report into its DTO.</summary>
+    /// <param name="report">Source per-period missing report.</param>
+    /// <returns>The wire representation.</returns>
+    public static MissingPeriodReportDto ToDto(MissingPeriodReport report) => new(
+        report.Cadence,
+        report.Offset,
+        report.PeriodStart,
+        report.PeriodEnd,
+        report.Entries.Select(ToDto).ToList());
+
+    /// <summary>Project the missing-submissions trend into its DTO.</summary>
+    /// <param name="history">Source trend.</param>
+    /// <returns>The wire representation.</returns>
+    public static MissingHistoryDto ToDto(MissingHistory history) => new(
+        history.Cadence,
+        history.Points.Select(p => new MissingHistoryPointDto(
+            p.Offset, p.PeriodStart, p.PeriodEnd, p.TotalMissing)).ToList());
+
+    private static MissingSubmissionEntryDto ToDto(MissingSubmissionEntry e) => new(
+        e.ServiceId,
+        e.ServiceName,
+        e.ServiceLabel,
+        e.SchemaName,
+        e.SchemaLabel,
+        e.MissingRequiredCount,
+        e.TotalRequiredCount);
 }

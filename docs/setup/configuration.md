@@ -71,6 +71,45 @@ Register the callback URL (`…/api/auth/callback/{provider}`) per environment w
 
 (Use the matching id for other providers, e.g. `.../api/auth/callback/Google`.)
 
+## Email & notifications
+
+> **The entire `Email` section only takes effect when `Email:Enabled` is `true` (the default).** Set it to `false` and the whole feature is inert — no background workers start, the admin **Settings → Email / Email templates / Notifications** tabs and the **Audit → Sent emails** tab disappear, the per-account **Send email** action is hidden, and the email/notification endpoints return 404. This mirrors the SSO master-switch pattern.
+
+The **runtime SMTP connection** (host, port, credentials, from-address) is **stored in the database**, not configuration, so admins can change it without a redeploy (**Settings → Email**). Configuration only provides an optional one-time **seed** used when no settings document exists yet. The SMTP password is encrypted at rest using a key derived from `ApiKey:Pepper`, so there is no extra secret to manage.
+
+| Key                            | Default | Notes |
+|--------------------------------|---------|-------|
+| `Email:Enabled`                | `true`  | Master switch for the email + notifications feature. |
+| `Email:Worker:Enabled`         | `true`  | Whether an in-process background service drains the outbox on a timer. Set `false` to drive sending from an external scheduler/service hitting `POST /api/admin/email/drain` instead — so the sender can be split out later without code changes. |
+| `Email:Worker:PollSeconds`     | `30`    | How often the in-process drainer wakes up (seconds, floored at 5). |
+| `Email:Worker:MaxAttempts`     | `5`     | Delivery attempts before a message is marked permanently `Failed`. |
+| `Email:Worker:BatchSize`       | `25`    | Max messages sent per drain pass. |
+| `Email:Smtp:Host`              | *(blank)* | **Seed only.** When set and no settings document exists yet, these values bootstrap the database settings on first start. Ignored once settings exist. |
+| `Email:Smtp:Port`              | `587`   | Seed SMTP port. |
+| `Email:Smtp:UseStartTls`       | `true`  | Seed STARTTLS flag. |
+| `Email:Smtp:Username`          | *(blank)* | Seed SMTP username. |
+| `Email:Smtp:Password`          | *(blank)* | Seed SMTP password (encrypted before it's written). |
+| `Email:Smtp:FromAddress`       | *(blank)* | Seed From address. |
+| `Email:Smtp:FromName`          | *(blank)* | Seed From display name. |
+
+> **Notifications** build on top of the email infrastructure. *What* to notify (upcoming / missed / warnings) and *who* receives it is admin data stored in the database (**Settings → Notifications**); only the scheduler cadence is configuration.
+
+| Key                                   | Default | Notes |
+|---------------------------------------|---------|-------|
+| `Notifications:Scheduler:Enabled`     | `true`  | Whether an in-process scheduler runs the notification job on a timer. Set `false` to drive runs from an external scheduler hitting `POST /api/admin/notifications/run`. |
+| `Notifications:Scheduler:PollMinutes` | `15`    | How often the in-process scheduler triggers a run (minutes, floored at 1). |
+
+> **Retention** is the time-based clean-up enforcing GDPR storage limitation. It hard-deletes data once it outlives its window. Off by default; every window is a day count where `0` (or absent) means "keep forever". A manual `POST /api/admin/retention/run` (Admin) works regardless of `Enabled`. See [admin-user-guide/settings.md § Retention](../admin-user-guide/settings.md#retention).
+
+| Key                             | Default | Notes |
+|---------------------------------|---------|-------|
+| `Retention:Enabled`             | `false` | Master switch. When off, nothing is purged and the worker isn't registered. |
+| `Retention:PollHours`           | `24`    | How often the in-process worker runs a purge pass (hours, floored at 1). |
+| `Retention:SentEmailsDays`      | `0`     | Days to keep delivered/failed outbox emails (full-body PII). `0` = keep forever. |
+| `Retention:AuditLogDays`        | `0`     | Days to keep audit-log entries. `0` = keep forever. |
+| `Retention:SoftDeletedDays`     | `0`     | Days to keep soft-deleted rows before hard-deleting them. `0` = keep forever. |
+| `Retention:NotificationLogDays` | `0`     | Days to keep notification dedupe markers. `0` = keep forever. |
+
 ## Application behaviour
 
 | Key                                | Default                       | Notes |
@@ -100,6 +139,8 @@ The strongly-typed options classes that read these sections live in:
 | `ApiKey`    | `ApiKeyOptions`  | `src/Ingest.Infrastructure/Security/ApiKeyOptions.cs`      |
 | `Ingest`    | `IngestOptions`  | `src/Ingest.Api/Options/IngestOptions.cs`                  |
 | `Sso`       | `SsoOptions`     | `src/Ingest.Api/Options/SsoOptions.cs`                     |
+| `Email`     | `EmailOptions`         | `src/Ingest.Infrastructure/Email/EmailOptions.cs`         |
+| `Notifications` | `NotificationOptions` | `src/Ingest.Infrastructure/Email/NotificationOptions.cs` |
 
 If you add a new option, follow the same pattern: add the property, bind it from `IConfiguration` in `Program.cs`, and document the key here.
 

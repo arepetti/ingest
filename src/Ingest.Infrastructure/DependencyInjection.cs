@@ -1,4 +1,5 @@
 using Ingest.Core.Abstractions;
+using Ingest.Infrastructure.Email;
 using Ingest.Infrastructure.Mongo;
 using Ingest.Infrastructure.Reports;
 using Ingest.Infrastructure.Security;
@@ -33,6 +34,9 @@ public static class DependencyInjection
 
         services.Configure<MongoOptions>(configuration.GetSection("Mongo"));
         services.Configure<ApiKeyOptions>(configuration.GetSection("ApiKey"));
+        services.Configure<EmailOptions>(configuration.GetSection("Email"));
+        services.Configure<NotificationOptions>(configuration.GetSection("Notifications"));
+        services.Configure<Retention.RetentionOptions>(configuration.GetSection("Retention"));
 
         services.AddSingleton<MongoContext>(sp =>
         {
@@ -63,6 +67,8 @@ public static class DependencyInjection
         services.AddScoped<ISubmissionRepository, SubmissionRepository>();
         services.AddScoped<ISampleRepository, SampleRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<INotificationLogRepository, NotificationLogRepository>();
 
         services.AddSingleton<IApiKeyHasher, ApiKeyHasher>();
         services.AddSingleton<IExpressionEvaluator, NCalcExpressionEvaluator>();
@@ -76,7 +82,29 @@ public static class DependencyInjection
         services.AddScoped<IApiKeyService, ApiKeyService>();
         services.AddScoped<ISchemaService, SchemaService>();
         services.AddScoped<ISubmissionService, SubmissionService>();
+        services.AddScoped<IBulkImportService, BulkImportService>();
+        services.AddScoped<IBackupService, BackupService>();
         services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
+
+        // GDPR data-rights services (erasure, retention purge, DSAR export).
+        services.AddScoped<IErasureService, ErasureService>();
+        services.AddScoped<IRetentionService, RetentionService>();
+        services.AddScoped<IPersonalDataService, PersonalDataService>();
+
+        // Email + notifications. These are always registered (cheap, stateless); whether the
+        // feature actually does anything is gated by Email:Enabled in the host (controllers guard,
+        // workers are only registered when enabled). The SMTP password protector and the SMTP
+        // sender are stateless singletons.
+        services.AddSingleton<IEmailSecretProtector, EmailSecretProtector>();
+        services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<IEmailSettingsService, EmailSettingsService>();
+        services.AddScoped<IEmailQueue, EmailQueue>();
+        services.AddScoped<IEmailTemplateService, EmailTemplateService>();
+        services.AddScoped<IEmailContentBuilder, EmailContentBuilder>();
+        services.AddScoped<IEmailDispatchService, EmailDispatchService>();
+        services.AddScoped<INotificationSettingsService, NotificationSettingsService>();
+        services.AddScoped<INotificationService, NotificationService>();
 
         return services;
     }

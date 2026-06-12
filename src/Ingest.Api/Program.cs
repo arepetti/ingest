@@ -5,6 +5,7 @@ using Ingest.Api.Odata;
 using Ingest.Api.Options;
 using Ingest.Core.Common;
 using Ingest.Infrastructure;
+using Ingest.Infrastructure.Email;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -154,6 +155,26 @@ builder.Services.AddExceptionHandler<ProblemDetailsExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 builder.Services.AddHostedService<AdminBootstrapper>();
+
+// Email + notifications. Gated by the Email:Enabled master switch (mirrors the SSO pattern):
+// when off, nothing here runs — no seeding, no outbox drainer, no scheduler — and the admin UI
+// hides the related settings. The two workers are additionally toggleable on their own so the
+// sending / scheduling concerns can be driven by an external service hitting the internal
+// trigger endpoints instead (POST /api/admin/email/drain, POST /api/admin/notifications/run).
+var emailOptions = builder.Configuration.GetSection("Email").Get<EmailOptions>() ?? new EmailOptions();
+var notificationOptions = builder.Configuration.GetSection("Notifications").Get<NotificationOptions>() ?? new NotificationOptions();
+if (emailOptions.Enabled)
+{
+    builder.Services.AddHostedService<EmailSeeder>();
+    if (emailOptions.Worker.Enabled) builder.Services.AddHostedService<EmailOutboxWorker>();
+    if (notificationOptions.Scheduler.Enabled) builder.Services.AddHostedService<NotificationSchedulerWorker>();
+}
+
+// Retention purge (GDPR storage limitation). Off by default; the in-process worker only runs when
+// Retention:Enabled is on. The manual POST /api/admin/retention/run trigger works regardless, so
+// the schedule can be driven externally instead.
+var retentionOptions = builder.Configuration.GetSection("Retention").Get<Ingest.Infrastructure.Retention.RetentionOptions>() ?? new Ingest.Infrastructure.Retention.RetentionOptions();
+if (retentionOptions.Enabled) builder.Services.AddHostedService<RetentionWorker>();
 
 var app = builder.Build();
 

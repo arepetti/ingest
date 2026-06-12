@@ -14,6 +14,7 @@ Two orthogonal classifications drive everything you'll do here:
    - **Name** — a short, stable machine-style identifier (e.g. `roads-team`, `analytics-jane`). Must be unique across all accounts ever created (including soft-deleted ones).
    - **Label** — the friendly name to display in the UI (e.g. *Roads & Highways team*, *Jane (Analytics)*).
    - **Description** — free-form notes.
+   - **Email** — contact address used by the email and notification features. **Required when creating a new account.** (Validated for shape; stored lower-cased.)
    - **Kind** — `Application` for automation credentials, `User` for people who will sign in to the SPA.
    - **Role** — `Service`, `Operator`, or `Admin`.
    - **Enabled** — leave on unless you want to pre-create a disabled account.
@@ -23,7 +24,9 @@ The new row appears at the top of the grid. Newly-created accounts have **no API
 
 ## Editing an account
 
-Use the row menu's **Edit** action. Name and Kind are **immutable** — to change either you must delete the account and create a fresh one. Label, Description, Role, and Enabled are all editable.
+Use the row menu's **Edit** action. Name and Kind are **immutable** — to change either you must delete the account and create a fresh one. Label, Description, Email, Role, and Enabled are all editable.
+
+Email is required when *creating* an account, but accounts that predate this field (or were created without one) can still be saved with an empty email when editing — fill it in whenever you're ready. A non-empty value must be a valid address.
 
 Toggling **Enabled** off immediately invalidates every key for this account; toggling it back on re-enables the existing keys.
 
@@ -50,11 +53,17 @@ Notes and rules:
 
 Clicking a row opens a side drawer with a read-only summary, including audit info (who created/modified it, when). The drawer also has a toolbar replicating the row menu actions so you can edit or manage keys without closing the drawer first.
 
+## Sending an email to an account
+
+> Only when the email feature is enabled (`Email:Enabled`, the default) and the account has a contact email.
+
+The row menu (and the detail-drawer toolbar) has a **Send email** action — available to operators and admins — for a one-off plain-text message to the account's contact email. Type a subject and body and send; the message is queued and delivered by the email sender. Confirm delivery on **Audit → Sent emails**. The same contact email is what the [notification triggers](settings.md#notifications) use when "Notify the service account" is on, so keeping it filled in is worthwhile.
+
 ## Issuing and rotating keys
 
 Row menu → **Manage keys**. The drawer lists every key attached to the account (including revoked ones — they're shown grayed out).
 
-- **Generate key** — issues a new key and shows the plaintext **once** in a modal dialog. Copy it now; there is no way to retrieve it later.
+- **Generate key** — issues a new key and shows the plaintext **once** in a modal dialog. Copy it now; there is no way to retrieve it later. You can optionally set an **expiry** before generating: pick a date (up to two years from today) in the *Expiry for the next key* field, or leave it blank for a key that never expires. Expired keys stop authenticating automatically — no revoke needed — and show as **Expired** in the list.
 - **Revoke** (in the row menu of an individual key) — marks the key revoked. Idempotent; safe to click twice.
 
 You can have any number of active keys per account. The pattern for a zero-downtime rotation is:
@@ -74,6 +83,25 @@ Both old and new keys authenticate during the overlap; the consumer never sees a
 > The server refuses to delete an account that has any live submission on its name (HTTP 409, "Account '…' has submitted data and cannot be deleted. Disable it instead…"). This protects the audit trail and keeps the OData feed / status dashboard from showing orphaned rows. If you really want the account gone, hard-delete the submissions first; otherwise just disable it.
 
 > If you delete an account and later create a new one with the same name, the tombstone is replaced automatically — the create succeeds rather than failing with an "account already exists" conflict. The new account starts with a fresh id and a fresh key set; any soft-deleted samples the old account left behind are not touched and stay excluded from queries.
+
+## Data-subject rights (GDPR)
+
+Two admin-only actions on the row menu (and the detail-drawer toolbar) cover the GDPR rights that need a button in the product (EU GDPR; the UK GDPR / DPA 2018 are equivalent). Both are **Admin-only**. See [docs/gdpr.md](../gdpr.md) for the full data-protection overview.
+
+### Export personal data (right of access / DSAR)
+
+**Export personal data** downloads a single JSON file with everything the system holds about that subject: the account record (labels, contact email, any SSO links), API-key *metadata* (never the secrets), every submission and sample they own, the emails sent to them **from the outbox** (which the registry backup omits), and the audit-log entries where they are the actor or the target. Hand this file to the subject to satisfy an access request.
+
+### Erase (right to erasure)
+
+**Erase (GDPR)** opens a dialog where you choose one of two modes. Both are **irreversible** and both bypass the ordinary "account has submitted data" delete guard, so you must tick *I understand this cannot be undone* before the button enables.
+
+- **Anonymise** — keeps the *statistical* record but strips the identity. The account is pseudonymised (`erased-…`), its label/description/email/SSO links are cleared and it is disabled; API keys and outbox emails are removed; free-text (string KPI values, notes, warnings) is redacted from submissions and samples while the numeric/date/boolean values stay so historical dashboards still add up; the audit trail is rewritten to the pseudonym. Use this when you must remove the person but the KPI numbers are still needed.
+- **Delete** — permanently removes the account and *everything* tied to it: keys, submissions, samples, outbox emails, audit entries and notification markers.
+
+Either way a single audit entry is recorded for the erasure itself (who, when, which mode), naming only the pseudonym — so you keep accountability without re-introducing the identity.
+
+> Routine, time-based clean-up (purging old sent emails, soft-deleted rows, old audit entries) is configured separately under **Retention** — see [settings.md § Retention](settings.md#retention).
 
 ## Viewing a service's status
 

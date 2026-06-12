@@ -41,6 +41,14 @@ public sealed class Submission : AuditedEntity
     /// <summary>The samples carried by this submission. All samples typically refer to the same schema.</summary>
     public List<Sample> Samples { get; set; } = new();
 
+    /// <summary>
+    /// Non-blocking diagnostics produced by the validator at the last write (fired <c>Warning</c>
+    /// rules and notices about samples discarded by <c>EnabledIf</c> / <c>VisibleIf</c>). Persisted
+    /// so operators/admins can review them later. Legacy documents that predate this field
+    /// deserialize to an empty list, which is treated as "no warnings".
+    /// </summary>
+    public List<string> Warnings { get; set; } = new();
+
     /// <summary>When the submission was first accepted by the API.</summary>
     public DateTime SubmittedAt { get; set; }
 

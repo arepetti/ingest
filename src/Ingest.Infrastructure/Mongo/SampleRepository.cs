@@ -37,7 +37,7 @@ public sealed class SampleRepository : RepositoryBase<SampleProjection>, ISample
 
         if (q.LatestOnly)
         {
-            // Latest per (service, schema). Cheap enough for PoC: load filtered, group in memory.
+            // Latest per (service, schema). Cheap enough at this scale: load filtered, group in memory.
             var loaded = await Collection.Find(filter)
                 .Sort(Builders<SampleProjection>.Sort.Descending(s => s.Timestamp))
                 .Limit(10_000)
@@ -79,6 +79,22 @@ public sealed class SampleRepository : RepositoryBase<SampleProjection>, ISample
     }
 
     /// <inheritdoc />
+    public Task<bool> ExistsInWindowAsync(Guid serviceId, string schemaName, string valueName, DateTime start, DateTime end, CancellationToken ct = default)
+    {
+        // The compound `by_service_schema_value_time` index has (ServiceAccountId, SchemaName,
+        // ValueName, Timestamp) as its prefix, so this equality-plus-range filter is a direct
+        // index hit; Limit(1) lets the driver stop at the first match.
+        var filter = Builders<SampleProjection>.Filter.And(
+            NotDeleted,
+            Builders<SampleProjection>.Filter.Eq(s => s.ServiceAccountId, serviceId),
+            Builders<SampleProjection>.Filter.Eq(s => s.SchemaName, schemaName),
+            Builders<SampleProjection>.Filter.Eq(s => s.ValueName, valueName),
+            Builders<SampleProjection>.Filter.Gte(s => s.Timestamp, start),
+            Builders<SampleProjection>.Filter.Lt(s => s.Timestamp, end));
+        return Collection.Find(filter).Limit(1).AnyAsync(ct);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default)
     {
         var filter = Builders<SampleProjection>.Filter.And(
@@ -117,7 +133,7 @@ public sealed class SampleRepository : RepositoryBase<SampleProjection>, ISample
         // `AnyAsync` over `Find().Limit(1)` stops the driver as soon as one matching document is
         // located — no scan of the full collection, no count to compute. The compound
         // `by_service_schema_value_time` index isn't a perfect fit for a SchemaName-only filter
-        // (the prefix is ServiceAccountId), but at PoC scale a bounded match-or-miss query is
+        // (the prefix is ServiceAccountId), but at this scale a bounded match-or-miss query is
         // fast enough that adding a dedicated index isn't worth the write cost.
         var filter = Builders<SampleProjection>.Filter.And(
             NotDeleted,
@@ -139,4 +155,37 @@ public sealed class SampleRepository : RepositoryBase<SampleProjection>, ISample
     /// <inheritdoc />
     public IQueryable<SampleProjection> AsQueryable()
         => Collection.AsQueryable().Where(s => !s.IsDeleted);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<SampleProjection>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default)
+    {
+        var filter = ApplySoftDelete(Builders<SampleProjection>.Filter.Eq(s => s.ServiceAccountId, serviceId), includeDeleted);
+        return await Collection.Find(filter)
+            .Sort(Builders<SampleProjection>.Sort.Descending(s => s.Timestamp))
+            .ToListAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<long> RedactByServiceAsync(Guid serviceId, string pseudonym, CancellationToken ct = default)
+    {
+        // Redact identity-bearing free-text across every row (including soft-deleted ones) while
+        // keeping the typed statistical columns intact.
+        var update = Builders<SampleProjection>.Update
+            .Set(s => s.StringValue, null)
+            .Set(s => s.Note, null)
+            .Set(s => s.ServiceName, pseudonym)
+            .Set(s => s.ModifiedAt, Audit.UtcNow)
+            .Set(s => s.ModifiedBy, Audit.UserName);
+        var result = await Collection.UpdateManyAsync(
+            Builders<SampleProjection>.Filter.Eq(s => s.ServiceAccountId, serviceId), update, cancellationToken: ct);
+        return result.ModifiedCount;
+    }
+
+    /// <inheritdoc />
+    public Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default) =>
+        HardDeleteManyCoreAsync(Builders<SampleProjection>.Filter.Eq(s => s.ServiceAccountId, serviceId), ct);
+
+    /// <inheritdoc />
+    public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) =>
+        PurgeSoftDeletedCoreAsync(olderThanUtc, ct);
 }

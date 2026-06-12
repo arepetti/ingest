@@ -66,6 +66,15 @@ public interface IAccountRepository
     /// <param name="id">Account id.</param>
     /// <param name="ct">Cancellation token.</param>
     Task HardDeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Permanently remove soft-deleted accounts whose deletion timestamp is older than the cutoff.
+    /// Backs the retention sweep (storage-limitation rule). Live accounts are never touched.
+    /// </summary>
+    /// <param name="olderThanUtc">Rows soft-deleted before this instant are purged.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of rows removed.</returns>
+    Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -101,6 +110,15 @@ public interface IApiKeyRepository
     /// <param name="key">Key with the new field values.</param>
     /// <param name="ct">Cancellation token.</param>
     Task UpdateAsync(ApiKey key, CancellationToken ct = default);
+
+    /// <summary>
+    /// Permanently remove every API key belonging to an account. Used by the GDPR erasure path
+    /// (both anonymise and full-delete drop the account's credentials).
+    /// </summary>
+    /// <param name="accountId">Owning account id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of keys removed.</returns>
+    Task<long> HardDeleteByAccountAsync(Guid accountId, CancellationToken ct = default);
 }
 
 /// <summary>Persistence boundary for <see cref="Schema"/> aggregates.</summary>
@@ -158,6 +176,15 @@ public interface ISchemaRepository
     /// <param name="id">Schema id.</param>
     /// <param name="ct">Cancellation token.</param>
     Task HardDeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Permanently remove soft-deleted schemas whose deletion timestamp is older than the cutoff.
+    /// Backs the retention sweep. Live schemas are never touched.
+    /// </summary>
+    /// <param name="olderThanUtc">Rows soft-deleted before this instant are purged.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of rows removed.</returns>
+    Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default);
 }
 
 /// <summary>Persistence boundary for <see cref="Submission"/> aggregates.</summary>
@@ -200,6 +227,31 @@ public interface ISubmissionRepository
     /// <param name="id">Submission id.</param>
     /// <param name="ct">Cancellation token.</param>
     Task SoftDeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Return every submission owned by a service account. Used by the GDPR erasure (anonymise
+    /// redaction) and DSAR export paths.
+    /// </summary>
+    /// <param name="serviceId">Owning service account id.</param>
+    /// <param name="includeDeleted">When true, soft-deleted submissions are also returned.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching submissions, newest first.</returns>
+    Task<IReadOnlyList<Submission>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default);
+
+    /// <summary>Permanently remove every submission owned by a service account (GDPR full delete).</summary>
+    /// <param name="serviceId">Owning service account id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of submissions removed.</returns>
+    Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Permanently remove soft-deleted submissions whose deletion timestamp is older than the
+    /// cutoff. Backs the retention sweep.
+    /// </summary>
+    /// <param name="olderThanUtc">Rows soft-deleted before this instant are purged.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of rows removed.</returns>
+    Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default);
 }
 
 /// <summary>Filter shape for the flat sample projection query.</summary>
@@ -245,6 +297,22 @@ public interface ISampleRepository
     /// <returns>The latest projection, or <c>null</c> if none exists.</returns>
     Task<SampleProjection?> GetLatestAsync(Guid serviceId, string schemaName, string valueName, CancellationToken ct = default);
 
+    /// <summary>
+    /// True when at least one live (non-deleted) projection for the given
+    /// <c>(service, schema, value)</c> tuple has a <see cref="SampleProjection.Timestamp"/> inside
+    /// the half-open window <c>[start, end)</c>. Used by the status service to test whether a
+    /// required value was satisfied in a specific cadence window (current, previous, or any
+    /// historical period) without loading the row.
+    /// </summary>
+    /// <param name="serviceId">Owning service account id.</param>
+    /// <param name="schemaName">Machine-style schema name.</param>
+    /// <param name="valueName">Machine-style value name inside that schema.</param>
+    /// <param name="start">Inclusive lower bound on the sample timestamp.</param>
+    /// <param name="end">Exclusive upper bound on the sample timestamp.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns><c>true</c> if a qualifying sample exists; <c>false</c> otherwise.</returns>
+    Task<bool> ExistsInWindowAsync(Guid serviceId, string schemaName, string valueName, DateTime start, DateTime end, CancellationToken ct = default);
+
     /// <summary>Return every non-deleted projection for a schema. Used by the schema history aggregation.</summary>
     /// <param name="schemaName">Machine-style schema name.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -285,4 +353,40 @@ public interface ISampleRepository
     /// <summary>Expose the projection store as <see cref="IQueryable{T}"/> for OData/LINQ consumers.</summary>
     /// <returns>An <see cref="IQueryable{SampleProjection}"/> bound to the underlying store.</returns>
     IQueryable<SampleProjection> AsQueryable();
+
+    /// <summary>
+    /// Return every projection submitted by a service account. Used by the DSAR export path.
+    /// </summary>
+    /// <param name="serviceId">Owning service account id.</param>
+    /// <param name="includeDeleted">When true, soft-deleted projections are also returned.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching projections.</returns>
+    Task<IReadOnlyList<SampleProjection>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default);
+
+    /// <summary>
+    /// Strip identifying free-text from every projection of a service account while keeping the
+    /// statistical (numeric/date/bool) values: nulls <see cref="SampleProjection.StringValue"/> and
+    /// <see cref="SampleProjection.Note"/> and rewrites the <see cref="SampleProjection.ServiceName"/>
+    /// snapshot to the supplied pseudonym. Backs the GDPR anonymise path.
+    /// </summary>
+    /// <param name="serviceId">Owning service account id.</param>
+    /// <param name="pseudonym">Replacement service-name snapshot.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of projections redacted.</returns>
+    Task<long> RedactByServiceAsync(Guid serviceId, string pseudonym, CancellationToken ct = default);
+
+    /// <summary>Permanently remove every projection submitted by a service account (GDPR full delete).</summary>
+    /// <param name="serviceId">Owning service account id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of projections removed.</returns>
+    Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Permanently remove soft-deleted projections whose deletion timestamp is older than the
+    /// cutoff. Backs the retention sweep.
+    /// </summary>
+    /// <param name="olderThanUtc">Rows soft-deleted before this instant are purged.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of rows removed.</returns>
+    Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default);
 }

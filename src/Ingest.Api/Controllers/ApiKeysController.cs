@@ -38,15 +38,18 @@ public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
     /// invalidate them.
     /// </remarks>
     /// <param name="accountId">Account to attach the new key to.</param>
+    /// <param name="request">Optional creation options. Supply <c>expiresAt</c> to set an absolute expiry (future-dated, at most two years out); omit the body for a key that never expires.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="201">Returns the key metadata and the one-time plaintext.</response>
+    /// <response code="400">The supplied expiry is in the past or more than two years in the future.</response>
     /// <response code="404">No account with that id exists.</response>
     [HttpPost]
     [ProducesResponseType(typeof(GeneratedApiKeyResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Create(Guid accountId, CancellationToken ct)
+    public async Task<IActionResult> Create(Guid accountId, [FromBody] GenerateApiKeyRequest? request, CancellationToken ct)
     {
-        var generated = await service.RotateAsync(accountId, ct);
+        var generated = await service.RotateAsync(accountId, request?.ExpiresAt, ct);
         return Created(
             $"/api/admin/accounts/{accountId}/keys/{generated.Entity.Id}",
             new GeneratedApiKeyResponse(ApiKeyDto.From(generated.Entity), generated.Plaintext));

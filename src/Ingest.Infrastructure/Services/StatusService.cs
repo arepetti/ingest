@@ -93,17 +93,21 @@ public sealed class StatusService : IStatusService
     /// <inheritdoc />
     public async Task<IReadOnlyList<MissingByCadence>> GetMissingAsync(CancellationToken ct = default)
     {
-        // Bucket key is the cadence; value accumulates one row per (service, schema) with at
-        // least one missing required value of that cadence in the current window. We track
-        // both the missing count and the total so the UI can render "2/3 missing".
-        var byCadence = new Dictionary<Cadence, List<MissingSubmissionEntry>>();
-        // Cache schema lookups: a "global" schema is visible to every service, so we'd otherwise
-        // re-fetch the same row N times. The ListVisibleToAsync call still does the audience
-        // filtering for service-scoped schemas; this cache only helps the per-service iteration
-        // skip the schema entity allocation cost.
-        // Cadence windows are constant for the whole report — compute once.
-        var windowByCadence = Enum.GetValues<Cadence>()
-            .ToDictionary(c => c, c => CadenceCalculator.BucketFor(c, _audit.UtcNow));
+        var now = _audit.UtcNow;
+        // Cadence windows are constant for the whole report — compute the current and the
+        // previous window for every cadence once. Previous windows are contiguous with the
+        // current ones (previousEnd == currentStart), which the per-value short-circuit below
+        // relies on.
+        var currentWindow = Enum.GetValues<Cadence>()
+            .ToDictionary(c => c, c => CadenceCalculator.BucketFor(c, now));
+        var previousWindow = Enum.GetValues<Cadence>()
+            .ToDictionary(c => c, c => CadenceCalculator.PreviousBucketFor(c, now));
+
+        // One row per (service, schema) per cadence with at least one missing required value,
+        // tracked separately for the current and previous windows so the dashboard can colour
+        // them differently (current = still open, previous = overdue).
+        var current = new Dictionary<Cadence, List<MissingSubmissionEntry>>();
+        var previous = new Dictionary<Cadence, List<MissingSubmissionEntry>>();
 
         // Page through service-role accounts so a registry with > 500 services still works.
         int page = 1;
@@ -127,35 +131,43 @@ public sealed class StatusService : IStatusService
                 {
                     if (!schema.Enabled) continue;
 
-                    // Tally missing-vs-total per cadence for this (service, schema) tuple in a
-                    // single pass over the schema's values, then flush the per-cadence buckets
-                    // that ended up with at least one missing entry.
-                    var tally = new Dictionary<Cadence, (int Missing, int Total)>();
+                    var curTally = new Dictionary<Cadence, (int Missing, int Total)>();
+                    var prevTally = new Dictionary<Cadence, (int Missing, int Total)>();
                     foreach (var v in schema.Values)
                     {
                         if (!v.Enabled || !v.Required) continue;
 
-                        var (start, end) = windowByCadence[v.Cadence];
+                        var cadence = v.Cadence;
+                        var (cs, ce) = currentWindow[cadence];
+                        var (ps, pe) = previousWindow[cadence];
                         var latest = await _samples.GetLatestAsync(account.Id, schema.Name, v.Name, ct);
-                        var satisfied = latest is not null && latest.Timestamp >= start && latest.Timestamp < end;
 
-                        var prev = tally.TryGetValue(v.Cadence, out var t) ? t : (Missing: 0, Total: 0);
-                        tally[v.Cadence] = (prev.Missing + (satisfied ? 0 : 1), prev.Total + 1);
-                    }
+                        // Current window.
+                        var curSatisfied = latest is not null && latest.Timestamp >= cs && latest.Timestamp < ce;
+                        Accumulate(curTally, cadence, curSatisfied);
 
-                    foreach (var (cadence, t) in tally)
-                    {
-                        if (t.Missing == 0) continue;
-                        if (!byCadence.TryGetValue(cadence, out var list))
+                        // Previous window — only meaningful when both the schema and the service
+                        // already existed before that window closed; otherwise we'd retroactively
+                        // flag data nobody could ever have submitted.
+                        if (schema.CreatedAt < pe && account.CreatedAt < pe)
                         {
-                            list = new List<MissingSubmissionEntry>();
-                            byCadence[cadence] = list;
+                            bool prevSatisfied;
+                            if (latest is null || latest.Timestamp < ps)
+                                prevSatisfied = false;                     // nothing as recent as the previous window
+                            else if (latest.Timestamp < pe)
+                                prevSatisfied = true;                      // the latest sample sits inside it
+                            else
+                                // The latest sample is newer (current window or beyond), so we
+                                // can't tell from it alone — ask whether anything landed in the
+                                // previous window. pe == cs, so this only fires when there IS a
+                                // current/newer sample, keeping the extra query rare.
+                                prevSatisfied = await _samples.ExistsInWindowAsync(account.Id, schema.Name, v.Name, ps, pe, ct);
+                            Accumulate(prevTally, cadence, prevSatisfied);
                         }
-                        list.Add(new MissingSubmissionEntry(
-                            account.Id, account.Name, account.Label,
-                            schema.Name, schema.Label,
-                            t.Missing, t.Total));
                     }
+
+                    Flush(curTally, current, account, schema);
+                    Flush(prevTally, previous, account, schema);
                 }
             }
 
@@ -163,19 +175,133 @@ public sealed class StatusService : IStatusService
             page++;
         }
 
-        // Sort entries inside each bucket for stable rendering, and cadences in their natural
-        // order (daily before weekly before monthly, …).
-        return byCadence
-            .OrderBy(kvp => (int)kvp.Key)
-            .Select(kvp =>
+        // Current-window buckets first (ordered by cadence), then previous-window buckets.
+        var result = new List<MissingByCadence>();
+        result.AddRange(BuildBuckets(current, currentWindow, MissingPeriodKind.Current));
+        result.AddRange(BuildBuckets(previous, previousWindow, MissingPeriodKind.Previous));
+        return result;
+
+        static void Accumulate(Dictionary<Cadence, (int Missing, int Total)> tally, Cadence cadence, bool satisfied)
+        {
+            var prev = tally.TryGetValue(cadence, out var t) ? t : (Missing: 0, Total: 0);
+            tally[cadence] = (prev.Missing + (satisfied ? 0 : 1), prev.Total + 1);
+        }
+
+        static void Flush(
+            Dictionary<Cadence, (int Missing, int Total)> tally,
+            Dictionary<Cadence, List<MissingSubmissionEntry>> dest,
+            Account account,
+            Schema schema)
+        {
+            foreach (var (cadence, t) in tally)
             {
-                var (start, end) = windowByCadence[kvp.Key];
-                var entries = kvp.Value
-                    .OrderBy(e => e.ServiceLabel ?? e.ServiceName, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(e => e.SchemaLabel ?? e.SchemaName, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                return new MissingByCadence(kvp.Key, start, end, entries);
-            })
-            .ToList();
+                if (t.Missing == 0) continue;
+                if (!dest.TryGetValue(cadence, out var list))
+                {
+                    list = new List<MissingSubmissionEntry>();
+                    dest[cadence] = list;
+                }
+                list.Add(new MissingSubmissionEntry(
+                    account.Id, account.Name, account.Label,
+                    schema.Name, schema.Label,
+                    t.Missing, t.Total));
+            }
+        }
+
+        static IEnumerable<MissingByCadence> BuildBuckets(
+            Dictionary<Cadence, List<MissingSubmissionEntry>> src,
+            Dictionary<Cadence, (DateTime Start, DateTime End)> windows,
+            MissingPeriodKind kind) =>
+            src.OrderBy(kvp => (int)kvp.Key)
+                .Select(kvp =>
+                {
+                    var (start, end) = windows[kvp.Key];
+                    var entries = SortEntries(kvp.Value);
+                    return new MissingByCadence(kvp.Key, start, end, kind, entries);
+                });
     }
+
+    /// <inheritdoc />
+    public async Task<MissingPeriodReport> GetMissingForPeriodAsync(Cadence cadence, int offset, CancellationToken ct = default)
+    {
+        var (start, end) = CadenceCalculator.BucketAtOffset(cadence, _audit.UtcNow, offset);
+        var entries = await ComputeMissingForWindowAsync(cadence, start, end, ct);
+        return new MissingPeriodReport(cadence, offset, start, end, SortEntries(entries));
+    }
+
+    /// <inheritdoc />
+    public async Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, CancellationToken ct = default)
+    {
+        periods = Math.Clamp(periods, 1, 52);
+        var now = _audit.UtcNow;
+        var points = new List<MissingHistoryPoint>(periods);
+        // Walk oldest → current so the trend reads left-to-right. Offset 0 is the current window.
+        for (int i = periods - 1; i >= 0; i--)
+        {
+            var offset = -i;
+            var (start, end) = CadenceCalculator.BucketAtOffset(cadence, now, offset);
+            var entries = await ComputeMissingForWindowAsync(cadence, start, end, ct);
+            points.Add(new MissingHistoryPoint(offset, start, end, entries.Sum(e => e.MissingRequiredCount)));
+        }
+        return new MissingHistory(cadence, points);
+    }
+
+    /// <summary>
+    /// Evaluate every enabled Service-role account against a single cadence and a single window,
+    /// returning one entry per (service, schema) tuple short at least one required value. A
+    /// schema/service is only considered if it existed before the window closed. Used by the
+    /// per-period detail and the trend builder.
+    /// </summary>
+    private async Task<List<MissingSubmissionEntry>> ComputeMissingForWindowAsync(
+        Cadence cadence, DateTime start, DateTime end, CancellationToken ct)
+    {
+        var entries = new List<MissingSubmissionEntry>();
+        int page = 1;
+        const int pageSize = 200;
+        while (true)
+        {
+            var accounts = await _accounts.ListAsync(
+                new PageRequest(page, pageSize, Sort: "name"),
+                role: AccountRole.Service,
+                ct: ct);
+            if (accounts.Items.Count == 0) break;
+
+            foreach (var account in accounts.Items)
+            {
+                if (!account.Enabled || account.CreatedAt >= end) continue;
+
+                var schemas = await _schemas.ListVisibleToAsync(account.Id, ct);
+                foreach (var schema in schemas)
+                {
+                    if (!schema.Enabled || schema.CreatedAt >= end) continue;
+
+                    int missing = 0, total = 0;
+                    foreach (var v in schema.Values)
+                    {
+                        if (!v.Enabled || !v.Required || v.Cadence != cadence) continue;
+                        total++;
+                        var satisfied = await _samples.ExistsInWindowAsync(account.Id, schema.Name, v.Name, start, end, ct);
+                        if (!satisfied) missing++;
+                    }
+
+                    if (missing > 0)
+                        entries.Add(new MissingSubmissionEntry(
+                            account.Id, account.Name, account.Label,
+                            schema.Name, schema.Label,
+                            missing, total));
+                }
+            }
+
+            if (accounts.Items.Count < pageSize) break;
+            page++;
+        }
+
+        return entries;
+    }
+
+    private static List<MissingSubmissionEntry> SortEntries(IEnumerable<MissingSubmissionEntry> entries) =>
+        entries
+            .OrderBy(e => e.ServiceLabel ?? e.ServiceName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(e => e.SchemaLabel ?? e.SchemaName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 }

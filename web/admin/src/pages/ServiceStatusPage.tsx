@@ -34,8 +34,7 @@ const periods = ['day', 'week', 'fortnight', 'month', 'quarter', 'halfyear', 'ye
 // Schemas can mix cadences across their values; when that happens we surface the sentinel "Mixed"
 // (or "—" when nothing is active) instead of a real Cadence, and those obviously have no
 // prettification rule. Keep the helper local so the shared cadenceLabel() stays strictly typed.
-const CADENCE_SENTINELS = ['—', 'Mixed'] as const
-type CadenceCellValue = Cadence | (typeof CADENCE_SENTINELS)[number]
+type CadenceCellValue = Cadence | '—' | 'Mixed'
 
 function displayCadence(value: CadenceCellValue): string {
   return value === '—' || value === 'Mixed' ? value : cadenceLabel(value)

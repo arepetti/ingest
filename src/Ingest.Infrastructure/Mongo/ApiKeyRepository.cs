@@ -57,4 +57,8 @@ public sealed class ApiKeyRepository : RepositoryBase<ApiKey>, IApiKeyRepository
         StampForUpdate(key);
         return Collection.ReplaceOneAsync(k => k.Id == key.Id, key, cancellationToken: ct);
     }
+
+    /// <inheritdoc />
+    public Task<long> HardDeleteByAccountAsync(Guid accountId, CancellationToken ct = default) =>
+        HardDeleteManyCoreAsync(Builders<ApiKey>.Filter.Eq(k => k.AccountId, accountId), ct);
 }

@@ -123,6 +123,8 @@ export function ReportViewPage() {
   // something useful selected before the user clicks anything.
   useEffect(() => {
     if (!report) return
+    // Seeding local UI state once the async report definition lands; not derivable during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (report.targetSchemaNames.length === 1) setSchemaName(report.targetSchemaNames[0])
   }, [report])
 
@@ -143,7 +145,10 @@ export function ReportViewPage() {
     { page: 1, pageSize: 200, from: range.from, to: range.to },
     !!isService && report?.type === 'Single',
   )
-  const submissions = (isService ? mySubmissionsQuery.data : adminSubmissionsQuery.data)?.items ?? []
+  const submissions = useMemo(
+    () => (isService ? mySubmissionsQuery.data : adminSubmissionsQuery.data)?.items ?? [],
+    [isService, mySubmissionsQuery.data, adminSubmissionsQuery.data],
+  )
 
   // Filter submission options to those that mention the chosen schema. When the report is
   // global (no targets) we accept any submission.

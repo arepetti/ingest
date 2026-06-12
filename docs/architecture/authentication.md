@@ -11,7 +11,9 @@ We keep things simple:
 - Stolen keys are revocable individually; an account can hold many keys at once for zero-downtime rotation.
 - Disabling an account immediately invalidates all of its keys without touching the key rows themselves.
 
-Out of scope: short-lived tokens, mTLS, IP allow-lists. None of these are technically hard to add later (the auth handler is the only place that would change) but the PoC doesn't ship them.
+Delegated to the hosting layer: **request/rate limiting and IP allow-listing**. These are deliberately handled by the platform in front of the app — a reverse proxy, API gateway, or the ingress of your container host (for example Azure Container Apps) — rather than implemented in-app. See [the hosting guide's network controls](../setup/hosting.md#network-controls).
+
+Possible future additions: short-lived tokens and mTLS. Neither is technically hard to add (the auth handler is the only place that would change); the app doesn't ship them today.
 
 ## Anatomy of a key
 
@@ -64,6 +66,8 @@ Admin                              Ingest API
 ```
 
 `plaintext` is returned **once**, in the body of the `POST` response. If the caller loses it, the only remedy is to rotate again. The API does not store, log, or transmit it after this point.
+
+The request body is optional. Supply `{ "expiresAt": "<ISO-8601 UTC>" }` to give the key an absolute expiry; omit it (or send `null`) for a key that never expires. When supplied, the expiry must be **in the future** and **no more than two years out** — the server rejects anything outside that window with a `400`. Once set, an expired key stops authenticating automatically (step 3 of the verification flow), with no need to revoke it.
 
 ## Verification flow
 

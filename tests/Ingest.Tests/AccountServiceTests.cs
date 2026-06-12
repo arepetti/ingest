@@ -16,7 +16,7 @@ public class AccountServiceTests
     {
         accounts = new FakeAccountRepo();
         samples = new FakeSampleRepo();
-        return new AccountService(accounts, samples);
+        return new AccountService(accounts, samples, new NoopAuditLogService());
     }
 
     private static Account NewAccount(string name = "alpha", string? label = null) => new()
@@ -113,7 +113,7 @@ public class AccountServiceTests
         user.ExternalLogins.Add(new ExternalLogin { Provider = "Microsoft", Email = "jane@example.com" });
         var created = await svc.CreateAsync(user);
 
-        var updated = await svc.UpdateAsync(created.Id, new AccountUpdate("Jane", null, AccountRole.Admin, true, ExternalLogins: null));
+        var updated = await svc.UpdateAsync(created.Id, new AccountUpdate("Jane", null, null, AccountRole.Admin, true, ExternalLogins: null));
 
         Assert.NotNull(updated);
         Assert.Single(updated!.ExternalLogins);
@@ -127,7 +127,7 @@ public class AccountServiceTests
         user.ExternalLogins.Add(new ExternalLogin { Provider = "Microsoft", Email = "jane@example.com" });
         var created = await svc.CreateAsync(user);
 
-        var updated = await svc.UpdateAsync(created.Id, new AccountUpdate("Jane", null, AccountRole.Operator, true, ExternalLogins: Array.Empty<ExternalLogin>()));
+        var updated = await svc.UpdateAsync(created.Id, new AccountUpdate("Jane", null, null, AccountRole.Operator, true, ExternalLogins: Array.Empty<ExternalLogin>()));
 
         Assert.NotNull(updated);
         Assert.Empty(updated!.ExternalLogins);
@@ -146,7 +146,7 @@ public class AccountServiceTests
         await accounts.UpdateAsync(created);
 
         // Admin re-saves the same link (no subject on the incoming DTO) — the binding must survive.
-        var updated = await svc.UpdateAsync(created.Id, new AccountUpdate("Jane", null, AccountRole.Operator, true,
+        var updated = await svc.UpdateAsync(created.Id, new AccountUpdate("Jane", null, null, AccountRole.Operator, true,
             ExternalLogins: new[] { new ExternalLogin { Provider = "Microsoft", Email = "jane@example.com" } }));
 
         Assert.Equal("sub-123", updated!.ExternalLogins.Single().Subject);
@@ -296,6 +296,8 @@ public class AccountServiceTests
             _store.RemoveAll(a => a.Id == id);
             return Task.CompletedTask;
         }
+
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 
     /// <summary>
@@ -312,6 +314,9 @@ public class AccountServiceTests
 
         public Task<SampleProjection?> GetLatestAsync(Guid serviceId, string schemaName, string valueName, CancellationToken ct = default) =>
             Task.FromResult<SampleProjection?>(null);
+
+        public Task<bool> ExistsInWindowAsync(Guid serviceId, string schemaName, string valueName, DateTime start, DateTime end, CancellationToken ct = default) =>
+            Task.FromResult(false);
 
         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
@@ -330,5 +335,11 @@ public class AccountServiceTests
 
         public IQueryable<SampleProjection> AsQueryable() =>
             Array.Empty<SampleProjection>().AsQueryable();
+
+        public Task<IReadOnlyList<SampleProjection>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
+        public Task<long> RedactByServiceAsync(Guid serviceId, string pseudonym, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 }

@@ -69,20 +69,72 @@ public sealed record MissingSubmissionEntry(
     int TotalRequiredCount);
 
 /// <summary>
+/// Which cadence window a <see cref="MissingByCadence"/> bucket describes. The dashboard renders
+/// <see cref="Current"/> buckets as a soft warning (the window is still open) and
+/// <see cref="Previous"/> buckets as overdue (the window has closed).
+/// </summary>
+public enum MissingPeriodKind
+{
+    /// <summary>The bucket covers the cadence window containing "now" — submissions can still arrive.</summary>
+    Current = 0,
+
+    /// <summary>The bucket covers the cadence window immediately before the current one — its deadline has passed.</summary>
+    Previous = 1,
+}
+
+/// <summary>
 /// "Missing submissions" report bucketed by cadence. The bucket's <see cref="PeriodStart"/> and
-/// <see cref="PeriodEnd"/> are the current cadence window for that cadence; <see cref="Entries"/>
-/// holds every (service, schema) tuple that's short at least one required-and-enabled value of
-/// that cadence inside the window.
+/// <see cref="PeriodEnd"/> are the cadence window (current or previous, per <see cref="Period"/>);
+/// <see cref="Entries"/> holds every (service, schema) tuple that's short at least one
+/// required-and-enabled value of that cadence inside the window.
 /// </summary>
 /// <param name="Cadence">Cadence the bucket covers.</param>
-/// <param name="PeriodStart">Inclusive start of the current cadence window.</param>
-/// <param name="PeriodEnd">Exclusive end of the current cadence window.</param>
+/// <param name="PeriodStart">Inclusive start of the cadence window.</param>
+/// <param name="PeriodEnd">Exclusive end of the cadence window.</param>
+/// <param name="Period">Whether the window is the current (still-open) one or the previous (overdue) one.</param>
 /// <param name="Entries">One row per (service, schema) tuple with missing required values. Sorted by service label then schema label.</param>
 public sealed record MissingByCadence(
     Cadence Cadence,
     DateTime PeriodStart,
     DateTime PeriodEnd,
+    MissingPeriodKind Period,
     IReadOnlyList<MissingSubmissionEntry> Entries);
+
+/// <summary>
+/// Detailed missing-submissions report for a single cadence and a single (possibly historical)
+/// window. Mirrors one <see cref="MissingByCadence"/> bucket but is addressed by an explicit
+/// <see cref="Offset"/> (0 = current, -1 = previous, -N = N periods ago) so the analytics page
+/// can page back through time.
+/// </summary>
+/// <param name="Cadence">Cadence the window belongs to.</param>
+/// <param name="Offset">Signed bucket offset from "now" (0 = current, negative = past).</param>
+/// <param name="PeriodStart">Inclusive start of the window.</param>
+/// <param name="PeriodEnd">Exclusive end of the window.</param>
+/// <param name="Entries">One row per (service, schema) tuple short at least one required value in the window.</param>
+public sealed record MissingPeriodReport(
+    Cadence Cadence,
+    int Offset,
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    IReadOnlyList<MissingSubmissionEntry> Entries);
+
+/// <summary>One point on the "missing submissions over time" trend for a single cadence.</summary>
+/// <param name="Offset">Signed bucket offset from "now" (0 = current, negative = past).</param>
+/// <param name="PeriodStart">Inclusive start of the window.</param>
+/// <param name="PeriodEnd">Exclusive end of the window.</param>
+/// <param name="TotalMissing">Total number of missing required values across every service and schema in the window.</param>
+public sealed record MissingHistoryPoint(
+    int Offset,
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    int TotalMissing);
+
+/// <summary>The "missing submissions over time" trend for a single cadence, oldest period first.</summary>
+/// <param name="Cadence">Cadence the trend covers.</param>
+/// <param name="Points">One point per period, ordered oldest → current.</param>
+public sealed record MissingHistory(
+    Cadence Cadence,
+    IReadOnlyList<MissingHistoryPoint> Points);
 
 /// <summary>
 /// Builds the per-value <em>cadence freshness</em> snapshot used by both the <c>/api/me/status</c>
@@ -109,19 +161,49 @@ public interface IStatusService
 
     /// <summary>
     /// Aggregate every Service-role account's submission status into a per-cadence "what's
-    /// missing right now" report. The result includes only cadences that have at least one
-    /// (service, schema) tuple with unsatisfied required values inside the current cadence
-    /// window — cadences with nothing missing are omitted, so the caller can render one card
-    /// per cadence that actually warrants attention.
+    /// missing" report covering both the current cadence window and the previous one. The result
+    /// includes only (period, cadence) combinations that have at least one (service, schema)
+    /// tuple with unsatisfied required values — combinations with nothing missing are omitted, so
+    /// the caller can render one card per window that actually warrants attention. Current-window
+    /// buckets come first (ordered by cadence), then previous-window buckets.
     /// </summary>
     /// <remarks>
     /// Disabled accounts, disabled schemas, and disabled values are skipped — they cannot be
     /// satisfied by definition, and including them would surface noise. Optional values are
-    /// also skipped (the report is specifically about <em>required</em> drift). The walk is
+    /// also skipped (the report is specifically about <em>required</em> drift). Previous-window
+    /// entries are only produced for schemas <em>and</em> services that already existed before
+    /// the window closed (<c>CreatedAt &lt; PeriodEnd</c>), so freshly-onboarded services and
+    /// brand-new schemas aren't retroactively flagged as overdue. The walk is
     /// O(services × schemas × required values); fine for the working-set of a council-sized
     /// registry, would want pre-aggregation in Mongo for anything larger.
     /// </remarks>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>One bucket per cadence with at least one missing entry, ordered by cadence (daily → yearly).</returns>
+    /// <returns>Current-window buckets (ordered by cadence) followed by previous-window buckets, each with at least one missing entry.</returns>
     Task<IReadOnlyList<MissingByCadence>> GetMissingAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Detailed missing-submissions report for a single cadence and a single window addressed by
+    /// <paramref name="offset"/> (0 = current, -1 = previous, -N = N periods ago). Powers the
+    /// per-period analytics page's table and per-service breakdown.
+    /// </summary>
+    /// <remarks>
+    /// Same skip rules as <see cref="GetMissingAsync"/>; the <c>CreatedAt &lt; PeriodEnd</c> guard
+    /// applies to every window (a schema/service that didn't exist yet can't owe data).
+    /// </remarks>
+    /// <param name="cadence">Cadence to evaluate.</param>
+    /// <param name="offset">Signed bucket offset from "now" (0 = current, negative = past).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The window bounds and one entry per (service, schema) tuple short at least one required value.</returns>
+    Task<MissingPeriodReport> GetMissingForPeriodAsync(Cadence cadence, int offset, CancellationToken ct = default);
+
+    /// <summary>
+    /// Build the "missing submissions over time" trend for a single cadence: the total count of
+    /// missing required values for each of the last <paramref name="periods"/> windows, oldest
+    /// first and ending with the current window. Powers the analytics page's trend chart.
+    /// </summary>
+    /// <param name="cadence">Cadence to evaluate.</param>
+    /// <param name="periods">Number of windows to include (clamped to a sane range).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>One point per window, ordered oldest → current.</returns>
+    Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, CancellationToken ct = default);
 }

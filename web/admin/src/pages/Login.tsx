@@ -82,7 +82,7 @@ export function Login() {
     // Full-page navigation hands the browser to the OIDC flow; the server sets the session cookie
     // and redirects back to returnUrl. Clear any stale API key first so the two paths don't mix.
     setApiKey(null)
-    window.location.href = `${loginUrl}?returnUrl=${encodeURIComponent('/')}`
+    window.location.assign(`${loginUrl}?returnUrl=${encodeURIComponent('/')}`)
   }
 
   const hasProviders = (providers?.length ?? 0) > 0

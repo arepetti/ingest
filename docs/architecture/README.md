@@ -4,7 +4,7 @@ The maintainer/contributor section of the docs: how the system is put together a
 
 | Page                                       | What's inside                                                                                                                |
 |--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
-| [architecture.md](architecture.md)         | Solution layout, domain model, request flow, validation pipeline, cadence semantics, Aspire orchestration, configuration, Mongo indexes, testing strategy. |
+| [architecture.md](architecture.md)         | Solution layout, domain model, request flow, validation pipeline, cadence semantics, the email & notifications subsystem, Aspire orchestration, configuration, Mongo indexes, testing strategy. |
 | [authentication.md](authentication.md)     | How API keys are produced, stored, verified, rotated, revoked. Threat model, roles, kinds, bootstrap admin, configuration knobs. |
 
 The source itself (with the XML documentation comments generated into Swagger) is the next step after these two pages. The companion practical guides live in:

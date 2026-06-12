@@ -6,38 +6,42 @@ This document explains how Ingest is put together, what each piece is responsibl
 
 Ingest is a small data-ingestion backend for local-council KPI submissions. Local-council services authenticate with an API key and POST KPI samples; administrators manage the catalogue of accepted schemas, accounts, and submissions through a React/Fluent UI admin SPA. The same backend exposes an OData feed so PowerBI (and any other generic OData consumer) can read the data directly.
 
-It's a PoC — the goal was a small, extensible foundation that can be productionised rather than a fully hardened, multi-tenant SaaS.
+Ingest is a single-tenant application with one clear job: collect KPI data from local-council services, validate it, and serve it to reporting tools through a stable read model. The design favours a small, extensible foundation with a well-defined scope over a multi-tenant SaaS.
 
 ## Birds-eye view
 
+```mermaid
+flowchart TB
+    APPHOST["Aspire AppHost — dev orchestration only<br/>(MongoDB + Mongo Express + API + Vite dev server)"]
+
+    SPA["React Admin SPA<br/>(Vite, Fluent)"]
+    CLIENT["Service client<br/>(script, bot, scheduler …)"]
+    POWERBI["PowerBI / OData clients"]
+
+    subgraph API["Ingest.Api"]
+        CTRL["Controllers"]
+        SVC["Services"]
+        REPO["Repositories"]
+        OUTBOX["Email outbox sender<br/>(BackgroundService —<br/>in-process, toggleable)"]
+        SCHED["Notification scheduler<br/>(BackgroundService —<br/>in-process, toggleable)"]
+    end
+
+    MONGO[("MongoDB<br/>(Cosmos / self-hosted)")]
+    SMTP["SMTP server<br/>(external)"]
+
+    SPA -- "HTTP · X-Api-Key" --> CTRL
+    CLIENT -- "HTTP · X-Api-Key" --> CTRL
+    POWERBI -- "OData / REST" --> CTRL
+    CTRL --> SVC
+    SVC --> REPO
+    REPO -- "MongoDB driver" --> MONGO
+    SCHED -- "run notification job" --> SVC
+    OUTBOX -- "drain outbox" --> SVC
+    OUTBOX == "send mail (SMTP/STARTTLS)" ==> SMTP
+    APPHOST -. "dev only" .-> API
 ```
-                                 ┌─────────────────────┐
-                                 │  Aspire AppHost     │   dev orchestration only
-                                 │  (MongoDB + Mongo   │
-                                 │   Express + API +   │
-                                 │   Vite dev server)  │
-                                 └─────────┬───────────┘
-                                           │
-                                           ▼
- ┌─────────────────┐                 ┌─────────────────┐               ┌────────────┐
- │ React Admin SPA │  HTTP (X-Api-   │ Ingest.Api      │  MongoDB.     │  MongoDB   │
- │  (Vite, Fluent) │  Key header)    │  ┌───────────┐  │  Driver       │  (Cosmos / │
- │                 │ ───────────────►│  │Controllers│  │ ─────────────►│   self-    │
- └─────────────────┘                 │  └───────────┘  │               │   hosted)  │
-                                     │  ┌───────────┐  │               └────────────┘
- ┌─────────────────┐                 │  │  Services │  │
- │ Service client  │   API key       │  └───────────┘  │
- │ (script, bot,   │  ───────────────►  ┌───────────┐  │
- │  scheduler …)   │                 │  │  Repos    │  │
- └─────────────────┘                 │  └───────────┘  │
-                                     └─────────────────┘
-                                            ▲
-                                            │ OData / REST
-                                     ┌──────┴──────┐
-                                     │   PowerBI   │
-                                     │  dashboards │
-                                     └─────────────┘
-```
+
+The two background services run **in-process** inside `Ingest.Api` by default and can be turned off (so an external scheduler drives the same work through internal endpoints) — see [§ Email & notifications](#email--notifications). In production the Docker image bundles the compiled API and the built SPA; Aspire is dev-only.
 
 ## Solution layout
 
@@ -45,11 +49,11 @@ It's a PoC — the goal was a small, extensible foundation that can be productio
 src/
   Ingest.AppHost/         Aspire orchestrator (Mongo + API + admin SPA). Local dev only.
   Ingest.ServiceDefaults/ OpenTelemetry, health checks, resilience defaults.
-  Ingest.Api/             ASP.NET Core host: controllers, auth, OData, SPA hosting.
+  Ingest.Api/             ASP.NET Core host: controllers, auth, OData, SPA hosting, background workers.
   Ingest.Core/            Pure domain model + abstractions. No I/O, no framework code.
-  Ingest.Infrastructure/  Concrete implementations: Mongo repos, hashing, NCalc, services.
+  Ingest.Infrastructure/  Concrete implementations: Mongo repos, hashing, NCalc, services, Email/ (SMTP, outbox, templates, notifications).
 web/admin/                React + Vite + Fluent UI admin SPA.
-tests/Ingest.Tests/       PoC test suite (happy paths only).
+tests/Ingest.Tests/       Test suite.
 Dockerfile                Multi-stage build: SPA + API into one image.
 ```
 
@@ -75,6 +79,7 @@ Represents anyone (or anything) authenticated by Ingest.
 | `Description` | Free-form notes. |
 | `Kind` | `User` (interactive — can log in to the UI) or `Application` (API-only). |
 | `Role` | `Service`, `Operator` or `Admin`. See [authentication.md](authentication.md). |
+| `Email` | Optional contact address. Recipient for ad-hoc emails and the target of "notify the service account" notification rules. Required at *create* time in the UI; pre-existing accounts may have it empty. |
 | `Enabled` | When false, every API key for this account is invalid. |
 
 Kind and Role are orthogonal: a `User` can hold any role; an `Application` can hold any role. The UI rejects `Application`-kind logins at the boundary.
@@ -115,6 +120,18 @@ A submission is the unit of writes: an account sends a batch of `Sample` rows in
 ### SampleProjection
 
 A denormalised, one-document-per-sample read model rebuilt on every submission save. It's what the OData feed (`/odata/samples`) and the admin query endpoint (`/api/admin/query`) actually read — submissions themselves are never touched by reporting workloads, so the schema for analysis can evolve independently of the schema for ingestion.
+
+### Email & notification entities
+
+These back the email/notification subsystem (see [§ Email & notifications](#email--notifications) for how they fit together):
+
+| Entity | Collection | Role |
+|--------|------------|------|
+| `EmailMessage` | `emailOutbox` | A queued message + its delivery state (`Pending` → `Sending` → `Sent`/`Failed`), attempt count and last error. The durable outbox. |
+| `EmailSettings` | `emailSettings` | The single SMTP connection document (host, port, STARTTLS, username, from). The password is stored **encrypted at rest**. |
+| `EmailTemplate` | `emailTemplates` | A named (`Key`) Liquid template: subject + text body + optional HTML body. |
+| `NotificationSettings` | `notificationSettings` | The single config document: per-trigger rules (enabled, lead time) and recipient choices. |
+| `NotificationLog` | `notificationLogs` | One row per already-sent notification (unique `Key`), used to deduplicate so an event notifies at most once. |
 
 ## Request flow
 
@@ -204,6 +221,8 @@ Configuration is pure ASP.NET Core: `appsettings.json`, environment variables, u
 | `Mongo`     | `MongoOptions`   | `Ingest.Infrastructure/Mongo/MongoOptions.cs` |
 | `ApiKey`    | `ApiKeyOptions`  | `Ingest.Infrastructure/Security/ApiKeyOptions.cs` |
 | `Ingest`    | `IngestOptions`  | `Ingest.Api/Options/IngestOptions.cs`    |
+| `Email`     | `EmailOptions`   | `Ingest.Infrastructure/Email/EmailOptions.cs` |
+| `Notifications` | `NotificationOptions` | `Ingest.Infrastructure/Email/NotificationOptions.cs` |
 
 See [../setup/configuration.md](../setup/configuration.md) for the full table of keys and defaults.
 
@@ -213,26 +232,77 @@ Indexes are ensured on startup by `MongoSetup.EnsureIndexesAsync`:
 
 | Collection    | Index                                                                    | Purpose |
 |---------------|--------------------------------------------------------------------------|---------|
-| `accounts`    | `uniq_name` on `Name` (unique)                                           | Name uniqueness + fast lookup. |
+| `accounts`    | `uniq_name` on `Name` (unique)<br/>`by_external_login` on `(externalLogins.provider, externalLogins.email)` (sparse) | Name uniqueness + fast lookup; SSO identity lookup. |
 | `apiKeys`     | `uniq_keyId` on `KeyId` (unique), `by_account` on `AccountId`            | Auth lookup, admin listing. |
 | `schemas`     | `uniq_name` on `Name` (unique)                                           | Name uniqueness + fast lookup. |
 | `submissions` | `by_service_time` on `(ServiceAccountId, SubmittedAt desc)`              | Per-service listing. |
 | `samples`     | `by_service_schema_value_time` on `(ServiceAccountId, SchemaName, ValueName, Timestamp desc)`<br/>`by_service_schema_value_period` on `(…, PeriodStart)`<br/>`by_submission` on `SubmissionId` | Status queries, history aggregation, cascade-delete on submission removal. |
 | `reports`     | `uniq_name` on `Name` (unique)                                           | Name uniqueness + fast lookup for the report viewer. |
+| `auditLogs`   | `by_timestamp` on `Timestamp desc`<br/>`by_target_time` on `(TargetId, Timestamp desc)`<br/>`by_type_change_time` on `(TargetType, Change, Timestamp desc)` | Audit browse, per-object history, type/change filters. |
+| `emailOutbox` | `by_status_created` on `(Status, CreatedAt)`<br/>`by_created` on `CreatedAt desc` | Drain pending oldest-first; "Sent emails" browse newest-first. |
+| `emailTemplates` | `uniq_key` on `Key` (unique)                                          | One template per key. |
+| `notificationLogs` | `uniq_key` on `Key` (unique)                                       | Dedupe: at most one row (and one send) per event. |
 
 ## Reports
 
 `Report` documents are HTML+Liquid templates uploaded by admins and stored verbatim alongside their parsed YAML front-matter metadata (`Name`, `Label`, `Description`, `Type`, `TargetSchemaNames`). Rendering is server-side via [Fluid](https://github.com/sebastienros/fluid) running with an `UnsafeMemberAccessStrategy` so templates can reach into the curated data envelope (schema, services, value buckets, samples) without per-type registration. The envelope shape depends on `ReportType`: `Single` carries one submission and the owning schema/service; `Aggregate` carries the per-value bucketed history of a schema over a date range. Render output is dropped into a `sandbox=""` iframe in the SPA so any script/style hostility in the template is neutralised. See [admin-user-guide/reports.md](../admin-user-guide/reports.md) for the author-facing reference.
 
+## Email & notifications
+
+The subsystem is split into two deliberately decoupled halves so the *delivery* mechanism and the *decision* logic can evolve (or be swapped/extracted) independently. The whole subsystem is gated by `Email:Enabled` (default on) — when off, the services, workers, controllers' effects, and the related SPA surfaces all stand down.
+
+```mermaid
+flowchart LR
+    subgraph NOTIF["Notifications (the *what/who*)"]
+        SCHED["NotificationSchedulerWorker<br/>(BackgroundService)"]
+        NSVC["NotificationService<br/>evaluate upcoming / missed / warnings"]
+        NSET[("notificationSettings")]
+        NLOG[("notificationLogs<br/>(dedupe)")]
+    end
+    subgraph EMAIL["Email (the *delivery*)"]
+        OUTW["EmailOutboxWorker<br/>(BackgroundService)"]
+        DISP["EmailDispatchService"]
+        SENDER["SmtpEmailSender<br/>(content-agnostic)"]
+        QUEUE[("emailOutbox")]
+        ESET[("emailSettings")]
+    end
+    TPL["EmailContentBuilder + EmailTemplateService<br/>(Liquid via Fluid)"]
+    TCOL[("emailTemplates")]
+    STATUS["IStatusService / CadenceCalculator"]
+    SMTP["SMTP server (external)"]
+
+    SCHED --> NSVC
+    NSVC --> NSET
+    NSVC --> STATUS
+    NSVC -- "dedupe check / record" --> NLOG
+    NSVC -- "render" --> TPL
+    TPL --> TCOL
+    NSVC -- "enqueue EmailMessage" --> QUEUE
+    OUTW --> DISP
+    DISP -- "claim Pending, oldest-first" --> QUEUE
+    DISP --> SENDER
+    SENDER -- "reads SMTP config" --> ESET
+    SENDER ==> SMTP
+```
+
+**Email (delivery) knows nothing about content.** `IEmailQueue` enqueues an `EmailMessage` (already-rendered subject/body + recipients) into `emailOutbox`. `EmailDispatchService` claims `Pending` messages oldest-first and hands each to `SmtpEmailSender`, which reads the SMTP connection from `emailSettings` and sends it. Delivery state, attempt count and the last error are written back to the message; if SMTP isn't configured the message is marked `Failed` with a clear reason rather than lost. The SMTP password is encrypted at rest by `IEmailSecretProtector` (AES-GCM with a key derived from `ApiKey:Pepper`), so a database dump never exposes it.
+
+**Notifications (logic) build on top.** `NotificationService` reads the admin-authored `notificationSettings` (which triggers are on, lead times, recipients), evaluates the three triggers against current state (`IStatusService` / `CadenceCalculator` for upcoming & missed; persisted submission `Warnings` for the warnings trigger), renders the relevant `emailTemplates` entry via `EmailContentBuilder` (the same Fluid engine the reports use), resolves recipients (the service account's `Email` and/or the operator/admin recipient list), and **enqueues** the result. Every event has a stable dedup `Key` recorded in `notificationLogs`, so re-running the job never double-sends.
+
+**Scheduling is a thin, replaceable trigger.** `EmailOutboxWorker` and `NotificationSchedulerWorker` are in-process `BackgroundService`s that simply call `EmailDispatchService.DrainAsync` / `NotificationService.RunAsync` on a timer. Both are independently toggleable (`Email:Worker:Enabled`, `Notifications:Scheduler:Enabled`); turning a worker off and POSTing to the matching internal admin endpoint (`/api/admin/email/drain`, `/api/admin/notifications/run`) lets an external scheduler — or, later, a dedicated service — drive exactly the same code path. This is the seam for promoting either half out of the monolith without touching the domain logic.
+
+See [../setup/configuration.md § Email & notifications](../setup/configuration.md#email--notifications) for the config keys and [../admin-user-guide/settings.md](../admin-user-guide/settings.md) for the operator-facing UI.
+
 ## Testing
 
-The PoC test project (`tests/Ingest.Tests`) covers happy paths only:
+The test project (`tests/Ingest.Tests`) focuses on the core domain logic:
 
 - API-key hashing roundtrip.
 - NCalc evaluator semantics (boolean, string-message, null-safe).
 - NCalc → JavaScript translation (short-circuit, identifiers, function calls).
 - Cadence bucketing.
 - The submission service end-to-end with an in-memory fake repository.
+- Email secret encryption round-trip (`EmailSecretProtector`) and Liquid email rendering (`EmailContentBuilder`).
 
 Repository-level integration tests would require a real Mongo and were intentionally skipped at this stage.
 

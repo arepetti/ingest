@@ -172,7 +172,7 @@ export function LayoutTreeEditor({
         )}
         <DropZone
           path={[0]}
-          active={isActiveDropZone(dragging, [0])}
+          active={isActiveDropZone(dragging)}
           onDrop={handleDrop}
         />
         {layout.map((node, i) => (
@@ -326,7 +326,7 @@ function NodeRenderer({
       <div className={s.nodeChildren}>
         <DropZone
           path={[...childrenPathBase, 0]}
-          active={isActiveDropZone(dragging, [...childrenPathBase, 0])}
+          active={isActiveDropZone(dragging)}
           onDrop={onDropAtChild}
         />
         {(node.items ?? []).map((child, i) => (
@@ -386,7 +386,7 @@ function Wrapped(props: {
       />
       <DropZone
         path={props.dropAfterPath}
-        active={isActiveDropZone(props.dragging, props.dropAfterPath)}
+        active={isActiveDropZone(props.dragging)}
         onDrop={props.onDropAfter}
       />
     </>
@@ -414,9 +414,9 @@ function DropZone({
 
 // ── Pure helpers ────────────────────────────────────────────────────────────────────────────
 
-function isActiveDropZone(dragging: DragPayload | null, _path: number[]): boolean {
+function isActiveDropZone(dragging: DragPayload | null): boolean {
   // Reserved for future "preview where the drop will land" hint. We just rely on the per-zone
-  // hover state for now — keep the signature so callers don't have to change later.
+  // hover state for now. (A target path will be threaded back in when that lands.)
   return !!dragging && false
 }
 

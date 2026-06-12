@@ -49,6 +49,13 @@ public sealed class Account : AuditedEntity
     /// <summary>Free-form description.</summary>
     public string? Description { get; set; }
 
+    /// <summary>
+    /// Contact email used by the notifications/email features. Optional at the data layer (legacy
+    /// accounts and the bootstrap admin may have none) even though the admin UI now asks for it on
+    /// create/edit. Stored lower-cased/trimmed; <c>null</c> when unset.
+    /// </summary>
+    public string? Email { get; set; }
+
     /// <summary>Distinguishes UI-capable accounts from API-only ones.</summary>
     public AccountKind Kind { get; set; } = AccountKind.Application;
 

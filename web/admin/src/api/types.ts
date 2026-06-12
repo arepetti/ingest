@@ -33,6 +33,8 @@ export interface Account {
   name: string
   label?: string | null
   description?: string | null
+  /** Contact email used by the email/notification features. May be empty for legacy accounts. */
+  email?: string | null
   kind: AccountKind
   role: AccountRole
   enabled: boolean
@@ -49,6 +51,8 @@ export interface CreateAccountRequest {
   name: string
   label?: string | null
   description?: string | null
+  /** Contact email. Asked for in the UI; the server accepts blank for backwards compatibility. */
+  email?: string | null
   kind: AccountKind
   role: AccountRole
   enabled?: boolean
@@ -59,10 +63,30 @@ export interface CreateAccountRequest {
 export interface UpdateAccountRequest {
   label?: string | null
   description?: string | null
+  /** Contact email. Blank clears it. */
+  email?: string | null
   role: AccountRole
   enabled: boolean
   /** Replacement set of SSO identity links. Omit to leave links untouched; pass [] to clear. */
   externalLogins?: ExternalLogin[]
+}
+
+/**
+ * GDPR right-to-erasure mode. 'Anonymise' keeps the statistical KPI values but strips identity;
+ * 'Delete' removes the account and everything tied to it.
+ */
+export type ErasureMode = 'Anonymise' | 'Delete'
+
+/** Per-collection tally returned by an erasure request. */
+export interface ErasureResult {
+  accountId: string
+  pseudonym: string
+  mode: ErasureMode
+  submissionsAffected: number
+  samplesAffected: number
+  emailsRemoved: number
+  auditEntriesAffected: number
+  apiKeysRemoved: number
 }
 
 /** One SSO provider the SPA can render a "Continue with …" button for. Empty list ⇒ SSO disabled. */
@@ -185,6 +209,8 @@ export interface Submission {
   serviceAccountId: string
   serviceName?: string | null
   samples: Sample[]
+  /** Non-blocking warnings recorded at the last write. Empty for legacy submissions predating warning persistence. */
+  warnings: string[]
   submittedAt: string
   replacedAt?: string | null
   createdAt: string
@@ -205,6 +231,41 @@ export interface SubmissionWriteResponse {
   id: string
   /** Non-blocking warnings (fired Warning rules, EnabledIf/VisibleIf discards). Always present; empty when none. */
   warnings: string[]
+}
+
+/** File format accepted by the admin bulk import endpoint. */
+export type BulkImportFormat = 'Json' | 'Csv'
+
+/** Body for the admin bulk import endpoint: target service, format, and the raw file text. */
+export interface BulkImportRequest {
+  serviceAccountId: string
+  format: BulkImportFormat
+  content: string
+}
+
+/** Outcome for one submission group within a bulk import. */
+export interface BulkImportItemResult {
+  index: number
+  /** CSV group key when present; null for JSON groups. */
+  group?: string | null
+  success: boolean
+  submissionId?: string | null
+  sampleCount: number
+  errors: string[]
+  warnings: string[]
+}
+
+/** Per-group report returned by the bulk import endpoint (the file itself parsed successfully). */
+export interface BulkImportResult {
+  total: number
+  succeeded: number
+  failed: number
+  items: BulkImportItemResult[]
+}
+
+/** Result of restoring a backup: per-collection counts of documents written. */
+export interface BackupImportResult {
+  restored: Record<string, number>
 }
 
 export interface SampleInput {
@@ -259,12 +320,48 @@ export interface MissingSubmissionEntry {
   totalRequiredCount: number
 }
 
+/**
+ * Which cadence window a missing-submissions bucket describes. 'Current' = the window is still
+ * open (submissions can still arrive — render as a soft warning); 'Previous' = the window has
+ * closed and the data is overdue (render as an error).
+ */
+export type MissingPeriodKind = 'Current' | 'Previous'
+
 /** A per-cadence bucket of the missing-submissions report. The server omits empty buckets. */
 export interface MissingByCadence {
   cadence: Cadence
   periodStart: string
   periodEnd: string
+  period: MissingPeriodKind
   entries: MissingSubmissionEntry[]
+}
+
+/**
+ * Detailed missing-submissions report for a single cadence and a single window addressed by
+ * `offset` (0 = current, -1 = previous, -N = N periods ago). Powers the analytics page's table
+ * and per-service breakdown.
+ */
+export interface MissingPeriodReport {
+  cadence: Cadence
+  offset: number
+  periodStart: string
+  periodEnd: string
+  entries: MissingSubmissionEntry[]
+}
+
+/** One point on the "missing submissions over time" trend for a single cadence. */
+export interface MissingHistoryPoint {
+  offset: number
+  periodStart: string
+  periodEnd: string
+  /** Total missing required values across every service and schema in the window. */
+  totalMissing: number
+}
+
+/** The "missing submissions over time" trend for a single cadence, oldest period first. */
+export interface MissingHistory {
+  cadence: Cadence
+  points: MissingHistoryPoint[]
 }
 
 export interface Me {
@@ -273,6 +370,139 @@ export interface Me {
   label?: string | null
   role: AccountRole
   kind: AccountKind
+  /** Whether the email + notification feature is enabled server-side. Drives whether the related UI shows at all. */
+  emailEnabled?: boolean
+  /** Server application version (from Directory.Build.props), shown in the dashboard footer. */
+  version?: string
+}
+
+// --- Email + notifications -----------------------------------------------------------------
+
+/** Delivery state of a queued email. */
+export type EmailStatus = 'Pending' | 'Sending' | 'Sent' | 'Failed'
+
+/** SMTP settings as returned by the API. The password is write-only and never included. */
+export interface EmailSettings {
+  host: string
+  port: number
+  useStartTls: boolean
+  username?: string | null
+  fromAddress: string
+  fromName?: string | null
+  /** True when a password is stored (the value itself is never returned). */
+  hasPassword: boolean
+  /** True when enough is set to attempt a send (host + from address). */
+  configured: boolean
+}
+
+/** Body for updating the SMTP settings. The password is only touched when `updatePassword` is true. */
+export interface UpdateEmailSettingsRequest {
+  host: string
+  port: number
+  useStartTls: boolean
+  username?: string | null
+  fromAddress: string
+  fromName?: string | null
+  /** When false the stored password is kept. When true it's replaced with `password` (blank clears it). */
+  updatePassword?: boolean
+  password?: string | null
+}
+
+/** An editable email template (Liquid). The key is immutable. */
+export interface EmailTemplate {
+  key: string
+  name: string
+  description?: string | null
+  subject: string
+  htmlBody?: string | null
+  textBody: string
+  modifiedAt: string
+  modifiedBy?: string | null
+}
+
+/** Body for updating a template's content. */
+export interface UpdateEmailTemplateRequest {
+  name: string
+  description?: string | null
+  subject: string
+  htmlBody?: string | null
+  textBody: string
+}
+
+/** One outbox message shown on the audit "Sent emails" tab. */
+export interface EmailMessage {
+  id: string
+  toAddress: string
+  toName?: string | null
+  subject: string
+  status: EmailStatus
+  attempts: number
+  lastError?: string | null
+  createdAt: string
+  sentAt?: string | null
+  category: string
+  relatedAccountId?: string | null
+}
+
+/** Result of a manual outbox drain. */
+export interface EmailDrainResult {
+  sent: number
+  failed: number
+}
+
+/** Body for the ad-hoc "send an email to an account" action. */
+export interface SendAdhocEmailRequest {
+  accountId: string
+  subject: string
+  body: string
+}
+
+/** A single notification trigger's configuration. */
+export interface NotificationRule {
+  enabled: boolean
+  notifyServiceAccount: boolean
+  notifyAdminList: boolean
+}
+
+/** The whole notification configuration. */
+export interface NotificationSettings {
+  upcoming: NotificationRule
+  missed: NotificationRule
+  warnings: NotificationRule
+  upcomingLeadHours: number
+  adminRecipientAccountIds: string[]
+}
+
+/** Body for updating the notification configuration (same shape as the settings). */
+export type UpdateNotificationSettingsRequest = NotificationSettings
+
+/** Per-trigger email counts produced by one notification run. */
+export interface NotificationRunResult {
+  upcomingQueued: number
+  missedQueued: number
+  warningsQueued: number
+  totalQueued: number
+}
+
+/** The kind of change recorded in the audit log. */
+export type AuditChangeType = 'Create' | 'Edit' | 'Delete'
+
+/**
+ * The type of object an audit entry targets. 'User' and 'Account' are both accounts, told apart
+ * by the account's kind at the time of the change.
+ */
+export type AuditTargetType = 'User' | 'Account' | 'Schema' | 'ApiKey' | 'Submission' | 'Report'
+
+/** A single audit-log entry: who changed what, when, and how. */
+export interface AuditLog {
+  id: string
+  timestamp: string
+  targetType: AuditTargetType
+  targetId: string
+  targetName?: string | null
+  change: AuditChangeType
+  actorId?: string | null
+  actorName?: string | null
 }
 
 export interface HistoryBucket {

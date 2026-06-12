@@ -87,4 +87,8 @@ public sealed class SchemaRepository : RepositoryBase<Schema>, ISchemaRepository
     /// <inheritdoc />
     public Task HardDeleteAsync(Guid id, CancellationToken ct = default) =>
         Collection.DeleteOneAsync(s => s.Id == id, ct);
+
+    /// <inheritdoc />
+    public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) =>
+        PurgeSoftDeletedCoreAsync(olderThanUtc, ct);
 }

@@ -28,6 +28,10 @@ Go to [**setup/powerbi.md**](setup/powerbi.md). It covers the OData feed, sample
 
 Start with [**../CONTRIBUTING.md**](../CONTRIBUTING.md) for the dev environment (prerequisites, running locally with Aspire, tests, building the image). Then [**architecture/**](architecture/README.md) is the source of truth for system design, code layout, and trade-offs. After that the source itself (with the XML docs generated into Swagger) is the next step.
 
+### "I'm responsible for data protection / GDPR"
+
+Read [**gdpr.md**](gdpr.md). It describes the EU GDPR features the product provides (UK GDPR / DPA 2018 apply the same article numbers) — erasure (anonymise or delete), retention purge, and per-subject data export (DSAR) — where each one lives, and what stays the controller's responsibility.
+
 ## All sections
 
 | Folder                                                              | What's inside                                                                                  |
@@ -36,6 +40,7 @@ Start with [**../CONTRIBUTING.md**](../CONTRIBUTING.md) for the dev environment 
 | [architecture/](architecture/README.md)                             | System overview: solution layout, domain model, request flow, validation pipeline, cadence, Mongo, Aspire, configuration, plus the auth model end-to-end. |
 | [client/](client/README.md)                                         | Everything a service-side developer needs: how to obtain a key, how to use it, full API reference. |
 | [setup/](setup/README.md)                                           | Production deployment to Azure, full configuration reference, plus connecting PowerBI / OData clients. |
+| [gdpr.md](gdpr.md)                                                  | Data-protection (EU GDPR; UK GDPR / DPA 2018 equivalent) features: erasure, retention purge, personal-data export, and what's out of scope. |
 
 ## Conventions used across the docs
 
