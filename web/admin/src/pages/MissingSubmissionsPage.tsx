@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Badge, Card, CardHeader, Dropdown, Field, MessageBar, MessageBarBody, Option,
+  Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
   Text, Title2, makeStyles, tokens,
 } from '@fluentui/react-components'
+import { ArrowClockwise20Regular, ArrowDownload20Regular, MoreHorizontal20Regular } from '@fluentui/react-icons'
 import {
   Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
@@ -13,6 +15,14 @@ import { formatApiError } from '../api/client'
 import { useMissingHistory, useMissingPeriod } from '../api/hooks'
 import type { Cadence, MissingHistoryPoint, MissingSubmissionEntry } from '../api/types'
 import { cadenceLabel } from '../utils/cadence'
+import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
+
+const MISSING_EXPORT_COLUMNS: ExportColumn<MissingSubmissionEntry>[] = [
+  { header: 'Service', value: e => e.serviceLabel || e.serviceName },
+  { header: 'Schema', value: e => e.schemaLabel || e.schemaName },
+  { header: 'Missing', value: e => e.missingRequiredCount },
+  { header: 'Total required', value: e => e.totalRequiredCount },
+]
 
 // All cadences in their natural (enum) order so the picker reads daily → yearly.
 const CADENCES: Cadence[] = ['Daily', 'Weekly', 'Fortnightly', 'Monthly', 'Quarterly', 'SemiAnnually', 'Yearly']
@@ -68,16 +78,48 @@ export function MissingSubmissionsPage() {
   const periodText = selectedPoint ? periodOptionLabel(selectedPoint, cadence) : ''
   const totalMissing = period.data?.entries.reduce((acc, e) => acc + e.missingRequiredCount, 0) ?? 0
 
+  const [exportError, setExportError] = useState<string | null>(null)
+  const entries = period.data?.entries ?? []
+  const missingExport = useCsvExport({
+    filename: `missing-submissions-${cadence}.csv`,
+    columns: MISSING_EXPORT_COLUMNS,
+    fetchAll: () => Promise.resolve(entries),
+    onError: setExportError,
+  })
+
   return (
     <div className={s.root}>
       <div className={s.header}>
         <Title2>Missing submissions by period</Title2>
-        <Link to="/submissions" className={s.link} style={{ fontSize: 13 }}>← Back to submissions</Link>
+        <Menu>
+          <MenuTrigger disableButtonEnhancement>
+            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => { history.refetch(); period.refetch() }}>Refresh</MenuItem>
+              <MenuDivider />
+              <MenuItem
+                icon={<ArrowDownload20Regular />}
+                disabled={missingExport.exporting || entries.length === 0}
+                onClick={missingExport.exportList}
+              >
+                {missingExport.exporting ? 'Exporting…' : 'Export this view'}
+              </MenuItem>
+            </MenuList>
+          </MenuPopover>
+        </Menu>
       </div>
 
       {(history.error || period.error) && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>{formatApiError(history.error || period.error)}</MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      {exportError && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>{exportError}</MessageBarBody>
         </AutoScrollMessageBar>
       )}
 

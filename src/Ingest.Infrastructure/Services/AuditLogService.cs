@@ -50,8 +50,10 @@ public sealed class AuditLogService : IAuditLogService
         AuditChangeType? change = null,
         AuditTargetType? targetType = null,
         string? nameFilter = null,
+        DateTime? from = null,
+        DateTime? to = null,
         CancellationToken ct = default) =>
-        _repo.ListAsync(request, change, targetType, nameFilter, ct);
+        _repo.ListAsync(request, change, targetType, nameFilter, from, to, ct);
 
     /// <inheritdoc />
     public Task<PagedResult<AuditLog>> ListByTargetAsync(Guid targetId, PageRequest request, CancellationToken ct = default) =>
@@ -62,6 +64,8 @@ public sealed class AuditLogService : IAuditLogService
         AuditChangeType? change = null,
         AuditTargetType? targetType = null,
         string? nameFilter = null,
+        DateTime? from = null,
+        DateTime? to = null,
         CancellationToken ct = default) =>
-        _repo.StreamAsync(change, targetType, nameFilter, ct);
+        _repo.StreamAsync(change, targetType, nameFilter, from, to, ct);
 }

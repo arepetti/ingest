@@ -20,6 +20,8 @@ public interface IAuditLogRepository
     /// <param name="change">Restrict to a single change type when set.</param>
     /// <param name="targetType">Restrict to a single target type when set.</param>
     /// <param name="nameFilter">Case-insensitive substring matched against either the target or actor name when set.</param>
+    /// <param name="from">Lower bound on the entry timestamp (inclusive) when set.</param>
+    /// <param name="to">Upper bound on the entry timestamp (exclusive) when set.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A page of entries with the total count.</returns>
     Task<PagedResult<AuditLog>> ListAsync(
@@ -27,6 +29,8 @@ public interface IAuditLogRepository
         AuditChangeType? change = null,
         AuditTargetType? targetType = null,
         string? nameFilter = null,
+        DateTime? from = null,
+        DateTime? to = null,
         CancellationToken ct = default);
 
     /// <summary>Page through every entry targeting a single object, newest first.</summary>
@@ -44,11 +48,15 @@ public interface IAuditLogRepository
     /// <param name="change">Restrict to a single change type when set.</param>
     /// <param name="targetType">Restrict to a single target type when set.</param>
     /// <param name="nameFilter">Case-insensitive substring matched against either the target or actor name when set.</param>
+    /// <param name="from">Lower bound on the entry timestamp (inclusive) when set.</param>
+    /// <param name="to">Upper bound on the entry timestamp (exclusive) when set.</param>
     /// <param name="ct">Cancellation token.</param>
     IAsyncEnumerable<AuditLog> StreamAsync(
         AuditChangeType? change = null,
         AuditTargetType? targetType = null,
         string? nameFilter = null,
+        DateTime? from = null,
+        DateTime? to = null,
         CancellationToken ct = default);
 
     /// <summary>

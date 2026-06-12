@@ -6,12 +6,13 @@ import {
   RadioGroup, Radio,
   Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TableCellLayout,
   Title2, Tooltip, makeStyles, MessageBarBody, MessageBarTitle,
+  Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger,
   Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, Delete20Regular, Edit20Regular, Key20Regular, Mail20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, Delete20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { useNavigate } from 'react-router-dom'
-import { useAccounts, useApiKeys, useAuthProviders, useCreateAccount, useDeleteAccount, useEraseAccount, useMe, useRevokeApiKey, useRotateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
+import { fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCreateAccount, useDeleteAccount, useEraseAccount, useMe, useRevokeApiKey, useRotateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
 import type { Account, AccountKind, AccountRole, AuthProvider, CreateAccountRequest, ErasureMode, ErasureResult, ExternalLogin, UpdateAccountRequest } from '../api/types'
 import { downloadFromUrl } from '../utils/download'
 import { formatApiError } from '../api/client'
@@ -19,6 +20,7 @@ import { RowActions } from '../components/RowActions'
 import { AccountAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import { confirmDelete } from '../utils/confirm'
 import { formatDate, formatDateTime } from '../utils/format'
 import { clickableRowProps } from '../utils/a11y'
@@ -26,6 +28,7 @@ import { clickableRowProps } from '../utils/a11y'
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
   toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  toolbarActions: { display: 'flex', alignItems: 'center', gap: '16px' },
   drawer: { width: 'max(600px, 50vw)' },
   drawerForm: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
@@ -82,12 +85,23 @@ const kindHints: Record<AccountKind, string> = {
   User: 'Interactive account (can log in to the UI and call APIs)',
 }
 
+const ACCOUNT_EXPORT_COLUMNS: ExportColumn<Account>[] = [
+  { header: 'Name', value: a => a.name },
+  { header: 'Label', value: a => a.label ?? '' },
+  { header: 'Kind', value: a => a.kind },
+  { header: 'Role', value: a => a.role },
+  { header: 'Status', value: a => (a.enabled ? 'Enabled' : 'Disabled') },
+  { header: 'Email', value: a => a.email ?? '' },
+  { header: 'Created', value: a => a.createdAt },
+  { header: 'Created by', value: a => a.createdBy ?? '' },
+]
+
 export function ServicesPage() {
   const s = useStyles()
   const nav = useNavigate()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const { data, isLoading, error } = useAccounts({ page, pageSize })
+  const { data, isLoading, error, refetch } = useAccounts({ page, pageSize })
   const { data: providers } = useAuthProviders()
   const { data: me } = useMe()
   const hasSso = (providers?.length ?? 0) > 0
@@ -104,6 +118,12 @@ export function ServicesPage() {
   const [eraseDialogFor, setEraseDialogFor] = useState<Account | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [rotatedPlaintext, setRotatedPlaintext] = useState<string | null>(null)
+  const accountsExport = useCsvExport({
+    filename: 'accounts.csv',
+    columns: ACCOUNT_EXPORT_COLUMNS,
+    fetchAll: () => fetchAllAccounts(),
+    onError: setActionError,
+  })
   // Per-drawer "expanded" state so the edit and view drawers can be enlarged independently
   // (e.g. expand the view to read a long description without losing the editor state).
   const [editorExpanded, setEditorExpanded] = useState(false)
@@ -188,8 +208,26 @@ export function ServicesPage() {
     <div className={s.root}>
       <div className={s.toolbar}>
         <Title2>Accounts</Title2>
-        <Toolbar>
+        <Toolbar className={s.toolbarActions}>
           <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>New account</ToolbarButton>
+          <Menu>
+            <MenuTrigger disableButtonEnhancement>
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                <MenuDivider />
+                <MenuItem
+                  icon={<ArrowDownload20Regular />}
+                  disabled={accountsExport.exporting}
+                  onClick={accountsExport.exportList}
+                >
+                  {accountsExport.exporting ? 'Exporting…' : 'Export this list'}
+                </MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
         </Toolbar>
       </div>
 

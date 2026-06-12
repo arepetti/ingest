@@ -267,11 +267,11 @@ public class GdprServiceTests
             return Task.CompletedTask;
         }
 
-        public Task<PagedResult<AuditLog>> ListAsync(PageRequest request, AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, CancellationToken ct = default) =>
+        public Task<PagedResult<AuditLog>> ListAsync(PageRequest request, AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<PagedResult<AuditLog>> ListByTargetAsync(Guid targetId, PageRequest request, CancellationToken ct = default) =>
             throw new NotSupportedException();
-        public async IAsyncEnumerable<AuditLog> StreamAsync(AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        public async IAsyncEnumerable<AuditLog> StreamAsync(AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, DateTime? from = null, DateTime? to = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             await Task.CompletedTask;
             yield break;
@@ -365,7 +365,7 @@ public class GdprServiceTests
         public Task<long> PurgeProcessedOlderThanAsync(DateTime olderThanUtc, CancellationToken ct = default) =>
             Task.FromResult((long)Store.RemoveAll(m => (m.Status == EmailStatus.Sent || m.Status == EmailStatus.Failed) && m.CreatedAt < olderThanUtc));
         public Task<Guid> EnqueueAsync(EmailRequest request, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<PagedResult<EmailMessage>> ListAsync(PageRequest request, EmailStatus? status = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<PagedResult<EmailMessage>> ListAsync(PageRequest request, EmailStatus? status = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class FakeAuditLogs : IAuditLogRepository
@@ -388,9 +388,9 @@ public class GdprServiceTests
         public Task<long> PurgeOlderThanAsync(DateTime olderThanUtc, CancellationToken ct = default) =>
             Task.FromResult((long)Store.RemoveAll(a => a.Timestamp < olderThanUtc));
         public Task AddAsync(AuditLog entry, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<PagedResult<AuditLog>> ListAsync(PageRequest request, AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<PagedResult<AuditLog>> ListAsync(PageRequest request, AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<PagedResult<AuditLog>> ListByTargetAsync(Guid targetId, PageRequest request, CancellationToken ct = default) => throw new NotSupportedException();
-        public IAsyncEnumerable<AuditLog> StreamAsync(AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public IAsyncEnumerable<AuditLog> StreamAsync(AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class FakeNotificationLogs : INotificationLogRepository

@@ -51,11 +51,16 @@ public sealed class EmailQueue : IEmailQueue
     }
 
     /// <inheritdoc />
-    public async Task<PagedResult<EmailMessage>> ListAsync(PageRequest request, EmailStatus? status = null, CancellationToken ct = default)
+    public async Task<PagedResult<EmailMessage>> ListAsync(PageRequest request, EmailStatus? status = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default)
     {
-        var filter = status is null
-            ? FilterDefinition<EmailMessage>.Empty
-            : Builders<EmailMessage>.Filter.Eq(m => m.Status, status.Value);
+        var fb = Builders<EmailMessage>.Filter;
+        var filter = status is null ? fb.Empty : fb.Eq(m => m.Status, status.Value);
+        // from inclusive, to exclusive (mirrors the submissions list); coerce to UTC so the
+        // comparison matches how CreatedAt is stored.
+        if (from is { } f)
+            filter &= fb.Gte(m => m.CreatedAt, DateTime.SpecifyKind(f, DateTimeKind.Utc));
+        if (to is { } u)
+            filter &= fb.Lt(m => m.CreatedAt, DateTime.SpecifyKind(u, DateTimeKind.Utc));
 
         var total = await _ctx.EmailOutbox.CountDocumentsAsync(filter, cancellationToken: ct);
         var items = await _ctx.EmailOutbox

@@ -55,8 +55,11 @@ public interface IEmailQueue
     /// <summary>Enqueue a fully-rendered message for delivery. Returns the new message id.</summary>
     Task<Guid> EnqueueAsync(EmailRequest request, CancellationToken ct = default);
 
-    /// <summary>Page through the outbox newest-first, optionally filtered by status. Powers the audit "Sent emails" tab.</summary>
-    Task<PagedResult<EmailMessage>> ListAsync(PageRequest request, EmailStatus? status = null, CancellationToken ct = default);
+    /// <summary>
+    /// Page through the outbox newest-first, optionally filtered by status and a createdAt range
+    /// (<paramref name="from"/> inclusive, <paramref name="to"/> exclusive). Powers the audit "Sent emails" tab.
+    /// </summary>
+    Task<PagedResult<EmailMessage>> ListAsync(PageRequest request, EmailStatus? status = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
 
     /// <summary>
     /// Return every outbox message tied to a subject — by <see cref="EmailMessage.RelatedAccountId"/>

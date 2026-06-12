@@ -93,7 +93,6 @@ export function Login() {
         <Title2>Ingest</Title2>
         <div className={s.hint}>
           Paste your API key. Only User-kind credentials can sign in here (any role); Application-kind keys are API-only.
-          The bootstrap admin key is printed once in the server logs on first start.
         </div>
 
         {ssoMessage && (

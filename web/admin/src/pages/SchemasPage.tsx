@@ -2,19 +2,19 @@ import { useMemo, useState } from 'react'
 import {
   Badge, Body1, Button, Drawer, DrawerBody,
   Field, Title2, Tooltip,
-  Menu, MenuTrigger, MenuList, MenuItem, MenuPopover, SplitButton,
+  Menu, MenuButton, MenuTrigger, MenuList, MenuItem, MenuDivider, MenuPopover, SplitButton,
   makeStyles, MessageBar, MessageBarBody, MessageBarTitle,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
   Toolbar, ToolbarButton, Divider, tokens,
 } from '@fluentui/react-components'
 import {
-  Add20Regular, ArrowDownload20Regular, ArrowUpload20Regular, ChartMultiple20Regular,
-  Copy20Regular, Delete20Regular, Edit20Regular,
+  Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, ChartMultiple20Regular,
+  Copy20Regular, Delete20Regular, Edit20Regular, MoreHorizontal20Regular,
 } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import type { Account, Schema, UpsertSchemaRequest } from '../api/types'
 import {
-  fetchSchemaExample, useAccounts, useCloneSchema,
+  fetchAllSchemas, fetchSchemaExample, useAccounts, useCloneSchema,
   useDeleteSchema, useMe, useSchemas,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
@@ -22,6 +22,7 @@ import { RowActions } from '../components/RowActions'
 import { SchemaAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import { ValueLabel } from '../components/ValueLabel'
 import { cadenceLabel } from '../utils/cadence'
 import { confirmDelete } from '../utils/confirm'
@@ -34,6 +35,7 @@ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
   toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  toolbarActions: { display: 'flex', alignItems: 'center', gap: '16px' },
   drawer: { width: 'max(600px, 50vw)' },
   drawerForm: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'start' },
@@ -96,6 +98,17 @@ const useStyles = makeStyles({
   preBlock: { whiteSpace: 'pre-wrap', margin: 0 },
 })
 
+const SCHEMA_EXPORT_COLUMNS: ExportColumn<Schema>[] = [
+  { header: 'Name', value: sc => sc.name },
+  { header: 'Label', value: sc => sc.label ?? '' },
+  { header: 'Values', value: sc => sc.values.length },
+  { header: 'Enabled', value: sc => (sc.enabled ? 'Enabled' : 'Disabled') },
+  { header: 'Modifiable', value: sc => (sc.modifiable ? 'Yes' : 'No') },
+  { header: 'Audience', value: sc => (sc.isGlobal ? 'Global' : `${sc.serviceIds.length} service(s)`) },
+  { header: 'Created', value: sc => sc.createdAt },
+  { header: 'Created by', value: sc => sc.createdBy ?? '' },
+]
+
 export function SchemasPage() {
   const s = useStyles()
   const nav = useNavigate()
@@ -103,7 +116,7 @@ export function SchemasPage() {
   const isAdmin = me?.role === 'Admin'
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const { data, isLoading, error } = useSchemas({ page, pageSize })
+  const { data, isLoading, error, refetch } = useSchemas({ page, pageSize })
   // The audience picker only cares about Service-role accounts (those who submit data); the kind
   // (User vs Application) is irrelevant here.
   const services = useAccounts({ role: 'Service' })
@@ -116,6 +129,12 @@ export function SchemasPage() {
   // their errors (clone, "download example").
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewerExpanded, setViewerExpanded] = useState(false)
+  const schemasExport = useCsvExport({
+    filename: 'schemas.csv',
+    columns: SCHEMA_EXPORT_COLUMNS,
+    fetchAll: () => fetchAllSchemas(),
+    onError: setActionError,
+  })
 
   const items = useMemo(() => data?.items ?? [], [data])
 
@@ -189,26 +208,24 @@ export function SchemasPage() {
     <div className={s.root}>
       <div className={s.toolbar}>
         <Title2>Schemas</Title2>
-        <Toolbar>
-          {/* SplitButton: primary action is "New" (current flow); the chevron exposes
-              "Upload JSON" for importing a previously-exported schema file. */}
-          <Menu positioning="below-end">
+        <Toolbar className={s.toolbarActions}>
+          <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>New schema</ToolbarButton>
+          <Menu>
             <MenuTrigger disableButtonEnhancement>
-              {(triggerProps) => (
-                <SplitButton
-                  menuButton={triggerProps}
-                  primaryActionButton={{ onClick: openCreate }}
-                  appearance="primary"
-                  icon={<Add20Regular />}
-                >
-                  New schema
-                </SplitButton>
-              )}
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
-                <MenuItem icon={<Add20Regular />} onClick={openCreate}>New schema</MenuItem>
-                <MenuItem icon={<ArrowUpload20Regular />} onClick={onUploadSchema}>Upload JSON…</MenuItem>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                <MenuDivider />
+                <MenuItem
+                  icon={<ArrowDownload20Regular />}
+                  disabled={schemasExport.exporting}
+                  onClick={schemasExport.exportList}
+                >
+                  {schemasExport.exporting ? 'Exporting…' : 'Export this list'}
+                </MenuItem>
+                <MenuItem icon={<ArrowUpload20Regular />} onClick={onUploadSchema}>Upload schema</MenuItem>
               </MenuList>
             </MenuPopover>
           </Menu>

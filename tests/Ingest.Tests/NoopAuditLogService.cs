@@ -13,13 +13,13 @@ internal sealed class NoopAuditLogService : IAuditLogService
     public Task RecordAsync(AuditTargetType targetType, AuditChangeType change, Guid targetId, string? targetName, CancellationToken ct = default) =>
         Task.CompletedTask;
 
-    public Task<PagedResult<AuditLog>> ListAsync(PageRequest request, AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, CancellationToken ct = default) =>
+    public Task<PagedResult<AuditLog>> ListAsync(PageRequest request, AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default) =>
         Task.FromResult(new PagedResult<AuditLog>(Array.Empty<AuditLog>(), 0, request.Page, request.PageSize));
 
     public Task<PagedResult<AuditLog>> ListByTargetAsync(Guid targetId, PageRequest request, CancellationToken ct = default) =>
         Task.FromResult(new PagedResult<AuditLog>(Array.Empty<AuditLog>(), 0, request.Page, request.PageSize));
 
-    public async IAsyncEnumerable<AuditLog> StreamAsync(AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    public async IAsyncEnumerable<AuditLog> StreamAsync(AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, DateTime? from = null, DateTime? to = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         await Task.CompletedTask;
         yield break;

@@ -24,12 +24,14 @@ public interface IAuditLogService
         string? targetName,
         CancellationToken ct = default);
 
-    /// <summary>Page through the log, newest first, with optional change/target/name filters.</summary>
+    /// <summary>Page through the log, newest first, with optional change/target/name/timestamp filters.</summary>
     Task<PagedResult<AuditLog>> ListAsync(
         PageRequest request,
         AuditChangeType? change = null,
         AuditTargetType? targetType = null,
         string? nameFilter = null,
+        DateTime? from = null,
+        DateTime? to = null,
         CancellationToken ct = default);
 
     /// <summary>Page through every entry targeting a single object, newest first.</summary>
@@ -40,5 +42,7 @@ public interface IAuditLogService
         AuditChangeType? change = null,
         AuditTargetType? targetType = null,
         string? nameFilter = null,
+        DateTime? from = null,
+        DateTime? to = null,
         CancellationToken ct = default);
 }

@@ -122,10 +122,11 @@ public sealed class AdminEmailController : ControllerBase
     [ProducesResponseType(typeof(PagedResponse<EmailMessageDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ListOutbox(
-        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] EmailStatus? status, CancellationToken ct)
+        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] EmailStatus? status,
+        [FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
     {
         if (!_enabled) return NotFound();
-        var result = await _queue.ListAsync(RequestHelpers.ToPageRequest(page, pageSize, null, false), status, ct);
+        var result = await _queue.ListAsync(RequestHelpers.ToPageRequest(page, pageSize, null, false), status, from, to, ct);
         return Ok(result.Map(EmailMessageDto.From));
     }
 

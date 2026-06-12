@@ -2,16 +2,17 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Badge, Body1, Drawer, DrawerBody, Dropdown, Field, Input,
-  Menu, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, SplitButton,
+  Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, SplitButton,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
   Title2, Tooltip, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowUpload20Regular, Delete20Regular, Edit20Regular, Eye20Regular, Open20Regular, Warning20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Delete20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { BulkImportDialog } from '../components/BulkImportDialog'
 import { formatApiError } from '../api/client'
-import { useAccounts, useDeleteSubmission, useMe, useMySchemas, useMySubmissions, useSchemas, useSubmissions } from '../api/hooks'
+import { fetchAllMySubmissions, fetchAllSubmissions, useAccounts, useDeleteSubmission, useMe, useMySchemas, useMySubmissions, useSchemas, useSubmissions } from '../api/hooks'
 import { RowActions } from '../components/RowActions'
+import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import { SubmissionAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
@@ -35,6 +36,7 @@ function submissionLabel(sub: Submission): string {
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
   toolbar: { display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between' },
+  toolbarActions: { display: 'flex', alignItems: 'center', gap: '16px' },
   filters: { display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' },
   row: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
   actionsHeader: { textAlign: 'right' },
@@ -142,6 +144,7 @@ export function SubmissionsPage() {
   const [viewing, setViewing] = useState<Submission | null>(null)
   const [viewerExpanded, setViewerExpanded] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   // Recompute the from/to pair whenever the interval changes so React Query gets a stable cache key.
   const { from, to } = useMemo(
@@ -175,6 +178,37 @@ export function SubmissionsPage() {
     [schemaList],
   )
 
+  // Columns for the "Export CSV" button. The Service column is admin/operator-only, mirroring the
+  // grid. Labels reuse the same resolvers the grid cells do so the file matches what's on screen.
+  const exportColumns = useMemo<ExportColumn<Submission>[]>(() => {
+    const cols: ExportColumn<Submission>[] = [
+      { header: 'Submitted at', value: sub => sub.submittedAt },
+    ]
+    if (!isService) {
+      cols.push({ header: 'Service', value: sub => resolveServiceLabel(sub, isService, me, services.data?.items ?? []) })
+    }
+    cols.push(
+      { header: 'Schema', value: sub => resolveSchemaLabel(sub, schemasByName) },
+      { header: 'Samples', value: sub => sub.samples.length },
+      { header: 'Warnings', value: sub => sub.warnings?.length ?? 0 },
+      { header: 'Created', value: sub => sub.createdAt },
+      { header: 'Created by', value: sub => sub.createdBy ?? '' },
+    )
+    return cols
+  }, [isService, me, services.data, schemasByName])
+
+  const fetchAllForExport = () =>
+    isService
+      ? fetchAllMySubmissions({ schemaName, from, to })
+      : fetchAllSubmissions({ serviceId, schemaName, from, to })
+
+  const submissionsExport = useCsvExport({
+    filename: 'submissions.csv',
+    columns: exportColumns,
+    fetchAll: fetchAllForExport,
+    onError: setExportError,
+  })
+
   function changeInterval(next: Interval) {
     setInterval(next)
     setPage(1)
@@ -184,20 +218,33 @@ export function SubmissionsPage() {
     <div className={s.root}>
       <div className={s.toolbar}>
         <Title2>{isService ? 'My submissions' : 'Submissions'}</Title2>
-        <Toolbar>
-          {!isService && (
-            <ToolbarButton icon={<Warning20Regular />} onClick={() => nav('/missing')}>
-              Missing by period
-            </ToolbarButton>
-          )}
-          {isAdmin && (
-            <ToolbarButton icon={<ArrowUpload20Regular />} onClick={() => setImportOpen(true)}>
-              Import
-            </ToolbarButton>
-          )}
+        <Toolbar className={s.toolbarActions}>
           <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={() => nav('/submissions/new')}>
             New submission
           </ToolbarButton>
+          <Menu>
+            <MenuTrigger disableButtonEnhancement>
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => submissions.refetch()}>Refresh</MenuItem>
+                <MenuDivider />
+                <MenuItem
+                  icon={<ArrowDownload20Regular />}
+                  disabled={submissionsExport.exporting}
+                  onClick={submissionsExport.exportList}
+                >
+                  {submissionsExport.exporting ? 'Exporting…' : 'Export this list'}
+                </MenuItem>
+                {isAdmin && (
+                  <MenuItem icon={<ArrowUpload20Regular />} onClick={() => setImportOpen(true)}>
+                    Import bulk data
+                  </MenuItem>
+                )}
+              </MenuList>
+            </MenuPopover>
+          </Menu>
         </Toolbar>
       </div>
 
@@ -264,6 +311,12 @@ export function SubmissionsPage() {
       {error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>{formatApiError(error)}</MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      {exportError && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>{exportError}</MessageBarBody>
         </AutoScrollMessageBar>
       )}
 

@@ -35,9 +35,11 @@ public sealed class AuditLogRepository : IAuditLogRepository
         AuditChangeType? change = null,
         AuditTargetType? targetType = null,
         string? nameFilter = null,
+        DateTime? from = null,
+        DateTime? to = null,
         CancellationToken ct = default)
     {
-        var filter = BuildFilter(change, targetType, nameFilter);
+        var filter = BuildFilter(change, targetType, nameFilter, from, to);
         var total = await _collection.CountDocumentsAsync(filter, cancellationToken: ct);
         var items = await _collection.Find(filter)
             .Sort(NewestFirst)
@@ -65,9 +67,11 @@ public sealed class AuditLogRepository : IAuditLogRepository
         AuditChangeType? change = null,
         AuditTargetType? targetType = null,
         string? nameFilter = null,
+        DateTime? from = null,
+        DateTime? to = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var filter = BuildFilter(change, targetType, nameFilter);
+        var filter = BuildFilter(change, targetType, nameFilter, from, to);
         using var cursor = await _collection.Find(filter).Sort(NewestFirst).ToCursorAsync(ct);
         while (await cursor.MoveNextAsync(ct))
         {
@@ -117,7 +121,8 @@ public sealed class AuditLogRepository : IAuditLogRepository
     }
 
     /// <summary>Build the AND-combined filter shared by the list and export paths. Empty when no filter is supplied.</summary>
-    private static FilterDefinition<AuditLog> BuildFilter(AuditChangeType? change, AuditTargetType? targetType, string? nameFilter)
+    private static FilterDefinition<AuditLog> BuildFilter(
+        AuditChangeType? change, AuditTargetType? targetType, string? nameFilter, DateTime? from, DateTime? to)
     {
         var fb = Builders<AuditLog>.Filter;
         var filter = fb.Empty;
@@ -130,6 +135,12 @@ public sealed class AuditLogRepository : IAuditLogRepository
             var rx = new BsonRegularExpression(Regex.Escape(nameFilter.Trim()), "i");
             filter &= fb.Or(fb.Regex(a => a.TargetName, rx), fb.Regex(a => a.ActorName, rx));
         }
+        // from inclusive, to exclusive (mirrors the submissions list); coerce to UTC so the
+        // comparison matches how timestamps are stored.
+        if (from is { } f)
+            filter &= fb.Gte(a => a.Timestamp, DateTime.SpecifyKind(f, DateTimeKind.Utc));
+        if (to is { } u)
+            filter &= fb.Lt(a => a.Timestamp, DateTime.SpecifyKind(u, DateTimeKind.Utc));
         return filter;
     }
 }

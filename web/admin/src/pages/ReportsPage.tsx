@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Avatar, Badge, Button, MessageBarBody, MessageBarTitle,
+  Avatar, Badge, MessageBarBody, MessageBarTitle,
+  Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
   Title2, Tooltip, Toolbar,
   makeStyles, tokens,
 } from '@fluentui/react-components'
 import {
-  ArrowUpload20Regular, Delete20Regular, DocumentText20Regular, Open20Regular,
+  ArrowClockwise20Regular, ArrowUpload20Regular, Delete20Regular, DocumentText20Regular, MoreHorizontal20Regular, Open20Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { RowActions } from '../components/RowActions'
@@ -64,7 +65,7 @@ export function ReportsPage() {
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const { data, isLoading, error } = useReports({ page, pageSize })
+  const { data, isLoading, error, refetch } = useReports({ page, pageSize })
   const upload = useUploadReport()
   const del = useDeleteReport()
 
@@ -100,13 +101,24 @@ export function ReportsPage() {
     <div className={s.root}>
       <div className={s.toolbar}>
         <Title2>Reports</Title2>
-        {isAdmin && (
-          <Toolbar>
-            <Button appearance="primary" icon={<ArrowUpload20Regular />} onClick={onUpload}>
-              Upload report
-            </Button>
-          </Toolbar>
-        )}
+        <Toolbar>
+          <Menu>
+            <MenuTrigger disableButtonEnhancement>
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                {isAdmin && (
+                  <>
+                    <MenuDivider />
+                    <MenuItem icon={<ArrowUpload20Regular />} onClick={onUpload}>Upload report</MenuItem>
+                  </>
+                )}
+              </MenuList>
+            </MenuPopover>
+          </Menu>
+        </Toolbar>
       </div>
 
       {error && (

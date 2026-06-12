@@ -1,14 +1,19 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
-  Badge, Button, Dropdown, Option, Tab, TabList, Tooltip,
+  Badge, Dropdown, Option, Tab, TabList, Tooltip,
+  Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger,
   Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow,
-  Title2, Toolbar, MessageBarBody, MessageBarTitle,
+  Title2, MessageBarBody, MessageBarTitle,
   makeStyles, tokens,
 } from '@fluentui/react-components'
-import { ArrowDownload20Regular, Send20Regular } from '@fluentui/react-icons'
+import { ArrowClockwise20Regular, ArrowDownload20Regular, MoreHorizontal20Regular, Send20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
-import { auditExportUrl, useAuditLog, useMe, useEmailOutbox, useDrainEmail } from '../api/hooks'
+import { PeriodFilter } from '../components/PeriodFilter'
+import { usePeriodFilter, type PeriodFilterState } from '../utils/usePeriodFilter'
+import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
+import { auditExportUrl, fetchAllEmailOutbox, useAuditLog, useMe, useEmailOutbox, useDrainEmail } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { downloadFromUrl } from '../utils/download'
 import { formatDateTime } from '../utils/format'
@@ -20,7 +25,7 @@ const EMAIL_STATUSES: EmailStatus[] = ['Pending', 'Sending', 'Sent', 'Failed']
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' },
   filters: { display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap' },
   field: { display: 'flex', flexDirection: 'column', gap: '4px' },
   fieldLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
@@ -39,6 +44,15 @@ const useStyles = makeStyles({
 
 const ALL = '__all__'
 
+const EMAIL_EXPORT_COLUMNS: ExportColumn<EmailMessage>[] = [
+  { header: 'Created', value: m => m.createdAt },
+  { header: 'To', value: m => (m.toName ? `${m.toName} <${m.toAddress}>` : m.toAddress) },
+  { header: 'Subject', value: m => m.subject },
+  { header: 'Status', value: m => m.status },
+  { header: 'Attempts', value: m => m.attempts },
+  { header: 'Sent', value: m => m.sentAt ?? '' },
+]
+
 type AuditTab = 'changes' | 'emails'
 
 export function AuditPage() {
@@ -47,57 +61,147 @@ export function AuditPage() {
   const [tab, setTab] = useState<AuditTab>('changes')
   const emailEnabled = me?.emailEnabled === true
 
+  // Filter state is lifted out of the tabs so the single actions menu in the title row can act on
+  // whichever tab is showing (export honours the active filters; the dropdowns still live in the
+  // tab bodies and read/write this state through props).
+  const [change, setChange] = useState<AuditChangeType | undefined>(undefined)
+  const [targetType, setTargetType] = useState<AuditTargetType | undefined>(undefined)
+  const [status, setStatus] = useState<EmailStatus | undefined>(undefined)
+  const changesPeriod = usePeriodFilter()
+  const emailsPeriod = usePeriodFilter()
+  const queryClient = useQueryClient()
+
+  // Refetch the active tab's list, keeping the current filters (react-query refetches with the
+  // existing query params).
+  const onRefresh = () =>
+    queryClient.invalidateQueries({ queryKey: [tab === 'emails' ? 'email-outbox' : 'audit'] })
+
+  const [pageError, setPageError] = useState<string | null>(null)
+  const [changesExporting, setChangesExporting] = useState(false)
+  const drain = useDrainEmail()
+  const emailsExport = useCsvExport({
+    filename: 'sent-emails.csv',
+    columns: EMAIL_EXPORT_COLUMNS,
+    fetchAll: () => fetchAllEmailOutbox({ status, from: emailsPeriod.from, to: emailsPeriod.to }),
+    onError: setPageError,
+  })
+
+  // The Changes tab exports via a server-streamed CSV (the whole log can be large), so it can't use
+  // the in-memory useCsvExport hook the other grids share.
+  async function onExportChanges() {
+    setPageError(null)
+    setChangesExporting(true)
+    try {
+      await downloadFromUrl(
+        auditExportUrl({ change, targetType, from: changesPeriod.from, to: changesPeriod.to }),
+        'audit-log.csv',
+      )
+    } catch (e) {
+      setPageError(formatApiError(e))
+    } finally {
+      setChangesExporting(false)
+    }
+  }
+
+  async function onDrain() {
+    setPageError(null)
+    try {
+      await drain.mutateAsync()
+    } catch (e) {
+      setPageError(formatApiError(e))
+    }
+  }
+
   return (
     <div className={s.root}>
-      <Title2>Audit</Title2>
+      <div className={s.header}>
+        <Title2>Audit</Title2>
+        <Menu>
+          <MenuTrigger disableButtonEnhancement>
+            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItem icon={<ArrowClockwise20Regular />} onClick={onRefresh}>Refresh</MenuItem>
+              <MenuDivider />
+              {tab === 'changes' && (
+                <MenuItem
+                  icon={<ArrowDownload20Regular />}
+                  disabled={changesExporting}
+                  onClick={onExportChanges}
+                >
+                  {changesExporting ? 'Exporting…' : 'Export CSV'}
+                </MenuItem>
+              )}
+              {tab === 'emails' && emailEnabled && (
+                <>
+                  <MenuItem
+                    icon={<ArrowDownload20Regular />}
+                    disabled={emailsExport.exporting}
+                    onClick={emailsExport.exportList}
+                  >
+                    {emailsExport.exporting ? 'Exporting…' : 'Export CSV'}
+                  </MenuItem>
+                  <MenuItem icon={<Send20Regular />} disabled={drain.isPending} onClick={onDrain}>
+                    {drain.isPending ? 'Sending…' : 'Send pending now'}
+                  </MenuItem>
+                </>
+              )}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+      </div>
+
       <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as AuditTab)}>
         <Tab value="changes">Changes</Tab>
         {emailEnabled && <Tab value="emails">Sent emails</Tab>}
       </TabList>
 
-      {tab === 'changes' && <ChangesTab />}
-      {tab === 'emails' && emailEnabled && <SentEmailsTab />}
+      {pageError && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>
+            <MessageBarTitle>Could not complete the action</MessageBarTitle>
+            {pageError}
+          </MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      {tab === 'changes' && (
+        <ChangesTab
+          change={change}
+          setChange={setChange}
+          targetType={targetType}
+          setTargetType={setTargetType}
+          period={changesPeriod}
+        />
+      )}
+      {tab === 'emails' && emailEnabled && (
+        <SentEmailsTab status={status} setStatus={setStatus} period={emailsPeriod} />
+      )}
     </div>
   )
 }
 
-function ChangesTab() {
+function ChangesTab({
+  change, setChange, targetType, setTargetType, period,
+}: {
+  change?: AuditChangeType
+  setChange: (value: AuditChangeType | undefined) => void
+  targetType?: AuditTargetType
+  setTargetType: (value: AuditTargetType | undefined) => void
+  period: PeriodFilterState
+}) {
   const s = useStyles()
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [change, setChange] = useState<AuditChangeType | undefined>(undefined)
-  const [targetType, setTargetType] = useState<AuditTargetType | undefined>(undefined)
 
-  const { data, isLoading, error } = useAuditLog({ page, pageSize, change, targetType })
-
-  const [pageError, setPageError] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
+  const { data, isLoading, error } = useAuditLog({ page, pageSize, change, targetType, from: period.from, to: period.to })
 
   const items = data?.items ?? []
 
-  async function onExport() {
-    setPageError(null)
-    setExporting(true)
-    try {
-      await downloadFromUrl(auditExportUrl({ change, targetType }), 'audit-log.csv')
-    } catch (e) {
-      setPageError(formatApiError(e))
-    } finally {
-      setExporting(false)
-    }
-  }
-
   return (
     <>
-      <div className={s.toolbar}>
-        <Toolbar>
-          <Button appearance="primary" icon={<ArrowDownload20Regular />} disabled={exporting} onClick={onExport}>
-            {exporting ? 'Exporting…' : 'Export CSV'}
-          </Button>
-        </Toolbar>
-      </div>
-
       <div className={s.filters}>
         <div className={s.field}>
           <span className={s.fieldLabel}>Change type</span>
@@ -131,6 +235,7 @@ function ChangesTab() {
             {TARGET_TYPES.map(t => <Option key={t} value={t}>{t}</Option>)}
           </Dropdown>
         </div>
+        <PeriodFilter state={period} onChange={() => setPage(1)} />
       </div>
 
       {error && (
@@ -138,15 +243,6 @@ function ChangesTab() {
           <MessageBarBody>
             <MessageBarTitle>Failed to load</MessageBarTitle>
             {formatApiError(error)}
-          </MessageBarBody>
-        </AutoScrollMessageBar>
-      )}
-
-      {pageError && (
-        <AutoScrollMessageBar intent="error">
-          <MessageBarBody>
-            <MessageBarTitle>Could not complete the action</MessageBarTitle>
-            {pageError}
           </MessageBarBody>
         </AutoScrollMessageBar>
       )}
@@ -193,37 +289,23 @@ function ChangesTab() {
   )
 }
 
-function SentEmailsTab() {
+function SentEmailsTab({
+  status, setStatus, period,
+}: {
+  status?: EmailStatus
+  setStatus: (value: EmailStatus | undefined) => void
+  period: PeriodFilterState
+}) {
   const s = useStyles()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [status, setStatus] = useState<EmailStatus | undefined>(undefined)
 
-  const { data, isLoading, error } = useEmailOutbox({ page, pageSize, status })
-  const drain = useDrainEmail()
-  const [pageError, setPageError] = useState<string | null>(null)
+  const { data, isLoading, error } = useEmailOutbox({ page, pageSize, status, from: period.from, to: period.to })
 
   const items = data?.items ?? []
 
-  async function onDrain() {
-    setPageError(null)
-    try {
-      await drain.mutateAsync()
-    } catch (e) {
-      setPageError(formatApiError(e))
-    }
-  }
-
   return (
     <>
-      <div className={s.toolbar}>
-        <Toolbar>
-          <Button icon={<Send20Regular />} disabled={drain.isPending} onClick={onDrain}>
-            {drain.isPending ? 'Sending…' : 'Send pending now'}
-          </Button>
-        </Toolbar>
-      </div>
-
       <div className={s.filters}>
         <div className={s.field}>
           <span className={s.fieldLabel}>Status</span>
@@ -241,6 +323,7 @@ function SentEmailsTab() {
             {EMAIL_STATUSES.map(st => <Option key={st} value={st}>{st}</Option>)}
           </Dropdown>
         </div>
+        <PeriodFilter state={period} onChange={() => setPage(1)} />
       </div>
 
       {error && (
@@ -249,11 +332,6 @@ function SentEmailsTab() {
             <MessageBarTitle>Failed to load</MessageBarTitle>
             {formatApiError(error)}
           </MessageBarBody>
-        </AutoScrollMessageBar>
-      )}
-      {pageError && (
-        <AutoScrollMessageBar intent="error">
-          <MessageBarBody>{pageError}</MessageBarBody>
         </AutoScrollMessageBar>
       )}
 

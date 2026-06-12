@@ -20,6 +20,72 @@ import type {
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/api/me') })
 
+// --- Full-list export helpers -------------------------------------------------------------
+// The grids' "Export CSV" buttons need the *entire* list, not the page currently on screen.
+// These helpers walk every page of a paged endpoint (max 500 rows per request, the server cap)
+// and concatenate the items. They return plain promises — they're invoked imperatively from a
+// click handler, not as React Query hooks.
+
+/** Page size used when paging through an endpoint to export the whole list (server caps at 500). */
+const EXPORT_PAGE_SIZE = 500
+
+async function fetchAllPaged<T>(path: string, search: URLSearchParams): Promise<T[]> {
+  const all: T[] = []
+  let page = 1
+  for (;;) {
+    search.set('page', String(page))
+    search.set('pageSize', String(EXPORT_PAGE_SIZE))
+    const res = await api.get<Paged<T>>(`${path}?${search}`)
+    all.push(...res.items)
+    // Stop when we've gathered everything the server says exists, or when a page comes back empty
+    // (guards against an off-by-one if `total` ever lags behind the data).
+    if (res.items.length === 0 || all.length >= res.total) break
+    page++
+  }
+  return all
+}
+
+export const fetchAllAccounts = (params?: { kind?: string; role?: string; includeDeleted?: boolean }) => {
+  const search = new URLSearchParams()
+  if (params?.kind) search.set('kind', params.kind)
+  if (params?.role) search.set('role', params.role)
+  if (params?.includeDeleted) search.set('includeDeleted', 'true')
+  return fetchAllPaged<Account>('/api/admin/accounts', search)
+}
+
+export const fetchAllSchemas = (params?: { includeDeleted?: boolean }) => {
+  const search = new URLSearchParams()
+  if (params?.includeDeleted) search.set('includeDeleted', 'true')
+  return fetchAllPaged<Schema>('/api/admin/schemas', search)
+}
+
+export const fetchAllSubmissions = (params?: { serviceId?: string; schemaName?: string; from?: string; to?: string }) => {
+  const search = new URLSearchParams()
+  if (params?.serviceId)  search.set('serviceId', params.serviceId)
+  if (params?.schemaName) search.set('schemaName', params.schemaName)
+  if (params?.from)       search.set('from', params.from)
+  if (params?.to)         search.set('to', params.to)
+  return fetchAllPaged<Submission>('/api/admin/submissions', search)
+}
+
+export const fetchAllMySubmissions = (params?: { schemaName?: string; from?: string; to?: string }) => {
+  const search = new URLSearchParams()
+  if (params?.schemaName) search.set('schemaName', params.schemaName)
+  if (params?.from)       search.set('from', params.from)
+  if (params?.to)         search.set('to', params.to)
+  return fetchAllPaged<Submission>('/api/submissions', search)
+}
+
+export const fetchAllReports = () => fetchAllPaged<Report>('/api/reports', new URLSearchParams())
+
+export const fetchAllEmailOutbox = (params?: { status?: EmailStatus; from?: string; to?: string }) => {
+  const search = new URLSearchParams()
+  if (params?.status) search.set('status', params.status)
+  if (params?.from)   search.set('from', params.from)
+  if (params?.to)     search.set('to', params.to)
+  return fetchAllPaged<EmailMessage>('/api/admin/email/outbox', search)
+}
+
 /**
  * Enabled SSO providers. Returns [] when SSO is disabled server-side, in which case the UI shows
  * no SSO buttons and no account-linking field — i.e. it looks exactly like the API-key-only build.
@@ -304,11 +370,13 @@ export const useUpdateEmailTemplate = () => {
 
 /** Page through the outbox (audit "Sent emails" tab), optionally filtered by delivery status. */
 export const useEmailOutbox = (
-  params: { page: number; pageSize: number; status?: EmailStatus },
+  params: { page: number; pageSize: number; status?: EmailStatus; from?: string; to?: string },
   enabled: boolean = true,
 ) => {
   const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize) })
   if (params.status) search.set('status', params.status)
+  if (params.from)   search.set('from', params.from)
+  if (params.to)     search.set('to', params.to)
   return useQuery({
     queryKey: ['email-outbox', params],
     queryFn: () => api.get<Paged<EmailMessage>>(`/api/admin/email/outbox?${search}`),
@@ -367,7 +435,7 @@ export const useRunNotifications = () => {
  * exposed here (it is reachable only by calling the export endpoint directly).
  */
 export const useAuditLog = (
-  params: { page: number; pageSize: number; change?: AuditChangeType; targetType?: AuditTargetType },
+  params: { page: number; pageSize: number; change?: AuditChangeType; targetType?: AuditTargetType; from?: string; to?: string },
   enabled: boolean = true,
 ) => {
   const search = new URLSearchParams({
@@ -376,6 +444,8 @@ export const useAuditLog = (
   })
   if (params.change)     search.set('change', params.change)
   if (params.targetType) search.set('targetType', params.targetType)
+  if (params.from)       search.set('from', params.from)
+  if (params.to)         search.set('to', params.to)
   return useQuery({
     queryKey: ['audit', params],
     queryFn: () => api.get<Paged<AuditLog>>(`/api/admin/audit?${search}`),
@@ -383,11 +453,13 @@ export const useAuditLog = (
   })
 }
 
-/** Build the relative URL for the server-side CSV export, honouring the current change/target filters. */
-export const auditExportUrl = (params: { change?: AuditChangeType; targetType?: AuditTargetType }) => {
+/** Build the relative URL for the server-side CSV export, honouring the current change/target/period filters. */
+export const auditExportUrl = (params: { change?: AuditChangeType; targetType?: AuditTargetType; from?: string; to?: string }) => {
   const search = new URLSearchParams()
   if (params.change)     search.set('change', params.change)
   if (params.targetType) search.set('targetType', params.targetType)
+  if (params.from)       search.set('from', params.from)
+  if (params.to)         search.set('to', params.to)
   const qs = search.toString()
   return qs ? `/api/admin/audit/export?${qs}` : '/api/admin/audit/export'
 }

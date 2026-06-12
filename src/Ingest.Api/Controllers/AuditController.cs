@@ -25,6 +25,8 @@ public sealed class AuditController(IAuditLogService service) : ControllerBase
     /// <param name="pageSize">Page size; defaults to 50.</param>
     /// <param name="change">Restrict to a single change type (Create, Edit, Delete).</param>
     /// <param name="targetType">Restrict to a single target type (User, Account, Schema, ApiKey, Submission, Report).</param>
+    /// <param name="from">Lower bound on the entry timestamp (inclusive).</param>
+    /// <param name="to">Upper bound on the entry timestamp (exclusive).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">A page of audit entries.</response>
     [HttpGet]
@@ -34,10 +36,12 @@ public sealed class AuditController(IAuditLogService service) : ControllerBase
         [FromQuery] int? pageSize,
         [FromQuery] AuditChangeType? change,
         [FromQuery] AuditTargetType? targetType,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
         CancellationToken ct)
     {
         var result = await service.ListAsync(
-            RequestHelpers.ToPageRequest(page, pageSize, null, false), change, targetType, null, ct);
+            RequestHelpers.ToPageRequest(page, pageSize, null, false), change, targetType, null, from, to, ct);
         return Ok(result.Map(AuditLogDto.From));
     }
 
@@ -50,6 +54,8 @@ public sealed class AuditController(IAuditLogService service) : ControllerBase
     /// <param name="name">Substring matched against either the target or actor name.</param>
     /// <param name="change">Restrict to a single change type.</param>
     /// <param name="targetType">Restrict to a single target type.</param>
+    /// <param name="from">Lower bound on the entry timestamp (inclusive).</param>
+    /// <param name="to">Upper bound on the entry timestamp (exclusive).</param>
     /// <param name="ct">Cancellation token.</param>
     [HttpGet("export")]
     [Produces("text/csv")]
@@ -57,6 +63,8 @@ public sealed class AuditController(IAuditLogService service) : ControllerBase
         [FromQuery] string? name,
         [FromQuery] AuditChangeType? change,
         [FromQuery] AuditTargetType? targetType,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
         CancellationToken ct)
     {
         Response.ContentType = "text/csv; charset=utf-8";
@@ -65,7 +73,7 @@ public sealed class AuditController(IAuditLogService service) : ControllerBase
         await using var writer = new StreamWriter(Response.Body, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         await writer.WriteLineAsync("Timestamp,Change,TargetType,TargetId,TargetName,ActorId,ActorName");
 
-        await foreach (var entry in service.StreamAsync(change, targetType, name, ct))
+        await foreach (var entry in service.StreamAsync(change, targetType, name, from, to, ct))
         {
             var line = string.Join(',',
                 Escape(entry.Timestamp.ToString("o", CultureInfo.InvariantCulture)),
