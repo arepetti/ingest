@@ -30,6 +30,9 @@ const EVENTS: { kind: WebhookEventKind; label: string; wire: string; desc: strin
   { kind: 'SubmissionWarnings', label: 'Submission warnings', wire: 'submission.warnings', desc: 'An accepted submission carried non-blocking warnings.' },
   { kind: 'WindowUpcoming', label: 'Window upcoming', wire: 'window.upcoming', desc: 'A submission window is approaching its close.' },
   { kind: 'WindowMissed', label: 'Window missed', wire: 'window.missed', desc: 'A window closed without the required submission.' },
+  { kind: 'SubmissionPendingApproval', label: 'Submission pending approval', wire: 'submission.pending_approval', desc: 'A submission was accepted but is held awaiting approval.' },
+  { kind: 'SubmissionApproved', label: 'Submission approved', wire: 'submission.approved', desc: 'A pending submission was approved and is now live.' },
+  { kind: 'SubmissionRejected', label: 'Submission rejected', wire: 'submission.rejected', desc: 'A pending submission was rejected and will not go live.' },
 ]
 
 const ALL = '__all__'

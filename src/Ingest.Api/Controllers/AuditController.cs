@@ -5,6 +5,7 @@ using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,7 +18,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/audit")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.AuditRead)]
 public sealed class AuditController(IAuditLogService service) : ControllerBase
 {
     /// <summary>Page through the audit log, newest change first.</summary>

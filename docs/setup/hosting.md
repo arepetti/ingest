@@ -145,7 +145,29 @@ az cosmosdb mongocluster create `
     --shard-node-count 1
 ```
 
-`M30` is the smallest production-ish tier; pick whatever sizing matches your expected volume. HA off keeps cost low for non-critical environments — flip it on for production.
+`M30` is the smallest production-ish tier; pick whatever sizing matches your expected volume. `--shard-node-ha false` in the command above keeps cost low for non-critical environments — flip it on for production (see [§ High availability](#high-availability) immediately below).
+
+### High availability
+
+The create command above sets `--shard-node-ha false`. For any deployment you can't afford to have offline during a node failure or planned maintenance, enable in-region HA:
+
+```powershell
+az cosmosdb mongocluster update `
+    --resource-group $Rg `
+    --cluster-name $Cluster `
+    --shard-node-ha true
+```
+
+(You can also pass `--shard-node-ha true` to the original `create` call.)
+
+What HA does and doesn't do:
+
+- **What you get.** A hot **standby replica** of each shard, kept in sync with the primary. In regions with [availability zones](https://learn.microsoft.com/azure/reliability/availability-zones-overview) the standby sits in a different zone. If the primary node fails — or Azure patches it during planned maintenance — the cluster **fails over automatically** to the standby. The connection string doesn't change, so Ingest reconnects on its own (the MongoDB driver retries transient errors).
+- **What it costs.** Roughly **double** the per-node compute bill, because you're paying for the standby node as well as the primary. Storage is not doubled.
+- **Tier requirement.** In-region HA is available on **M30 and above** — not on the Free tier or the burstable tiers (M10/M20/M25). The standard guide's M30 qualifies.
+- **What it does *not* cover.** HA protects against a *node* or *zone* failure inside one region. It does **not** protect against the loss of an entire Azure region, accidental data deletion, or a bad write — those are covered by [backups](#backups) and, optionally, cross-region replication. See the [disaster recovery plan](disaster-recovery.md) for how these layers fit together.
+
+For the Container Apps tier, the equivalent lever is `--min-replicas` (Step 8): keep it at **1 or higher** so a single replica restart doesn't take the API offline. The app itself is stateless, so replicas are interchangeable.
 
 Allow your Container Apps environment to talk to the cluster:
 
@@ -431,7 +453,7 @@ The settings the deployment commands above pass — and every other knob you can
 - **Recommended behind any reverse proxy:** `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`.
 - **Optional but useful:** the OpenTelemetry / Application Insights variables for telemetry.
 
-For expected throughput, data volume, and response times on the footprint above, see [performance.md](performance.md).
+For expected throughput, data volume, and response times on the footprint above, see [performance.md](performance.md). For recovering this deployment after data loss or an outage, see the [disaster recovery plan](disaster-recovery.md).
 
 ## Network controls
 
@@ -442,6 +464,36 @@ Ingest authenticates every request with an API key, but it deliberately does **n
 - **IP allow-listing:** restrict who can reach the app at the ingress. Azure Container Apps supports inbound IP restrictions (`az containerapp ingress access-restriction set`); App Gateway / Front Door use WAF rules; Nginx uses `allow`/`deny`; Kubernetes ingress controllers expose `whitelist-source-range` annotations.
 
 Keeping these at the hosting layer means they apply uniformly to every entry point (REST, OData, SPA) and can be tuned without redeploying the application.
+
+#### Picking a rate limit
+
+There's no single correct number — it depends on how many services submit, how chatty your Power BI refreshes are, and how much burst you want to absorb. The [performance profile](performance.md) is the starting point: a typical council deployment sits **well under 1 request/second** on average, with short peaks of **~1–2 req/s** (analysts plus a Power BI refresh) and a worst-plausible write spike of **~0.5 req/s** for a few seconds. So a limit that protects the platform without tripping on legitimate traffic is generously above those numbers. Reasonable **starting points** (then tune from real traffic):
+
+| Scope | Suggested starting limit | Rationale |
+|-------|--------------------------|-----------|
+| Per client IP | **~60–120 requests/minute** | Comfortably above a single analyst + a paging Power BI refresh, which can fire many OData pages back-to-back. Set too low and a legitimate full-history refresh will trip it. |
+| Whole app (all IPs) | **~300–600 requests/minute** | Caps total inbound while leaving headroom for several services and refreshes at once. |
+
+Power BI paging is the usual reason a too-aggressive per-IP limit causes trouble: an unfiltered refresh issues hundreds of sequential page requests from one address (see [performance.md § Data volume](performance.md#data-volume) and [powerbi.md § Pre-filtering at the source](powerbi.md#pre-filtering-at-the-source)). If you rate-limit, either pre-filter those refreshes or set the per-IP window high enough to absorb a full page run.
+
+Azure Front Door (Standard/Premium) is the typical place to enforce this in front of Container Apps. A custom WAF rule expresses the per-IP rule above:
+
+```powershell
+# Rate-limit each client IP to 100 requests per minute on the Front Door WAF policy.
+az network front-door waf-policy rule create `
+    --resource-group $Rg `
+    --policy-name "ingestWaf" `
+    --name "PerIpRateLimit" `
+    --rule-type RateLimitRule `
+    --rate-limit-duration 1 `        # window, in minutes
+    --rate-limit-threshold 100 `     # requests per window per client IP
+    --action Block `
+    --priority 100
+```
+
+API Management is the heavier alternative — `rate-limit-by-key` / `quota-by-key` inbound policies give per-subscription throttling and monthly quotas if you front the API with APIM. Behind your own reverse proxy, the equivalent knobs are Nginx `limit_req_zone` + `limit_req` or Caddy's `rate_limit` handler.
+
+Whichever you choose, **return `429 Too Many Requests`** (the platforms above do) so clients can back off, and watch the WAF/proxy metrics after rollout to confirm you aren't blocking real refreshes.
 
 ## Free tier - a $0 evaluation deployment
 
@@ -619,6 +671,26 @@ If you prefer running MongoDB yourself (replica set on Azure VMs, MongoDB Atlas,
 
 The application does not need to be quiesced for a backup; it's stateless apart from MongoDB. After a restore the app re-creates indexes on startup (`MongoSetup.EnsureIndexesAsync`), so an index-less `mongorestore --noIndexRestore` is fine too.
 
+### Automatic backups on Cosmos DB for MongoDB vCore
+
+On the recommended Cosmos DB vCore path, **automatic point-in-time backups are on by default — there is nothing to configure and no schedule to set up.** The key facts (verify current numbers against [Microsoft's restore guide](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/how-to-restore-cluster), as Azure changes them over time):
+
+- **Retention.** Backups are kept for **35 days** on a standard active cluster (the M30 used here), and **7 days** on the burstable tiers (M10/M20/M25) or after a cluster is deleted. You can restore to **any point in time** within that window.
+- **Tier requirement.** Backup/restore is available on **M25 and above** — the standard M30 qualifies. (The Free tier has *no* backup/restore; see the [free-tier caveats](#free-tier-caveats).)
+- **Durability.** Snapshots are AES-256 encrypted and, in regions with availability zones, stored across **three zones** — so a backup survives the loss of a zone.
+- **It is not a complete DR solution by itself.** Microsoft is explicit that PITR protects against accidental change/deletion and node/zone loss, but you still need your own plan for a full-region outage. That's what the [disaster recovery plan](disaster-recovery.md) and (optionally) cross-region replication are for.
+
+**Restoring is a create-new-cluster operation, not an in-place rollback.** A point-in-time restore provisions a **brand-new cluster** in the same region, subscription, and resource group; the original is untouched. Two things that **do not carry over** to the new cluster and must be set again before Ingest can use it:
+
+1. **High availability** is **off** on the restored cluster — re-enable it ([§ High availability](#high-availability)) if you need it.
+2. **Networking / firewall rules** are **not copied** — re-add the `azure-services` firewall rule (or VNet wiring) so Container Apps can reach it.
+
+Then **repoint the app** at the new cluster by updating the `mongo-cs` secret with the new connection string and restarting the app — the same secret you set in [Step 5](#step-5--store-secrets-in-key-vault-recommended) / [Step 8](#step-8--create-the-container-app). Step-by-step restore runbooks live in the [disaster recovery plan](disaster-recovery.md).
+
+> **Restoring beyond the window.** If a cluster is 35+ days old and the point you want isn't in the restore list, you may need to open an Azure support request. Don't rely on this; if you need long-term archival (regulatory retention beyond 35 days), take periodic `mongodump` exports and store them in your own immutable storage.
+
+> **Region-level resilience (optional).** For continuity through the loss of an entire Azure region, Cosmos DB vCore also offers **cross-region replication** — a continuously-synced replica cluster in a second region you can fail writes over to. It's an add-on to (not a replacement for) in-region HA and backups. It's out of scope for the standard single-region guide above; weigh it in the [disaster recovery plan](disaster-recovery.md) against your recovery objectives and budget.
+
 > **In-app export/import is *not* the backup mechanism.** The admin SPA has a **Settings → Backup & restore** tool that exports the whole registry to a single JSON file and restores it. It exists for **small** deployments and for copying data between environments. It loads everything into memory, a restore **replaces all current data**, and it is **not transactional**. Do not rely on it for production backups or large databases — use the database-level options above. See [admin-user-guide/settings.md](../admin-user-guide/settings.md).
 
 ## Tearing it down
@@ -637,12 +709,13 @@ Before you call it "production":
 
 - [ ] `ApiKey:Pepper` is set to a long random value and stored in Key Vault.
 - [ ] Bootstrap admin key has been **rotated** and the original revoked (especially if `ApiKey:BootstrapAdminKey` was pre-set).
-- [ ] Cosmos DB shard-node-ha is **on** if you can't tolerate planned maintenance.
+- [ ] Cosmos DB shard-node-ha is **on** if you can't tolerate planned maintenance — see [§ High availability](#high-availability).
 - [ ] `Ingest:EnableSwagger` is `false`.
 - [ ] Liveness/readiness probes are wired.
-- [ ] Rate limiting and (if needed) IP allow-listing are configured at the ingress / proxy — see [Network controls](#network-controls).
+- [ ] Rate limiting and (if needed) IP allow-listing are configured at the ingress / proxy — see [Network controls](#network-controls) and [§ Picking a rate limit](#picking-a-rate-limit).
 - [ ] Logs flow to Log Analytics or Application Insights.
 - [ ] You've validated PowerBI can connect with an Operator-role key (see [powerbi.md](powerbi.md)).
 - [ ] **If using SSO:** `Sso__EnableSso=true`, the client id/secret are sourced from Key Vault (not inline), the production redirect URI is registered with each IdP, and at least one admin's identity is linked to a `User` account (so you're not locked out if a key is lost).
 - [ ] A backup of `mongo-cs` (your Mongo connection string) is stored somewhere you can find without logging into Azure.
-- [ ] **Database backups** are configured at the MongoDB layer (provider automated backups or scheduled `mongodump`) — see [Backups](#backups). The in-app export/import is *not* a substitute.
+- [ ] **Database backups** are configured at the MongoDB layer (provider automated backups or scheduled `mongodump`) — see [Backups](#backups). On Cosmos DB vCore these are automatic; confirm the tier supports them and the retention window meets your needs. The in-app export/import is *not* a substitute.
+- [ ] A **disaster recovery plan** has been reviewed, customised to your org, and the restore runbook tested at least once — see [disaster-recovery.md](disaster-recovery.md).

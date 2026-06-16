@@ -34,7 +34,7 @@ If you're just getting started — including how to obtain a key in the first pl
 | **204 No Content** | Mutation succeeded, no body. |
 | **400 Bad Request** | Validation failed. Look at `errors[]` for the list. |
 | **401 Unauthorized** | Missing/invalid `X-Api-Key`. The `WWW-Authenticate` header tells you which header to send. |
-| **403 Forbidden** | The credential is valid but lacks permission (wrong role, foreign resource, or cadence window closed). |
+| **403 Forbidden** | The credential is valid but lacks permission (missing capability, foreign resource, or cadence window closed). |
 | **404 Not Found** | The referenced resource doesn't exist, or isn't visible to you. |
 | **409 Conflict** | Uniqueness collision (mostly relevant to admins). |
 | **500 Internal Server Error** | Unhandled exception. Check the server logs. |
@@ -65,7 +65,7 @@ The response shape is always:
 
 ## `GET /api/me`
 
-Identifies the account behind the supplied API key. Useful for verifying credentials before doing real work and for adapting client behaviour to the role/kind.
+Identifies the account behind the supplied API key. Useful for verifying credentials before doing real work and for adapting client behaviour to the role/kind/capabilities.
 
 **Request**
 
@@ -82,9 +82,12 @@ X-Api-Key: abc12345.7N3pK0M9C0LSx0OqGZpY3vW0eFkdsbVz
   "name":  "roads-team",
   "label": "Roads & Highways team",
   "role":  "Service",
-  "kind":  "Application"
+  "kind":  "Application",
+  "capabilities": []
 }
 ```
+
+`capabilities` is the account's **effective** capability set — the fine-grained permissions that actually govern what it may do (see [architecture/authentication.md § Authorisation: capabilities](../architecture/authentication.md#authorisation-capabilities)). A pure `Service` account has none (it uses the self-service `/api/me*`, `/api/schemas*` and `/api/submissions*` endpoints, which don't require a capability); back-office accounts list strings such as `"submissions:read"` or `"schemas:manage"`. The SPA uses this array to decide which navigation and actions to render. The payload also carries feature flags (e.g. `approvalEnabled`, `emailEnabled`) used by the admin UI.
 
 **Status codes**
 
@@ -583,11 +586,19 @@ Example response with both kinds of warning:
 
 If you only care about errors, you can ignore the field. If you care about data quality, fail loudly on it. See the rule-authoring guide ([../admin-user-guide/validation.md § Conditional display](../admin-user-guide/validation.md#conditional-display-enabled-if--visible-if) and [§ Warnings](../admin-user-guide/validation.md#warnings-non-blocking-notices)) for the full semantics.
 
+## Approval (optional)
+
+If an administrator has enabled the [submission approval workflow](../admin-user-guide/approval-process.md) and a policy covers your schema and source, your submission is **accepted and stored exactly as usual** (same 201/200 response with `id` + `warnings`) but is held as `Pending` — it stays out of the OData feed, Explore, reports and webhooks until a reviewer approves it. No client change is needed.
+
+- **Source.** Submissions are tagged with a source so policies can target manual vs. API traffic. Direct API calls default to `Api`; the admin console tags its own writes as `Manual`. You can override with the optional `X-Ingest-Source: api|manual` header, but you normally shouldn't.
+- **Re-submitting.** Re-sending data for a window that already has a submission replaces it and, when approval applies, resets it to `Pending` — even if the previous one was approved. Editing an approved submission therefore removes it from reporting until it's approved again.
+- **Approving** is an admin/approver action and is not part of the service-facing API.
+
 ---
 
 ## Reports
 
-Reports are HTML+Liquid templates uploaded by admins and rendered server-side. The list/get/render endpoints are open to **Operator** and **Admin** roles; **Service** accounts have no access. Service accounts can keep ignoring `/api/reports/*` entirely — they're a back-office feature. Full author/viewer documentation lives in [../admin-user-guide/reports.md](../admin-user-guide/reports.md).
+Reports are HTML+Liquid templates uploaded by admins and rendered server-side. The list/get/render endpoints require the `reports:read` capability (creating/deleting report definitions needs `reports:manage`); a pure **Service** account has neither and can keep ignoring `/api/reports/*` entirely — they're a back-office feature. Full author/viewer documentation lives in [../admin-user-guide/reports.md](../admin-user-guide/reports.md).
 
 ### `GET /api/reports`
 
@@ -653,11 +664,11 @@ Response (200):
 
 `html` is the rendered output — drop it into a sandboxed iframe via `srcdoc` for safe display.
 
-### `POST /api/admin/reports` *(admin only)*
+### `POST /api/admin/reports` *(requires `reports:manage`)*
 
 `multipart/form-data` with a single `file` field. Use this from a file picker.
 
-### `POST /api/admin/reports/json` *(admin only)*
+### `POST /api/admin/reports/json` *(requires `reports:manage`)*
 
 JSON variant for non-browser tooling:
 
@@ -668,7 +679,7 @@ JSON variant for non-browser tooling:
 }
 ```
 
-### `DELETE /api/admin/reports/{id}` *(admin only)*
+### `DELETE /api/admin/reports/{id}` *(requires `reports:manage`)*
 
 Soft-delete. Idempotent.
 

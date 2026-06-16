@@ -2,7 +2,7 @@
 
 **Webhooks** push events *out* of Ingest the moment they happen, so you can wire submissions and missed-window alerts into Teams, Power Automate, Slack, or your own service **without polling** the OData feed. Each registered endpoint receives a signed HTTP `POST` for the events it subscribes to.
 
-It's an admin-only section under **Settings → Webhooks**, and it only appears when the feature is switched on server-side (`Webhooks:Enabled`, **off by default** — see [setup/configuration.md → Webhooks](../setup/configuration.md#webhooks)). When the switch is off the section is hidden and every `/api/admin/webhooks/*` endpoint returns 404, mirroring the email master-switch pattern.
+It's a **Settings → Webhooks** section gated by the `webhooks:read` capability (managing endpoints needs `webhooks:manage`) — in the Admin default bundle, but grantable to any non-admin — and it only appears when the feature is switched on server-side (`Webhooks:Enabled`, **off by default** — see [setup/configuration.md → Webhooks](../setup/configuration.md#webhooks)). When the switch is off the section is hidden and every `/api/admin/webhooks/*` endpoint returns 404, mirroring the email master-switch pattern.
 
 ## Events you can subscribe to
 
@@ -12,8 +12,13 @@ It's an admin-only section under **Settings → Webhooks**, and it only appears 
 | `submission.warnings`    | An accepted submission carried non-blocking validation warnings. (`submission.accepted` also fires for the same write.) | Immediate, on write. |
 | `window.upcoming`        | A required value's cadence window is about to close and nothing has been submitted yet. | The notification scheduler (timer). |
 | `window.missed`          | A required value's *previous* window closed without a submission. | The notification scheduler (timer). |
+| `submission.pending_approval` | A submission was accepted but is held awaiting approval before it goes live. | Immediate, on write. |
+| `submission.approved`    | A pending submission was approved and is now live. (`submission.accepted` also fires for the same transition.) | Immediate, on the approve decision. |
+| `submission.rejected`    | A pending submission was rejected and will not go live. The payload carries the reviewer's `note`. | Immediate, on the reject decision. |
 
 > The two `window.*` events are discovered by the same background job that drives the **upcoming / missed email reminders** ([settings.md → Notifications](settings.md#notifications)). They fire whether or not the matching *email* trigger is enabled — subscribing a webhook is enough to make the job look for them. The cadence of the timer is `Notifications:Scheduler:PollMinutes`.
+>
+> The three `submission.*_approval` / `submission.approved` / `submission.rejected` events only ever fire while the [approval workflow](approval-process.md) is enabled (`Approval:Enabled`) — a submission has to be held pending for them to make sense. Like the accepted/warnings events they are emitted synchronously by the write/decision and are independent of the email triggers.
 
 ## Registering an endpoint
 

@@ -4,6 +4,7 @@ using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
+using Ingest.Core.Security;
 using Ingest.Infrastructure.Email;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +20,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/email")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.NotificationsRead)]
 public sealed class AdminEmailController : ControllerBase
 {
     private readonly IEmailSettingsService _settings;
@@ -63,6 +64,7 @@ public sealed class AdminEmailController : ControllerBase
     /// <response code="400">Validation failed (bad host/port/from-address).</response>
     /// <response code="404">Email is disabled.</response>
     [HttpPut("settings")]
+    [Authorize(Policy = Capabilities.NotificationsManage)]
     [ProducesResponseType(typeof(EmailSettingsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -104,6 +106,7 @@ public sealed class AdminEmailController : ControllerBase
     /// <response code="400">The Liquid failed to parse.</response>
     /// <response code="404">Email is disabled, or no template with that key.</response>
     [HttpPut("templates/{key}")]
+    [Authorize(Policy = Capabilities.NotificationsManage)]
     [ProducesResponseType(typeof(EmailTemplateDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -134,6 +137,7 @@ public sealed class AdminEmailController : ControllerBase
     /// <response code="200">The drain result (sent / failed counts).</response>
     /// <response code="404">Email is disabled.</response>
     [HttpPost("drain")]
+    [Authorize(Policy = Capabilities.NotificationsManage)]
     [ProducesResponseType(typeof(EmailDrainResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Drain([FromQuery] int? max, CancellationToken ct)
@@ -143,14 +147,14 @@ public sealed class AdminEmailController : ControllerBase
     }
 
     /// <summary>
-    /// Send an ad-hoc plain-text email to a single account. Available to operators and admins.
-    /// The message is enqueued into the outbox and delivered by the sender like any other.
+    /// Send an ad-hoc plain-text email to a single account. Requires the <c>notifications:manage</c>
+    /// capability. The message is enqueued into the outbox and delivered by the sender like any other.
     /// </summary>
     /// <response code="202">Enqueued; returns the new message id.</response>
     /// <response code="400">Subject/body missing, or the account has no contact email.</response>
     /// <response code="404">Email is disabled, or no account with that id.</response>
     [HttpPost("send")]
-    [Authorize(Policy = AuthConstants.OperatorPolicy)]
+    [Authorize(Policy = Capabilities.NotificationsManage)]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

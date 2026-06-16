@@ -128,6 +128,9 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const key = getApiKey()
   if (key) headers['X-Api-Key'] = key
+  // Everything the admin console does is a human action at a keyboard. Tag it so the approval
+  // workflow can apply source-aware policies (manual vs. API). Harmless on non-submission calls.
+  headers['X-Ingest-Source'] = 'manual'
   const res = await fetch(url, {
     method,
     headers,

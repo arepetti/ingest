@@ -1,7 +1,8 @@
 # Settings
 
-**Settings** is an admin-only hub (it doesn't appear for operators or services). It uses a master-detail layout — a vertical list of **sections** on the left, the selected section's content on the right (much like VS Code's settings). The sections shown depend on which features are enabled:
+**Settings** is the configuration hub. It appears for any account that holds at least one settings-related capability (e.g. `settings:read`, `notifications:read`, `webhooks:read`) — in practice admins, plus any non-admin you've specifically granted one of those. Each section is independently gated by its own capability, so a user only sees (and can only change) the parts they're permitted to. It uses a master-detail layout — a vertical list of **sections** on the left, the selected section's content on the right (much like VS Code's settings). The sections shown depend on which features are enabled **and** your capabilities:
 
+- When the **approval workflow is enabled** (`Approval:Enabled`, on by default) you get an **Approval** section for the global default policy — documented in [approval-process.md](approval-process.md).
 - When the **email feature is enabled** (`Email:Enabled`, on by default — see [setup/configuration.md → Email & notifications](../setup/configuration.md#email--notifications)) you get **Email**, **Email templates** and **Notifications**.
 - When **webhooks are enabled** (`Webhooks:Enabled`, **off** by default) you get a **Webhooks** section — documented separately in [webhooks.md](webhooks.md).
 
@@ -35,6 +36,9 @@ The built-in templates and the model each one is rendered against:
 | `notification.upcoming`   | Upcoming reminder       | `service.name`, `service.label`, `items[]` → `schema`, `value`, `cadence`, `periodEnd` |
 | `notification.missed`     | Missed alert            | `service.name`, `service.label`, `items[]` → `schema`, `missingCount`, `totalCount`, `periodStart`, `periodEnd` |
 | `notification.warnings`   | Submission with warnings| `service.name`, `service.label`, `submissionId`, `submittedAt`, `warnings[]` (strings) |
+| `notification.pendingApproval` | Submission pending approval | `service.name`, `service.label`, `submissionId`, `submittedAt`, `schemas[]` (strings), `sampleCount` |
+| `notification.approved`   | Submission approved     | `service.name`, `service.label`, `submissionId`, `submittedAt`, `schemas[]`, `sampleCount`, `decidedBy`, `note` |
+| `notification.rejected`   | Submission rejected     | `service.name`, `service.label`, `submissionId`, `submittedAt`, `schemas[]`, `sampleCount`, `decidedBy`, `reason` |
 
 Reference fields with the usual Liquid syntax, e.g. `{{ service.label }}` or `{% for item in items %}{{ item.value }}{% endfor %}`.
 
@@ -46,12 +50,20 @@ The **Notifications** section controls *which events generate emails* and *who r
 - **Missed submission alert** — a required value's *previous* window closed without a submission (the deadline passed).
 - **Submission with warnings notice** — a submission was accepted but carried validation warnings.
 
+When the [approval workflow](approval-process.md) is enabled (`Approval:Enabled`) three more triggers appear:
+
+- **Submission pending approval notice** — a submission is held awaiting approval. **The submission's designated approvers are always emailed when this is on** so they know there's something to review; the two recipient switches below add the submitter and/or admin-list copies on top.
+- **Submission approved notice** — a pending submission was approved and is now live.
+- **Submission rejected notice** — a pending submission was rejected; the email carries the reviewer's reason.
+
 For each trigger you choose the recipients (additive):
 
 - **Notify the service account** — sends to the contact **email on the service account** the event is about. (Set those on [accounts.md](accounts.md).)
 - **Notify the admin/operator list** — sends to the shared **recipient list** at the bottom of the section (operator/admin accounts that have an email).
 
 **Run now** triggers the job immediately (it also runs on a timer — `Notifications:Scheduler:PollMinutes`). Each event is **deduplicated**: the same window/submission is notified at most once, no matter how often the job runs. Enabling a trigger never floods recipients with a backlog — "upcoming" only looks at windows inside the lead time, "missed" only at the just-closed window, and "warnings" only at submissions from the last few days.
+
+Unlike the three scheduled triggers above, the **approval notices are event-driven**: they are sent the moment a submission is held pending, approved, or rejected (not on the timer, and not affected by **Run now**).
 
 Generated emails land in the outbox and are delivered by the sender like any other; watch their status on **Audit → Sent emails**.
 

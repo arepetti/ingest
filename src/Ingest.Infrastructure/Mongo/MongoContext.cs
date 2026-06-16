@@ -37,6 +37,9 @@ public sealed class MongoContext
     /// <summary><c>auditLogs</c> collection (append-only create/edit/delete change log).</summary>
     public IMongoCollection<AuditLog> AuditLogs => Database.GetCollection<AuditLog>("auditLogs");
 
+    /// <summary><c>approvalSettings</c> collection — singleton global default approval policy.</summary>
+    public IMongoCollection<ApprovalSettings> ApprovalSettings => Database.GetCollection<ApprovalSettings>("approvalSettings");
+
     /// <summary><c>emailSettings</c> collection — singleton SMTP configuration.</summary>
     public IMongoCollection<EmailSettings> EmailSettings => Database.GetCollection<EmailSettings>("emailSettings");
 

@@ -10,16 +10,18 @@ import {
 import {
   Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, ChartMultiple20Regular,
   Copy20Regular, Delete20Regular, Edit20Regular, History20Regular, MoreHorizontal20Regular,
+  ShieldCheckmark16Regular,
 } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import type { Account, Schema, UpsertSchemaRequest } from '../api/types'
 import {
   fetchAllSchemas, fetchSchemaExample, useAccounts, useCloneSchema,
-  useDeleteSchema, useMe, useSchemas,
+  useCapabilities, useDeleteSchema, useSchemas,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
 import { SchemaAvatar } from '../components/Avatars'
+import { schemaRequiresApproval } from '../utils/approvers'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
@@ -69,6 +71,10 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
+  // Name + the optional "requires approval" marker, kept on one line; the label truncates while
+  // the marker icon stays pinned and visible.
+  nameWithMarker: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 },
+  approvalMarker: { flexShrink: 0, color: tokens.colorBrandForeground1 },
   // Right-align the actions menu within its (fixed-width) cell.
   actionsHeader: { textAlign: 'right' },
   actionsCell:   { textAlign: 'right' },
@@ -112,8 +118,10 @@ const SCHEMA_EXPORT_COLUMNS: ExportColumn<Schema>[] = [
 export function SchemasPage() {
   const s = useStyles()
   const nav = useNavigate()
-  const { data: me } = useMe()
-  const isAdmin = me?.role === 'Admin'
+  const { me, has } = useCapabilities()
+  const canManage = has('schemas:manage')
+  const approvalEnabled = !!me?.approvalEnabled
+  const globalDefaultRequired = !!me?.approvalDefaultRequired
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const { data, isLoading, error, refetch } = useSchemas({ page, pageSize })
@@ -213,7 +221,7 @@ export function SchemasPage() {
       <div className={s.toolbar}>
         <Title2>Schemas</Title2>
         <Toolbar className={s.toolbarActions}>
-          <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>New schema</ToolbarButton>
+          {canManage && <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>New schema</ToolbarButton>}
           <Menu>
             <MenuTrigger disableButtonEnhancement>
               <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
@@ -292,9 +300,16 @@ export function SchemasPage() {
             >
               <TableCell className={s.nameCell}>
                 <TableCellLayout media={<SchemaAvatar schema={sc} />}>
-                  <Tooltip content={sc.label || sc.name} relationship="label">
-                    <strong className={s.truncate}>{sc.label || sc.name}</strong>
-                  </Tooltip>
+                  <span className={s.nameWithMarker}>
+                    <Tooltip content={sc.label || sc.name} relationship="label">
+                      <strong className={s.truncate} style={{ flex: 1, minWidth: 0 }}>{sc.label || sc.name}</strong>
+                    </Tooltip>
+                    {schemaRequiresApproval(sc, { approvalEnabled, globalDefaultRequired }) && (
+                      <Tooltip content="Requires approval" relationship="label">
+                        <ShieldCheckmark16Regular className={s.approvalMarker} aria-label="Requires approval" />
+                      </Tooltip>
+                    )}
+                  </span>
                 </TableCellLayout>
               </TableCell>
               <TableCell>{sc.values.length}</TableCell>
@@ -319,24 +334,24 @@ export function SchemasPage() {
                 <RowActions
                   ariaLabel={`Actions for ${sc.name}`}
                   actions={[
-                    { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => openEdit(sc) },
-                    { key: 'clone', label: 'Clone', icon: <Copy20Regular />, onClick: () => onCloneSchema(sc) },
-                    // Backed by an Admin-only endpoint — surface the menu item only for admins so we
-                    // don't lead operators down a path that ends in a 403.
-                    ...(isAdmin
-                      ? [{
-                          key: 'history',
-                          label: 'View historical data',
-                          icon: <ChartMultiple20Regular />,
-                          onClick: () => nav(`/schemas/${encodeURIComponent(sc.name)}/history`),
-                        }, {
-                          key: 'versions',
-                          label: 'View version history',
-                          icon: <History20Regular />,
-                          onClick: () => nav(`/schemas/${encodeURIComponent(sc.name)}/versions`),
-                        }]
-                      : []),
-                    { key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(sc) },
+                    // Editing/cloning/deleting are gated by schemas:manage; for read-only viewers we
+                    // still surface the (read) history views so the menu stays useful.
+                    ...(canManage ? [
+                      { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => openEdit(sc) },
+                      { key: 'clone', label: 'Clone', icon: <Copy20Regular />, onClick: () => onCloneSchema(sc) },
+                    ] : []),
+                    {
+                      key: 'history',
+                      label: 'View historical data',
+                      icon: <ChartMultiple20Regular />,
+                      onClick: () => nav(`/schemas/${encodeURIComponent(sc.name)}/history`),
+                    }, {
+                      key: 'versions',
+                      label: 'View version history',
+                      icon: <History20Regular />,
+                      onClick: () => nav(`/schemas/${encodeURIComponent(sc.name)}/versions`),
+                    },
+                    ...(canManage ? [{ key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(sc) }] : []),
                   ]}
                 />
               </TableCell>
@@ -370,8 +385,8 @@ export function SchemasPage() {
         />
         {viewing && (
           <Toolbar className={s.drawerToolbar}>
-            <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>Edit</ToolbarButton>
-            <ToolbarButton icon={<Copy20Regular />} onClick={() => onCloneSchema(viewing)}>Clone</ToolbarButton>
+            {canManage && <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>Edit</ToolbarButton>}
+            {canManage && <ToolbarButton icon={<Copy20Regular />} onClick={() => onCloneSchema(viewing)}>Clone</ToolbarButton>}
             {/* Download: default is "schema as JSON"; chevron exposes "example submission". */}
             <Menu positioning="below-end">
               <MenuTrigger disableButtonEnhancement>
@@ -397,45 +412,50 @@ export function SchemasPage() {
                 </MenuList>
               </MenuPopover>
             </Menu>
-            {isAdmin && (
-              // Default action stays "view historical data"; the chevron exposes "view version history".
-              <Menu positioning="below-end">
-                <MenuTrigger disableButtonEnhancement>
-                  {(triggerProps) => (
-                    <SplitButton
-                      menuButton={triggerProps}
-                      primaryActionButton={{ onClick: () => historyFromView(viewing) }}
-                      appearance="subtle"
-                      icon={<ChartMultiple20Regular />}
-                    >
-                      View historical data
-                    </SplitButton>
-                  )}
-                </MenuTrigger>
-                <MenuPopover>
-                  <MenuList>
-                    <MenuItem icon={<ChartMultiple20Regular />} onClick={() => historyFromView(viewing)}>
-                      View historical data
-                    </MenuItem>
-                    <MenuItem icon={<History20Regular />} onClick={() => versionsFromView(viewing)}>
-                      View version history
-                    </MenuItem>
-                  </MenuList>
-                </MenuPopover>
-              </Menu>
-            )}
-            <ToolbarButton icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>Delete</ToolbarButton>
+            {/* History views are read-only, so they stay available to anyone who can view schemas.
+                Default action is "view historical data"; the chevron exposes "view version history". */}
+            <Menu positioning="below-end">
+              <MenuTrigger disableButtonEnhancement>
+                {(triggerProps) => (
+                  <SplitButton
+                    menuButton={triggerProps}
+                    primaryActionButton={{ onClick: () => historyFromView(viewing) }}
+                    appearance="subtle"
+                    icon={<ChartMultiple20Regular />}
+                  >
+                    View historical data
+                  </SplitButton>
+                )}
+              </MenuTrigger>
+              <MenuPopover>
+                <MenuList>
+                  <MenuItem icon={<ChartMultiple20Regular />} onClick={() => historyFromView(viewing)}>
+                    View historical data
+                  </MenuItem>
+                  <MenuItem icon={<History20Regular />} onClick={() => versionsFromView(viewing)}>
+                    View version history
+                  </MenuItem>
+                </MenuList>
+              </MenuPopover>
+            </Menu>
+            {canManage && <ToolbarButton icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>Delete</ToolbarButton>}
           </Toolbar>
         )}
         <DrawerBody>
-          {viewing && <SchemaViewBody schema={viewing} services={services.data?.items ?? []} />}
+          {viewing && (
+            <SchemaViewBody
+              schema={viewing}
+              services={services.data?.items ?? []}
+              requiresApproval={schemaRequiresApproval(viewing, { approvalEnabled, globalDefaultRequired })}
+            />
+          )}
         </DrawerBody>
       </Drawer>
     </div>
   )
 }
 
-function SchemaViewBody({ schema, services }: { schema: Schema; services: Account[] }) {
+function SchemaViewBody({ schema, services, requiresApproval }: { schema: Schema; services: Account[]; requiresApproval: boolean }) {
   const s = useStyles()
   const audience = schema.isGlobal
     ? 'Global (visible to all services)'
@@ -460,7 +480,23 @@ function SchemaViewBody({ schema, services }: { schema: Schema; services: Accoun
         <Badge appearance="outline" color={schema.modifiable ? 'informative' : 'subtle'}>
           {schema.modifiable ? 'Modifiable' : 'Frozen'}
         </Badge>
+        {requiresApproval && (
+          <Badge appearance="outline" color="brand" icon={<ShieldCheckmark16Regular />}>
+            Requires approval
+          </Badge>
+        )}
       </div>
+      {requiresApproval && schema.modifiable && (
+        <MessageBar intent="warning">
+          <MessageBarBody>
+            <MessageBarTitle>Modifiable and approval-gated</MessageBarTitle>
+            Re-submitting data for a window that already has a submission replaces it and resets
+            approval to Pending — even if it was previously approved — so the earlier values are
+            withdrawn from live reporting and ultimately overwritten. Mark the schema (or value) as
+            not modifiable if approved figures should never change mid-cycle.
+          </MessageBarBody>
+        </MessageBar>
+      )}
       <div className={s.twoCol}>
         <Field label="Audience"><Body1>{audience}</Body1></Field>
         <Field label="Version">

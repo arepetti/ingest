@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Ingest.Api.Auth;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +16,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/backup")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.BackupRead)]
 public sealed class AdminBackupController(IBackupService backup) : ControllerBase
 {
     /// <summary>Download a full backup of every collection as one JSON file.</summary>
@@ -45,6 +46,7 @@ public sealed class AdminBackupController(IBackupService backup) : ControllerBas
     /// <response code="400">The file is empty, not valid JSON, not an Ingest backup, or an unsupported version.</response>
     /// <response code="403">Caller is not an Admin.</response>
     [HttpPost("import")]
+    [Authorize(Policy = Capabilities.BackupManage)]
     [ProducesResponseType(typeof(BackupImportResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

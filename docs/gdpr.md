@@ -4,7 +4,7 @@ This page explains the **data-protection features Ingest provides in the product
 
 Article references are to **Regulation (EU) 2016/679 (GDPR)**. The **UK GDPR** and the **Data Protection Act 2018** keep the *same article numbering*, so everything below applies identically under either regime.
 
-Everything here is **Admin-only**.
+The data-subject actions here are gated by the `privacy:read` (export/access) and `privacy:manage` (erasure, retention) capabilities — both in the Admin default bundle, and grantable to a non-admin such as a data-protection officer.
 
 ## What personal data the system holds
 
@@ -74,7 +74,7 @@ The bundle gathers everything tied to the subject into one file: the account rec
 These aren't GDPR features per se but support the same goals:
 
 - **API keys** are stored only as a salted HMAC-SHA256 hash; the plaintext is shown once and never recoverable. Keys can be given an **optional expiry** (up to two years) and revoked at any time — see [admin-user-guide/accounts.md § Issuing and rotating keys](admin-user-guide/accounts.md#issuing-and-rotating-keys).
-- **Least-privilege roles** (`Service` / `Operator` / `Admin`) gate who can read or change what — see [architecture/authentication.md § Roles](architecture/authentication.md#roles).
+- **Least-privilege capabilities** gate who can read or change what (roles seed them, then they're tuned per account) — see [architecture/authentication.md § Authorisation: capabilities](architecture/authentication.md#authorisation-capabilities).
 - **Audit log** records every create/edit/delete with actor and timestamp.
 - **Transport security, rate limiting and IP allow-listing** are delegated to the hosting layer — see [setup/hosting.md § Network controls](setup/hosting.md#network-controls).
 

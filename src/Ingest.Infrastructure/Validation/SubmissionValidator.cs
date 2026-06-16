@@ -4,7 +4,9 @@ using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.Core.Validation;
 using MongoDB.Driver;
+using Ingest.Infrastructure.Approvals;
 using Ingest.Infrastructure.Mongo;
+using Microsoft.Extensions.Options;
 
 namespace Ingest.Infrastructure.Validation;
 
@@ -23,22 +25,26 @@ public sealed class SubmissionValidator : ISubmissionValidator
     private readonly MongoContext _ctx;
     private readonly IExpressionEvaluator _evaluator;
     private readonly IAuditContext _audit;
+    private readonly bool _approvalEnabled;
 
     /// <summary>Create a new <see cref="SubmissionValidator"/>.</summary>
     /// <param name="schemas">Schema repository used to fetch the caller's visible schemas.</param>
     /// <param name="ctx">Mongo context, used directly for the cadence lookup so it doesn't go through the generic repo.</param>
     /// <param name="evaluator">Expression evaluator for the user-provided validation rules.</param>
     /// <param name="audit">Audit context; not used today but injected to make per-rule logging trivial to add.</param>
+    /// <param name="approvalOptions">Approval master switch; when on, the cadence check also considers pending (not-yet-approved) submissions so a window can't hold two.</param>
     public SubmissionValidator(
         ISchemaRepository schemas,
         MongoContext ctx,
         IExpressionEvaluator evaluator,
-        IAuditContext audit)
+        IAuditContext audit,
+        IOptions<ApprovalOptions> approvalOptions)
     {
         _schemas = schemas;
         _ctx = ctx;
         _evaluator = evaluator;
         _audit = audit;
+        _approvalEnabled = approvalOptions.Value.Enabled;
     }
 
     /// <inheritdoc />
@@ -480,7 +486,34 @@ public sealed class SubmissionValidator : ISubmissionValidator
 
         var existsInPeriod = await _ctx.Samples.Find(filter).AnyAsync(ct);
         if (existsInPeriod)
+        {
             errors.Add($"Value '{Display(schema, def)}' already submitted for this {def.Cadence.ToString().ToLowerInvariant()} period.");
+            return;
+        }
+
+        // Live (approved / not-required) submissions surface above through their projection. Pending
+        // submissions have no projection yet, so when approval is enabled we additionally guard the
+        // window against a second pending submission — a re-send must replace the existing one
+        // (which resets its approval) rather than create a duplicate.
+        if (_approvalEnabled)
+        {
+            var sampleInWindow = Builders<Sample>.Filter.And(
+                Builders<Sample>.Filter.Eq(x => x.SchemaName, schema.Name),
+                Builders<Sample>.Filter.Eq(x => x.ValueName, def.Name),
+                Builders<Sample>.Filter.Gte(x => x.Timestamp, start),
+                Builders<Sample>.Filter.Lt(x => x.Timestamp, end));
+            var pendingFilter = Builders<Submission>.Filter.And(
+                Builders<Submission>.Filter.Eq(s => s.IsDeleted, false),
+                Builders<Submission>.Filter.Eq(s => s.ServiceAccountId, serviceId),
+                Builders<Submission>.Filter.Eq(s => s.ApprovalStatus, ApprovalStatus.Pending),
+                Builders<Submission>.Filter.ElemMatch(s => s.Samples, sampleInWindow));
+            if (isReplacement && existing is not null)
+                pendingFilter = Builders<Submission>.Filter.And(pendingFilter,
+                    Builders<Submission>.Filter.Ne(s => s.Id, existing.Id));
+
+            if (await _ctx.Submissions.Find(pendingFilter).AnyAsync(ct))
+                errors.Add($"Value '{Display(schema, def)}' already has a submission awaiting approval for this {def.Cadence.ToString().ToLowerInvariant()} period; replace that submission instead.");
+        }
     }
 
     /// <summary>Human-friendly schema name: label when set, machine name as fallback.</summary>

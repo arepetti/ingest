@@ -16,7 +16,7 @@ public class SchemaServiceTests
     {
         repo = new FakeSchemaRepo();
         return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService(),
-            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new ImmediateClock());
+            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock());
     }
 
     private static SchemaService NewService(out FakeSchemaRepo repo, out FakeEmptySampleRepo samples)
@@ -24,7 +24,7 @@ public class SchemaServiceTests
         repo = new FakeSchemaRepo();
         samples = new FakeEmptySampleRepo();
         return new SchemaService(repo, samples, new NoopAuditLogService(),
-            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new ImmediateClock());
+            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock());
     }
 
     private static SchemaService NewServiceWithVersions(out FakeSchemaRepo repo, out FakeVersionHistoryRepo versions)
@@ -32,7 +32,27 @@ public class SchemaServiceTests
         repo = new FakeSchemaRepo();
         versions = new FakeVersionHistoryRepo();
         return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService(),
-            versions, new FakeSubmissionCountRepo(), new ImmediateClock());
+            versions, new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock());
+    }
+
+    /// <summary>
+    /// Minimal <see cref="IAccountRepository"/> stub. The schema service only consults it to validate
+    /// approval-policy approver references; these tests never set an approval policy, so a stub that
+    /// returns an account for any id (so any approver "exists") is sufficient.
+    /// </summary>
+    private sealed class StubAccountRepo : IAccountRepository
+    {
+        public Task<Account?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) =>
+            Task.FromResult<Account?>(new Account { Name = "approver", Kind = AccountKind.User, Role = AccountRole.Approver });
+        public Task<Account?> GetByNameAsync(string name, bool includeDeleted = false, CancellationToken ct = default) => Task.FromResult<Account?>(null);
+        public Task<Account?> GetByExternalLoginAsync(string provider, string email, CancellationToken ct = default) => Task.FromResult<Account?>(null);
+        public Task<PagedResult<Account>> ListAsync(PageRequest request, AccountKind? kind = null, AccountRole? role = null, CancellationToken ct = default) =>
+            Task.FromResult(new PagedResult<Account>(Array.Empty<Account>(), 0, request.Page, request.PageSize));
+        public Task AddAsync(Account account, CancellationToken ct = default) => Task.CompletedTask;
+        public Task UpdateAsync(Account account, CancellationToken ct = default) => Task.CompletedTask;
+        public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task HardDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
 
     private static Schema NewSchema(string name = "demo", int version = 1) => new()
@@ -711,8 +731,9 @@ public class SchemaServiceTests
 
         public Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) =>
             Task.FromResult<Submission?>(null);
-        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, CancellationToken ct = default) =>
+        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, ApprovalStatus? approvalStatus = null, CancellationToken ct = default) =>
             Task.FromResult(new PagedResult<Submission>(Array.Empty<Submission>(), 0, 1, 0));
+        public Task<long> CountByApprovalStatusAsync(ApprovalStatus status, CancellationToken ct = default) => Task.FromResult(0L);
         public Task AddAsync(Submission submission, CancellationToken ct = default) => Task.CompletedTask;
         public Task UpdateAsync(Submission submission, CancellationToken ct = default) => Task.CompletedTask;
         public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;

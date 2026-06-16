@@ -88,6 +88,10 @@ public static class MongoSetup
             new CreateIndexModel<Submission>(
                 Builders<Submission>.IndexKeys.Ascending(s => s.ServiceAccountId).Descending(s => s.SubmittedAt),
                 new CreateIndexOptions { Name = "by_service_time" }),
+            // Backs the pending-approvals queue + count card.
+            new CreateIndexModel<Submission>(
+                Builders<Submission>.IndexKeys.Ascending(s => s.ApprovalStatus).Descending(s => s.SubmittedAt),
+                new CreateIndexOptions { Name = "by_approval_status" }),
         }, cancellationToken: ct);
 
         await ctx.Reports.Indexes.CreateOneAsync(

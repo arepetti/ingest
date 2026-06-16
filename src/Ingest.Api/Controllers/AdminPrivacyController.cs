@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Ingest.Api.Auth;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,7 +18,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.PrivacyManage)]
 public sealed class AdminPrivacyController(
     IErasureService erasure,
     IPersonalDataService personalData,
@@ -50,6 +51,7 @@ public sealed class AdminPrivacyController(
     /// <response code="200">The data bundle (an attachment download).</response>
     /// <response code="404">No account with that id.</response>
     [HttpGet("accounts/{id:guid}/personal-data/export")]
+    [Authorize(Policy = Capabilities.PrivacyRead)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ExportPersonalData(Guid id, CancellationToken ct)

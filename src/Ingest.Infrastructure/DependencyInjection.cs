@@ -1,4 +1,5 @@
 using Ingest.Core.Abstractions;
+using Ingest.Infrastructure.Approvals;
 using Ingest.Infrastructure.Email;
 using Ingest.Infrastructure.Mongo;
 using Ingest.Infrastructure.Reports;
@@ -39,6 +40,7 @@ public static class DependencyInjection
         services.Configure<NotificationOptions>(configuration.GetSection("Notifications"));
         services.Configure<WebhookOptions>(configuration.GetSection("Webhooks"));
         services.Configure<Retention.RetentionOptions>(configuration.GetSection("Retention"));
+        services.Configure<ApprovalOptions>(configuration.GetSection("Approval"));
 
         services.AddSingleton<MongoContext>(sp =>
         {
@@ -90,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<IExploreService, ExploreService>();
+        services.AddScoped<IApprovalSettingsService, ApprovalSettingsService>();
 
         // GDPR data-rights services (erasure, retention purge, DSAR export).
         services.AddScoped<IErasureService, ErasureService>();
@@ -109,6 +112,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailDispatchService, EmailDispatchService>();
         services.AddScoped<INotificationSettingsService, NotificationSettingsService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IApprovalNotificationService, ApprovalNotificationService>();
 
         // Outbound webhooks. Like email these are always registered (cheap); behaviour is gated by
         // Webhooks:Enabled (controllers 404, the dispatcher worker only registers when enabled, and

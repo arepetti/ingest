@@ -189,14 +189,12 @@ export function TopBar({ me }: { me?: Me }) {
   const nav = useNavigate()
   const { pathname } = useLocation()
 
-  // Service-role users can't hit the admin listings — gate the lookups so we don't spam 403s
-  // just to populate breadcrumbs they'd never see anyway. Their breadcrumbs only ever feature
-  // /, /submissions, /submissions/new and /submissions/:id, none of which need an entity label.
-  const isService = me?.role === 'Service'
-  const accountsQuery = useAccounts(undefined, !isService)
-  const schemasQuery = useSchemas(undefined, !isService)
-  // Reports are an operator/admin tool; same gating logic.
-  const reportsQuery = useReports(undefined, !isService)
+  // Gate each breadcrumb-label lookup by the capability backing its listing so we don't spam 403s
+  // for callers who can't read that entity (their breadcrumbs never feature those routes anyway).
+  const caps = new Set(me?.capabilities ?? [])
+  const accountsQuery = useAccounts(undefined, caps.has('accounts:read'))
+  const schemasQuery = useSchemas(undefined, caps.has('schemas:read'))
+  const reportsQuery = useReports(undefined, caps.has('reports:read'))
 
   // Memoise the name → label maps so buildBreadcrumbs gets stable inputs and isn't pointlessly
   // rerun while React Query mutates the parent objects between requests.

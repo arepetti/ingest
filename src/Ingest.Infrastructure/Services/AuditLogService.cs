@@ -29,6 +29,16 @@ public sealed class AuditLogService : IAuditLogService
         AuditChangeType change,
         Guid targetId,
         string? targetName,
+        CancellationToken ct = default) =>
+        RecordAsync(targetType, change, targetId, targetName, note: null, ct);
+
+    /// <inheritdoc />
+    public Task RecordAsync(
+        AuditTargetType targetType,
+        AuditChangeType change,
+        Guid targetId,
+        string? targetName,
+        string? note,
         CancellationToken ct = default)
     {
         var entry = new AuditLog
@@ -40,6 +50,7 @@ public sealed class AuditLogService : IAuditLogService
             TargetName = targetName,
             ActorId = _audit.AccountId,
             ActorName = _audit.UserName,
+            Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
         };
         return _repo.AddAsync(entry, ct);
     }

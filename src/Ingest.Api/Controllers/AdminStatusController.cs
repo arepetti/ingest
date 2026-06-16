@@ -3,6 +3,7 @@ using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +16,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/status")]
-[Authorize(Policy = AuthConstants.OperatorPolicy)]
+[Authorize(Policy = Capabilities.StatusRead)]
 public sealed class AdminStatusController(IStatusService statuses) : ControllerBase
 {
     /// <summary>

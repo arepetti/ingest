@@ -1,5 +1,6 @@
 using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
+using Ingest.Core.Security;
 
 namespace Ingest.Api.Models;
 
@@ -18,6 +19,8 @@ namespace Ingest.Api.Models;
 /// <param name="ModifiedBy">Name of the last modifier.</param>
 /// <param name="IsDeleted">Soft-deletion flag.</param>
 /// <param name="ExternalLogins">SSO identity links (provider + email). Only ever populated for <see cref="AccountKind.User"/> accounts; relevant only when SSO is enabled.</param>
+/// <param name="Capabilities">The account's stored capability overrides. Empty means "follow the role default bundle"; the admin UI pre-fills the picker from <paramref name="EffectiveCapabilities"/> in that case.</param>
+/// <param name="EffectiveCapabilities">The resolved capability set actually in force (role defaults when there are no overrides; the full catalogue for Admins). Read-only — set <paramref name="Capabilities"/> to change it.</param>
 public sealed record AccountDto(
     Guid Id,
     string Name,
@@ -32,13 +35,17 @@ public sealed record AccountDto(
     DateTime ModifiedAt,
     string? ModifiedBy,
     bool IsDeleted,
-    List<ExternalLoginDto> ExternalLogins)
+    List<ExternalLoginDto> ExternalLogins,
+    List<string> Capabilities,
+    IReadOnlyCollection<string> EffectiveCapabilities)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static AccountDto From(Account a) => new(
         a.Id, a.Name, a.Label, a.Description, a.Email, a.Kind, a.Role, a.Enabled,
         a.CreatedAt, a.CreatedBy, a.ModifiedAt, a.ModifiedBy, a.IsDeleted,
-        a.ExternalLogins.Select(ExternalLoginDto.From).ToList());
+        a.ExternalLogins.Select(ExternalLoginDto.From).ToList(),
+        a.Capabilities.ToList(),
+        RoleCapabilities.Effective(a).ToList());
 }
 
 /// <summary>Wire representation of an SSO identity link on an account. The provider's subject is intentionally not exposed.</summary>
@@ -59,7 +66,8 @@ public sealed record ExternalLoginDto(string Provider, string Email)
 /// <param name="Role">Authorisation tier.</param>
 /// <param name="Enabled">Initial enabled state; defaults to <c>true</c>.</param>
 /// <param name="ExternalLogins">Optional SSO identity links. Only valid for <see cref="AccountKind.User"/> accounts; each (provider, email) pair must be unique across accounts.</param>
-public sealed record CreateAccountRequest(string Name, string? Label, string? Description, string? Email, AccountKind Kind, AccountRole Role, bool Enabled = true, List<ExternalLoginDto>? ExternalLogins = null);
+/// <param name="Capabilities">Optional capability overrides. <c>null</c>/empty seeds the account with the chosen role's default bundle (so it behaves exactly as before); a non-empty list is stored verbatim as the effective set. Ignored for Admins (who implicitly hold every capability).</param>
+public sealed record CreateAccountRequest(string Name, string? Label, string? Description, string? Email, AccountKind Kind, AccountRole Role, bool Enabled = true, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null);
 
 /// <summary>Body for <c>PUT /api/admin/accounts/{id}</c>. Only the mutable fields are accepted.</summary>
 /// <param name="Label">New friendly label.</param>
@@ -68,7 +76,8 @@ public sealed record CreateAccountRequest(string Name, string? Label, string? De
 /// <param name="Role">New authorisation tier.</param>
 /// <param name="Enabled">New enabled state.</param>
 /// <param name="ExternalLogins">Replacement set of SSO identity links. <c>null</c> leaves the existing links untouched; an empty list clears them.</param>
-public sealed record UpdateAccountRequest(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, List<ExternalLoginDto>? ExternalLogins = null);
+/// <param name="Capabilities">Replacement capability override set. <c>null</c> leaves the stored overrides untouched; an empty list clears them (reverting the account to its role default bundle); a non-empty list replaces them. Ignored for Admins.</param>
+public sealed record UpdateAccountRequest(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null);
 
 /// <summary>Wire representation of an API key. <b>Never</b> carries the plaintext secret.</summary>
 /// <param name="Id">Key id (primary key of the row).</param>
@@ -264,7 +273,8 @@ public sealed record SchemaDto(
     DateTime CreatedAt,
     string? CreatedBy,
     DateTime ModifiedAt,
-    string? ModifiedBy)
+    string? ModifiedBy,
+    ApprovalPolicyDto? Approval)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static SchemaDto From(Schema s) => new(
@@ -273,7 +283,8 @@ public sealed record SchemaDto(
         s.Values.Select(SchemaValueDto.From).ToList(),
         s.Layout.Select(SchemaLayoutNodeDto.From).ToList(),
         s.Version, s.VersionModifiedAt,
-        s.CreatedAt, s.CreatedBy, s.ModifiedAt, s.ModifiedBy);
+        s.CreatedAt, s.CreatedBy, s.ModifiedAt, s.ModifiedBy,
+        s.Approval is null ? null : ApprovalPolicyDto.From(s.Approval));
 }
 
 /// <summary>
@@ -304,7 +315,8 @@ public sealed record UpsertSchemaRequest(
     List<Guid>? ServiceIds,
     List<SchemaValueDto>? Values,
     List<SchemaLayoutNodeDto>? Layout = null,
-    int Version = 1);
+    int Version = 1,
+    ApprovalPolicyDto? Approval = null);
 
 /// <summary>One row in a schema's version history: metadata about a single save, without the snapshot.</summary>
 /// <param name="Id">Snapshot id.</param>
@@ -392,6 +404,10 @@ public sealed record SampleDto(string SchemaName, string ValueName, object? Valu
 /// <param name="ModifiedAt">Last update timestamp.</param>
 /// <param name="ModifiedBy">Name of the last modifier.</param>
 /// <param name="IsDeleted">Soft-deletion flag.</param>
+/// <param name="Source">Where the submission originated (<c>Api</c> or <c>Manual</c>).</param>
+/// <param name="ApprovalStatus">Approval lifecycle state (<c>NotRequired</c> / <c>Pending</c> / <c>Approved</c> / <c>Rejected</c>).</param>
+/// <param name="RequiredApprovers">Snapshot of designated approvers governing this submission (empty when approval isn't required).</param>
+/// <param name="Approvals">Recorded approval/rejection decisions for the current cycle (carries reject reasons).</param>
 public sealed record SubmissionDto(
     Guid Id,
     Guid ServiceAccountId,
@@ -404,14 +420,21 @@ public sealed record SubmissionDto(
     string? CreatedBy,
     DateTime ModifiedAt,
     string? ModifiedBy,
-    bool IsDeleted)
+    bool IsDeleted,
+    SubmissionSource Source,
+    ApprovalStatus ApprovalStatus,
+    List<ApproverSpecDto> RequiredApprovers,
+    List<SubmissionApprovalDto> Approvals)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static SubmissionDto From(Submission s) => new(
         s.Id, s.ServiceAccountId, s.ServiceName,
         s.Samples.Select(x => new SampleDto(x.SchemaName, x.ValueName, x.Value, x.Timestamp, x.Note)).ToList(),
         s.Warnings ?? new(),
-        s.SubmittedAt, s.ReplacedAt, s.CreatedAt, s.CreatedBy, s.ModifiedAt, s.ModifiedBy, s.IsDeleted);
+        s.SubmittedAt, s.ReplacedAt, s.CreatedAt, s.CreatedBy, s.ModifiedAt, s.ModifiedBy, s.IsDeleted,
+        s.Source, s.ApprovalStatus,
+        (s.RequiredApprovers ?? new()).Select(ApproverSpecDto.From).ToList(),
+        (s.Approvals ?? new()).Select(SubmissionApprovalDto.From).ToList());
 }
 
 /// <summary>
@@ -426,6 +449,63 @@ public sealed record SubmissionDto(
 /// had nothing to report.
 /// </param>
 public sealed record SubmissionWriteResponse(Guid Id, IReadOnlyList<string> Warnings);
+
+/// <summary>Wire shape of a single designated approver in an approval policy.</summary>
+/// <param name="AccountId">Account designated as an approver (ignored for the <c>ServiceOwner</c> kind).</param>
+/// <param name="Requirement">Whether this approver is <c>Required</c> or <c>Optional</c>.</param>
+/// <param name="Kind">Approver kind: a named <c>Account</c>, or the dynamic <c>ServiceOwner</c> (the submitting service).</param>
+public sealed record ApproverSpecDto(Guid AccountId, ApproverRequirement Requirement, ApproverKind Kind = ApproverKind.Account)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ApproverSpecDto From(ApproverSpec a) => new(a.AccountId, a.Requirement, a.Kind);
+
+    /// <summary>Convert the wire DTO back into a domain entity.</summary>
+    public ApproverSpec ToEntity() => new() { AccountId = AccountId, Requirement = Requirement, Kind = Kind };
+}
+
+/// <summary>Wire shape of an approval policy (per-schema or the global default).</summary>
+/// <param name="Mode">Whether (and how) approval is required (<c>None</c> / <c>UseGlobalDefault</c> / <c>Required</c>).</param>
+/// <param name="AppliesToSources">Which submission sources the policy applies to (<c>Both</c> / <c>ManualOnly</c> / <c>ApiOnly</c>).</param>
+/// <param name="Approvers">Designated approvers, each required or optional.</param>
+public sealed record ApprovalPolicyDto(
+    ApprovalMode Mode,
+    ApprovalSourceScope AppliesToSources,
+    List<ApproverSpecDto> Approvers)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ApprovalPolicyDto From(ApprovalPolicy p) => new(
+        p.Mode, p.AppliesToSources, (p.Approvers ?? new()).Select(ApproverSpecDto.From).ToList());
+
+    /// <summary>Convert the wire DTO back into a domain entity.</summary>
+    public ApprovalPolicy ToEntity() => new()
+    {
+        Mode = Mode,
+        AppliesToSources = AppliesToSources,
+        Approvers = Approvers?.Select(a => a.ToEntity()).ToList() ?? new(),
+    };
+}
+
+/// <summary>Wire shape of one recorded approval/rejection decision on a submission.</summary>
+/// <param name="ApproverAccountId">Account that recorded the decision.</param>
+/// <param name="ApproverName">Machine-name snapshot of the approver.</param>
+/// <param name="Decision">The decision (<c>Approved</c> / <c>Rejected</c>).</param>
+/// <param name="DecidedAt">When the decision was recorded (UTC).</param>
+/// <param name="Note">Optional note; carries the reject reason.</param>
+public sealed record SubmissionApprovalDto(
+    Guid ApproverAccountId,
+    string? ApproverName,
+    ApprovalDecision Decision,
+    DateTime DecidedAt,
+    string? Note)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static SubmissionApprovalDto From(SubmissionApproval a) => new(
+        a.ApproverAccountId, a.ApproverName, a.Decision, a.DecidedAt, a.Note);
+}
+
+/// <summary>Body for <c>POST /api/admin/submissions/{id}/approve</c> and <c>.../reject</c>. The note is optional (used as the reject reason).</summary>
+/// <param name="Note">Optional free-form note recorded against the decision.</param>
+public sealed record ApprovalDecisionRequest(string? Note = null);
 
 /// <summary>Body for <c>POST /api/admin/submissions/import</c>: bulk import historical submissions for one service.</summary>
 /// <param name="ServiceAccountId">The service account every imported submission is attributed to.</param>
@@ -568,12 +648,18 @@ public sealed record NotificationRuleDto(bool Enabled, bool NotifyServiceAccount
 /// <param name="Upcoming">Upcoming-reminder rule.</param>
 /// <param name="Missed">Missed-alert rule.</param>
 /// <param name="Warnings">Warnings-notice rule.</param>
+/// <param name="PendingApproval">Pending-approval notice rule.</param>
+/// <param name="Approved">Approved-notice rule.</param>
+/// <param name="Rejected">Rejected-notice rule.</param>
 /// <param name="UpcomingLeadHours">Lead time (hours) before a window closes that an upcoming reminder fires.</param>
 /// <param name="AdminRecipientAccountIds">Accounts that receive the admin-list copy.</param>
 public sealed record NotificationSettingsDto(
     NotificationRuleDto Upcoming,
     NotificationRuleDto Missed,
     NotificationRuleDto Warnings,
+    NotificationRuleDto PendingApproval,
+    NotificationRuleDto Approved,
+    NotificationRuleDto Rejected,
     int UpcomingLeadHours,
     List<Guid> AdminRecipientAccountIds)
 {
@@ -582,6 +668,9 @@ public sealed record NotificationSettingsDto(
         NotificationRuleDto.From(s.Upcoming),
         NotificationRuleDto.From(s.Missed),
         NotificationRuleDto.From(s.Warnings),
+        NotificationRuleDto.From(s.PendingApproval),
+        NotificationRuleDto.From(s.Approved),
+        NotificationRuleDto.From(s.Rejected),
         s.UpcomingLeadHours,
         s.AdminRecipientAccountIds);
 }
@@ -590,12 +679,18 @@ public sealed record NotificationSettingsDto(
 /// <param name="Upcoming">Upcoming-reminder rule.</param>
 /// <param name="Missed">Missed-alert rule.</param>
 /// <param name="Warnings">Warnings-notice rule.</param>
+/// <param name="PendingApproval">Pending-approval notice rule.</param>
+/// <param name="Approved">Approved-notice rule.</param>
+/// <param name="Rejected">Rejected-notice rule.</param>
 /// <param name="UpcomingLeadHours">Lead time (hours, clamped 1..720).</param>
 /// <param name="AdminRecipientAccountIds">Accounts that receive the admin-list copy.</param>
 public sealed record UpdateNotificationSettingsRequest(
     NotificationRuleDto Upcoming,
     NotificationRuleDto Missed,
     NotificationRuleDto Warnings,
+    NotificationRuleDto PendingApproval,
+    NotificationRuleDto Approved,
+    NotificationRuleDto Rejected,
     int UpcomingLeadHours,
     List<Guid>? AdminRecipientAccountIds = null);
 
@@ -630,6 +725,7 @@ public sealed record PagedResponse<T>(IReadOnlyList<T> Items, long Total, int Pa
 /// <param name="Change">The kind of change (Create, Edit or Delete).</param>
 /// <param name="ActorId">Id of the account that made the change, or <c>null</c>.</param>
 /// <param name="ActorName">Machine name of the account that made the change, or <c>null</c>.</param>
+/// <param name="Note">Optional free-form context (e.g. a submission rejection reason); <c>null</c> when none.</param>
 public sealed record AuditLogDto(
     Guid Id,
     DateTime Timestamp,
@@ -638,11 +734,12 @@ public sealed record AuditLogDto(
     string? TargetName,
     AuditChangeType Change,
     Guid? ActorId,
-    string? ActorName)
+    string? ActorName,
+    string? Note)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static AuditLogDto From(AuditLog a) => new(
-        a.Id, a.Timestamp, a.TargetType, a.TargetId, a.TargetName, a.Change, a.ActorId, a.ActorName);
+        a.Id, a.Timestamp, a.TargetType, a.TargetId, a.TargetName, a.Change, a.ActorId, a.ActorName, a.Note);
 }
 
 /// <summary>Body for the admin sample-query endpoint. Each filter is optional and ANDed.</summary>

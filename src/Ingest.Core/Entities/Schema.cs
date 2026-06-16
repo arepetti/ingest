@@ -77,6 +77,13 @@ public sealed class Schema : AuditedEntity
     public bool Enabled { get; set; } = true;
 
     /// <summary>
+    /// Optional approval policy. <c>null</c> (the default, and how legacy documents deserialize) is
+    /// treated as <see cref="ApprovalMode.None"/> — no approval. Only consulted when the
+    /// <c>Approval:Enabled</c> master switch is on.
+    /// </summary>
+    public ApprovalPolicy? Approval { get; set; }
+
+    /// <summary>
     /// Validation rules evaluated against the assembled submission. Each rule runs once per
     /// schema present in the payload and can compare values to each other. See the admin guide
     /// for rule syntax.

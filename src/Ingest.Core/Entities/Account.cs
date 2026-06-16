@@ -31,6 +31,13 @@ public enum AccountRole
 
     /// <summary>Full control: account/key/schema/submission CRUD, on-behalf-of submissions, hard delete.</summary>
     Admin = 2,
+
+    /// <summary>
+    /// Reviewer in the submission-approval workflow. Like <see cref="Operator"/> for reads, but
+    /// additionally allowed to approve/reject submissions they are designated approvers for.
+    /// (Phase 1 baseline role; finer-grained capabilities arrive in Phase 2.)
+    /// </summary>
+    Approver = 3,
 }
 
 /// <summary>
@@ -59,8 +66,18 @@ public sealed class Account : AuditedEntity
     /// <summary>Distinguishes UI-capable accounts from API-only ones.</summary>
     public AccountKind Kind { get; set; } = AccountKind.Application;
 
-    /// <summary>Authorisation tier; drives every role-based policy.</summary>
+    /// <summary>Authorisation tier. From Phase 2 the role is a decorative template that seeds the
+    /// default capability bundle; the effective authorization is governed by <see cref="Capabilities"/>.</summary>
     public AccountRole Role { get; set; } = AccountRole.Service;
+
+    /// <summary>
+    /// Per-account capability overrides (Phase 2). When non-empty this set is the authoritative
+    /// effective capability set for the account; when empty the account falls back to its
+    /// <see cref="Role"/>'s default bundle (so legacy accounts behave exactly as before — no data
+    /// migration). <see cref="AccountRole.Admin"/> ignores this and implicitly holds every
+    /// capability. Capability strings come from <c>Ingest.Core.Security.Capabilities</c>.
+    /// </summary>
+    public List<string> Capabilities { get; set; } = new();
 
     /// <summary>When false, every API key attached to this account is invalid for new requests.</summary>
     public bool Enabled { get; set; } = true;

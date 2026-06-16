@@ -13,6 +13,9 @@ internal sealed class NoopAuditLogService : IAuditLogService
     public Task RecordAsync(AuditTargetType targetType, AuditChangeType change, Guid targetId, string? targetName, CancellationToken ct = default) =>
         Task.CompletedTask;
 
+    public Task RecordAsync(AuditTargetType targetType, AuditChangeType change, Guid targetId, string? targetName, string? note, CancellationToken ct = default) =>
+        Task.CompletedTask;
+
     public Task<PagedResult<AuditLog>> ListAsync(PageRequest request, AuditChangeType? change = null, AuditTargetType? targetType = null, string? nameFilter = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default) =>
         Task.FromResult(new PagedResult<AuditLog>(Array.Empty<AuditLog>(), 0, request.Page, request.PageSize));
 

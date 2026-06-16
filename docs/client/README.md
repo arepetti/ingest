@@ -66,7 +66,7 @@ If your account is **User**-kind, you can also sign in to the admin SPA at the d
 - Browse your own submissions (filtered to your account).
 - Create or edit a submission through a form — useful for one-off corrections or when your automation is down. Same form admins use; the back-end treats it exactly like a `POST /api/submissions`.
 
-Service-role users see a slimmed-down sidebar: just **Dashboard** and **Submissions**. There's no access to Accounts or Schemas — those are admin-only.
+Accounts with no back-office capabilities (a typical **Service**) see a slimmed-down sidebar: just **Dashboard** and **Submissions**. Accounts, Schemas and the other sections appear only for accounts granted the matching capabilities.
 
 If your account is **Application**-kind, the SPA's login screen rejects your key with a clear message: only User-kind credentials can sign in. Use the API for everything in that case.
 

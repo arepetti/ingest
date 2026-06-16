@@ -46,6 +46,9 @@ public sealed class NotificationSettingsService : INotificationSettingsService
         settings.Upcoming = Map(update.Upcoming);
         settings.Missed = Map(update.Missed);
         settings.Warnings = Map(update.Warnings);
+        settings.PendingApproval = Map(update.PendingApproval);
+        settings.Approved = Map(update.Approved);
+        settings.Rejected = Map(update.Rejected);
         settings.UpcomingLeadHours = Math.Clamp(update.UpcomingLeadHours, 1, 24 * 30);
         settings.AdminRecipientAccountIds = update.AdminRecipientAccountIds?.Distinct().ToList() ?? new();
         settings.ModifiedAt = _audit.UtcNow;

@@ -139,6 +139,9 @@ public class WebhookEventNameTests
     [InlineData(WebhookEventKind.SubmissionWarnings, "submission.warnings")]
     [InlineData(WebhookEventKind.WindowUpcoming, "window.upcoming")]
     [InlineData(WebhookEventKind.WindowMissed, "window.missed")]
+    [InlineData(WebhookEventKind.SubmissionPendingApproval, "submission.pending_approval")]
+    [InlineData(WebhookEventKind.SubmissionApproved, "submission.approved")]
+    [InlineData(WebhookEventKind.SubmissionRejected, "submission.rejected")]
     public void ToWire_maps_each_kind_to_its_dotted_name(WebhookEventKind kind, string expected)
     {
         Assert.Equal(expected, kind.ToWire());

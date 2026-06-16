@@ -37,6 +37,7 @@ Each value has its own cadence: a monthly schema can contain weekly KPIs perfect
    - **Enabled (Published)** — the schema's publication state. **Enabled = Published**: services can submit against it. **Enabled off = Draft**: submissions are rejected. A freshly created schema is Published if you leave the box ticked. Throughout the app and this guide, "Published" and "Draft" are just friendly names for this single flag.
    - **Audience** — *Global* (every service sees it) or *Restricted to specific services* (you pick from a dropdown of Service-role accounts).
    - **Schema-level validations** — a list editor where each row is one validation rule. Add as many as you like; each runs once per submission with every value of the schema in scope. Use these for cross-value checks like `revenue >= expenses` or `total == a + b`. See [validation.md § Schema-level rules](validation.md#schema-level-rules-cross-value) for the full syntax.
+   - **Approval** — (only when the [approval workflow](approval-process.md) is enabled) whether submissions for this schema need review before going live. Choose *no approval*, *use the global default*, or *approval required* with a source scope (manual / API / both) and a set of approvers (specific accounts holding `submissions:approve` and/or the **service owner**, i.e. the account that sent the submission). The editor warns if a **modifiable** schema requires approval, because re-submitting a window resets approval and can drop previously-approved data out of reporting. See [approval-process.md](approval-process.md). Schemas that are gated by approval — whether by their own policy or by deferring to a global default that requires it — show a small **shield-checkmark** next to their name in the list and a **Requires approval** badge in the preview drawer.
 3. Add at least one **value** (the actual KPIs). For each value:
    - **Name** / **Label** / **Description** / **Notes**.
    - **Caption** — optional heading rendered above this value when filling in or viewing a submission (think section title). Use it to group related inputs visually — *"Collection metrics"*, *"Financial"*, *"Equipment"*. Display-only: it doesn't affect validation and API callers never see it as anything other than another field on the schema definition.
@@ -209,9 +210,9 @@ Open it from the row menu → **View version history**, or the **View historical
 
 Click a row (or row menu → **View this version**) to open a **read-only** copy of the editor showing the schema exactly as it was at that point in time. Nothing on that page can be changed — it's purely for inspection.
 
-### Cleaning up history (Admins)
+### Cleaning up history (requires `schemas:manage`)
 
-Administrators can prune the history to reclaim space or cut noise:
+Accounts that can manage schemas can prune the history to reclaim space or cut noise:
 
 - **Row menu → Delete this entry** removes a single snapshot.
 - **Three-dots menu → Delete all history** clears every snapshot for the schema (after a confirmation).

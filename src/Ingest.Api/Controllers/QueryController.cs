@@ -2,6 +2,7 @@ using Ingest.Api.Auth;
 using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,7 +15,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/query")]
-[Authorize(Policy = AuthConstants.OperatorPolicy)]
+[Authorize(Policy = Capabilities.QueryRead)]
 public sealed class QueryController(ISampleRepository samples) : ControllerBase
 {
     /// <summary>Query the flat sample projection.</summary>

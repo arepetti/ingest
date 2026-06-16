@@ -20,7 +20,7 @@ import { usePeriodFilter } from '../utils/usePeriodFilter'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import {
   fetchAllSchemaVersionHistory, useDeleteSchemaVersionEntry, useDeleteSchemaVersionHistory,
-  useMe, useSchemaVersionHistory,
+  useCapabilities, useSchemaVersionHistory,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { confirmDelete } from '../utils/confirm'
@@ -64,8 +64,8 @@ export function SchemaVersionHistoryPage() {
   const s = useStyles()
   const nav = useNavigate()
   const { name } = useParams<{ name: string }>()
-  const { data: me } = useMe()
-  const isAdmin = me?.role === 'Admin'
+  const { has } = useCapabilities()
+  const isAdmin = has('schemas:manage')
   const queryClient = useQueryClient()
 
   const period = usePeriodFilter()

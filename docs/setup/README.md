@@ -10,6 +10,7 @@ Operations-side documentation: standing up the service and hooking reporting too
 | [powerbi.md](powerbi.md)              | Connecting Power BI (or any OData v4 client) to the `/odata/samples` feed. Custom-header auth recipe, pre-filtering, data-model tips, refresh schedules. |
 | [excel.md](excel.md)                  | Connecting Excel (Get & Transform / Power Query) to the `/odata/samples` feed — the cheapest analyst on-ramp using existing Microsoft 365. Header recipe, key-in-parameter, flattening, PivotTables, refresh. |
 | [performance.md](performance.md)      | Expected workload, throughput, and response times for a typical council deployment on the standard Azure hosting setup — data volume, QPS, latencies, and when to revisit sizing. |
+| [disaster-recovery.md](disaster-recovery.md) | **Starting-point** disaster recovery plan template written against the standard Azure setup — recovery objectives, backup/restore runbooks, failure scenarios, and a customisation checklist. Review and adapt to your regulations and hosting before relying on it. |
 
 ## Related reading
 

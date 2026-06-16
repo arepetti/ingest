@@ -3,7 +3,7 @@
 The most common things admins run into, with the fix.
 
 **I can sign in, but every page shows "Forbidden".**
-You probably have an `Operator` key when you need an `Admin` key (or vice versa). Sign in with an Admin key for write operations on accounts/schemas; Operator keys are read-only outside the service-facing endpoints. See [../architecture/authentication.md § Roles](../architecture/authentication.md#roles).
+Your account probably lacks the capability the action needs — e.g. you can read schemas (`schemas:read`) but not edit them (`schemas:manage`). Use an account that holds the required capability (an Admin holds them all), or have an admin grant it on the **Accounts → Edit → Permissions** panel. See [../architecture/authentication.md § Authorisation: capabilities](../architecture/authentication.md#authorisation-capabilities).
 
 **My new key doesn't authenticate even though I copied it correctly.**
 The `Account` may be disabled or soft-deleted. Reopen the account (set `includeDeleted=true` on the API or use Mongo directly) and check `enabled`/`isDeleted`. If the account is fine, double-check the `ApiKey:Pepper` value matches between deployments — rotating the pepper invalidates every key.

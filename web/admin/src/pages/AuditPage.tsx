@@ -3,12 +3,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   Badge, Dropdown, Option, Tab, TabList, Tooltip,
   Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger,
-  Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow,
+  Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
   Title2, MessageBarBody, MessageBarTitle,
   makeStyles, tokens,
 } from '@fluentui/react-components'
 import { ArrowClockwise20Regular, ArrowDownload20Regular, MoreHorizontal20Regular, Send20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+import { AuditChangeAvatar, StatusAvatar } from '../components/Avatars'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
 import { PeriodFilter } from '../components/PeriodFilter'
 import { RowActions } from '../components/RowActions'
@@ -16,7 +17,7 @@ import { usePeriodFilter, type PeriodFilterState } from '../utils/usePeriodFilte
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import {
   auditExportUrl, fetchAllEmailOutbox, fetchAllWebhookDeliveries,
-  useAuditLog, useMe, useEmailOutbox, useDrainEmail,
+  useAuditLog, useCapabilities, useEmailOutbox, useDrainEmail,
   useWebhookDeliveries, useRedeliverWebhook, useDrainWebhooks,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
@@ -27,7 +28,7 @@ import type {
   WebhookDelivery, WebhookDeliveryStatus,
 } from '../api/types'
 
-const CHANGE_TYPES: AuditChangeType[] = ['Create', 'Edit', 'Delete']
+const CHANGE_TYPES: AuditChangeType[] = ['Create', 'Edit', 'Delete', 'Approve', 'Reject']
 const TARGET_TYPES: AuditTargetType[] = ['User', 'Account', 'Schema', 'ApiKey', 'Submission', 'Report', 'SchemaHistory']
 
 /** Friendly labels for target types whose raw enum name doesn't read well in the UI. */
@@ -49,7 +50,7 @@ const useStyles = makeStyles({
   table: { tableLayout: 'fixed', width: '100%' },
   row: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
   truncate: { display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  colTime:   { width: '180px' },
+  colTime:   { width: '210px' },
   colChange: { width: '100px' },
   colTarget: { width: '120px' },
   colStatus: { width: '110px' },
@@ -85,10 +86,14 @@ type AuditTab = 'changes' | 'emails' | 'webhooks'
 
 export function AuditPage() {
   const s = useStyles()
-  const { data: me } = useMe()
+  const { me, has } = useCapabilities()
   const [tab, setTab] = useState<AuditTab>('changes')
-  const emailEnabled = me?.emailEnabled === true
-  const webhooksEnabled = me?.webhooksEnabled === true
+  // The email/webhook tabs read the notification + webhook stores, so they need the matching read
+  // capability on top of the server-side master switch.
+  const emailEnabled = me?.emailEnabled === true && has('notifications:read')
+  const webhooksEnabled = me?.webhooksEnabled === true && has('webhooks:read')
+  const canDrainEmail = has('notifications:manage')
+  const canDrainWebhooks = has('webhooks:manage')
 
   // Filter state is lifted out of the tabs so the single actions menu in the title row can act on
   // whichever tab is showing (export honours the active filters; the dropdowns still live in the
@@ -191,9 +196,11 @@ export function AuditPage() {
                   >
                     {emailsExport.exporting ? 'Exporting…' : 'Export CSV'}
                   </MenuItem>
-                  <MenuItem icon={<Send20Regular />} disabled={drain.isPending} onClick={onDrain}>
-                    {drain.isPending ? 'Sending…' : 'Send pending now'}
-                  </MenuItem>
+                  {canDrainEmail && (
+                    <MenuItem icon={<Send20Regular />} disabled={drain.isPending} onClick={onDrain}>
+                      {drain.isPending ? 'Sending…' : 'Send pending now'}
+                    </MenuItem>
+                  )}
                 </>
               )}
               {tab === 'webhooks' && webhooksEnabled && (
@@ -205,9 +212,11 @@ export function AuditPage() {
                   >
                     {webhooksExport.exporting ? 'Exporting…' : 'Export CSV'}
                   </MenuItem>
-                  <MenuItem icon={<Send20Regular />} disabled={webhookDrain.isPending} onClick={onWebhookDrain}>
-                    {webhookDrain.isPending ? 'Sending…' : 'Send pending now'}
-                  </MenuItem>
+                  {canDrainWebhooks && (
+                    <MenuItem icon={<Send20Regular />} disabled={webhookDrain.isPending} onClick={onWebhookDrain}>
+                      {webhookDrain.isPending ? 'Sending…' : 'Send pending now'}
+                    </MenuItem>
+                  )}
                 </>
               )}
             </MenuList>
@@ -322,17 +331,20 @@ function ChangesTab({
             <TableHeaderCell className={s.colTarget}>Target type</TableHeaderCell>
             <TableHeaderCell>Target</TableHeaderCell>
             <TableHeaderCell>Changed by</TableHeaderCell>
+            <TableHeaderCell>Note</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={5}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={6}>Loading…</GridMessageRow>}
           {!isLoading && items.length === 0 && (
-            <GridMessageRow colSpan={5}>No changes recorded.</GridMessageRow>
+            <GridMessageRow colSpan={6}>No changes recorded.</GridMessageRow>
           )}
           {items.map(entry => (
             <TableRow key={entry.id} className={s.row}>
               <TableCell className={s.colTime}>
-                <span className={s.truncate}>{formatDateTime(entry.timestamp)}</span>
+                <TableCellLayout media={<AuditChangeAvatar change={entry.change} targetType={entry.targetType} />}>
+                  <span className={s.truncate}>{formatDateTime(entry.timestamp)}</span>
+                </TableCellLayout>
               </TableCell>
               <TableCell className={s.colChange}>
                 <ChangeBadge change={entry.change} />
@@ -340,6 +352,11 @@ function ChangesTab({
               <TableCell className={s.colTarget}>{targetTypeLabel(entry.targetType)}</TableCell>
               <TableCell className={s.cellId}><IdentityCell name={entry.targetName} id={entry.targetId} /></TableCell>
               <TableCell className={s.cellId}><IdentityCell name={entry.actorName} id={entry.actorId} /></TableCell>
+              <TableCell className={s.cellId}>
+                {entry.note
+                  ? <Tooltip content={entry.note} relationship="label"><span className={s.truncate}>{entry.note}</span></Tooltip>
+                  : '—'}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -421,7 +438,9 @@ function SentEmailsTab({
           {items.map(m => (
             <TableRow key={m.id} className={s.row}>
               <TableCell className={s.colTime}>
-                <span className={s.truncate}>{formatDateTime(m.createdAt)}</span>
+                <TableCellLayout media={<StatusAvatar status={m.status} name={m.toName || m.toAddress} label="Email" />}>
+                  <span className={s.truncate}>{formatDateTime(m.createdAt)}</span>
+                </TableCellLayout>
               </TableCell>
               <TableCell className={s.cellId}>
                 <Tooltip content={m.toAddress} relationship="label">
@@ -527,7 +546,9 @@ function WebhookDeliveriesTab({
           {items.map(d => (
             <TableRow key={d.id} className={s.row}>
               <TableCell className={s.colTime}>
-                <span className={s.truncate}>{formatDateTime(d.createdAt)}</span>
+                <TableCellLayout media={<StatusAvatar status={d.status} name={d.event} label="Delivery" />}>
+                  <span className={s.truncate}>{formatDateTime(d.createdAt)}</span>
+                </TableCellLayout>
               </TableCell>
               <TableCell className={s.cellId}><span className={`${s.truncate} ${s.mono}`}>{d.event}</span></TableCell>
               <TableCell className={s.cellId}>
@@ -594,7 +615,10 @@ function EmailStatusBadge({ message }: { message: EmailMessage }) {
 }
 
 function ChangeBadge({ change }: { change: AuditLog['change'] }) {
-  const color = change === 'Create' ? 'success' : change === 'Delete' ? 'danger' : 'brand'
+  const color =
+    change === 'Create' || change === 'Approve' ? 'success'
+    : change === 'Delete' || change === 'Reject' ? 'danger'
+    : 'brand'
   return <Badge appearance="outline" color={color}>{change}</Badge>
 }
 

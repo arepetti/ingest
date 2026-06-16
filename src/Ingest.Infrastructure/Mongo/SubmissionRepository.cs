@@ -31,11 +31,14 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
         DateTime? from = null,
         DateTime? to = null,
         string? schemaName = null,
+        ApprovalStatus? approvalStatus = null,
         CancellationToken ct = default)
     {
         var filter = ApplySoftDelete(Builders<Submission>.Filter.Empty, request.IncludeDeleted);
         if (serviceId is { } sid)
             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Eq(s => s.ServiceAccountId, sid));
+        if (approvalStatus is { } status)
+            filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Eq(s => s.ApprovalStatus, status));
         if (from is { } f)
             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Gte(s => s.SubmittedAt, DateTime.SpecifyKind(f, DateTimeKind.Utc)));
         if (to is { } t)
@@ -65,6 +68,15 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
         var filter = Builders<Submission>.Filter.And(
             ApplySoftDelete(Builders<Submission>.Filter.Empty, includeDeleted: false),
             Builders<Submission>.Filter.ElemMatch(s => s.Samples, Builders<Sample>.Filter.Eq(x => x.SchemaName, schemaName)));
+        return Collection.CountDocumentsAsync(filter, cancellationToken: ct);
+    }
+
+    /// <inheritdoc />
+    public Task<long> CountByApprovalStatusAsync(ApprovalStatus status, CancellationToken ct = default)
+    {
+        var filter = Builders<Submission>.Filter.And(
+            ApplySoftDelete(Builders<Submission>.Filter.Empty, includeDeleted: false),
+            Builders<Submission>.Filter.Eq(s => s.ApprovalStatus, status));
         return Collection.CountDocumentsAsync(filter, cancellationToken: ct);
     }
 

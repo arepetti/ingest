@@ -12,7 +12,7 @@ import {
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { formatApiError } from '../api/client'
 import {
-  useReport, useRenderReport, useSchemas, useSubmissions, useMySubmissions, useMe,
+  useReport, useRenderReport, useSchemas, useSubmissions, useMySubmissions, useCapabilities,
 } from '../api/hooks'
 import { downloadText } from '../utils/download'
 import type { RenderReportRequest, ReportRenderResponse } from '../api/types'
@@ -105,8 +105,9 @@ function addDays(d: Date, days: number): Date {
 export function ReportViewPage() {
   const s = useStyles()
   const { name } = useParams<{ name: string }>()
-  const { data: me } = useMe()
-  const isService = me?.role === 'Service'
+  const { has } = useCapabilities()
+  // Without cross-service read the picker can only offer the caller's own submissions.
+  const isService = !has('submissions:read')
 
   const { data: report, isLoading, error } = useReport(name)
   const render = useRenderReport()

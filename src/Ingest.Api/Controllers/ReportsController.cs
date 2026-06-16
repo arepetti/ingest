@@ -2,6 +2,7 @@ using Ingest.Api.Auth;
 using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,7 +15,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/reports")]
-[Authorize(Policy = AuthConstants.OperatorPolicy)]
+[Authorize(Policy = Capabilities.ReportsRead)]
 public sealed class ReportsController(IReportService service) : ControllerBase
 {
     /// <summary>List every report.</summary>
@@ -83,7 +84,7 @@ public sealed class ReportsController(IReportService service) : ControllerBase
 /// </summary>
 [ApiController]
 [Route("api/admin/reports")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.ReportsManage)]
 public sealed class AdminReportsController(IReportService service) : ControllerBase
 {
     /// <summary>Upload a new report as a multipart file. Use this from a file picker.</summary>

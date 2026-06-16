@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { Board24Regular, ChartMultiple24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Toolbox24Regular, Warning24Regular } from '@fluentui/react-icons'
-import { useMe } from '../api/hooks'
+import { useCapabilities } from '../api/hooks'
 import { TopBar } from '../components/TopBar'
 import type { ReactNode } from 'react'
 
@@ -99,38 +99,34 @@ interface NavEntry {
 
 export function Shell() {
   const s = useStyles()
-  const { data: me } = useMe()
+  const { me, has, hasAny } = useCapabilities()
 
   const cls = ({ isActive }: { isActive: boolean }) =>
     isActive ? mergeClasses(s.navItem, s.navItemActive) : s.navItem
 
-  // Services see a stripped-down sidebar: they only need a dashboard and access to their own submissions.
-  // Schemas/services management pages call admin endpoints and would just 403 for them.
-  const isService = me?.role === 'Service'
+  // Each entry shows when the caller holds the capability backing its page; a pure self-service
+  // account (no back-office capabilities) sees only the dashboard and its own submissions.
+  const canConfigure = hasAny('settings:read', 'settings:manage', 'notifications:read', 'notifications:manage', 'webhooks:read', 'webhooks:manage')
   const navEntries: NavEntry[] = [
     { to: '/',            label: 'Dashboard',   icon: <Board24Regular />,              show: true, end: true },
     { to: '/submissions', label: 'Submissions', icon: <DocumentBulletList24Regular />, show: true },
-    // Cross-service "what's overdue" analytics; relies on admin endpoints so it's hidden for services.
-    { to: '/missing',     label: 'Missing',     icon: <Warning24Regular />,            show: !isService },
-    // Lightweight in-app analytics (trends/compare/snapshot). Operator + admin only; the backing
-    // endpoint is operator-gated so service-role users would just 403.
-    { to: '/explore',     label: 'Explore',     icon: <ChartMultiple24Regular />,      show: !isService },
-    // Reports are an operator/admin tool; service-role users would get a 403 for the catalogue
-    // and have no reason to use them anyway.
-    { to: '/reports',     label: 'Reports',     icon: <DocumentText24Regular />,       show: !isService },
+    { to: '/missing',     label: 'Missing',     icon: <Warning24Regular />,            show: has('status:read') },
+    { to: '/explore',     label: 'Explore',     icon: <ChartMultiple24Regular />,      show: has('explore:read') },
+    { to: '/reports',     label: 'Reports',     icon: <DocumentText24Regular />,       show: has('reports:read') },
     // Route stays /services for URL stability (/services/{name}/status still resolves); the label
     // is "Accounts" because the page lists every account (any kind, any role), not only services.
-    { to: '/services',    label: 'Accounts',    icon: <PeopleTeam24Regular />,         show: !isService },
-    { to: '/schemas',     label: 'Schemas',     icon: <DataTreemap24Regular />,        show: !isService },
-    // The audit trail is an admin-only oversight tool; operators and services have no access
-    // to the backing endpoint (it would 403), so the entry only appears for admins.
-    { to: '/audit',       label: 'Audit',       icon: <History24Regular />,            show: me?.role === 'Admin' },
-    // Admin-only operational utilities (backup/restore today). Pinned to the bottom, directly
-    // above Settings. `marginTop: auto` on the first bottom entry pushes the whole bottom group down.
-    { to: '/tools',       label: 'Tools',       icon: <Toolbox24Regular />,            show: me?.role === 'Admin', bottom: true },
-    // Admin-only configuration hub (email, notifications, webhooks).
-    { to: '/settings',    label: 'Settings',    icon: <Settings24Regular />,           show: me?.role === 'Admin' },
+    { to: '/services',    label: 'Accounts',    icon: <PeopleTeam24Regular />,         show: has('accounts:read') },
+    { to: '/schemas',     label: 'Schemas',     icon: <DataTreemap24Regular />,        show: has('schemas:read') },
+    { to: '/audit',       label: 'Audit',       icon: <History24Regular />,            show: has('audit:read') },
+    // Operational utilities (backup/restore today). Pinned to the bottom, directly above Settings.
+    // `marginTop: auto` on the first bottom entry pushes the whole bottom group down.
+    { to: '/tools',       label: 'Tools',       icon: <Toolbox24Regular />,            show: has('backup:read'), bottom: true },
+    // Configuration hub (email, notifications, webhooks, default approval policy).
+    { to: '/settings',    label: 'Settings',    icon: <Settings24Regular />,           show: canConfigure },
   ]
+
+  // Subtitle reflects whether any back-office nav is visible at all.
+  const isService = !navEntries.some(e => e.show && e.to !== '/' && e.to !== '/submissions')
 
   return (
     <div className={s.root}>

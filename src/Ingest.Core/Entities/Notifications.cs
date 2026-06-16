@@ -13,6 +13,15 @@ public enum NotificationKind
 
     /// <summary>A submission was accepted but carried validation warnings worth a human's attention.</summary>
     Warnings = 2,
+
+    /// <summary>A submission was accepted but is held awaiting approval before it goes live.</summary>
+    PendingApproval = 3,
+
+    /// <summary>A pending submission was approved and is now live.</summary>
+    Approved = 4,
+
+    /// <summary>A pending submission was rejected and will not go live.</summary>
+    Rejected = 5,
 }
 
 /// <summary>
@@ -47,6 +56,18 @@ public sealed class NotificationSettings : AuditedEntity
 
     /// <summary>Rule for the "submission with warnings" notice.</summary>
     public NotificationRule Warnings { get; set; } = new();
+
+    /// <summary>
+    /// Rule for the "submission pending approval" notice. When enabled, the submission's designated
+    /// approvers are always emailed; the two recipient switches add the submitter and/or admin list.
+    /// </summary>
+    public NotificationRule PendingApproval { get; set; } = new();
+
+    /// <summary>Rule for the "submission approved" notice (the submission is now live).</summary>
+    public NotificationRule Approved { get; set; } = new();
+
+    /// <summary>Rule for the "submission rejected" notice (carries the reviewer's reason, if any).</summary>
+    public NotificationRule Rejected { get; set; } = new();
 
     /// <summary>
     /// How many hours before a cadence window closes an "upcoming" reminder should fire. A value

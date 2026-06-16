@@ -1,6 +1,6 @@
 # Tools
 
-**Tools** is an admin-only page of operational utilities — things you *do* occasionally rather than *configure*. It sits in the sidebar directly above **Settings** and uses the same master-detail layout (a list of tools on the left, the selected one on the right). Today it hosts a single tool, **Backup & restore**; more maintenance utilities will slot in as additional sections over time.
+**Tools** is a page of operational utilities — things you *do* occasionally rather than *configure* — gated by the `backup:read` capability (running a restore needs `backup:manage`). Both are in the Admin default bundle. It sits in the sidebar directly above **Settings** and uses the same master-detail layout (a list of tools on the left, the selected one on the right). Today it hosts a single tool, **Backup & restore**; more maintenance utilities will slot in as additional sections over time.
 
 ## Backup & restore
 

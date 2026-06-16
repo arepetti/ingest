@@ -3,6 +3,7 @@ using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,11 +11,11 @@ namespace Ingest.Api.Controllers;
 
 /// <summary>
 /// Administrative CRUD over the schema catalogue plus a read-only history endpoint used by the
-/// admin dashboard's charts. Admin-only.
+/// admin dashboard's charts. Reads require <c>schemas:read</c>; mutations require <c>schemas:manage</c>.
 /// </summary>
 [ApiController]
 [Route("api/admin/schemas")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.SchemasRead)]
 public sealed class AdminSchemasController(ISchemaService service) : ControllerBase
 {
     /// <summary>List schemas in paged form.</summary>
@@ -64,6 +65,7 @@ public sealed class AdminSchemasController(ISchemaService service) : ControllerB
     /// <response code="201">The created schema.</response>
     /// <response code="409">A schema with the same name already exists.</response>
     [HttpPost]
+    [Authorize(Policy = Capabilities.SchemasManage)]
     [ProducesResponseType(typeof(SchemaDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] UpsertSchemaRequest req, CancellationToken ct)
@@ -86,6 +88,7 @@ public sealed class AdminSchemasController(ISchemaService service) : ControllerB
     /// <response code="404">No schema with that id.</response>
     /// <response code="409">The new name conflicts with another schema.</response>
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = Capabilities.SchemasManage)]
     [ProducesResponseType(typeof(SchemaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -105,6 +108,7 @@ public sealed class AdminSchemasController(ISchemaService service) : ControllerB
     /// <param name="ct">Cancellation token.</param>
     /// <response code="204">Schema deleted (or already deleted — call is idempotent).</response>
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Capabilities.SchemasManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
@@ -125,6 +129,7 @@ public sealed class AdminSchemasController(ISchemaService service) : ControllerB
     /// <response code="201">The created clone.</response>
     /// <response code="404">No schema with that id.</response>
     [HttpPost("{id:guid}/clone")]
+    [Authorize(Policy = Capabilities.SchemasManage)]
     [ProducesResponseType(typeof(SchemaDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Clone(Guid id, CancellationToken ct)
@@ -209,6 +214,7 @@ public sealed class AdminSchemasController(ISchemaService service) : ControllerB
     /// <response code="204">Entry deleted.</response>
     /// <response code="404">No entry with that id under this schema.</response>
     [HttpDelete("{name}/version-history/{entryId:guid}")]
+    [Authorize(Policy = Capabilities.SchemasManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteVersionEntry(string name, Guid entryId, CancellationToken ct)
@@ -226,6 +232,7 @@ public sealed class AdminSchemasController(ISchemaService service) : ControllerB
     /// <param name="ct">Cancellation token.</param>
     /// <response code="204">History cleared (or already empty — call is idempotent).</response>
     [HttpDelete("{name}/version-history")]
+    [Authorize(Policy = Capabilities.SchemasManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteVersionHistory(string name, CancellationToken ct)
     {
@@ -254,6 +261,9 @@ public sealed class AdminSchemasController(ISchemaService service) : ControllerB
         target.Values = (req.Values ?? new()).Select(v => v.ToEntity()).ToList();
         target.Layout = (req.Layout ?? new()).Select(n => n.ToEntity()).ToList();
         target.Version = req.Version;
+        // A None policy with no approvers is equivalent to "no approval"; normalise to null so the
+        // stored document stays clean and back-compatible.
+        target.Approval = req.Approval is { } a && a.Mode != ApprovalMode.None ? a.ToEntity() : null;
         return target;
     }
 }

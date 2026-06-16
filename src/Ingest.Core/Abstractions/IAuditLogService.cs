@@ -24,6 +24,25 @@ public interface IAuditLogService
         string? targetName,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Record a change with an extra free-form note (e.g. a submission rejection reason). Same as
+    /// <see cref="RecordAsync(AuditTargetType,AuditChangeType,Guid,string,CancellationToken)"/> but
+    /// stamps <see cref="AuditLog.Note"/>.
+    /// </summary>
+    /// <param name="targetType">The type of object that changed.</param>
+    /// <param name="change">The kind of change.</param>
+    /// <param name="targetId">Id of the changed object.</param>
+    /// <param name="targetName">Name of the changed object when it has one; otherwise <c>null</c>.</param>
+    /// <param name="note">Free-form context to store on the entry.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task RecordAsync(
+        AuditTargetType targetType,
+        AuditChangeType change,
+        Guid targetId,
+        string? targetName,
+        string? note,
+        CancellationToken ct = default);
+
     /// <summary>Page through the log, newest first, with optional change/target/name/timestamp filters.</summary>
     Task<PagedResult<AuditLog>> ListAsync(
         PageRequest request,

@@ -6,7 +6,7 @@ import { ArrowDownload20Regular, ArrowUpload20Regular, DatabaseArrowDownRegular 
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { SectionedLayout } from '../components/SectionedLayout'
 import type { LayoutSection } from '../components/SectionedLayout'
-import { backupExportUrl, useImportBackup, useMe } from '../api/hooks'
+import { backupExportUrl, useCapabilities, useImportBackup } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { downloadFromUrl, pickTextFile } from '../utils/download'
 import type { BackupImportResult } from '../api/types'
@@ -33,25 +33,25 @@ const useStyles = makeStyles({
  * sections. Uses the same master-detail layout as Settings.
  */
 export function ToolsPage() {
-  const { data: me, isLoading } = useMe()
+  const { has, isLoading } = useCapabilities()
 
   if (isLoading) return <Spinner label="Loading…" />
-  if (me?.role !== 'Admin') {
+  if (!has('backup:read')) {
     return (
       <AutoScrollMessageBar intent="error">
-        <MessageBarBody>Tools are available to administrators only.</MessageBarBody>
+        <MessageBarBody>You don't have permission to use these tools.</MessageBarBody>
       </AutoScrollMessageBar>
     )
   }
 
   const sections: LayoutSection[] = [
-    { id: 'backup', label: 'Backup & restore', icon: <DatabaseArrowDownRegular fontSize={24} />, render: () => <BackupRestoreSection /> },
+    { id: 'backup', label: 'Backup & restore', icon: <DatabaseArrowDownRegular fontSize={24} />, render: () => <BackupRestoreSection canRestore={has('backup:manage')} /> },
   ]
 
   return <SectionedLayout title="Tools" sections={sections} />
 }
 
-function BackupRestoreSection() {
+function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
   const s = useStyles()
   const importer = useImportBackup()
   const [error, setError] = useState<string | null>(null)
@@ -144,13 +144,15 @@ function BackupRestoreSection() {
         >
           {busy ? 'Preparing…' : 'Download backup'}
         </Button>
-        <Button
-          icon={importer.isPending ? <Spinner size="tiny" /> : <ArrowUpload20Regular />}
-          disabled={busy || importer.isPending}
-          onClick={onImport}
-        >
-          {importer.isPending ? 'Restoring…' : 'Restore from file…'}
-        </Button>
+        {canRestore && (
+          <Button
+            icon={importer.isPending ? <Spinner size="tiny" /> : <ArrowUpload20Regular />}
+            disabled={busy || importer.isPending}
+            onClick={onImport}
+          >
+            {importer.isPending ? 'Restoring…' : 'Restore from file…'}
+          </Button>
+        )}
       </div>
     </Card>
   )

@@ -2,20 +2,23 @@ using Ingest.Api.Auth;
 using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Entities;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ingest.Api.Controllers;
 
 /// <summary>
-/// Operator/admin-facing submission management. Reads (listing and lookup) are available to
-/// operators; mutations — including create-on-behalf-of a service, replace, and delete — require
-/// the Admin role. Admin-driven mutations stamp the audit trail (CreatedBy / ModifiedBy) with
-/// the admin's identity rather than the impersonated service.
+/// Operator/admin-facing submission management. Reads (listing and lookup) require
+/// <c>submissions:read</c>; create/replace/import require <c>submissions:submit</c>; delete requires
+/// <c>submissions:delete</c>; and the pending queue + approve/reject require <c>submissions:approve</c>.
+/// Admin-driven mutations stamp the audit trail (CreatedBy / ModifiedBy) with the admin's identity
+/// rather than the impersonated service.
 /// </summary>
 [ApiController]
 [Route("api/admin/submissions")]
-[Authorize(Policy = AuthConstants.OperatorPolicy)]
+[Authorize(Policy = Capabilities.SubmissionsRead)]
 public sealed class AdminSubmissionsController(ISubmissionService service, IAuditLogService auditLog, IBulkImportService bulkImport) : ControllerBase
 {
     /// <summary>List submissions across all services, optionally filtered by service and/or date range.</summary>
@@ -27,6 +30,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
     /// <param name="schemaName">Restrict the listing to submissions for the given schema.</param>
+    /// <param name="approvalStatus">Restrict the listing to a single approval state (e.g. <c>Pending</c> for the review queue).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">A page of submissions.</response>
     [HttpGet]
@@ -40,10 +44,11 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         [FromQuery] string? schemaName,
+        [FromQuery] ApprovalStatus? approvalStatus,
         CancellationToken ct)
     {
         var result = await service.ListAsync(
-            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, schemaName, ct);
+            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, schemaName, approvalStatus, ct);
         return Ok(result.Map(SubmissionDto.From));
     }
 
@@ -90,7 +95,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     /// <response code="204">Submission deleted (or already deleted — call is idempotent).</response>
     /// <response code="403">Caller is not an Admin.</response>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = AuthConstants.AdminPolicy)]
+    [Authorize(Policy = Capabilities.SubmissionsDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
@@ -113,14 +118,14 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     /// <response code="404">No matching schema, or the target service does not exist.</response>
     /// <response code="403">Caller is not an Admin.</response>
     [HttpPost]
-    [Authorize(Policy = AuthConstants.AdminPolicy)]
+    [Authorize(Policy = Capabilities.SubmissionsSubmit)]
     [ProducesResponseType(typeof(SubmissionWriteResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create([FromBody] AdminSubmissionInput input, CancellationToken ct)
     {
-        var written = await service.AdminCreateAsync(input, ct);
+        var written = await service.AdminCreateAsync(input, Request.ResolveSource(), ct);
         return Created($"/api/admin/submissions/{written.Submission.Id}",
             new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
@@ -141,7 +146,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     /// <response code="400">The file could not be parsed, or contained no submissions.</response>
     /// <response code="403">Caller is not an Admin.</response>
     [HttpPost("import")]
-    [Authorize(Policy = AuthConstants.AdminPolicy)]
+    [Authorize(Policy = Capabilities.SubmissionsSubmit)]
     [ProducesResponseType(typeof(BulkImportResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -166,14 +171,76 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     /// <response code="404">No submission with that id (or no matching schema).</response>
     /// <response code="403">Caller is not an Admin.</response>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = AuthConstants.AdminPolicy)]
+    [Authorize(Policy = Capabilities.SubmissionsSubmit)]
     [ProducesResponseType(typeof(SubmissionWriteResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Replace(Guid id, [FromBody] AdminSubmissionInput input, CancellationToken ct)
     {
-        var written = await service.AdminReplaceAsync(id, input, ct);
+        var written = await service.AdminReplaceAsync(id, input, Request.ResolveSource(), ct);
         return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
+    }
+
+    /// <summary>Number of submissions currently awaiting approval. Backs the dashboard pending-approvals card.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">An object carrying the pending count.</response>
+    [HttpGet("pending-count")]
+    [Authorize(Policy = Capabilities.SubmissionsApprove)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> PendingCount(CancellationToken ct)
+    {
+        var count = await service.CountPendingAsync(ct);
+        return Ok(new { count });
+    }
+
+    /// <summary>Approve a pending submission.</summary>
+    /// <remarks>
+    /// Records the caller's approval. Once every required approver has approved (or the caller is an
+    /// Admin), the submission goes live: its sample projection is built and it enters the OData feed
+    /// and Explore. Requires the Approver role (or Admin); the caller must additionally be a
+    /// designated approver for this submission, unless they are an Admin.
+    /// </remarks>
+    /// <param name="id">Submission id.</param>
+    /// <param name="body">Optional note recorded against the decision.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The updated submission.</response>
+    /// <response code="400">The submission is not awaiting approval.</response>
+    /// <response code="403">The caller is not a designated approver (and not an Admin).</response>
+    /// <response code="404">No submission with that id, or the approval workflow is disabled.</response>
+    [HttpPost("{id:guid}/approve")]
+    [Authorize(Policy = Capabilities.SubmissionsApprove)]
+    [ProducesResponseType(typeof(SubmissionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Approve(Guid id, [FromBody] ApprovalDecisionRequest? body, CancellationToken ct)
+    {
+        var updated = await service.ApproveAsync(User.CurrentAccountId(), id, body?.Note, ct);
+        return Ok(SubmissionDto.From(updated));
+    }
+
+    /// <summary>Reject a pending submission, optionally recording a reason.</summary>
+    /// <remarks>
+    /// The submission moves to <c>Rejected</c>: it is excluded from the OData feed and Explore but
+    /// stays visible (with the reason) in the submissions list. Same authorisation as approve.
+    /// </remarks>
+    /// <param name="id">Submission id.</param>
+    /// <param name="body">Optional reason shown to the submitter and reviewers.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The updated submission.</response>
+    /// <response code="400">The submission is not awaiting approval.</response>
+    /// <response code="403">The caller is not a designated approver (and not an Admin).</response>
+    /// <response code="404">No submission with that id, or the approval workflow is disabled.</response>
+    [HttpPost("{id:guid}/reject")]
+    [Authorize(Policy = Capabilities.SubmissionsApprove)]
+    [ProducesResponseType(typeof(SubmissionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Reject(Guid id, [FromBody] ApprovalDecisionRequest? body, CancellationToken ct)
+    {
+        var updated = await service.RejectAsync(User.CurrentAccountId(), id, body?.Note, ct);
+        return Ok(SubmissionDto.From(updated));
     }
 }

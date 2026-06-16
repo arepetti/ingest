@@ -20,9 +20,32 @@ import type {
   WebhookEndpoint, CreateWebhookEndpointRequest, UpdateWebhookEndpointRequest,
   WebhookEndpointCreatedResponse, WebhookSecretResponse,
   WebhookDelivery, WebhookDeliveryStatus, WebhookDrainResult,
+  ApprovalStatus, ApprovalPolicy,
 } from './types'
+import type { Capability } from './capabilities'
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/api/me') })
+
+/**
+ * Capability helper derived from `/api/me`. Use this to gate sidebar entries, pages, buttons and
+ * row actions instead of comparing roles directly — roles are now just decorative templates.
+ * While `/api/me` is still loading every check returns `false`, so gated UI stays hidden until the
+ * effective capability set is known.
+ */
+export function useCapabilities() {
+  const { data: me, isLoading } = useMe()
+  const set = new Set<Capability>(me?.capabilities ?? [])
+  return {
+    me,
+    isLoading,
+    /** True when the account holds the given capability. */
+    has: (cap: Capability) => set.has(cap),
+    /** True when the account holds at least one of the given capabilities. */
+    hasAny: (...caps: Capability[]) => caps.some(c => set.has(c)),
+    /** The raw effective capability set. */
+    all: set,
+  }
+}
 
 // --- Full-list export helpers -------------------------------------------------------------
 // The grids' "Export CSV" buttons need the *entire* list, not the page currently on screen.
@@ -63,12 +86,13 @@ export const fetchAllSchemas = (params?: { includeDeleted?: boolean }) => {
   return fetchAllPaged<Schema>('/api/admin/schemas', search)
 }
 
-export const fetchAllSubmissions = (params?: { serviceId?: string; schemaName?: string; from?: string; to?: string }) => {
+export const fetchAllSubmissions = (params?: { serviceId?: string; schemaName?: string; from?: string; to?: string; approvalStatus?: ApprovalStatus }) => {
   const search = new URLSearchParams()
   if (params?.serviceId)  search.set('serviceId', params.serviceId)
   if (params?.schemaName) search.set('schemaName', params.schemaName)
   if (params?.from)       search.set('from', params.from)
   if (params?.to)         search.set('to', params.to)
+  if (params?.approvalStatus) search.set('approvalStatus', params.approvalStatus)
   return fetchAllPaged<Submission>('/api/admin/submissions', search)
 }
 
@@ -337,7 +361,7 @@ export const useExploreSeries = (params: ExploreSeriesParams, enabled: boolean =
 }
 
 export const useSubmissions = (
-  params: { page: number; pageSize: number; serviceId?: string; schemaName?: string; from?: string; to?: string },
+  params: { page: number; pageSize: number; serviceId?: string; schemaName?: string; from?: string; to?: string; approvalStatus?: ApprovalStatus },
   enabled: boolean = true,
 ) => {
   const search = new URLSearchParams({
@@ -348,10 +372,69 @@ export const useSubmissions = (
   if (params.schemaName) search.set('schemaName', params.schemaName)
   if (params.from)       search.set('from', params.from)
   if (params.to)         search.set('to', params.to)
+  if (params.approvalStatus) search.set('approvalStatus', params.approvalStatus)
   return useQuery({
     queryKey: ['submissions', params],
     queryFn: () => api.get<Paged<Submission>>(`/api/admin/submissions?${search}`),
     enabled,
+  })
+}
+
+// --- Approval workflow (admin) ------------------------------------------------------------
+
+/**
+ * Count of submissions awaiting approval, backing the dashboard pending-approvals card. Only
+ * meaningful for approver/admin callers; gate the call with `enabled` on the approval master
+ * switch + role so non-approvers never hit the 403-guarded endpoint.
+ */
+export const usePendingApprovalCount = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['pending-approval-count'],
+    queryFn: () => api.get<{ count: number }>('/api/admin/submissions/pending-count'),
+    enabled,
+  })
+
+/** Approve a pending submission (optionally with a note). Refreshes the queue, the row, and the dashboard count. */
+export const useApproveSubmission = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, note }: { id: string; note?: string }) =>
+      api.post<Submission>(`/api/admin/submissions/${id}/approve`, { note: note ?? null }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['submissions'] })
+      qc.invalidateQueries({ queryKey: ['submission', v.id] })
+      qc.invalidateQueries({ queryKey: ['pending-approval-count'] })
+    },
+  })
+}
+
+/** Reject a pending submission with an optional reason. Same cache invalidation as approve. */
+export const useRejectSubmission = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, note }: { id: string; note?: string }) =>
+      api.post<Submission>(`/api/admin/submissions/${id}/reject`, { note: note ?? null }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['submissions'] })
+      qc.invalidateQueries({ queryKey: ['submission', v.id] })
+      qc.invalidateQueries({ queryKey: ['pending-approval-count'] })
+    },
+  })
+}
+
+/** The server-wide default approval policy schemas can defer to. 404s when the workflow is disabled. */
+export const useApprovalSettings = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['approval-settings'],
+    queryFn: () => api.get<ApprovalPolicy>('/api/admin/approval/settings'),
+    enabled,
+  })
+
+export const useUpdateApprovalSettings = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: ApprovalPolicy) => api.put<ApprovalPolicy>('/api/admin/approval/settings', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['approval-settings'] }),
   })
 }
 

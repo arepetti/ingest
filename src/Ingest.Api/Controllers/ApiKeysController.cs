@@ -1,6 +1,7 @@
 using Ingest.Api.Auth;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,7 +14,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/accounts/{accountId:guid}/keys")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.ApiKeysRead)]
 public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
 {
     /// <summary>List the keys (metadata only) attached to an account.</summary>
@@ -44,6 +45,7 @@ public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
     /// <response code="400">The supplied expiry is in the past or more than two years in the future.</response>
     /// <response code="404">No account with that id exists.</response>
     [HttpPost]
+    [Authorize(Policy = Capabilities.ApiKeysManage)]
     [ProducesResponseType(typeof(GeneratedApiKeyResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -63,6 +65,7 @@ public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
     /// <response code="200">The revoked key's metadata.</response>
     /// <response code="404">No such key (or it belongs to a different account).</response>
     [HttpPost("{keyId:guid}/revoke")]
+    [Authorize(Policy = Capabilities.ApiKeysManage)]
     [ProducesResponseType(typeof(ApiKeyDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Revoke(Guid accountId, Guid keyId, CancellationToken ct)

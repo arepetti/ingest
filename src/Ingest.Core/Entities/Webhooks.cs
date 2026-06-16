@@ -20,6 +20,15 @@ public enum WebhookEventKind
 
     /// <summary>A required value's previous cadence window closed unsatisfied (the deadline passed).</summary>
     WindowMissed = 3,
+
+    /// <summary>A submission was accepted but is held awaiting approval before it goes live.</summary>
+    SubmissionPendingApproval = 4,
+
+    /// <summary>A pending submission was approved and is now live.</summary>
+    SubmissionApproved = 5,
+
+    /// <summary>A pending submission was rejected and will not go live.</summary>
+    SubmissionRejected = 6,
 }
 
 /// <summary>
@@ -136,6 +145,9 @@ public static class WebhookEventNames
         WebhookEventKind.SubmissionWarnings => "submission.warnings",
         WebhookEventKind.WindowUpcoming => "window.upcoming",
         WebhookEventKind.WindowMissed => "window.missed",
+        WebhookEventKind.SubmissionPendingApproval => "submission.pending_approval",
+        WebhookEventKind.SubmissionApproved => "submission.approved",
+        WebhookEventKind.SubmissionRejected => "submission.rejected",
         _ => kind.ToString(),
     };
 }

@@ -13,7 +13,7 @@ import {
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { RowActions } from '../components/RowActions'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
-import { useDeleteReport, useMe, useReports, useUploadReport } from '../api/hooks'
+import { useCapabilities, useDeleteReport, useReports, useUploadReport } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { confirmDelete } from '../utils/confirm'
 import { pickTextFile } from '../utils/download'
@@ -60,8 +60,8 @@ const useStyles = makeStyles({
 export function ReportsPage() {
   const s = useStyles()
   const nav = useNavigate()
-  const { data: me } = useMe()
-  const isAdmin = me?.role === 'Admin'
+  const { has } = useCapabilities()
+  const isAdmin = has('reports:manage')
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)

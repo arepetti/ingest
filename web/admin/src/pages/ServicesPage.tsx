@@ -12,8 +12,9 @@ import {
 import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, Delete20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, PersonAdd20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { useNavigate } from 'react-router-dom'
-import { fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCreateAccount, useDeleteAccount, useEraseAccount, useMe, useRevokeApiKey, useRotateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
+import { fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCapabilities, useCreateAccount, useDeleteAccount, useEraseAccount, useRevokeApiKey, useRotateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
 import type { Account, AccountKind, AccountRole, AuthProvider, CreateAccountRequest, ErasureMode, ErasureResult, ExternalLogin, UpdateAccountRequest } from '../api/types'
+import { CAPABILITY_GROUPS, defaultCapabilitiesForRole, type Capability } from '../api/capabilities'
 import { downloadFromUrl } from '../utils/download'
 import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
@@ -66,9 +67,83 @@ const useStyles = makeStyles({
     padding: '0 16px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
   },
+  capPicker: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' },
+  capGroupLabel: { fontWeight: 600, fontSize: '12px', color: tokens.colorNeutralForeground2, textTransform: 'uppercase', letterSpacing: '0.02em' },
+  capGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 16px' },
+  capNote: { color: tokens.colorNeutralForeground3, fontSize: '12px' },
 })
 
-const roles: AccountRole[] = ['Service', 'Operator', 'Admin']
+/** Compare two capability lists as sets (order-insensitive). */
+function sameCapabilitySet(a: readonly Capability[], b: readonly Capability[]): boolean {
+  if (a.length !== b.length) return false
+  const set = new Set(a)
+  return b.every(c => set.has(c))
+}
+
+/**
+ * Grouped checkbox picker for an account's effective capabilities. The role dropdown seeds the
+ * selection; this lets the admin add or remove individual capabilities on top of (or instead of)
+ * the role default. Two roles are non-editable: Admins always hold every capability, and Service
+ * accounts hold none (they only submit/view their own data) — both are shown read-only.
+ *
+ * Note: each Checkbox carries an explicit, unique `id`. Without it the surrounding Field injects a
+ * single generated id into every descendant control via context, so all the labels' `htmlFor`
+ * collide and clicking one label toggles an unrelated checkbox.
+ */
+function CapabilityPicker({
+  role,
+  selected,
+  onChange,
+}: {
+  role: AccountRole
+  selected: Capability[]
+  onChange: (next: Capability[]) => void
+}) {
+  const s = useStyles()
+  const isAdmin = role === 'Admin'
+  const isService = role === 'Service'
+  const readOnly = isAdmin || isService
+  const set = new Set(selected)
+
+  function toggle(cap: Capability, checked: boolean) {
+    const next = new Set(set)
+    if (checked) next.add(cap)
+    else next.delete(cap)
+    onChange(Array.from(next))
+  }
+
+  return (
+    <Field label="Permissions" hint="Fine-grained capabilities. The role above is just a starting template — tailor these as needed.">
+      <div className={s.capPicker}>
+        {isAdmin && (
+          <Body1 className={s.capNote}>Administrators always hold every permission; this cannot be reduced.</Body1>
+        )}
+        {isService && (
+          <Body1 className={s.capNote}>Service accounts only submit and view their own data; they hold no back-office permissions.</Body1>
+        )}
+        {CAPABILITY_GROUPS.map(group => (
+          <div key={group.group}>
+            <div className={s.capGroupLabel}>{group.group}</div>
+            <div className={s.capGrid}>
+              {group.items.map(item => (
+                <Checkbox
+                  key={item.id}
+                  id={`cap-${item.id}`}
+                  label={item.label}
+                  checked={isAdmin ? true : isService ? false : set.has(item.id)}
+                  disabled={readOnly}
+                  onChange={(_, d) => toggle(item.id, !!d.checked)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Field>
+  )
+}
+
+const roles: AccountRole[] = ['Service', 'Operator', 'Approver', 'Admin']
 const kinds: AccountKind[] = ['User', 'Application']
 
 // Drop blank rows and trim emails before sending. The server lower-cases and de-duplicates, so we
@@ -104,9 +179,13 @@ export function ServicesPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const { data, isLoading, error, refetch } = useAccounts({ page, pageSize })
   const { data: providers } = useAuthProviders()
-  const { data: me } = useMe()
+  const { me, has } = useCapabilities()
   const hasSso = (providers?.length ?? 0) > 0
   const emailEnabled = me?.emailEnabled === true
+  const canManageAccounts = has('accounts:manage')
+  const canManageKeys = has('apikeys:manage')
+  const canErase = has('privacy:manage')
+  const canExportPersonal = has('privacy:read')
   const create = useCreateAccount()
   const update = useUpdateAccount()
   const del = useDeleteAccount()
@@ -133,11 +212,13 @@ export function ServicesPage() {
   const [viewerExpanded, setViewerExpanded] = useState(false)
 
   function openCreate() {
-    setEditing({ kind: 'create', account: { name: '', label: '', description: '', email: '', kind: 'Application', role: 'Service', enabled: true } })
+    setEditing({ kind: 'create', account: { name: '', label: '', description: '', email: '', kind: 'Application', role: 'Service', enabled: true, capabilities: defaultCapabilitiesForRole('Service') } })
     setSubmitError(null)
   }
   function openEdit(a: Account) {
-    setEditing({ kind: 'edit', account: { ...a } })
+    // The picker is driven off the *effective* set; on save we collapse it back to either the
+    // role-default bundle (stored as no overrides) or an explicit override list.
+    setEditing({ kind: 'edit', account: { ...a, capabilities: a.effectiveCapabilities ?? defaultCapabilitiesForRole(a.role ?? 'Service') } })
     setSubmitError(null)
   }
   function editFromView(a: Account) { setViewing(null); openEdit(a) }
@@ -175,6 +256,13 @@ export function ServicesPage() {
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setSubmitError('Enter a valid email address.'); return }
     // Only User-kind accounts can hold SSO links; never send them for Application accounts.
     const logins = a.kind === 'User' ? cleanLogins(a.externalLogins) : []
+    const role = a.role ?? 'Service'
+    // Collapse the picker selection: Admins implicitly hold everything (send []), and a selection
+    // identical to the role default bundle is persisted as "no overrides" (so the account keeps
+    // tracking the role defaults). Anything else is stored verbatim as an explicit override set.
+    const desired = a.capabilities ?? []
+    const capabilities: Capability[] =
+      role === 'Admin' || sameCapabilitySet(desired, defaultCapabilitiesForRole(role)) ? [] : desired
     try {
       if (editing.kind === 'create') {
         const req: CreateAccountRequest = {
@@ -183,8 +271,9 @@ export function ServicesPage() {
           description: a.description,
           email,
           kind: a.kind ?? 'Application',
-          role: a.role ?? 'Service',
+          role,
           enabled: a.enabled ?? true,
+          capabilities,
           // Only include when SSO is on so an API-key-only deployment never touches this field.
           ...(hasSso ? { externalLogins: logins } : {}),
         }
@@ -194,8 +283,9 @@ export function ServicesPage() {
           label: a.label,
           description: a.description,
           email,
-          role: a.role ?? 'Service',
+          role,
           enabled: a.enabled ?? true,
+          capabilities,
           // Omit entirely when SSO is off (undefined ⇒ "leave links untouched" server-side).
           ...(hasSso ? { externalLogins: logins } : {}),
         }
@@ -212,16 +302,16 @@ export function ServicesPage() {
       <div className={s.toolbar}>
         <Title2>Accounts</Title2>
         <Toolbar className={s.toolbarActions}>
-          <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>New account</ToolbarButton>
+          {canManageAccounts && <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>New account</ToolbarButton>}
           <Menu>
             <MenuTrigger disableButtonEnhancement>
               <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
-                <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Service')}>Onboard new service</MenuItem>
-                <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Operator')}>Onboard new operator</MenuItem>
-                <MenuDivider />
+                {canManageAccounts && <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Service')}>Onboard new service</MenuItem>}
+                {canManageAccounts && <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Operator')}>Onboard new operator</MenuItem>}
+                {canManageAccounts && <MenuDivider />}
                 <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
                 <MenuDivider />
                 <MenuItem
@@ -302,8 +392,8 @@ export function ServicesPage() {
                 <RowActions
                   ariaLabel={`Actions for ${a.name}`}
                   actions={[
-                    { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => openEdit(a) },
-                    { key: 'keys', label: 'API keys', icon: <Key20Regular />, onClick: () => setKeyDialogFor(a) },
+                    ...(canManageAccounts ? [{ key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => openEdit(a) }] : []),
+                    ...(canManageKeys ? [{ key: 'keys', label: 'API keys', icon: <Key20Regular />, onClick: () => setKeyDialogFor(a) }] : []),
                     ...(emailEnabled && a.email
                       ? [{ key: 'email', label: 'Send email', icon: <Mail20Regular />, onClick: () => setEmailDialogFor(a) }]
                       : []),
@@ -315,9 +405,9 @@ export function ServicesPage() {
                           onClick: () => nav(`/services/${encodeURIComponent(a.name)}/status`),
                         }]
                       : []),
-                    { key: 'export', label: 'Export personal data', icon: <ArrowDownload20Regular />, onClick: () => exportPersonalData(a) },
-                    { key: 'erase', label: 'Erase (GDPR)', icon: <ShieldPerson20Regular />, destructive: true, onClick: () => setEraseDialogFor(a) },
-                    { key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(a) },
+                    ...(canExportPersonal ? [{ key: 'export', label: 'Export personal data', icon: <ArrowDownload20Regular />, onClick: () => exportPersonalData(a) }] : []),
+                    ...(canErase ? [{ key: 'erase', label: 'Erase (GDPR)', icon: <ShieldPerson20Regular />, destructive: true, onClick: () => setEraseDialogFor(a) }] : []),
+                    ...(canManageAccounts ? [{ key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(a) }] : []),
                   ]}
                 />
               </TableCell>
@@ -383,16 +473,26 @@ export function ServicesPage() {
                   {kinds.map(k => <Option key={k} value={k}>{k}</Option>)}
                 </Dropdown>
               </Field>
-              <Field label="Role">
+              <Field label="Role" hint="A template that seeds the permissions below — adjust them freely afterwards.">
                 <Dropdown
                   selectedOptions={[editing.account.role ?? 'Service']}
                   value={editing.account.role ?? 'Service'}
-                  onOptionSelect={(_, d) => setEditing({ ...editing, account: { ...editing.account, role: d.optionValue as AccountRole } })}
+                  onOptionSelect={(_, d) => {
+                    const nextRole = d.optionValue as AccountRole
+                    // Re-seed the permissions picker from the new role's default bundle.
+                    setEditing({ ...editing, account: { ...editing.account, role: nextRole, capabilities: defaultCapabilitiesForRole(nextRole) } })
+                  }}
                 >
                   {roles.map(r => <Option key={r} value={r}>{r}</Option>)}
                 </Dropdown>
               </Field>
               <Checkbox label="Enabled" checked={editing.account.enabled ?? true} onChange={(_, d) => setEditing({ ...editing, account: { ...editing.account, enabled: !!d.checked } })} />
+
+              <CapabilityPicker
+                role={editing.account.role ?? 'Service'}
+                selected={editing.account.capabilities ?? []}
+                onChange={(next) => setEditing({ ...editing, account: { ...editing.account, capabilities: next } })}
+              />
 
               {hasSso && (editing.account.kind ?? 'Application') === 'User' && (
                 <ExternalLoginsEditor
@@ -434,44 +534,50 @@ export function ServicesPage() {
         />
         {viewing && (
           <Toolbar className={s.drawerToolbar}>
-            <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>Edit</ToolbarButton>
-            <ToolbarButton icon={<Key20Regular />} onClick={() => keysFromView(viewing)}>API keys</ToolbarButton>
+            {canManageAccounts && <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>Edit</ToolbarButton>}
+            {canManageKeys && <ToolbarButton icon={<Key20Regular />} onClick={() => keysFromView(viewing)}>API keys</ToolbarButton>}
             {emailEnabled && viewing.email && (
               <ToolbarButton icon={<Mail20Regular />} onClick={() => emailFromView(viewing)}>Send email</ToolbarButton>
             )}
             {viewing.role === 'Service' && (
               <ToolbarButton icon={<Status20Regular />} onClick={() => statusFromView(viewing)}>View status</ToolbarButton>
             )}
-            <ToolbarButton icon={<ArrowDownload20Regular />} onClick={() => exportPersonalData(viewing)}>Export data</ToolbarButton>
-            {/* Default action is Delete; the chevron exposes the heavier GDPR erase as a subitem. */}
-            <Menu positioning="below-end">
-              <MenuTrigger disableButtonEnhancement>
-                {(triggerProps) => (
-                  <SplitButton
-                    menuButton={triggerProps}
-                    primaryActionButton={{ onClick: () => deleteFromView(viewing) }}
-                    appearance="subtle"
-                    icon={<Delete20Regular />}
-                  >
-                    Delete
-                  </SplitButton>
-                )}
-              </MenuTrigger>
-              <MenuPopover>
-                <MenuList>
-                  <MenuItem icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>
-                    Delete
-                  </MenuItem>
-                  <MenuItem
-                    icon={<ShieldPerson20Regular />}
-                    onClick={() => eraseFromView(viewing)}
-                    style={{ color: 'var(--colorPaletteRedForeground1)' }}
-                  >
-                    Erase (GDPR)
-                  </MenuItem>
-                </MenuList>
-              </MenuPopover>
-            </Menu>
+            {canExportPersonal && <ToolbarButton icon={<ArrowDownload20Regular />} onClick={() => exportPersonalData(viewing)}>Export data</ToolbarButton>}
+            {canManageAccounts ? (
+              // Default action is Delete; the chevron exposes the heavier GDPR erase as a subitem.
+              <Menu positioning="below-end">
+                <MenuTrigger disableButtonEnhancement>
+                  {(triggerProps) => (
+                    <SplitButton
+                      menuButton={triggerProps}
+                      primaryActionButton={{ onClick: () => deleteFromView(viewing) }}
+                      appearance="subtle"
+                      icon={<Delete20Regular />}
+                    >
+                      Delete
+                    </SplitButton>
+                  )}
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    <MenuItem icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>
+                      Delete
+                    </MenuItem>
+                    {canErase && (
+                      <MenuItem
+                        icon={<ShieldPerson20Regular />}
+                        onClick={() => eraseFromView(viewing)}
+                        style={{ color: 'var(--colorPaletteRedForeground1)' }}
+                      >
+                        Erase (GDPR)
+                      </MenuItem>
+                    )}
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
+            ) : canErase ? (
+              <ToolbarButton icon={<ShieldPerson20Regular />} onClick={() => eraseFromView(viewing)}>Erase (GDPR)</ToolbarButton>
+            ) : null}
           </Toolbar>
         )}
         <DrawerBody>

@@ -3,6 +3,7 @@ using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,7 +15,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/accounts")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.AccountsRead)]
 public sealed class AccountsController(IAccountService service) : ControllerBase
 {
     /// <summary>List accounts in a paged form, optionally filtered by kind and/or role.</summary>
@@ -71,6 +72,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
     /// <response code="201">The account was created and is returned in the body.</response>
     /// <response code="409">Another account (including a soft-deleted one) already uses the same name.</response>
     [HttpPost]
+    [Authorize(Policy = Capabilities.AccountsManage)]
     [ProducesResponseType(typeof(AccountDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateAccountRequest req, CancellationToken ct)
@@ -85,6 +87,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
             Role = req.Role,
             Enabled = req.Enabled,
             ExternalLogins = ToExternalLogins(req.ExternalLogins) ?? new(),
+            Capabilities = req.Capabilities ?? new(),
         }, ct);
         return Created($"/api/admin/accounts/{created.Id}", AccountDto.From(created));
     }
@@ -101,11 +104,12 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
     /// <response code="200">The updated account.</response>
     /// <response code="404">No account with that id.</response>
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = Capabilities.AccountsManage)]
     [ProducesResponseType(typeof(AccountDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateAccountRequest req, CancellationToken ct)
     {
-        var updated = await service.UpdateAsync(id, new AccountUpdate(req.Label, req.Description, req.Email, req.Role, req.Enabled, ToExternalLogins(req.ExternalLogins)), ct);
+        var updated = await service.UpdateAsync(id, new AccountUpdate(req.Label, req.Description, req.Email, req.Role, req.Enabled, ToExternalLogins(req.ExternalLogins), req.Capabilities), ct);
         return updated is null ? NotFound() : Ok(AccountDto.From(updated));
     }
 
@@ -123,6 +127,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <response code="204">Account soft-deleted (or already deleted — the call is idempotent).</response>
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Capabilities.AccountsManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {

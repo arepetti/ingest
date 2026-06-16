@@ -3,6 +3,7 @@ using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
+using Ingest.Core.Security;
 using Ingest.Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +19,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/webhooks")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.WebhooksRead)]
 public sealed class AdminWebhooksController : ControllerBase
 {
     private readonly IWebhookEndpointService _endpoints;
@@ -69,6 +70,7 @@ public sealed class AdminWebhooksController : ControllerBase
     /// <response code="400">Validation failed (bad name/URL).</response>
     /// <response code="404">Webhooks are disabled.</response>
     [HttpPost]
+    [Authorize(Policy = Capabilities.WebhooksManage)]
     [ProducesResponseType(typeof(WebhookEndpointCreatedResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -87,6 +89,7 @@ public sealed class AdminWebhooksController : ControllerBase
     /// <response code="400">Validation failed.</response>
     /// <response code="404">Webhooks are disabled, or no endpoint with that id.</response>
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = Capabilities.WebhooksManage)]
     [ProducesResponseType(typeof(WebhookEndpointDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -102,6 +105,7 @@ public sealed class AdminWebhooksController : ControllerBase
     /// <response code="204">Deleted (idempotent).</response>
     /// <response code="404">Webhooks are disabled.</response>
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Capabilities.WebhooksManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
@@ -115,6 +119,7 @@ public sealed class AdminWebhooksController : ControllerBase
     /// <response code="200">The endpoint and the new plaintext secret.</response>
     /// <response code="404">Webhooks are disabled, or no endpoint with that id.</response>
     [HttpPost("{id:guid}/rotate-secret")]
+    [Authorize(Policy = Capabilities.WebhooksManage)]
     [ProducesResponseType(typeof(WebhookSecretResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RotateSecret(Guid id, CancellationToken ct)
@@ -128,6 +133,7 @@ public sealed class AdminWebhooksController : ControllerBase
     /// <response code="202">Enqueued; returns the new delivery id.</response>
     /// <response code="404">Webhooks are disabled, or no endpoint with that id.</response>
     [HttpPost("{id:guid}/test")]
+    [Authorize(Policy = Capabilities.WebhooksManage)]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SendTest(Guid id, CancellationToken ct)
@@ -156,6 +162,7 @@ public sealed class AdminWebhooksController : ControllerBase
     /// <response code="200">Requeued.</response>
     /// <response code="404">Webhooks are disabled, or no delivery with that id.</response>
     [HttpPost("deliveries/{deliveryId:guid}/redeliver")]
+    [Authorize(Policy = Capabilities.WebhooksManage)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Redeliver(Guid deliveryId, CancellationToken ct)
@@ -168,6 +175,7 @@ public sealed class AdminWebhooksController : ControllerBase
     /// <response code="200">The drain result (sent / failed counts).</response>
     /// <response code="404">Webhooks are disabled.</response>
     [HttpPost("drain")]
+    [Authorize(Policy = Capabilities.WebhooksManage)]
     [ProducesResponseType(typeof(WebhookDrainResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Drain([FromQuery] int? max, CancellationToken ct)

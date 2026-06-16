@@ -18,6 +18,15 @@ public static class DefaultEmailTemplates
     /// <summary>Template key for the "submission with warnings" notice.</summary>
     public const string Warnings = "notification.warnings";
 
+    /// <summary>Template key for the "submission pending approval" notice.</summary>
+    public const string PendingApproval = "notification.pendingApproval";
+
+    /// <summary>Template key for the "submission approved" notice.</summary>
+    public const string Approved = "notification.approved";
+
+    /// <summary>Template key for the "submission rejected" notice.</summary>
+    public const string Rejected = "notification.rejected";
+
     /// <summary>Every built-in template, in display order.</summary>
     public static IReadOnlyList<EmailTemplate> All { get; } = new[]
     {
@@ -77,6 +86,62 @@ public static class DefaultEmailTemplates
                 "<p>A submission from <strong>{{ service.label }}</strong> (id {{ submissionId }}, {{ submittedAt }}) was accepted with warnings:</p>" +
                 "<ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>" +
                 "<p>Review the submission to confirm the data is correct.</p><p>— Ingest</p>",
+        },
+        new EmailTemplate
+        {
+            Key = PendingApproval,
+            Name = "Submission pending approval notice",
+            Description = "Sent when a submission is accepted but held awaiting approval before it goes live. " +
+                          "Model: service (name, label), submissionId, submittedAt, schemas[] (strings), sampleCount.",
+            Subject = "Approval needed: submission from {{ service.label }}",
+            TextBody =
+                "Hello,\n\n" +
+                "A submission from {{ service.label }} (id {{ submissionId }}, {{ submittedAt }}) is awaiting approval before it goes live.\n" +
+                "Schemas: {% for s in schemas %}{{ s }}{% unless forloop.last %}, {% endunless %}{% endfor %} ({{ sampleCount }} value(s)).\n\n" +
+                "Please review it in the admin console.\n\n" +
+                "— Ingest",
+            HtmlBody =
+                "<p>Hello,</p>" +
+                "<p>A submission from <strong>{{ service.label }}</strong> (id {{ submissionId }}, {{ submittedAt }}) is awaiting approval before it goes live.</p>" +
+                "<p>Schemas: {% for s in schemas %}{{ s }}{% unless forloop.last %}, {% endunless %}{% endfor %} ({{ sampleCount }} value(s)).</p>" +
+                "<p>Please review it in the admin console.</p><p>— Ingest</p>",
+        },
+        new EmailTemplate
+        {
+            Key = Approved,
+            Name = "Submission approved notice",
+            Description = "Sent when a pending submission is approved and becomes live. " +
+                          "Model: service (name, label), submissionId, submittedAt, decidedBy, note, schemas[] (strings), sampleCount.",
+            Subject = "Submission approved — {{ service.label }}",
+            TextBody =
+                "Hello,\n\n" +
+                "The submission from {{ service.label }} (id {{ submissionId }}, {{ submittedAt }}) was approved{% if decidedBy %} by {{ decidedBy }}{% endif %} and is now live.\n" +
+                "{% if note %}Note: {{ note }}\n{% endif %}\n" +
+                "— Ingest",
+            HtmlBody =
+                "<p>Hello,</p>" +
+                "<p>The submission from <strong>{{ service.label }}</strong> (id {{ submissionId }}, {{ submittedAt }}) was approved{% if decidedBy %} by {{ decidedBy }}{% endif %} and is now live.</p>" +
+                "{% if note %}<p>Note: {{ note }}</p>{% endif %}" +
+                "<p>— Ingest</p>",
+        },
+        new EmailTemplate
+        {
+            Key = Rejected,
+            Name = "Submission rejected notice",
+            Description = "Sent when a pending submission is rejected. " +
+                          "Model: service (name, label), submissionId, submittedAt, decidedBy, reason, schemas[] (strings), sampleCount.",
+            Subject = "Submission rejected — {{ service.label }}",
+            TextBody =
+                "Hello,\n\n" +
+                "The submission from {{ service.label }} (id {{ submissionId }}, {{ submittedAt }}) was rejected{% if decidedBy %} by {{ decidedBy }}{% endif %} and will not go live.\n" +
+                "{% if reason %}Reason: {{ reason }}\n{% endif %}\n" +
+                "You can re-submit corrected data for the same period.\n\n" +
+                "— Ingest",
+            HtmlBody =
+                "<p>Hello,</p>" +
+                "<p>The submission from <strong>{{ service.label }}</strong> (id {{ submissionId }}, {{ submittedAt }}) was rejected{% if decidedBy %} by {{ decidedBy }}{% endif %} and will not go live.</p>" +
+                "{% if reason %}<p>Reason: {{ reason }}</p>{% endif %}" +
+                "<p>You can re-submit corrected data for the same period.</p><p>— Ingest</p>",
         },
     };
 }

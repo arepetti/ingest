@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Tab, TabList, Title2, makeStyles, tokens } from '@fluentui/react-components'
+import { Tab, TabList, Title2, makeStyles } from '@fluentui/react-components'
 
 /**
  * One entry in a {@link SectionedLayout}. The `render` callback is only invoked while the
@@ -65,6 +65,3 @@ export function SectionedLayout({
     </div>
   )
 }
-
-// Re-export so consumers can colocate the section background token if they need it.
-export const sectionBorderColor = tokens.colorNeutralStroke2

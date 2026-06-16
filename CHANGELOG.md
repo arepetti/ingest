@@ -6,10 +6,16 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 
 ### Added
 
-- Explore page: lightweight in-app analytics for numeric KPIs (trend, service comparison, and latest-value snapshot), with an optional trend projection, CSV/PNG export, and shareable filter links. A convenience for deployments without a BI tool; Power BI remains the primary analytics surface.
+- Optional submission approval workflow (and notifications/webhooks).
+- Capability-based permissions: fine-grained per-account capabilities, with roles (Service / Operator / Approver / Admin) as templates that seed defaults. Grant any capability to any non-admin.
+- Explore page: lightweight in-app analytics for numeric KPIs.
 - Data export: download lists and reports as CSV, with reusable period filters.
 - Outbound webhooks so external systems can react to events.
 - Schema version history: track and review how schemas change over time.
+
+### Changed
+
+- Authorisation now resolves per-capability instead of by role. Existing accounts keep their previous access via role-default capability bundles — no migration or config change required.
 
 ## 0.2.0
 

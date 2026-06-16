@@ -5,18 +5,21 @@ import {
   Badge, Body1, Button, Card, CardHeader, Checkbox, Dialog, DialogActions,
   DialogBody, DialogContent, DialogSurface, DialogTitle, Divider,
   Dropdown, Field, Input, MessageBar, MessageBarBody, MessageBarTitle,
-  Option, Radio, RadioGroup, Spinner, Textarea, Title2, Toolbar, ToolbarButton, Tooltip,
+  Option, Radio, RadioGroup, Spinner, Tab, TabList, Textarea, Title2, Toolbar, ToolbarButton, Tooltip,
   makeStyles, tokens,
 } from '@fluentui/react-components'
 import { Add20Regular, ArrowLeft20Regular, Delete20Regular, Dismiss16Regular } from '@fluentui/react-icons'
 import type {
+  Account, ApprovalMode, ApprovalPolicy, ApprovalSourceScope, ApproverRequirement,
   Cadence, SchemaLayoutNode, SchemaValue, SchemaValueType, UpsertSchemaRequest,
 } from '../api/types'
-import { useAccounts, useCreateSchema, useSchemas, useSchemaVersionSnapshot, useSubmissions, useUpdateSchema } from '../api/hooks'
+import { useAccounts, useCreateSchema, useMe, useSchemas, useSchemaVersionSnapshot, useSubmissions, useUpdateSchema } from '../api/hooks'
+import { accountHasCapability } from '../api/capabilities'
 import { formatApiError } from '../api/client'
 import { LayoutTreeEditor } from '../components/LayoutTreeEditor'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { cadenceLabel } from '../utils/cadence'
+import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY, SERVICE_OWNER_LABEL } from '../utils/approvers'
 import { confirmDelete } from '../utils/confirm'
 import { formatDateTime } from '../utils/format'
 import { validateExpression, type ExpressionSyntaxResult } from '../utils/expression'
@@ -27,6 +30,8 @@ const useStyles = makeStyles({
   toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   headerLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
   form: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' },
+  // One tab's worth of fields. Same vertical rhythm as the old single-column form.
+  tabPanel: { display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'start' },
   flagsRow: { display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' },
   sectionLabel: { color: tokens.colorNeutralForeground3, fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginTop: '12px' },
@@ -39,6 +44,17 @@ const useStyles = makeStyles({
   dialogOptions: { display: 'flex', flexDirection: 'column', gap: '4px' },
   optionHint: { color: tokens.colorNeutralForeground3, fontSize: '12px', marginLeft: '28px' },
   readOnlyLayout: { opacity: 0.85 },
+  approverList: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  approverRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    padding: '6px 10px',
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderRadius: '6px',
+  },
+  approverName: { fontWeight: tokens.fontWeightSemibold },
 })
 
 const types: SchemaValueType[] = ['String', 'Integer', 'Number', 'Date', 'Boolean']
@@ -47,6 +63,9 @@ const cadences: Cadence[] = ['Daily', 'Weekly', 'Fortnightly', 'Monthly', 'Quart
 
 /** What to do about the version number when publishing changes to an Enabled schema without a bump. */
 type PublishChoice = 'increment' | 'asis' | 'draft' | 'discard'
+
+/** The sections the editor is split into. (Approvals is hidden when the workflow is disabled.) */
+type SchemaTab = 'general' | 'values' | 'validations' | 'approvals' | 'layout'
 
 /**
  * Full-page schema editor. Entry points, all routed here:
@@ -67,9 +86,19 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
   const isSnapshot = readOnly && !!name && !!entryId
   const isEdit = !!name && !readOnly
 
+  const { data: me } = useMe()
+  // The approval policy editor only appears when the workflow is switched on server-side.
+  const approvalEnabled = !!me?.approvalEnabled
   // The audience picker only cares about Service-role accounts (those who submit data); the kind
   // (User vs Application) is irrelevant here.
   const services = useAccounts({ role: 'Service' })
+  // Candidate approvers: any account whose effective capabilities include submissions:approve.
+  // Fetched only when the workflow is on.
+  const approverAccountsQuery = useAccounts(undefined, approvalEnabled)
+  const approverAccounts = useMemo<Account[]>(
+    () => (approverAccountsQuery.data?.items ?? []).filter(a => accountHasCapability(a, 'submissions:approve')),
+    [approverAccountsQuery.data],
+  )
   // Only needed in edit mode, to hydrate the form from the existing schema. The listing page
   // primes this cache, so navigating here from a row is usually instant.
   const schemasQuery = useSchemas(undefined, isEdit)
@@ -82,6 +111,9 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
   const update = useUpdateSchema()
 
   const [req, setReq] = useState<UpsertSchemaRequest | null>(null)
+  // Which editor section is showing. The form is split into three tabs that mirror the old
+  // top-to-bottom sections (General settings, Values, Layout).
+  const [tab, setTab] = useState<SchemaTab>('general')
   const [schemaId, setSchemaId] = useState<string | undefined>(undefined)
   const [hydrated, setHydrated] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -173,6 +205,17 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
 
   function patchLayout(layout: SchemaLayoutNode[]) {
     patchReq({ layout })
+  }
+
+  // Approval policy edits. Setting mode to `None` clears the policy back to null so untouched
+  // schemas keep the back-compatible "no approval" shape rather than persisting an empty object.
+  function patchApproval(patch: Partial<ApprovalPolicy>) {
+    setReq(prev => {
+      if (!prev) return prev
+      const base: ApprovalPolicy = prev.approval ?? { mode: 'None', appliesToSources: 'Both', approvers: [] }
+      const next = { ...base, ...patch }
+      return { ...prev, approval: next.mode === 'None' && next.approvers.length === 0 ? null : next }
+    })
   }
 
   // Whether the form differs from what was loaded (edit mode only). Read-only/new flows never
@@ -278,6 +321,16 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
       {req && (
         <Card>
           <div className={s.form}>
+            <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as SchemaTab)}>
+              <Tab value="general">General</Tab>
+              <Tab value="values">Values</Tab>
+              <Tab value="validations">Validations</Tab>
+              {approvalEnabled && <Tab value="approvals">Approvals</Tab>}
+              <Tab value="layout">Layout</Tab>
+            </TabList>
+
+            {tab === 'general' && (
+            <div className={s.tabPanel}>
             <div className={s.twoCol}>
               <Field
                 label="Name"
@@ -333,6 +386,14 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
               </Field>
             )}
 
+            <Field label="Notes">
+              <Textarea value={req.notes ?? ''} disabled={readOnly} onChange={(_, v) => patchReq({ notes: v.value })} />
+            </Field>
+            </div>
+            )}
+
+            {tab === 'validations' && (
+            <div className={s.tabPanel}>
             <div className={s.sectionLabel}>Submission validations</div>
             <Field hint="Each rule runs once per submission against every value in the schema. Add several to enforce multiple cross-value invariants.">
               <div className={s.rulesList}>
@@ -345,7 +406,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
                   <div key={i} className={s.ruleRow}>
                     <Textarea
                       className={s.ruleTextarea}
-                      rows={3}
+                      rows={8}
                       value={rule}
                       disabled={readOnly}
                       placeholder="e.g. if(expenses > revenue, 'expenses cannot exceed revenue', null)"
@@ -372,15 +433,25 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
                 )}
               </div>
             </Field>
+            </div>
+            )}
 
-            <Field label="Notes">
-              <Textarea value={req.notes ?? ''} disabled={readOnly} onChange={(_, v) => patchReq({ notes: v.value })} />
-            </Field>
+            {approvalEnabled && tab === 'approvals' && (
+            <div className={s.tabPanel}>
+              <ApprovalPolicyEditor
+                policy={req.approval ?? null}
+                accounts={approverAccounts}
+                modifiable={req.modifiable}
+                disabled={readOnly}
+                onChange={patchApproval}
+                styles={s}
+              />
+            </div>
+            )}
 
-            <Divider />
-
-            <div className={s.valuesToolbar}>
-              <div className={s.sectionLabel} style={{ marginTop: 0 }}>Values</div>
+            {tab === 'values' && (
+            <div className={s.tabPanel}>
+            <div className={s.valuesToolbar} style={{ justifyContent: 'flex-end' }}>
               {!readOnly && <Button appearance="primary" icon={<Add20Regular />} size="small" onClick={addValue}>Add value</Button>}
             </div>
 
@@ -417,10 +488,11 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
                 </AccordionItem>
               ))}
             </Accordion>
+            </div>
+            )}
 
-            <Divider />
-
-            <div className={s.sectionLabel}>Layout (UI grouping)</div>
+            {tab === 'layout' && (
+            <div className={s.tabPanel}>
             <Field hint="Drag values into sections to group them. This affects the submission form layout only — the server treats submissions as flat lists.">
               {/* `inert` makes the whole subtree non-interactive in the read-only snapshot view. */}
               <div className={readOnly ? s.readOnlyLayout : undefined} {...(readOnly ? { inert: true } : {})}>
@@ -449,6 +521,8 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
                 />
               </div>
             </Field>
+            </div>
+            )}
 
             {submitError && (
               <AutoScrollMessageBar intent="error">
@@ -502,6 +576,161 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
         </DialogSurface>
       </Dialog>
     </div>
+  )
+}
+
+const approvalModeLabels: Record<ApprovalMode, string> = {
+  None: 'No approval required',
+  UseGlobalDefault: 'Use the global default',
+  Required: 'Approval required',
+}
+
+const approvalSourceLabels: Record<ApprovalSourceScope, string> = {
+  Both: 'Both manual and API submissions',
+  ManualOnly: 'Manual (web console) submissions only',
+  ApiOnly: 'API submissions only',
+}
+
+/**
+ * Per-schema approval policy editor. A policy has a mode (none / defer to global / required), the
+ * source scope it applies to, and — when `Required` — a set of designated approvers each marked
+ * Required or Optional. At least one Required approver is needed; the server enforces this and we
+ * surface a hint when the rule isn't met yet.
+ */
+function ApprovalPolicyEditor({
+  policy, accounts, modifiable, disabled, onChange, styles,
+}: {
+  policy: ApprovalPolicy | null
+  accounts: Account[]
+  modifiable: boolean
+  disabled?: boolean
+  onChange: (patch: Partial<ApprovalPolicy>) => void
+  styles: ReturnType<typeof useStyles>
+}) {
+  const mode: ApprovalMode = policy?.mode ?? 'None'
+  const appliesToSources: ApprovalSourceScope = policy?.appliesToSources ?? 'Both'
+  const approvers = policy?.approvers ?? []
+  const accountsById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts])
+  const hasRequiredApprover = approvers.some(a => a.requirement === 'Required')
+  // Show the data-loss caution whenever this schema is both editable and may gate submissions:
+  // a re-submission for the same window replaces the row and resets it to Pending, so a value
+  // that was previously approved (and live) drops out of reporting until it's approved again.
+  const showModifiableWarning = modifiable && mode !== 'None'
+
+  function setApprovers(next: ApprovalPolicy['approvers']) {
+    onChange({ approvers: next })
+  }
+  function toggleApprover(key: string, selected: boolean) {
+    if (selected) {
+      if (approvers.some(a => approverKey(a) === key)) return
+      setApprovers([...approvers, approverFromKey(key)])
+    } else {
+      setApprovers(approvers.filter(a => approverKey(a) !== key))
+    }
+  }
+  function setRequirement(key: string, requirement: ApproverRequirement) {
+    setApprovers(approvers.map(a => approverKey(a) === key ? { ...a, requirement } : a))
+  }
+
+  return (
+    <>
+      <div className={styles.sectionLabel}>Approval</div>
+      <Field
+        label="Approval mode"
+        hint="Submissions in scope are held as Pending until approved, and excluded from the OData feed and Explore until then. Defaults to no approval for backwards compatibility."
+      >
+        <Dropdown
+          disabled={disabled}
+          value={approvalModeLabels[mode]}
+          selectedOptions={[mode]}
+          onOptionSelect={(_, d) => onChange({ mode: d.optionValue as ApprovalMode })}
+        >
+          {(Object.keys(approvalModeLabels) as ApprovalMode[]).map(m => (
+            <Option key={m} value={m}>{approvalModeLabels[m]}</Option>
+          ))}
+        </Dropdown>
+      </Field>
+
+      {mode !== 'None' && (
+        <Field label="Applies to" hint="You can require approval for only manual entries, only API submissions, or both.">
+          <Dropdown
+            disabled={disabled}
+            value={approvalSourceLabels[appliesToSources]}
+            selectedOptions={[appliesToSources]}
+            onOptionSelect={(_, d) => onChange({ appliesToSources: d.optionValue as ApprovalSourceScope })}
+          >
+            {(Object.keys(approvalSourceLabels) as ApprovalSourceScope[]).map(sc => (
+              <Option key={sc} value={sc}>{approvalSourceLabels[sc]}</Option>
+            ))}
+          </Dropdown>
+        </Field>
+      )}
+
+      {mode === 'UseGlobalDefault' && (
+        <MessageBar intent="info">
+          <MessageBarBody>
+            This schema follows the global default approval policy, configured in Settings → Approval.
+          </MessageBarBody>
+        </MessageBar>
+      )}
+
+      {mode === 'Required' && (
+        <Field
+          label="Approvers"
+          hint="Pick who may review: the Approver/Admin accounts below, and/or the service owner (the account that sent the submission, so a service can sign off on its own data). Mark at least one as Required; the submission goes live once every Required approver has approved."
+          validationState={hasRequiredApprover ? 'none' : 'warning'}
+          validationMessage={hasRequiredApprover ? undefined : 'Add at least one Required approver.'}
+        >
+          <Dropdown
+            multiselect
+            disabled={disabled}
+            placeholder="Select approvers"
+            selectedOptions={approvers.map(approverKey)}
+            value={approvers.map(a => approverLabel(a, accountsById)).join(', ')}
+            onOptionSelect={(_, d) => toggleApprover(d.optionValue!, d.selectedOptions.includes(d.optionValue!))}
+          >
+            <Option value={SERVICE_OWNER_KEY}>{SERVICE_OWNER_LABEL}</Option>
+            {accounts.map(a => (
+              <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
+            ))}
+          </Dropdown>
+        </Field>
+      )}
+
+      {mode === 'Required' && approvers.length > 0 && (
+        <div className={styles.approverList}>
+          {approvers.map(a => {
+            const key = approverKey(a)
+            return (
+              <div key={key} className={styles.approverRow}>
+                <span className={styles.approverName}>{approverLabel(a, accountsById)}</span>
+                <RadioGroup
+                  layout="horizontal"
+                  disabled={disabled}
+                  value={a.requirement}
+                  onChange={(_, d) => setRequirement(key, d.value as ApproverRequirement)}
+                >
+                  <Radio value="Required" label="Required" />
+                  <Radio value="Optional" label="Optional" />
+                </RadioGroup>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {showModifiableWarning && (
+        <MessageBar intent="warning">
+          <MessageBarBody>
+            <MessageBarTitle>Heads up: this schema is modifiable</MessageBarTitle>
+            Re-submitting data for a window that already has a submission replaces it and resets its
+            approval status to Pending — even if it was previously approved. While it waits for
+            re-approval it drops out of the OData feed and Explore. If you don’t want re-submissions to
+            disturb approved data, mark the schema as not modifiable.
+          </MessageBarBody>
+        </MessageBar>
+      )}
+    </>
   )
 }
 

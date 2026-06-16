@@ -1,6 +1,7 @@
 using Ingest.Api.Auth;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,7 +19,7 @@ namespace Ingest.Api.Controllers;
 /// </remarks>
 [ApiController]
 [Route("api/admin/explore")]
-[Authorize(Policy = AuthConstants.OperatorPolicy)]
+[Authorize(Policy = Capabilities.ExploreRead)]
 public sealed class ExploreController(IExploreService explore) : ControllerBase
 {
     /// <summary>

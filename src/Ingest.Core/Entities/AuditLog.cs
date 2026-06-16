@@ -14,6 +14,12 @@ public enum AuditChangeType
 
     /// <summary>An object was deleted (or, for API keys which cannot be deleted, revoked).</summary>
     Delete = 2,
+
+    /// <summary>A submission was approved (an approval-workflow decision). Recorded distinctly so the audit log is filterable.</summary>
+    Approve = 3,
+
+    /// <summary>A submission was rejected (an approval-workflow decision). The reason, when supplied, is stored in <see cref="AuditLog.Note"/>.</summary>
+    Reject = 4,
 }
 
 /// <summary>
@@ -81,4 +87,11 @@ public sealed class AuditLog
 
     /// <summary>Machine name of the account that performed the change, or <c>null</c> as above.</summary>
     public string? ActorName { get; set; }
+
+    /// <summary>
+    /// Optional free-form note carrying extra context for the change — e.g. the reason supplied
+    /// when a submission is rejected. General-purpose; <c>null</c> for changes that don't need it.
+    /// Legacy documents that predate this field deserialize to <c>null</c>.
+    /// </summary>
+    public string? Note { get; set; }
 }

@@ -9,11 +9,12 @@ The guide is split into focused pages — pick whichever matches the task at han
 | [accounts.md](accounts.md)                    | Creating people and applications, editing them, issuing & rotating API keys, disabling vs deleting, viewing a service's status. |
 | [schemas.md](schemas.md)                      | Designing schemas: per-value type/cadence flags, multi-line validation rules, conditional display (`Enabled if` / `Visible if`), warnings, historical-data view. |
 | [submissions.md](submissions.md)              | Browsing submissions with filters, editing/creating on behalf of a service, bulk-importing history from JSON/CSV, deleting submissions. |
+| [approval-process.md](approval-process.md)    | The optional submission approval workflow: per-schema/global source-aware policies, the `submissions:approve` capability, the review queue, and the replace-and-reset rule. |
 | [reports.md](reports.md)                      | Uploading HTML+Liquid report templates, what data they receive, the viewer's filter bar. |
 | [explore.md](explore.md)                      | Lightweight in-app analytics: charting numeric KPIs by period and service (Trend / Compare / Snapshot). A convenience for deployments without a BI tool — PowerBI is still the primary analytics surface. |
-| [settings.md](settings.md)                    | Admin-only settings hub: email (SMTP) settings, editable notification templates, notification triggers & recipients, ad-hoc email send, and retention policy. |
+| [settings.md](settings.md)                    | Settings hub (gated per-section by `settings:*`/`notifications:*`/`webhooks:*` capabilities): email (SMTP) settings, editable notification templates, notification triggers & recipients, ad-hoc email send, and retention policy. |
 | [webhooks.md](webhooks.md)                    | Outbound webhooks: registering signed endpoints, subscribing to submission/window events, signature verification, retries and the delivery log. |
-| [tools.md](tools.md)                          | Admin-only operational utilities — currently backup & restore (a convenience tool, *not* the primary backup). |
+| [tools.md](tools.md)                          | Operational utilities gated by the `backup:*` capabilities — currently backup & restore (a convenience tool, *not* the primary backup). |
 | [validation.md](validation.md)                | Writing custom validation rules — operators, conditionals, helpers, recipes. The companion to schemas.md when you start using the rule fields. |
 | [troubleshooting.md](troubleshooting.md)      | Common error messages and what they mean.                                      |
 
@@ -35,8 +36,8 @@ If your deployment has [SSO](../architecture/authentication.md#single-sign-on-op
 
 Once logged in:
 
-- The left sidebar carries **Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Missing**, **Explore**, **Reports**, and (admins only) **Audit**, **Tools** and **Settings**.
-- Service-role users see a stripped-down sidebar (Dashboard + Submissions only) — Schemas, Accounts and Reports call admin endpoints.
+- The left sidebar is **driven by your capabilities**: each entry (**Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Missing**, **Explore**, **Reports**, **Audit**, **Tools**, **Settings**) appears only when you hold the matching read capability. An admin holds them all; a custom non-admin sees exactly the subset you granted.
+- An account with no back-office capabilities (a typical **Service**) sees a stripped-down sidebar (Dashboard + Submissions only).
 - Your friendly **label** (or **name** as a fallback) and role show at the bottom.
 - **Sign out** is the icon next to your name.
 
@@ -65,14 +66,14 @@ The admin SPA is built to be usable without a mouse:
 
 The dashboard greets you by **label** (or **name**) and surfaces a few at-a-glance widgets:
 
-- For Admins / Operators: total counts of services, schemas and submissions, plus a **Missing submissions** section showing one card per cadence (Daily / Weekly / Fortnightly / Monthly / Quarterly / Semi-annually / Yearly) that currently has work outstanding. Each card lists the affected `service • schema` rows with a `missing/total` count, and each row links straight to that service's status page so you can drill in. Cadences with nothing missing are simply omitted — if the whole section is gone, everyone is up to date for the current windows.
-- For Services: their own status (same data as `/api/me/status`).
+- For back-office accounts: total counts of services, schemas and submissions (each card shown only if you hold the relevant read capability), plus a **Missing submissions** section (needs `status:read`) showing one card per cadence (Daily / Weekly / Fortnightly / Monthly / Quarterly / Semi-annually / Yearly) that currently has work outstanding. Each card lists the affected `service • schema` rows with a `missing/total` count, and each row links straight to that service's status page so you can drill in. Cadences with nothing missing are simply omitted — if the whole section is gone, everyone is up to date for the current windows. Accounts with `submissions:approve` also get a **Pending approvals** card.
+- For services (no back-office capabilities): their own status (same data as `/api/me/status`).
 
 The dashboard is intentionally lightweight — a health check, not an analytics surface. The **Missing submissions** section can take a few seconds to load on a full registry because it evaluates every required KPI across all services; see [setup/performance.md § Response times](../setup/performance.md#response-times). The **primary way to explore the data is PowerBI** (or any similar BI/OData client) pointed at the OData feed — see [setup/powerbi.md](../setup/powerbi.md) — or `/api/admin/query` from a custom dashboard. The built-in [Explore](explore.md) page (quick in-app charts) and [reports](reports.md) are likewise basic conveniences, **not** a full analytics tool. Use PowerBI for real exploration, slicing and charting.
 
-## Services console (Service-role users)
+## Services console (accounts with no back-office capabilities)
 
-Service-role users get a slimmer console (Dashboard + Submissions only). They can:
+An account with no back-office capabilities (a typical **Service**) gets a slimmer console (Dashboard + Submissions only). They can:
 
 - View their own submissions (the **Submissions** page is automatically filtered to their account).
 - Create submissions through the same on-behalf-of form (without picking the service — it's pinned to themselves).

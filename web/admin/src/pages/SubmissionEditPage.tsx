@@ -9,7 +9,7 @@ import {
 import { Add20Regular, ArrowLeft20Regular } from '@fluentui/react-icons'
 import {
   useAccounts, useAdminCreateSubmission, useAdminUpdateSubmission,
-  useCreateMySubmission, useMe, useMySchemas, useMySubmission,
+  useCreateMySubmission, useCapabilities, useMySchemas, useMySubmission,
   useReplaceMySubmission, useSchemas, useSubmission,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
@@ -128,11 +128,12 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
   // path runs); the read-only flag then suppresses every mutation surface.
   const isEdit = !!id
 
-  const { data: me } = useMe()
-  const isService = me?.role === 'Service'
+  const { me, has } = useCapabilities()
+  // Self-service submitters (no cross-service read) use their own schemas + /api/submissions.
+  const isService = !has('submissions:read')
 
-  // Different data sources depending on role: service callers can only see their own visible schemas
-  // and use /api/submissions; everyone else uses the admin listings.
+  // Different data sources depending on capability: self-service callers can only see their own
+  // visible schemas and use /api/submissions; everyone else uses the admin listings.
   const services    = useAccounts({ role: 'Service' }, !isService)
   const adminSchemas = useSchemas(undefined, !isService)
   const myVisible   = useMySchemas(isService)

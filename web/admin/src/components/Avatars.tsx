@@ -1,9 +1,12 @@
 import { Avatar, type AvatarProps } from '@fluentui/react-components'
 import { DocumentBulletList20Regular } from '@fluentui/react-icons'
-import type { Account, AccountRole, Schema } from '../api/types'
+import type { Account, AccountRole, ApprovalStatus, AuditChangeType, AuditTargetType, Schema } from '../api/types'
 
 type AvatarColor = AvatarProps['color']
 type AvatarSize = AvatarProps['size']
+
+/** Status of a queued email or webhook delivery — the avatar tints to match the row's status badge. */
+export type DeliveryStatus = 'Pending' | 'Sending' | 'Sent' | 'Failed'
 
 // Reserves a single color for each role so users can scan a long list and pick out
 // service vs operator vs admin at a glance.
@@ -44,15 +47,90 @@ export function SchemaAvatar({ schema, size = 32 }: { schema: Schema; size?: Ava
   )
 }
 
-// Submissions don't have a meaningful axis to differentiate visually, so this is just a glyph
-// to give the leftmost column a consistent visual anchor.
-export function SubmissionAvatar({ size = 32 }: { size?: AvatarSize }) {
+// Approval status → avatar colour, mirroring the Status badge on the submissions grid so the
+// leftmost column doubles as an at-a-glance approval signal. NotRequired (and legacy rows) stay
+// neutral navy so nothing changes visually when the approval workflow is off.
+function colorForApproval(status?: ApprovalStatus): AvatarColor {
+  switch (status) {
+    case 'Pending':  return 'marigold'
+    case 'Approved': return 'forest'
+    case 'Rejected': return 'red'
+    default:         return 'navy'
+  }
+}
+
+export function SubmissionAvatar({ status, size = 32 }: { status?: ApprovalStatus; size?: AvatarSize }) {
+  const label = status && status !== 'NotRequired' ? `Submission · ${status}` : 'Submission'
   return (
     <Avatar
       icon={<DocumentBulletList20Regular />}
-      color="navy"
+      color={colorForApproval(status)}
       size={size}
-      aria-label="Submission"
+      aria-label={label}
+    />
+  )
+}
+
+// Audit "Changes" log → avatar colour mirrors the operation badge (create/edit/delete and the
+// approval decisions) so the leftmost column reads as the action at a glance.
+function colorForChange(change: AuditChangeType): AvatarColor {
+  switch (change) {
+    case 'Create':
+    case 'Approve': return 'forest'
+    case 'Delete':
+    case 'Reject':  return 'red'
+    default:        return 'royal-blue' // Edit
+  }
+}
+
+// Short, distinct two-letter tags per target type (no icon). Distinct so colliding first letters
+// (Schema vs Submission, Account vs ApiKey) stay tellable apart at a glance.
+const TARGET_TYPE_INITIALS: Record<AuditTargetType, string> = {
+  User:          'Us',
+  Account:       'Ac',
+  Schema:        'Sc',
+  ApiKey:        'Ak',
+  Submission:    'Sb',
+  Report:        'Rp',
+  SchemaHistory: 'Sh',
+}
+
+export function AuditChangeAvatar({ change, targetType, size = 32 }: { change: AuditChangeType; targetType: AuditTargetType; size?: AvatarSize }) {
+  return (
+    <Avatar
+      initials={TARGET_TYPE_INITIALS[targetType]}
+      color={colorForChange(change)}
+      size={size}
+      aria-label={`${targetType} · ${change}`}
+    />
+  )
+}
+
+// Email outbox / webhook delivery → avatar colour mirrors the status badge (ok / pending / error).
+function colorForStatus(status: DeliveryStatus): AvatarColor {
+  switch (status) {
+    case 'Sent':    return 'forest'
+    case 'Failed':  return 'red'
+    case 'Sending': return 'royal-blue'
+    default:        return 'marigold' // Pending
+  }
+}
+
+export function StatusAvatar({
+  status, name, label = 'Status', size = 32,
+}: {
+  status: DeliveryStatus
+  /** Source text for the avatar's initials (e.g. the recipient, or the webhook event name). */
+  name: string
+  label?: string
+  size?: AvatarSize
+}) {
+  return (
+    <Avatar
+      name={name}
+      color={colorForStatus(status)}
+      size={size}
+      aria-label={`${label} · ${status}`}
     />
   )
 }

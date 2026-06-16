@@ -1,16 +1,16 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Badge, Body1, Drawer, DrawerBody, Dropdown, Field, Input,
+  Badge, Body1, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Drawer, DrawerBody, Dropdown, Field, Input,
   Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, Option, SplitButton,
-  Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
+  Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow, Text, Textarea,
   Title2, Tooltip, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Delete20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Checkmark20Regular, Delete20Regular, Dismiss20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { BulkImportDialog } from '../components/BulkImportDialog'
 import { formatApiError } from '../api/client'
-import { fetchAllMySubmissions, fetchAllSubmissions, useAccounts, useDeleteSubmission, useMe, useMySchemas, useMySubmissions, useSchemas, useSubmissions } from '../api/hooks'
+import { fetchAllMySubmissions, fetchAllSubmissions, useAccounts, useApproveSubmission, useCapabilities, useDeleteSubmission, useMySchemas, useMySubmissions, useRejectSubmission, useSchemas, useSubmissions } from '../api/hooks'
 import { RowActions } from '../components/RowActions'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import { SubmissionAvatar } from '../components/Avatars'
@@ -21,7 +21,41 @@ import { confirmDelete } from '../utils/confirm'
 import { formatDate, formatDateTime } from '../utils/format'
 import { walkLayout, type RenderItem } from '../utils/layout'
 import { clickableRowProps } from '../utils/a11y'
-import type { Account, Schema, Submission } from '../api/types'
+import type { Account, ApprovalStatus, Schema, Submission } from '../api/types'
+
+/** Approval-status filter values for the dropdown. 'all' clears the filter. */
+type ApprovalFilter = 'all' | ApprovalStatus
+
+const approvalFilterLabels: Record<ApprovalFilter, string> = {
+  all:         'All statuses',
+  Pending:     'Pending',
+  Approved:    'Approved',
+  Rejected:    'Rejected',
+  NotRequired: 'Not required',
+}
+
+/** Map an approval status onto a Fluent badge colour. */
+function approvalBadgeColor(status: ApprovalStatus): 'warning' | 'success' | 'danger' | 'informative' {
+  switch (status) {
+    case 'Pending':  return 'warning'
+    case 'Approved': return 'success'
+    case 'Rejected': return 'danger'
+    default:         return 'informative'
+  }
+}
+
+/** The reviewer's note left when a submission was rejected, if any (newest decision wins). */
+function rejectionNote(sub: Submission): string | null {
+  if (sub.approvalStatus !== 'Rejected') return null
+  const last = [...(sub.approvals ?? [])].reverse().find(a => a.decision === 'Rejected')
+  return last?.note?.trim() || null
+}
+
+/** Small inline approval-state badge. Renders nothing for the legacy `NotRequired` state. */
+function ApprovalBadge({ status }: { status: ApprovalStatus }) {
+  if (status === 'NotRequired') return <>—</>
+  return <Badge appearance="tint" color={approvalBadgeColor(status)}>{status}</Badge>
+}
 
 /**
  * Human-friendly label for a submission, used in confirmation prompts. Submissions don't have
@@ -41,6 +75,48 @@ const useStyles = makeStyles({
   row: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
   actionsHeader: { textAlign: 'right' },
   actionsCell:   { textAlign: 'right' },
+  // Inner row so the quick actions sit to the LEFT of the three-dots menu (not stacked above it)
+  // and everything stays vertically centred within the row.
+  actionsRow:    { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' },
+  // Quick approve/reject buttons sit inline, just before the three-dots menu.
+  quickActions: { display: 'inline-flex', alignItems: 'center', gap: '8px' },
+  // Colour-coded outlines so the two actions are instantly distinguishable.
+  approveBtn: {
+    borderTopColor: tokens.colorStatusSuccessBorder1,
+    borderRightColor: tokens.colorStatusSuccessBorder1,
+    borderBottomColor: tokens.colorStatusSuccessBorder1,
+    borderLeftColor: tokens.colorStatusSuccessBorder1,
+    color: tokens.colorStatusSuccessForeground1,
+    ':hover': {
+      borderTopColor: tokens.colorStatusSuccessBorder2,
+      borderRightColor: tokens.colorStatusSuccessBorder2,
+      borderBottomColor: tokens.colorStatusSuccessBorder2,
+      borderLeftColor: tokens.colorStatusSuccessBorder2,
+      color: tokens.colorStatusSuccessForeground1,
+    },
+  },
+  rejectBtn: {
+    borderTopColor: tokens.colorStatusDangerBorder1,
+    borderRightColor: tokens.colorStatusDangerBorder1,
+    borderBottomColor: tokens.colorStatusDangerBorder1,
+    borderLeftColor: tokens.colorStatusDangerBorder1,
+    color: tokens.colorStatusDangerForeground1,
+    ':hover': {
+      borderTopColor: tokens.colorStatusDangerBorder2,
+      borderRightColor: tokens.colorStatusDangerBorder2,
+      borderBottomColor: tokens.colorStatusDangerBorder2,
+      borderLeftColor: tokens.colorStatusDangerBorder2,
+      color: tokens.colorStatusDangerForeground1,
+    },
+  },
+  rejectNote: {
+    marginTop: '8px',
+    padding: '8px 12px',
+    borderLeft: `3px solid ${tokens.colorStatusDangerBorder1}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+  approverRow: { display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 0', fontSize: tokens.fontSizeBase300 },
   rowClickable: {
     cursor: 'pointer',
     ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '-2px' },
@@ -130,9 +206,17 @@ function intervalRange(interval: Interval, customFrom: string, customTo: string)
 export function SubmissionsPage() {
   const s = useStyles()
   const nav = useNavigate()
-  const { data: me } = useMe()
-  const isService = me?.role === 'Service'
-  const isAdmin = me?.role === 'Admin'
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { me, has } = useCapabilities()
+  // A caller without cross-service read only ever sees its own submissions (self-service view).
+  const canReadSubmissions = has('submissions:read')
+  const isService = !canReadSubmissions
+  const canImport = has('submissions:submit')
+  const canDelete = has('submissions:delete')
+  // Approval-workflow visibility: only when the master switch is on. Acting on the queue
+  // additionally needs the approve capability; the backend enforces it regardless.
+  const approvalEnabled = !!me?.approvalEnabled
+  const canApprove = approvalEnabled && has('submissions:approve')
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
@@ -145,6 +229,28 @@ export function SubmissionsPage() {
   const [viewerExpanded, setViewerExpanded] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [rejecting, setRejecting] = useState<Submission | null>(null)
+  const [rejectNote, setRejectNote] = useState('')
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  // The approval-status filter is mirrored in the URL so the dashboard "Review" action can deep-link
+  // straight to the pending queue (?approvalStatus=Pending) and the filter survives a refresh.
+  const approvalParam = searchParams.get('approvalStatus')
+  const approvalFilter: ApprovalFilter =
+    approvalEnabled && approvalParam && approvalParam in approvalFilterLabels
+      ? (approvalParam as ApprovalFilter)
+      : 'all'
+  const setApprovalFilter = (next: ApprovalFilter) => {
+    const sp = new URLSearchParams(searchParams)
+    if (next === 'all') sp.delete('approvalStatus')
+    else sp.set('approvalStatus', next)
+    setSearchParams(sp, { replace: true })
+    setPage(1)
+  }
+  const approvalStatus = approvalFilter === 'all' ? undefined : approvalFilter
+
+  const approve = useApproveSubmission()
+  const reject = useRejectSubmission()
 
   // Recompute the from/to pair whenever the interval changes so React Query gets a stable cache key.
   const { from, to } = useMemo(
@@ -153,7 +259,7 @@ export function SubmissionsPage() {
   )
 
   const services = useAccounts({ role: 'Service' }, !isService)
-  const adminSubs = useSubmissions({ page, pageSize, serviceId, schemaName, from, to }, !isService)
+  const adminSubs = useSubmissions({ page, pageSize, serviceId, schemaName, from, to, approvalStatus }, !isService)
   const mySubs = useMySubmissions({ page, pageSize, schemaName, from, to }, isService)
   // Schemas are needed by the read-only view drawer (value labels + units), not by the list itself.
   // Cached by react-query so the click latency stays close to zero on subsequent opens.
@@ -163,8 +269,31 @@ export function SubmissionsPage() {
 
   const submissions = isService ? mySubs : adminSubs
   const { data, isLoading, error } = submissions
-  // Column count for the loading / empty placeholder rows (Service column is admin-only).
-  const colSpan = isService ? 7 : 8
+  // Column count for the loading / empty placeholder rows (Service column is admin-only; the
+  // approval Status column only appears when the workflow is enabled).
+  const colSpan = (isService ? 7 : 8) + (approvalEnabled ? 1 : 0)
+
+  function doApprove(sub: Submission) {
+    setActionError(null)
+    approve.mutate({ id: sub.id }, {
+      onError: e => setActionError(formatApiError(e)),
+      onSuccess: () => { if (viewing?.id === sub.id) setViewing(null) },
+    })
+  }
+
+  function submitReject() {
+    if (!rejecting) return
+    const target = rejecting
+    setActionError(null)
+    reject.mutate({ id: target.id, note: rejectNote.trim() || undefined }, {
+      onError: e => setActionError(formatApiError(e)),
+      onSuccess: () => {
+        setRejecting(null)
+        setRejectNote('')
+        if (viewing?.id === target.id) setViewing(null)
+      },
+    })
+  }
 
   // Schemas visible to the current viewer — drives both the read-only drawer's value labels and
   // the Schema filter dropdown below.
@@ -200,7 +329,7 @@ export function SubmissionsPage() {
   const fetchAllForExport = () =>
     isService
       ? fetchAllMySubmissions({ schemaName, from, to })
-      : fetchAllSubmissions({ serviceId, schemaName, from, to })
+      : fetchAllSubmissions({ serviceId, schemaName, from, to, approvalStatus })
 
   const submissionsExport = useCsvExport({
     filename: 'submissions.csv',
@@ -237,7 +366,7 @@ export function SubmissionsPage() {
                 >
                   {submissionsExport.exporting ? 'Exporting…' : 'Export this list'}
                 </MenuItem>
-                {isAdmin && (
+                {canImport && (
                   <MenuItem icon={<ArrowUpload20Regular />} onClick={() => setImportOpen(true)}>
                     Import bulk data
                   </MenuItem>
@@ -277,6 +406,19 @@ export function SubmissionsPage() {
             ))}
           </Dropdown>
         </Field>
+        {approvalEnabled && !isService && (
+          <Field label="Approval">
+            <Dropdown
+              selectedOptions={[approvalFilter]}
+              value={approvalFilterLabels[approvalFilter]}
+              onOptionSelect={(_, d) => setApprovalFilter((d.optionValue as ApprovalFilter) ?? 'all')}
+            >
+              {(Object.keys(approvalFilterLabels) as ApprovalFilter[]).map(k => (
+                <Option key={k} value={k}>{approvalFilterLabels[k]}</Option>
+              ))}
+            </Dropdown>
+          </Field>
+        )}
         <Field label="Interval">
           <Dropdown
             selectedOptions={[interval]}
@@ -320,12 +462,19 @@ export function SubmissionsPage() {
         </AutoScrollMessageBar>
       )}
 
+      {actionError && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>{actionError}</MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
       <Table size="small">
         <TableHeader>
           <TableRow>
             <TableHeaderCell>Submitted at</TableHeaderCell>
             {!isService && <TableHeaderCell>Service</TableHeaderCell>}
             <TableHeaderCell>Schema</TableHeaderCell>
+            {approvalEnabled && <TableHeaderCell>Status</TableHeaderCell>}
             <TableHeaderCell>Samples</TableHeaderCell>
             <TableHeaderCell>Warnings</TableHeaderCell>
             <TableHeaderCell>Created</TableHeaderCell>
@@ -346,13 +495,20 @@ export function SubmissionsPage() {
             >
               <TableCell>
                 <Tooltip content={formatDateTime(sub.submittedAt)} relationship="label">
-                  <TableCellLayout media={<SubmissionAvatar />}>
+                  <TableCellLayout media={<SubmissionAvatar status={sub.approvalStatus} />}>
                     {formatDate(sub.submittedAt)}
                   </TableCellLayout>
                 </Tooltip>
               </TableCell>
               {!isService && <TableCell>{resolveServiceLabel(sub, isService, me, services.data?.items ?? [])}</TableCell>}
               <TableCell>{resolveSchemaLabel(sub, schemasByName)}</TableCell>
+              {approvalEnabled && (
+                <TableCell>
+                  {sub.approvalStatus === 'Rejected' && rejectionNote(sub)
+                    ? <Tooltip content={rejectionNote(sub)!} relationship="label"><span><ApprovalBadge status={sub.approvalStatus} /></span></Tooltip>
+                    : <ApprovalBadge status={sub.approvalStatus} />}
+                </TableCell>
+              )}
               <TableCell>{sub.samples.length}</TableCell>
               <TableCell>
                 {(sub.warnings?.length ?? 0) > 0
@@ -366,20 +522,47 @@ export function SubmissionsPage() {
               </TableCell>
               <TableCell>{sub.createdBy || '—'}</TableCell>
               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
-                <RowActions
-                  ariaLabel={`Actions for submission ${sub.id}`}
-                  actions={[
-                    // "View" reuses the editor layout in read-only mode (same look as Edit, just
-                    // disabled). "View details" goes to the raw-table page for the flat sample
-                    // dump — handy for diffing values or copy-pasting. The row click still opens
-                    // the quick-look drawer beside the list.
-                    { key: 'view-form',    label: 'View',         icon: <Eye20Regular />,    onClick: () => nav(`/submissions/${sub.id}/view`) },
-                    { key: 'view-details', label: 'View details', icon: <Open20Regular />,   onClick: () => nav(`/submissions/${sub.id}`) },
-                    { key: 'edit',         label: 'Edit',         icon: <Edit20Regular />,   onClick: () => nav(`/submissions/${sub.id}/edit`) },
-                    // Only admins can hard-delete; for everyone else this would just 403 anyway.
-                    ...(isAdmin ? [{ key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => { if (confirmDelete('submission', submissionLabel(sub))) del.mutate(sub.id) } }] : []),
-                  ]}
-                />
+                <div className={s.actionsRow}>
+                  {canApprove && sub.approvalStatus === 'Pending' && (
+                    <span className={s.quickActions}>
+                      <Button
+                        size="small"
+                        appearance="outline"
+                        className={s.approveBtn}
+                        icon={<Checkmark20Regular />}
+                        disabled={approve.isPending || reject.isPending}
+                        onClick={() => doApprove(sub)}
+                      >
+                        Approve
+                      </Button>
+                      <Tooltip content="Reject" relationship="label">
+                        <Button
+                          size="small"
+                          appearance="outline"
+                          className={s.rejectBtn}
+                          icon={<Dismiss20Regular />}
+                          aria-label="Reject"
+                          disabled={approve.isPending || reject.isPending}
+                          onClick={() => { setRejectNote(''); setRejecting(sub) }}
+                        />
+                      </Tooltip>
+                    </span>
+                  )}
+                  <RowActions
+                    ariaLabel={`Actions for submission ${sub.id}`}
+                    actions={[
+                      // "View" reuses the editor layout in read-only mode (same look as Edit, just
+                      // disabled). "View details" goes to the raw-table page for the flat sample
+                      // dump — handy for diffing values or copy-pasting. The row click still opens
+                      // the quick-look drawer beside the list.
+                      { key: 'view-form',    label: 'View',         icon: <Eye20Regular />,    onClick: () => nav(`/submissions/${sub.id}/view`) },
+                      { key: 'view-details', label: 'View details', icon: <Open20Regular />,   onClick: () => nav(`/submissions/${sub.id}`) },
+                      { key: 'edit',         label: 'Edit',         icon: <Edit20Regular />,   onClick: () => nav(`/submissions/${sub.id}/edit`) },
+                      // Hard-delete needs the submissions:delete capability; for everyone else this would just 403 anyway.
+                      ...(canDelete ? [{ key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => { if (confirmDelete('submission', submissionLabel(sub))) del.mutate(sub.id) } }] : []),
+                    ]}
+                  />
+                </div>
               </TableCell>
             </TableRow>
           ))}
@@ -443,7 +626,25 @@ export function SubmissionsPage() {
             <ToolbarButton icon={<Edit20Regular />} onClick={() => { const id = viewing.id; setViewing(null); nav(`/submissions/${id}/edit`) }}>
               Edit
             </ToolbarButton>
-            {isAdmin && (
+            {canApprove && viewing.approvalStatus === 'Pending' && (
+              <>
+                <ToolbarButton
+                  icon={<Checkmark20Regular />}
+                  disabled={approve.isPending || reject.isPending}
+                  onClick={() => doApprove(viewing)}
+                >
+                  Approve
+                </ToolbarButton>
+                <ToolbarButton
+                  icon={<Dismiss20Regular />}
+                  disabled={approve.isPending || reject.isPending}
+                  onClick={() => { setRejectNote(''); setRejecting(viewing) }}
+                >
+                  Reject
+                </ToolbarButton>
+              </>
+            )}
+            {canDelete && (
               <ToolbarButton
                 icon={<Delete20Regular />}
                 onClick={() => {
@@ -464,18 +665,47 @@ export function SubmissionsPage() {
               submission={viewing}
               serviceLabel={resolveServiceLabel(viewing, isService, me, services.data?.items ?? [])}
               schema={schemasByName.get(viewing.samples[0]?.schemaName ?? '')}
+              approvalEnabled={approvalEnabled}
             />
           )}
         </DrawerBody>
       </Drawer>
 
-      {isAdmin && (
+      {canImport && (
         <BulkImportDialog
           open={importOpen}
           onClose={() => setImportOpen(false)}
           services={services.data?.items ?? []}
         />
       )}
+
+      <Dialog open={!!rejecting} onOpenChange={(_, d) => { if (!d.open) { setRejecting(null); setRejectNote('') } }}>
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>Reject submission</DialogTitle>
+            <DialogContent>
+              <Body1>
+                This submission will be marked rejected and excluded from the OData feed and Explore,
+                but stays visible here. You can leave an optional reason for the submitter and other reviewers.
+              </Body1>
+              <Field label="Reason (optional)" style={{ marginTop: 12 }}>
+                <Textarea
+                  value={rejectNote}
+                  onChange={(_, d) => setRejectNote(d.value)}
+                  placeholder="e.g. Week 22 figures look transposed — please re-check the night-shift totals."
+                  rows={3}
+                />
+              </Field>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => { setRejecting(null); setRejectNote('') }}>Cancel</Button>
+              <Button appearance="primary" disabled={reject.isPending} onClick={submitReject}>
+                {reject.isPending ? 'Rejecting…' : 'Reject'}
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </div>
   )
 }
@@ -508,17 +738,19 @@ function resolveSchemaLabel(submission: Submission, schemasByName: Map<string, S
 }
 
 function SubmissionViewBody({
-  submission, serviceLabel, schema,
+  submission, serviceLabel, schema, approvalEnabled,
 }: {
   submission: Submission
   serviceLabel: string
   schema?: Schema
+  approvalEnabled: boolean
 }) {
   const s = useStyles()
   // A submission has at most one schema (the editor enforces it). Use the first sample's
   // schemaName as the source of truth and prefer the schema's friendly label when loaded.
   const schemaName = submission.samples[0]?.schemaName
   const schemaDisplay = schema?.label || schemaName || '—'
+  const showApproval = approvalEnabled && submission.approvalStatus !== 'NotRequired'
 
   return (
     <div className={s.drawerForm}>
@@ -527,6 +759,23 @@ function SubmissionViewBody({
         <Field label="Schema"><Body1>{schemaDisplay}</Body1></Field>
         <Field label="Samples"><Body1>{submission.samples.length}</Body1></Field>
       </div>
+
+      {showApproval && (
+        <>
+          <div className={s.sectionLabel}>Approval</div>
+          <div className={s.twoCol}>
+            <Field label="Status"><div><ApprovalBadge status={submission.approvalStatus} /></div></Field>
+            <Field label="Source"><Body1>{submission.source === 'Manual' ? 'Manual entry' : 'API'}</Body1></Field>
+          </div>
+          <ApprovalProgress submission={submission} styles={s} />
+          {rejectionNote(submission) && (
+            <div className={s.rejectNote}>
+              <Text weight="semibold">Rejection reason</Text>
+              <div>{rejectionNote(submission)}</div>
+            </div>
+          )}
+        </>
+      )}
 
       <div className={s.sectionLabel}>Audit</div>
       <div className={s.twoCol}>
@@ -652,6 +901,43 @@ function renderItem(
         <TableCell>{formatSampleValue(sample?.value ?? null, item.value.unit)}</TableCell>
       </TableRow>
     </Fragment>
+  )
+}
+
+/**
+ * Compact approver summary for the drawer: how many required approvers have signed off, followed
+ * by the recorded decisions (who, what, when, and any note). The `requiredApprovers` list is the
+ * snapshot frozen when approval was triggered, so it reflects the policy as it stood then.
+ */
+function ApprovalProgress({
+  submission, styles,
+}: {
+  submission: Submission
+  styles: ReturnType<typeof useStyles>
+}) {
+  const required = (submission.requiredApprovers ?? []).filter(a => a.requirement === 'Required')
+  const approvedIds = new Set((submission.approvals ?? []).filter(a => a.decision === 'Approved').map(a => a.approverAccountId))
+  const approvedRequired = required.filter(a => approvedIds.has(a.accountId)).length
+  const decisions = submission.approvals ?? []
+
+  return (
+    <>
+      {required.length > 0 && submission.approvalStatus === 'Pending' && (
+        <Body1>{approvedRequired} of {required.length} required {required.length === 1 ? 'approval' : 'approvals'} received.</Body1>
+      )}
+      {decisions.length > 0 && (
+        <div>
+          {decisions.map((d, i) => (
+            <div key={i} className={styles.approverRow}>
+              <Badge appearance="tint" color={d.decision === 'Approved' ? 'success' : 'danger'}>{d.decision}</Badge>
+              <span>{d.approverName || d.approverAccountId}</span>
+              <span style={{ color: tokens.colorNeutralForeground3 }}>· {new Date(d.decidedAt).toLocaleString()}</span>
+              {d.note && <span style={{ color: tokens.colorNeutralForeground2 }}>— {d.note}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   )
 }
 

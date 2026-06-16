@@ -38,7 +38,7 @@ public sealed class BulkImportService : IBulkImportService
             var input = new AdminSubmissionInput(serviceAccountId, group.Samples.ToList());
             try
             {
-                var written = await _submissions.AdminCreateAsync(input, ct);
+                var written = await _submissions.AdminCreateAsync(input, ct: ct);
                 succeeded++;
                 items.Add(new BulkImportItemResult(i, group.Group, true, written.Submission.Id, group.Samples.Count, Array.Empty<string>(), written.Warnings));
             }

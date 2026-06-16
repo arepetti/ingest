@@ -2,6 +2,7 @@ using System.Net.Mail;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
+using Ingest.Core.Security;
 
 namespace Ingest.Infrastructure.Services;
 
@@ -60,6 +61,7 @@ public sealed class AccountService : IAccountService
 
         input.Email = NormalizeAndValidateEmail(input.Email);
         input.ExternalLogins = await NormalizeAndValidateLinksAsync(input.Id, input.Kind, input.ExternalLogins, preserveSubjectsFrom: null, ct);
+        input.Capabilities = NormalizeAndValidateCapabilities(input.Role, input.Capabilities);
 
         await _accounts.AddAsync(input, ct);
         await _audit.RecordAsync(TargetTypeFor(input), AuditChangeType.Create, input.Id, input.Name, ct);
@@ -83,6 +85,14 @@ public sealed class AccountService : IAccountService
         if (update.ExternalLogins is not null)
             existing.ExternalLogins = await NormalizeAndValidateLinksAsync(existing.Id, existing.Kind, update.ExternalLogins, preserveSubjectsFrom: existing.ExternalLogins, ct);
 
+        // Same null/empty contract as links: null leaves the stored overrides untouched, a
+        // (possibly empty) list replaces them. An Admin always resolves to the full catalogue, so
+        // overrides are normalised away for that role.
+        if (update.Capabilities is not null)
+            existing.Capabilities = NormalizeAndValidateCapabilities(existing.Role, update.Capabilities);
+        else if (existing.Role == AccountRole.Admin)
+            existing.Capabilities = new();
+
         await _accounts.UpdateAsync(existing, ct);
         await _audit.RecordAsync(TargetTypeFor(existing), AuditChangeType.Edit, existing.Id, existing.Name, ct);
         return existing;
@@ -102,6 +112,31 @@ public sealed class AccountService : IAccountService
             throw new ValidationException(new[] { $"'{trimmed}' is not a valid email address." });
 
         return trimmed.ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Validate and normalise an account's capability override set. Unknown capability strings are
+    /// rejected (typo-safety). Admins implicitly hold every capability, so their overrides are
+    /// meaningless and normalised to empty. Otherwise the input is de-duplicated and stored verbatim
+    /// (an empty result simply means "follow the role default bundle").
+    /// </summary>
+    /// <param name="role">The account's role (drives the Admin special-case).</param>
+    /// <param name="capabilities">The requested override set.</param>
+    private static List<string> NormalizeAndValidateCapabilities(AccountRole role, IEnumerable<string>? capabilities)
+    {
+        if (role == AccountRole.Admin) return new();
+
+        var input = (capabilities ?? Enumerable.Empty<string>())
+            .Select(c => c?.Trim() ?? string.Empty)
+            .Where(c => c.Length > 0)
+            .ToList();
+        if (input.Count == 0) return new();
+
+        var unknown = input.Where(c => !Capabilities.IsKnown(c)).Distinct(StringComparer.Ordinal).ToList();
+        if (unknown.Count > 0)
+            throw new ValidationException(new[] { $"Unknown capabilities: {string.Join(", ", unknown)}." });
+
+        return input.Distinct(StringComparer.Ordinal).ToList();
     }
 
     /// <summary>

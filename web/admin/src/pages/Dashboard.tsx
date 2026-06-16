@@ -1,6 +1,6 @@
 import { Badge, Card, CardHeader, makeStyles, Subtitle2, Text, Title2, Tooltip, tokens } from '@fluentui/react-components'
 import {
-  useAccounts, useMe, useMissingSubmissions, useMySubmissions, useSchemas, useSubmissions,
+  useAccounts, useCapabilities, useMissingSubmissions, useMySubmissions, usePendingApprovalCount, useSchemas, useSubmissions,
 } from '../api/hooks'
 import type { MissingByCadence, MissingSubmissionEntry } from '../api/types'
 import { cadenceLabel } from '../utils/cadence'
@@ -12,7 +12,16 @@ const useStyles = makeStyles({
   // Missing-submission cards need more room for the inline list, so they live in a wider grid.
   missingGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' },
   card: { padding: '20px' },
+  // Pending-approvals card. The amber accent only shows when there's actually a backlog, so an
+  // empty queue reads as calm/neutral like the other count cards.
+  pendingCard: {
+    padding: '20px',
+  },
+  pendingCardWarning: {
+    borderTop: `3px solid ${tokens.colorStatusWarningBorder1}`,
+  },
   big: { fontSize: '32px', fontWeight: 700, color: tokens.colorBrandForeground1 },
+  bigWarning: { fontSize: '32px', fontWeight: 700, color: tokens.colorStatusWarningForeground1 },
   sub: { color: tokens.colorNeutralForeground3, fontSize: '12px' },
   missingHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' },
   missingCount: { fontSize: '28px', fontWeight: 700 },
@@ -57,25 +66,44 @@ const useStyles = makeStyles({
 
 export function Dashboard() {
   const s = useStyles()
-  const { data: me } = useMe()
-  const isService = me?.role === 'Service'
+  const { me, has } = useCapabilities()
+  // Only callers with the approve capability can act on the queue, and only when the workflow is on.
+  const canApprove = !!me?.approvalEnabled && has('submissions:approve')
+  const pending = usePendingApprovalCount(canApprove)
+  const pendingCount = pending.data?.count ?? 0
 
-  // Service callers can't hit admin listings — gate the queries by role to avoid pointless 403s in the UI.
-  // The dashboard role cards count by `AccountRole` and ignore `AccountKind` (so a Service-role
-  // can be either an automated Application or an interactive User and still be tallied here).
-  const services = useAccounts({ role: 'Service' }, !isService)
-  const operators = useAccounts({ role: 'Operator' }, !isService)
-  const admins = useAccounts({ role: 'Admin' }, !isService)
-  const schemas = useSchemas(undefined, !isService)
-  const adminSubs = useSubmissions({ page: 1, pageSize: 1 }, !isService)
-  const mySubs = useMySubmissions({ page: 1, pageSize: 1 }, !!isService)
-  const missing = useMissingSubmissions(!isService)
+  // Each summary card is gated by the capability backing its page; a self-service submitter (no
+  // cross-service read) instead sees the "my submissions" cards. Gate the queries the same way to
+  // avoid pointless 403s in the UI.
+  const canReadAccounts = has('accounts:read')
+  const canReadSchemas = has('schemas:read')
+  const canReadSubmissions = has('submissions:read')
+  const canReadStatus = has('status:read')
+  const selfService = !canReadSubmissions
+
+  // The dashboard role cards count by `AccountRole` and ignore `AccountKind`.
+  const services = useAccounts({ role: 'Service' }, canReadAccounts)
+  const operators = useAccounts({ role: 'Operator' }, canReadAccounts)
+  const admins = useAccounts({ role: 'Admin' }, canReadAccounts)
+  const schemas = useSchemas(undefined, canReadSchemas)
+  const adminSubs = useSubmissions({ page: 1, pageSize: 1 }, canReadSubmissions)
+  const mySubs = useMySubmissions({ page: 1, pageSize: 1 }, selfService)
+  const missing = useMissingSubmissions(canReadStatus)
 
   return (
     <div className={s.root}>
-      <Title2>{isService ? `Welcome, ${me?.label || me?.name || ''}` : 'Overview'}</Title2>
+      <Title2>{selfService ? `Welcome, ${me?.label || me?.name || ''}` : 'Overview'}</Title2>
       <div className={s.grid}>
-        {!isService && (
+        {canApprove && (
+          <Card className={pendingCount > 0 ? `${s.pendingCard} ${s.pendingCardWarning}` : s.pendingCard}>
+            <CardHeader header={<Text weight="semibold">Pending approvals</Text>} />
+            <div className={pendingCount > 0 ? s.bigWarning : s.big}>{pending.isLoading ? '—' : pendingCount}</div>
+            <div className={s.sub}>
+              <Link to="/submissions?approvalStatus=Pending">Review</Link>
+            </div>
+          </Card>
+        )}
+        {canReadAccounts && (
           <>
             <Card className={s.card}>
               <CardHeader header={<Text weight="semibold">Services</Text>} />
@@ -98,24 +126,28 @@ export function Dashboard() {
                 <Link to="/services">Manage</Link>
               </div>
             </Card>
-            <Card className={s.card}>
-              <CardHeader header={<Text weight="semibold">Schemas</Text>} />
-              <div className={s.big}>{schemas.data?.total ?? '—'}</div>
-              <div className={s.sub}>
-                <Link to="/schemas">Manage</Link>
-              </div>
-            </Card>
-            <Card className={s.card}>
-              <CardHeader header={<Text weight="semibold">Submissions</Text>} />
-              <div className={s.big}>{adminSubs.data?.total ?? '—'}</div>
-              <div className={s.sub}>
-                <Link to="/submissions">Browse</Link>
-              </div>
-            </Card>
           </>
         )}
+        {canReadSchemas && (
+          <Card className={s.card}>
+            <CardHeader header={<Text weight="semibold">Schemas</Text>} />
+            <div className={s.big}>{schemas.data?.total ?? '—'}</div>
+            <div className={s.sub}>
+              <Link to="/schemas">Manage</Link>
+            </div>
+          </Card>
+        )}
+        {canReadSubmissions && (
+          <Card className={s.card}>
+            <CardHeader header={<Text weight="semibold">Submissions</Text>} />
+            <div className={s.big}>{adminSubs.data?.total ?? '—'}</div>
+            <div className={s.sub}>
+              <Link to="/submissions">Browse</Link>
+            </div>
+          </Card>
+        )}
 
-        {isService && (
+        {selfService && (
           <>
             <Card className={s.card}>
               <CardHeader header={<Text weight="semibold">My submissions</Text>} />
@@ -134,7 +166,7 @@ export function Dashboard() {
         )}
       </div>
 
-      {!isService && <MissingSubmissionsSection
+      {canReadStatus && <MissingSubmissionsSection
         loading={missing.isLoading}
         buckets={missing.data}
         styles={s}

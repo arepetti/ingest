@@ -20,14 +20,12 @@ public static class AuthConstants
     /// <summary>Builds the per-provider OpenIdConnect scheme name from a provider id (e.g. <c>oidc:Microsoft</c>).</summary>
     public static string OidcScheme(string providerId) => $"oidc:{providerId}";
 
-    /// <summary>Policy that authorises any role at or above <see cref="Core.Entities.AccountRole.Service"/> (i.e. everyone).</summary>
+    /// <summary>
+    /// Policy that authorises any authenticated caller, used by the self-service endpoints
+    /// (a service reads/writes its <i>own</i> submissions, schemas and status). These are gated to the
+    /// caller's own data rather than by capability, so they survive the move to the capability model.
+    /// </summary>
     public const string ServicePolicy = "Service";
-
-    /// <summary>Policy that authorises operators and admins for read-everything endpoints.</summary>
-    public const string OperatorPolicy = "OperatorOrAdmin";
-
-    /// <summary>Policy that restricts the endpoint to admin-only operations.</summary>
-    public const string AdminPolicy = "Admin";
 
     /// <summary>Custom claim carrying the calling account's id as a string Guid.</summary>
     public const string AccountIdClaim = "ingest:accountId";
@@ -40,4 +38,17 @@ public static class AuthConstants
 
     /// <summary>Custom claim carrying the calling account's <see cref="Core.Entities.AccountKind"/> as a string.</summary>
     public const string KindClaim = "ingest:kind";
+
+    /// <summary>
+    /// Custom claim type carrying a single effective capability (Phase 2). The authentication
+    /// handler emits one of these per capability in the account's effective set; the
+    /// capability-requirement authorization handler checks for the matching value.
+    /// </summary>
+    /// <remarks>
+    /// Each capability also names an authorization policy whose name is simply the capability
+    /// string itself (e.g. policy <c>"schemas:manage"</c>). Because the
+    /// <c>Ingest.Core.Security.Capabilities.*</c> members are compile-time constants they can be
+    /// used directly in <c>[Authorize(Policy = ...)]</c> attributes.
+    /// </remarks>
+    public const string CapabilityClaim = "ingest:cap";
 }

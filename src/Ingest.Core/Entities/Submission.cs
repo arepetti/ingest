@@ -54,6 +54,34 @@ public sealed class Submission : AuditedEntity
 
     /// <summary>Set when a replacement has overwritten this submission. Useful for audit timelines.</summary>
     public DateTime? ReplacedAt { get; set; }
+
+    /// <summary>
+    /// Where this submission came from. Drives the source-aware approval policy. Legacy documents
+    /// deserialize to <see cref="SubmissionSource.Api"/>.
+    /// </summary>
+    public SubmissionSource Source { get; set; } = SubmissionSource.Api;
+
+    /// <summary>
+    /// Approval lifecycle state. Legacy documents (and every submission when approval is off or not
+    /// required for the schema/source) deserialize to <see cref="ApprovalStatus.NotRequired"/>,
+    /// which means "live as soon as accepted" — identical to the pre-approval behaviour.
+    /// </summary>
+    public ApprovalStatus ApprovalStatus { get; set; } = ApprovalStatus.NotRequired;
+
+    /// <summary>
+    /// Snapshot of the approvers that govern this submission, captured when approval was first
+    /// required for it. Snapshotting means later edits to the schema/global policy don't retroactively
+    /// change what an in-flight submission needs. Empty when <see cref="ApprovalStatus"/> is
+    /// <see cref="ApprovalStatus.NotRequired"/>.
+    /// </summary>
+    public List<ApproverSpec> RequiredApprovers { get; set; } = new();
+
+    /// <summary>
+    /// Recorded approval/rejection decisions for the current approval cycle. Cleared whenever the
+    /// submission is replaced (a re-send resets approval). Empty for submissions that never needed
+    /// approval. Legacy documents deserialize to an empty list.
+    /// </summary>
+    public List<SubmissionApproval> Approvals { get; set; } = new();
 }
 
 /// <summary>

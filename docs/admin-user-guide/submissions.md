@@ -7,7 +7,11 @@ Open **Submissions** in the sidebar.
 The grid lists every submission across every service, newest first. Filters at the top:
 
 - **Service** — narrow to a specific account.
+- **Schema** — narrow to a specific schema.
+- **Approval** — narrow by approval state (only shown when the [approval workflow](approval-process.md) is enabled). The dashboard's **Review** action deep-links here pre-filtered to `Pending`.
 - **Date range** — preset (*last week*, *last month*, *last year*) or *custom* with two date pickers.
+
+When the approval workflow is enabled, a **Status** column shows each submission's approval state, and pending rows get quick **Approve** (✓) / **Reject** (✕) actions before the row menu. See [approval-process.md](approval-process.md) for the full reviewer workflow.
 
 The **Warnings** column shows a count badge when a submission carries non-blocking warnings (and a dash when it has none). Warnings are recorded at the last write, so the count reflects the current stored state of the submission. Submissions created before warnings were stored show no count.
 
@@ -31,9 +35,9 @@ Use this to back-fill data, fix mistakes, or test a new schema.
 
 If the server emits warnings on accept (typically because a `Warning` rule fired, or a `Visible if` / `Enabled if` was false on a value you submitted), the editor stays on the page and shows the warnings in a banner instead of navigating away. Inspect them; they're not blocking, the submission is already saved.
 
-## Bulk importing historical submissions (admins only)
+## Bulk importing historical submissions (requires `submissions:submit`)
 
-When you have a lot of history to load for one service — months of past readings, a migration from another system — use **Import** (top toolbar, admins only) instead of entering each submission by hand. It accepts a single **JSON** or **CSV** file containing many submissions, all attributed to one service you choose.
+When you have a lot of history to load for one service — months of past readings, a migration from another system — use **Import** (top toolbar, shown to accounts with `submissions:submit`) instead of entering each submission by hand. It accepts a single **JSON** or **CSV** file containing many submissions, all attributed to one service you choose.
 
 1. Click **Import**.
 2. Pick the target **service** (every submission in the file is attributed to it).

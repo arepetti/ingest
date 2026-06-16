@@ -58,11 +58,12 @@ Every accepted sample lands in a flat, denormalised projection that's exposed as
 
 ### A security model that's easy to operate
 
-Authentication is plain **API keys** carried in an HTTP header — no OAuth flow to set up, no token server to run. Keys are tied to accounts, can be rotated without downtime (two keys live in parallel during the handover), and are revoked individually when needed. Three roles cover the typical staff layout:
+Authentication is plain **API keys** carried in an HTTP header — no OAuth flow to set up, no token server to run. Keys are tied to accounts, can be rotated without downtime (two keys live in parallel during the handover), and are revoked individually when needed. Authorisation is **capability-based**: each account holds a fine-grained set of permissions (e.g. `schemas:read`, `submissions:approve`, `accounts:manage`) that decides exactly what it can do and see. Roles are convenient templates that seed those capabilities, which you can then tune per account:
 
-- **Service** — automated submitters; can read and write their own data only.
-- **Operator** — back-office staff (data analysts, finance); can read everything but cannot delete or edit submissions.
-- **Admin** — full control, including issuing keys, editing schemas, and correcting submissions retroactively.
+- **Service** — automated submitters; can read and write their own data only (no extra capabilities).
+- **Operator** — back-office staff (data analysts, finance); seeded with read-everything capabilities, but grant a trusted one `schemas:manage` (or any other capability) without making them an admin.
+- **Approver** — reviewers for the optional submission-approval workflow (view + approve submissions).
+- **Admin** — every capability, non-reducible; full control including issuing keys, editing schemas, and correcting submissions retroactively.
 
 Every change is **audited** (who did it, when) and **soft-deleted** by default — nothing important is destroyed unless an admin explicitly wipes it.
 
@@ -129,12 +130,21 @@ Everything Ingest does, in one place:
 
 **Security, governance & operations**
 
-- **API-key auth** with zero-downtime rotation and individual revocation; **three roles** (Service / Operator / Admin).
+- **API-key auth** with zero-downtime rotation and individual revocation; **capability-based authorisation** with roles (Service / Operator / Approver / Admin) as templates that seed per-account capabilities.
 - **Optional SSO** (Microsoft / Google) layered on top of API keys.
 - **Full audit log** and **soft-delete** by default — nothing important is destroyed silently.
 - **GDPR built in** — right-to-erasure (anonymise or delete), per-subject data export, and configurable time-based retention.
 - **Backup & restore** convenience tool for small deployments and environment seeding.
 - **One container, one database** — health probes, structured logging, and OpenTelemetry tracing wired in; Aspire-driven local dev.
+
+## Project status & support
+
+Ingest is an open-source project maintained by **a single developer in their spare time**. It's offered under the [MIT licence](LICENSE) **as-is, with no warranty and no SLA** — there's no company behind it and no guaranteed response time. That's stated plainly so you can plan around it, not to put you off: the project is built to be self-supportable and you're never locked in.
+
+- **Getting help** — best-effort via [GitHub Discussions](https://github.com/arepetti/ingest/discussions) and [Issues](https://github.com/arepetti/ingest/issues). Details and expectations: [SUPPORT.md](SUPPORT.md).
+- **Security issues** — please report **privately**, never in a public issue: [SECURITY.md](SECURITY.md).
+- **How the project is run** (and how to become a co-maintainer — they're welcome) — [GOVERNANCE.md](GOVERNANCE.md).
+- **Relying on it in production?** Go ahead — but plan to self-support: the code is small and layered, every public type is documented, and [docs/](docs/README.md) covers deployment, configuration, and disaster recovery. The MIT licence means you can always fork and maintain your own copy.
 
 ## License
 

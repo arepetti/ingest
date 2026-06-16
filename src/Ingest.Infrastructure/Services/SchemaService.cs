@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
+using Ingest.Infrastructure.Approvals;
 
 namespace Ingest.Infrastructure.Services;
 
@@ -27,6 +28,7 @@ public sealed class SchemaService : ISchemaService
     private readonly IAuditLogService _audit;
     private readonly ISchemaVersionHistoryRepository _versions;
     private readonly ISubmissionRepository _submissions;
+    private readonly IAccountRepository _accounts;
     private readonly IAuditContext _auditContext;
 
     /// <summary>Create a new <see cref="SchemaService"/>.</summary>
@@ -35,6 +37,7 @@ public sealed class SchemaService : ISchemaService
     /// <param name="audit">Audit log used to record create/edit/delete changes.</param>
     /// <param name="versions">Version-history repository — receives a full snapshot on every save.</param>
     /// <param name="submissions">Submission repository, used to snapshot the submission count at save time.</param>
+    /// <param name="accounts">Account repository, used to validate approval-policy approver references.</param>
     /// <param name="auditContext">Ambient who/when context for stamping the snapshot author + timestamp.</param>
     public SchemaService(
         ISchemaRepository schemas,
@@ -42,6 +45,7 @@ public sealed class SchemaService : ISchemaService
         IAuditLogService audit,
         ISchemaVersionHistoryRepository versions,
         ISubmissionRepository submissions,
+        IAccountRepository accounts,
         IAuditContext auditContext)
     {
         _schemas = schemas;
@@ -49,6 +53,7 @@ public sealed class SchemaService : ISchemaService
         _audit = audit;
         _versions = versions;
         _submissions = submissions;
+        _accounts = accounts;
         _auditContext = auditContext;
     }
 
@@ -94,6 +99,8 @@ public sealed class SchemaService : ISchemaService
         }
 
         ValidateStructure(input);
+        if (input.Approval is { } createPolicy)
+            await ApprovalPolicyValidator.ValidateAsync(createPolicy, allowUseGlobalDefault: true, _accounts, ct);
 
         // CreatedAt is stamped by the repository — set VersionModifiedAt to "now" so it aligns
         // with the moment the schema was first persisted. The repo will overwrite CreatedAt on
@@ -151,12 +158,15 @@ public sealed class SchemaService : ISchemaService
         existing.ServiceIds = input.ServiceIds ?? new();
         existing.Values = input.Values ?? new();
         existing.Layout = input.Layout ?? new();
+        existing.Approval = input.Approval;
 
         var versionChanged = input.Version != existing.Version;
         existing.Version = input.Version;
         if (versionChanged) existing.VersionModifiedAt = DateTime.UtcNow;
 
         ValidateStructure(existing);
+        if (existing.Approval is { } updatePolicy)
+            await ApprovalPolicyValidator.ValidateAsync(updatePolicy, allowUseGlobalDefault: true, _accounts, ct);
 
         await _schemas.UpdateAsync(existing, ct);
         await _audit.RecordAsync(AuditTargetType.Schema, AuditChangeType.Edit, existing.Id, existing.Name, ct);
@@ -209,6 +219,7 @@ public sealed class SchemaService : ISchemaService
         ServiceIds = s.ServiceIds.ToList(),
         Values = s.Values.Select(CloneValue).ToList(),
         Layout = s.Layout.Select(CloneLayoutNode).ToList(),
+        Approval = CloneApproval(s.Approval),
         Version = s.Version,
         VersionModifiedAt = s.VersionModifiedAt,
         CreatedAt = s.CreatedAt,
@@ -261,6 +272,7 @@ public sealed class SchemaService : ISchemaService
             ServiceIds = source.ServiceIds.ToList(),
             Values = source.Values.Select(CloneValue).ToList(),
             Layout = source.Layout.Select(CloneLayoutNode).ToList(),
+            Approval = CloneApproval(source.Approval),
             Version = source.Version,
             VersionModifiedAt = now,
         };
@@ -460,6 +472,13 @@ public sealed class SchemaService : ISchemaService
         VisibleIf = v.VisibleIf,
         Warning = v.Warning,
         SinceVersion = v.SinceVersion,
+    };
+
+    private static ApprovalPolicy? CloneApproval(ApprovalPolicy? p) => p is null ? null : new ApprovalPolicy
+    {
+        Mode = p.Mode,
+        AppliesToSources = p.AppliesToSources,
+        Approvers = p.Approvers.Select(a => new ApproverSpec { AccountId = a.AccountId, Requirement = a.Requirement }).ToList(),
     };
 
     private static SchemaLayoutNode CloneLayoutNode(SchemaLayoutNode n) => new()

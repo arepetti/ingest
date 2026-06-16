@@ -13,7 +13,8 @@ namespace Ingest.Core.Abstractions;
 /// <param name="Role">New role assignment.</param>
 /// <param name="Enabled">New enabled flag. Disabling an account immediately invalidates its API keys.</param>
 /// <param name="ExternalLogins">Replacement set of SSO identity links, or <c>null</c> to leave the existing links untouched. An empty list clears them. Subjects already bound to surviving links are preserved by the service.</param>
-public sealed record AccountUpdate(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, IReadOnlyList<ExternalLogin>? ExternalLogins = null);
+/// <param name="Capabilities">Replacement capability override set, or <c>null</c> to leave the stored overrides untouched. An empty list clears them (the account reverts to its role default bundle); a non-empty list replaces them. Validated (unknown names rejected) and ignored for Admins.</param>
+public sealed record AccountUpdate(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, IReadOnlyList<ExternalLogin>? ExternalLogins = null, IReadOnlyList<string>? Capabilities = null);
 
 /// <summary>
 /// Domain service that owns the lifecycle rules for <see cref="Account"/> aggregates: enforces the

@@ -95,11 +95,27 @@ var authSchemes = ssoActive
     ? new[] { AuthConstants.Scheme, AuthConstants.SessionScheme }
     : new[] { AuthConstants.Scheme };
 
-builder.Services.AddAuthorizationBuilder()
+// Authorization is capability-based (Phase 2). Every feature endpoint names a "cap:<capability>"
+// policy; the requirement is satisfied by the matching capability claim the auth handlers emit
+// (role default bundle merged with per-account overrides; Admin implicitly holds all). The only
+// surviving role-style policy is ServicePolicy (= any authenticated caller) for the self-service
+// endpoints that are gated to the caller's own data rather than by capability.
+builder.Services.AddSingleton<IAuthorizationHandler, CapabilityAuthorizationHandler>();
+
+var authzBuilder = builder.Services.AddAuthorizationBuilder()
     .SetDefaultPolicy(new AuthorizationPolicyBuilder(authSchemes).RequireAuthenticatedUser().Build())
-    .AddPolicy(AuthConstants.ServicePolicy, p => { p.AddAuthenticationSchemes(authSchemes); p.RequireAuthenticatedUser(); })
-    .AddPolicy(AuthConstants.OperatorPolicy, p => { p.AddAuthenticationSchemes(authSchemes); p.RequireRole("Operator", "Admin"); })
-    .AddPolicy(AuthConstants.AdminPolicy, p => { p.AddAuthenticationSchemes(authSchemes); p.RequireRole("Admin"); });
+    .AddPolicy(AuthConstants.ServicePolicy, p => { p.AddAuthenticationSchemes(authSchemes); p.RequireAuthenticatedUser(); });
+
+foreach (var capability in Ingest.Core.Security.Capabilities.All)
+{
+    // Policy name == the capability string itself (e.g. "schemas:manage").
+    authzBuilder.AddPolicy(capability, p =>
+    {
+        p.AddAuthenticationSchemes(authSchemes);
+        p.RequireAuthenticatedUser();
+        p.AddRequirements(new CapabilityRequirement(capability));
+    });
+}
 
 builder.Services.AddCors(o => o.AddPolicy("dev", p =>
 {

@@ -29,7 +29,7 @@ public interface ISubmissionService
     /// <returns>The persisted submission together with any non-blocking warnings.</returns>
     /// <exception cref="NotFoundException">The referenced schema does not exist or isn't visible to the caller.</exception>
     /// <exception cref="ValidationException">Per-value or schema-level validators rejected the payload.</exception>
-    Task<SubmissionWriteResult> CreateMineAsync(Guid callerAccountId, SubmissionInput input, CancellationToken ct = default);
+    Task<SubmissionWriteResult> CreateMineAsync(Guid callerAccountId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, CancellationToken ct = default);
 
     /// <summary>Replace one of the caller's submissions in-place.</summary>
     /// <remarks>
@@ -45,7 +45,7 @@ public interface ISubmissionService
     /// <exception cref="NotFoundException">No such submission, or no matching schema.</exception>
     /// <exception cref="ForbiddenException">The submission belongs to a different account, or its cadence window is already closed.</exception>
     /// <exception cref="ValidationException">Per-value or schema-level validators rejected the payload.</exception>
-    Task<SubmissionWriteResult> ReplaceMineAsync(Guid callerAccountId, Guid submissionId, SubmissionInput input, CancellationToken ct = default);
+    Task<SubmissionWriteResult> ReplaceMineAsync(Guid callerAccountId, Guid submissionId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, CancellationToken ct = default);
 
     /// <summary>Fetch one of the caller's own submissions by id.</summary>
     /// <param name="callerAccountId">Account id taken from the bearer credential.</param>
@@ -74,7 +74,7 @@ public interface ISubmissionService
     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
     /// <param name="schemaName">When non-null, restrict the listing to submissions for a single schema.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default);
+    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, ApprovalStatus? approvalStatus = null, CancellationToken ct = default);
 
     /// <summary>Fetch any submission by id.</summary>
     /// <param name="submissionId">Submission id.</param>
@@ -89,7 +89,7 @@ public interface ISubmissionService
     /// <returns>The persisted submission together with any non-blocking warnings.</returns>
     /// <exception cref="NotFoundException">The referenced service or schema does not exist.</exception>
     /// <exception cref="ValidationException">Validators rejected the payload.</exception>
-    Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, CancellationToken ct = default);
+    Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, CancellationToken ct = default);
 
     /// <summary>Replace any submission. No cadence-window restriction; the audit trail records the calling admin.</summary>
     /// <param name="submissionId">Id of the submission to replace.</param>
@@ -98,10 +98,45 @@ public interface ISubmissionService
     /// <returns>The updated submission together with any non-blocking warnings.</returns>
     /// <exception cref="NotFoundException">No submission with that id, or no matching schema.</exception>
     /// <exception cref="ValidationException">Validators rejected the payload.</exception>
-    Task<SubmissionWriteResult> AdminReplaceAsync(Guid submissionId, AdminSubmissionInput input, CancellationToken ct = default);
+    Task<SubmissionWriteResult> AdminReplaceAsync(Guid submissionId, AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, CancellationToken ct = default);
 
     /// <summary>Soft-delete a submission and its derived sample projections. Idempotent.</summary>
     /// <param name="submissionId">Submission id.</param>
     /// <param name="ct">Cancellation token.</param>
     Task DeleteAsync(Guid submissionId, CancellationToken ct = default);
+
+    // ── Approval workflow ──
+
+    /// <summary>
+    /// Record an approval decision for a pending submission. When every required approver has
+    /// approved (or the caller is an Admin), the submission becomes <see cref="ApprovalStatus.Approved"/>,
+    /// its sample projection is built, and it enters the live read model.
+    /// </summary>
+    /// <param name="approverAccountId">Account recording the decision (taken from the bearer credential).</param>
+    /// <param name="submissionId">Submission to approve.</param>
+    /// <param name="note">Optional note recorded against the decision.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The updated submission.</returns>
+    /// <exception cref="NotFoundException">No such submission.</exception>
+    /// <exception cref="ForbiddenException">The caller is not a designated approver (and not an Admin).</exception>
+    /// <exception cref="ValidationException">The submission is not awaiting approval.</exception>
+    Task<Submission> ApproveAsync(Guid approverAccountId, Guid submissionId, string? note, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reject a pending submission. The submission moves to <see cref="ApprovalStatus.Rejected"/>,
+    /// stays out of the live read model, but remains visible (with the reason) in the UI.
+    /// </summary>
+    /// <param name="approverAccountId">Account recording the decision (taken from the bearer credential).</param>
+    /// <param name="submissionId">Submission to reject.</param>
+    /// <param name="note">Optional reason; shown to the submitter and reviewers.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The updated submission.</returns>
+    /// <exception cref="NotFoundException">No such submission.</exception>
+    /// <exception cref="ForbiddenException">The caller is not a designated approver (and not an Admin).</exception>
+    /// <exception cref="ValidationException">The submission is not awaiting approval.</exception>
+    Task<Submission> RejectAsync(Guid approverAccountId, Guid submissionId, string? note, CancellationToken ct = default);
+
+    /// <summary>Count submissions currently awaiting approval. Backs the pending-approvals dashboard card.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    Task<long> CountPendingAsync(CancellationToken ct = default);
 }

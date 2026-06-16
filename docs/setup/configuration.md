@@ -92,7 +92,7 @@ The **runtime SMTP connection** (host, port, credentials, from-address) is **sto
 | `Email:Smtp:FromAddress`       | *(blank)* | Seed From address. |
 | `Email:Smtp:FromName`          | *(blank)* | Seed From display name. |
 
-> **Notifications** build on top of the email infrastructure. *What* to notify (upcoming / missed / warnings) and *who* receives it is admin data stored in the database (**Settings → Notifications**); only the scheduler cadence is configuration.
+> **Notifications** build on top of the email infrastructure. *What* to notify (upcoming / missed / warnings, plus the event-driven pending-approval / approved / rejected notices when the approval workflow is on) and *who* receives it is admin data stored in the database (**Settings → Notifications**); only the scheduler cadence is configuration.
 
 | Key                                   | Default | Notes |
 |---------------------------------------|---------|-------|
@@ -114,6 +114,16 @@ The **runtime SMTP connection** (host, port, credentials, from-address) is **sto
 | `Webhooks:Worker:PollSeconds`    | `15`    | How often the in-process drainer wakes up (seconds). |
 | `Webhooks:Worker:MaxAttempts`    | `6`     | Delivery attempts (with exponential backoff) before a delivery is marked permanently `Failed`. |
 | `Webhooks:Worker:BatchSize`      | `25`    | Max deliveries sent per drain pass. |
+
+## Approval workflow
+
+> **The submission approval workflow only takes effect when `Approval:Enabled` is `true` (the default).** When off, the whole subsystem is inert — submissions are never held for review, the **Approval** dashboard card and the approval columns/filters/actions disappear, the **Settings → Approval** section is hidden, and the approval endpoints (`/api/admin/approval/*`, the approve/reject/pending-count actions) return 404. This mirrors the email/SSO/webhooks master-switch pattern.
+
+Whether a given submission needs approval is **schema data stored in the database** (per-schema policy, or the global default a schema can defer to); configuration only carries the master switch. The defaults are backwards-compatible: with no policy configured nothing is gated, so existing deployments behave exactly as before even with the switch on. See [admin-user-guide/approval-process.md](../admin-user-guide/approval-process.md) for the full workflow.
+
+| Key                | Default | Notes |
+|--------------------|---------|-------|
+| `Approval:Enabled` | `true`  | Master switch for the submission approval workflow. Set `false` to remove the feature entirely. |
 
 > **Retention** is the time-based clean-up enforcing GDPR storage limitation. It hard-deletes data once it outlives its window. Off by default; every window is a day count where `0` (or absent) means "keep forever". A manual `POST /api/admin/retention/run` (Admin) works regardless of `Enabled`. See [admin-user-guide/settings.md § Retention](../admin-user-guide/settings.md#retention).
 
@@ -157,6 +167,7 @@ The strongly-typed options classes that read these sections live in:
 | `Sso`       | `SsoOptions`     | `src/Ingest.Api/Options/SsoOptions.cs`                     |
 | `Email`     | `EmailOptions`         | `src/Ingest.Infrastructure/Email/EmailOptions.cs`         |
 | `Notifications` | `NotificationOptions` | `src/Ingest.Infrastructure/Email/NotificationOptions.cs` |
+| `Approval`  | `ApprovalOptions`      | `src/Ingest.Infrastructure/Approvals/ApprovalOptions.cs`  |
 
 If you add a new option, follow the same pattern: add the property, bind it from `IConfiguration` in `Program.cs`, and document the key here.
 

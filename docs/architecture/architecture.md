@@ -78,7 +78,8 @@ Represents anyone (or anything) authenticated by Ingest.
 | `Label` | Friendly name displayed in the UI (e.g. "Roads & Highways team"). |
 | `Description` | Free-form notes. |
 | `Kind` | `User` (interactive — can log in to the UI) or `Application` (API-only). |
-| `Role` | `Service`, `Operator` or `Admin`. See [authentication.md](authentication.md). |
+| `Role` | `Service`, `Operator`, `Approver` or `Admin` — a template that seeds the account's capabilities. See [authentication.md](authentication.md). |
+| `Capabilities` | Per-account override set of fine-grained capabilities. Empty means "follow the role default bundle". See [authentication.md § Authorisation: capabilities](authentication.md#authorisation-capabilities). |
 | `Email` | Optional contact address. Recipient for ad-hoc emails and the target of "notify the service account" notification rules. Required at *create* time in the UI; pre-existing accounts may have it empty. |
 | `Enabled` | When false, every API key for this account is invalid. |
 
@@ -137,9 +138,9 @@ These back the email/notification subsystem (see [§ Email & notifications](#ema
 
 A typical `POST /api/submissions` walks through these layers, in this order:
 
-1. **Authentication handler** (`ApiKeyAuthenticationHandler`) reads `X-Api-Key`, splits it into `KeyId` and `Secret`, looks up the key row, verifies the HMAC, loads the account, then emits a `ClaimsPrincipal` with `accountId`, `name`, `label`, `kind`, and `role` claims.
+1. **Authentication handler** (`ApiKeyAuthenticationHandler`) reads `X-Api-Key`, splits it into `KeyId` and `Secret`, looks up the key row, verifies the HMAC, loads the account, then emits a `ClaimsPrincipal` with `accountId`, `name`, `label`, `kind`, `role`, and one `ingest:cap` claim per effective capability.
 
-2. **Authorization policy** (`Service`, `OperatorOrAdmin`, `Admin`) gates the controller action based on the principal's role.
+2. **Authorization policy** (one per capability, named after the capability itself, e.g. `submissions:read`) gates the controller action by checking the principal carries the matching capability claim. The self-service endpoints use the bare authenticated `Service` policy instead.
 
 3. **Controller** (`SubmissionsController`) does parameter binding and DTO mapping. No business logic.
 

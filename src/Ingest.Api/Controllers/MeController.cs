@@ -1,5 +1,8 @@
 using Ingest.Api.Auth;
 using Ingest.Api.Common;
+using Ingest.Core.Abstractions;
+using Ingest.Core.Entities;
+using Ingest.Infrastructure.Approvals;
 using Ingest.Infrastructure.Email;
 using Ingest.Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Authorization;
@@ -29,14 +32,20 @@ public sealed class MeController : ControllerBase
 
     private readonly EmailOptions _email;
     private readonly WebhookOptions _webhooks;
+    private readonly ApprovalOptions _approval;
+    private readonly IApprovalSettingsService _approvalSettings;
 
     /// <summary>Create a new <see cref="MeController"/>.</summary>
     /// <param name="email">Bound email options (only the master switch is read, to expose it to the SPA).</param>
     /// <param name="webhooks">Bound webhook options (only the master switch is read, to expose it to the SPA).</param>
-    public MeController(IOptions<EmailOptions> email, IOptions<WebhookOptions> webhooks)
+    /// <param name="approval">Bound approval options (only the master switch is read, to expose it to the SPA).</param>
+    /// <param name="approvalSettings">Global default approval policy provider; used to expose whether the default gates submissions.</param>
+    public MeController(IOptions<EmailOptions> email, IOptions<WebhookOptions> webhooks, IOptions<ApprovalOptions> approval, IApprovalSettingsService approvalSettings)
     {
         _email = email.Value;
         _webhooks = webhooks.Value;
+        _approval = approval.Value;
+        _approvalSettings = approvalSettings;
     }
 
     /// <summary>
@@ -55,8 +64,19 @@ public sealed class MeController : ControllerBase
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public IActionResult Get()
+    public async Task<IActionResult> Get(CancellationToken ct)
     {
+        // Surface whether the *global default* policy gates submissions, so the SPA can flag schemas
+        // set to "use the global default" without needing the (admin-only) full policy. Only read it
+        // when the workflow is on; otherwise it's trivially false.
+        var approvalDefaultRequired = _approval.Enabled
+            && (await _approvalSettings.GetDefaultAsync(ct)).Mode == ApprovalMode.Required;
+
+        // The effective capability set drives every UI gate in the SPA. It's already materialised on
+        // the principal as one claim per capability by the auth handlers (role default bundle merged
+        // with per-account overrides; Admin implicitly holds all), so we just project the claims.
+        var capabilities = User.FindAll(AuthConstants.CapabilityClaim).Select(c => c.Value).ToArray();
+
         return Ok(new
         {
             id = User.CurrentAccountId(),
@@ -64,8 +84,11 @@ public sealed class MeController : ControllerBase
             label = User.FindFirst(AuthConstants.AccountLabelClaim)?.Value,
             role = User.FindFirst(ClaimTypes.Role)?.Value,
             kind = User.FindFirst(AuthConstants.KindClaim)?.Value,
+            capabilities,
             emailEnabled = _email.Enabled,
             webhooksEnabled = _webhooks.Enabled,
+            approvalEnabled = _approval.Enabled,
+            approvalDefaultRequired,
             version = AppVersion,
         });
     }

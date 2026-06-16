@@ -10,7 +10,7 @@ import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/Grid
 import { formatApiError } from '../api/client'
 import { formatDateTime } from '../utils/format'
 import { ArrowLeft20Regular, Edit20Regular } from '@fluentui/react-icons'
-import { useMe, useMySubmission, useSubmission, useSubmissionHistory } from '../api/hooks'
+import { useCapabilities, useMySubmission, useSubmission, useSubmissionHistory } from '../api/hooks'
 import type { AuditLog } from '../api/types'
 
 const useStyles = makeStyles({
@@ -27,8 +27,9 @@ export function SubmissionDetailPage() {
   const s = useStyles()
   const nav = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const { data: me } = useMe()
-  const isService = me?.role === 'Service'
+  const { has } = useCapabilities()
+  // Without cross-service read we only ever touch the caller's own submissions.
+  const isService = !has('submissions:read')
 
   // Mutually-exclusive queries so we only ever talk to the endpoint our role can use.
   const adminQuery = useSubmission(id, !isService)

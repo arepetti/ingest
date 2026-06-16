@@ -85,17 +85,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
         if (account is null || !account.Enabled || account.IsDeleted)
             return AuthenticateResult.Fail("Account is not active.");
 
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, account.Id.ToString()),
-            new(ClaimTypes.Name, account.Name),
-            new(AuthConstants.AccountIdClaim, account.Id.ToString()),
-            new(AuthConstants.AccountNameClaim, account.Name),
-            new(AuthConstants.KindClaim, account.Kind.ToString()),
-            new(ClaimTypes.Role, account.Role.ToString()),
-        };
-        if (!string.IsNullOrEmpty(account.Label))
-            claims.Add(new Claim(AuthConstants.AccountLabelClaim, account.Label));
+        var claims = IngestClaims.Build(account);
 
         var identity = new ClaimsIdentity(claims, Scheme.Name, ClaimTypes.Name, ClaimTypes.Role);
         var principal = new ClaimsPrincipal(identity);

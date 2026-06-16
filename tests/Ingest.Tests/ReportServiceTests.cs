@@ -241,10 +241,12 @@ public class ReportServiceTests
 
         public Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) =>
             Task.FromResult(_store.FirstOrDefault(s => s.Id == id));
-        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, CancellationToken ct = default) =>
+        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, ApprovalStatus? approvalStatus = null, CancellationToken ct = default) =>
             Task.FromResult(new PagedResult<Submission>(_store.ToList(), _store.Count, 1, _store.Count));
         public Task<long> CountBySchemaAsync(string schemaName, CancellationToken ct = default) =>
             Task.FromResult((long)_store.Count(s => s.Samples.Any(x => x.SchemaName == schemaName)));
+        public Task<long> CountByApprovalStatusAsync(ApprovalStatus status, CancellationToken ct = default) =>
+            Task.FromResult((long)_store.Count(s => s.ApprovalStatus == status));
         public Task AddAsync(Submission submission, CancellationToken ct = default) { _store.Add(submission); return Task.CompletedTask; }
         public Task UpdateAsync(Submission submission, CancellationToken ct = default) => Task.CompletedTask;
         public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;

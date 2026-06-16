@@ -1,6 +1,7 @@
 using Ingest.Api.Auth;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Security;
 using Ingest.Infrastructure.Email;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +16,7 @@ namespace Ingest.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/notifications")]
-[Authorize(Policy = AuthConstants.AdminPolicy)]
+[Authorize(Policy = Capabilities.NotificationsRead)]
 public sealed class AdminNotificationsController : ControllerBase
 {
     private readonly INotificationSettingsService _settings;
@@ -49,6 +50,7 @@ public sealed class AdminNotificationsController : ControllerBase
     /// <response code="200">The updated settings.</response>
     /// <response code="404">Email is disabled.</response>
     [HttpPut("settings")]
+    [Authorize(Policy = Capabilities.NotificationsManage)]
     [ProducesResponseType(typeof(NotificationSettingsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateSettings([FromBody] UpdateNotificationSettingsRequest req, CancellationToken ct)
@@ -56,6 +58,7 @@ public sealed class AdminNotificationsController : ControllerBase
         if (!_enabled) return NotFound();
         var updated = await _settings.UpdateAsync(new NotificationSettingsUpdate(
             req.Upcoming.ToUpdate(), req.Missed.ToUpdate(), req.Warnings.ToUpdate(),
+            req.PendingApproval.ToUpdate(), req.Approved.ToUpdate(), req.Rejected.ToUpdate(),
             req.UpcomingLeadHours, req.AdminRecipientAccountIds ?? new()), ct);
         return Ok(NotificationSettingsDto.From(updated));
     }
@@ -64,6 +67,7 @@ public sealed class AdminNotificationsController : ControllerBase
     /// <response code="200">The run result (per-trigger email counts).</response>
     /// <response code="404">Email is disabled.</response>
     [HttpPost("run")]
+    [Authorize(Policy = Capabilities.NotificationsManage)]
     [ProducesResponseType(typeof(NotificationRunResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Run(CancellationToken ct)

@@ -1,6 +1,7 @@
 using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
+using Ingest.Core.Security;
 using Ingest.Infrastructure.Services;
 
 namespace Ingest.Tests;
@@ -235,6 +236,96 @@ public class AccountServiceTests
         var ex = await Assert.ThrowsAsync<ConflictException>(() => svc.DeleteAsync(created.Id));
         Assert.Contains("Alpha service", ex.Message);
         Assert.DoesNotContain("'alpha'", ex.Message);
+    }
+
+    // ── Capability overrides (Phase 2) ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Create_persists_a_valid_capability_override_set()
+    {
+        var svc = NewService(out _, out _);
+        var op = NewUser("trusted");
+        op.Role = AccountRole.Operator;
+        op.Capabilities = new List<string> { Capabilities.SchemasManage, Capabilities.SchemasManage }; // dupe
+
+        var created = await svc.CreateAsync(op);
+
+        Assert.Equal(new[] { Capabilities.SchemasManage }, created.Capabilities); // de-duplicated
+    }
+
+    [Fact]
+    public async Task Create_rejects_unknown_capability_names()
+    {
+        var svc = NewService(out _, out _);
+        var op = NewUser("typo");
+        op.Role = AccountRole.Operator;
+        op.Capabilities = new List<string> { "schemas:destroy" };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(op));
+        Assert.Contains("Unknown capabilities", ex.Message);
+    }
+
+    [Fact]
+    public async Task Create_normalises_admin_overrides_away()
+    {
+        var svc = NewService(out _, out _);
+        var admin = NewUser("boss");
+        admin.Role = AccountRole.Admin;
+        admin.Capabilities = new List<string> { Capabilities.StatusRead };
+
+        var created = await svc.CreateAsync(admin);
+
+        // Admins implicitly hold everything; stored overrides are meaningless and cleared.
+        Assert.Empty(created.Capabilities);
+        Assert.Equal(Capabilities.All.OrderBy(x => x), RoleCapabilities.Effective(created).OrderBy(x => x));
+    }
+
+    [Fact]
+    public async Task Update_with_null_capabilities_leaves_overrides_untouched()
+    {
+        var svc = NewService(out _, out _);
+        var op = NewUser("trusted");
+        op.Role = AccountRole.Operator;
+        op.Capabilities = new List<string> { Capabilities.SchemasManage };
+        var created = await svc.CreateAsync(op);
+
+        var updated = await svc.UpdateAsync(created.Id,
+            new AccountUpdate("Trusted", null, null, AccountRole.Operator, true, Capabilities: null));
+
+        Assert.Equal(new[] { Capabilities.SchemasManage }, updated!.Capabilities);
+    }
+
+    [Fact]
+    public async Task Update_with_empty_capabilities_reverts_to_role_defaults()
+    {
+        var svc = NewService(out _, out _);
+        var op = NewUser("trusted");
+        op.Role = AccountRole.Operator;
+        op.Capabilities = new List<string> { Capabilities.SchemasManage };
+        var created = await svc.CreateAsync(op);
+
+        var updated = await svc.UpdateAsync(created.Id,
+            new AccountUpdate("Trusted", null, null, AccountRole.Operator, true, Capabilities: Array.Empty<string>()));
+
+        // Empty override set => fall back to the role default bundle.
+        Assert.Empty(updated!.Capabilities);
+        Assert.Equal(RoleCapabilities.DefaultsFor(AccountRole.Operator).OrderBy(x => x),
+            RoleCapabilities.Effective(updated).OrderBy(x => x));
+    }
+
+    [Fact]
+    public async Task Update_to_admin_clears_any_existing_overrides()
+    {
+        var svc = NewService(out _, out _);
+        var op = NewUser("trusted");
+        op.Role = AccountRole.Operator;
+        op.Capabilities = new List<string> { Capabilities.SchemasManage };
+        var created = await svc.CreateAsync(op);
+
+        var updated = await svc.UpdateAsync(created.Id,
+            new AccountUpdate("Trusted", null, null, AccountRole.Admin, true, Capabilities: null));
+
+        Assert.Empty(updated!.Capabilities);
     }
 
     // ── In-memory repositories (just enough surface) ────────────────────────────────────────

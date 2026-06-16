@@ -5,7 +5,7 @@ Open **Accounts** in the sidebar. The grid shows every account — interactive u
 Two orthogonal classifications drive everything you'll do here:
 
 - **Kind** — `User` (can sign in to the SPA) or `Application` (API-only, never logs in).
-- **Role** — `Service`, `Operator`, or `Admin`. See [architecture/authentication.md § Roles](../architecture/authentication.md#roles) for what each one can do.
+- **Role** — `Service`, `Approver`, `Operator`, or `Admin`. Roles are now **templates**: picking one only seeds a default bundle of *capabilities*, which you can then tune freely (see [Permissions (capabilities)](#permissions-capabilities) below). See [architecture/authentication.md § Authorisation: capabilities](../architecture/authentication.md#authorisation-capabilities) for the full model. The `Approver` role is the reviewer for the optional [submission approval workflow](approval-process.md).
 
 ## Creating an account
 
@@ -16,7 +16,7 @@ Two orthogonal classifications drive everything you'll do here:
    - **Description** — free-form notes.
    - **Email** — contact address used by the email and notification features. **Required when creating a new account.** (Validated for shape; stored lower-cased.)
    - **Kind** — `Application` for automation credentials, `User` for people who will sign in to the SPA.
-   - **Role** — `Service`, `Operator`, or `Admin`.
+   - **Role** — `Service`, `Approver`, `Operator`, or `Admin`.
    - **Enabled** — leave on unless you want to pre-create a disabled account.
 3. Click **Save**.
 
@@ -29,6 +29,17 @@ Use the row menu's **Edit** action. Name and Kind are **immutable** — to chang
 Email is required when *creating* an account, but accounts that predate this field (or were created without one) can still be saved with an empty email when editing — fill it in whenever you're ready. A non-empty value must be a valid address.
 
 Toggling **Enabled** off immediately invalidates every key for this account; toggling it back on re-enables the existing keys.
+
+## Permissions (capabilities)
+
+Below the role selector the editor shows a **Permissions** panel — a grouped checklist of every fine-grained capability the system understands (schemas, submissions, reports, accounts, API keys, audit, webhooks, notifications, privacy, backup and settings, each with a `read` and, where it applies, a `manage`/verb capability). This is what actually governs what the account can do and see; the role is just the template that pre-fills it.
+
+- **Picking a role pre-fills the checklist** with that role's default bundle. `Operator` ticks the read-everything boxes; `Approver` ticks *view + approve submissions*; `Service` ticks nothing (a pure submitter); `Admin` holds everything.
+- **You can tick or untick any box** on a non-admin account. This is the whole point of the model: grant one trusted operator `schemas:manage` without making them an admin, or a service-desk user just `accounts:read` + `apikeys:manage`, and nothing else.
+- **Admins always hold every capability.** The checklist is shown read-only (all ticked) for `Admin` accounts — the role is the lockout-safe floor and can't be reduced.
+- **Leaving the checklist exactly on the role default** stores *no override*, so the account keeps tracking the role's defaults if those ever change. Deviating from the default stores your explicit selection.
+
+Capabilities take effect the next time the account authenticates (a fresh API request, or the next page load for a signed-in SPA user). In the SPA, the sidebar, dashboard cards and action buttons a user sees are driven entirely by their effective capabilities — someone without `schemas:manage` simply won't see the schema-editing controls.
 
 ## Linking an SSO identity (only when SSO is enabled)
 
@@ -86,7 +97,7 @@ Both old and new keys authenticate during the overlap; the consumer never sees a
 
 ## Data-subject rights (GDPR)
 
-Two admin-only actions on the row menu (and the detail-drawer toolbar) cover the GDPR rights that need a button in the product (EU GDPR; the UK GDPR / DPA 2018 are equivalent). Both are **Admin-only**. See [docs/gdpr.md](../gdpr.md) for the full data-protection overview.
+Two actions on the row menu (and the detail-drawer toolbar) cover the GDPR rights that need a button in the product (EU GDPR; the UK GDPR / DPA 2018 are equivalent). **Export personal data** needs the `privacy:read` capability; **Erase (GDPR)** needs `privacy:manage`. Both are in the `Admin` default bundle, but either can be granted to a non-admin (e.g. a data-protection officer). See [docs/gdpr.md](../gdpr.md) for the full data-protection overview.
 
 ### Export personal data (right of access / DSAR)
 

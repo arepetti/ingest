@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import {
-  Avatar, Badge, Body1, Button, Card, Checkbox, Dropdown, Drawer, DrawerBody, Field, Input, Option, Spinner,
+  Avatar, Badge, Body1, Button, Card, Checkbox, Dropdown, Drawer, DrawerBody, Field, Input, Option, Radio, RadioGroup, Spinner,
   Switch,
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
   Textarea, Title3,
   MessageBarBody, makeStyles, tokens,
 } from '@fluentui/react-components'
 import {
-  Alert24Regular, DocumentText24Regular, Mail20Regular, Mail24Regular, PlugConnected24Regular,
+  Alert24Regular, CheckmarkCircle24Regular, DocumentText24Regular, Mail20Regular, Mail24Regular, PlugConnected24Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
@@ -16,13 +16,17 @@ import type { LayoutSection } from '../components/SectionedLayout'
 import { WebhooksSection } from '../components/WebhooksSection'
 import { clickableRowProps } from '../utils/a11y'
 import {
-  useMe, useAccounts,
+  useCapabilities, useAccounts,
   useEmailSettings, useUpdateEmailSettings,
   useEmailTemplates, useUpdateEmailTemplate,
   useNotificationSettings, useUpdateNotificationSettings, useRunNotifications,
+  useApprovalSettings, useUpdateApprovalSettings,
 } from '../api/hooks'
+import { accountHasCapability } from '../api/capabilities'
 import { formatApiError } from '../api/client'
+import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY, SERVICE_OWNER_LABEL } from '../utils/approvers'
 import type {
+  Account, ApprovalMode, ApprovalPolicy, ApprovalSourceScope, ApproverRequirement,
   EmailSettings, EmailTemplate, NotificationSettings, NotificationRule,
 } from '../api/types'
 
@@ -54,30 +58,179 @@ const useStyles = makeStyles({
   colFormat: { width: '120px' },
   drawer: { width: 'max(600px, 50vw)' },
   drawerForm: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  approverList: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  approverRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+    padding: '6px 10px', borderRadius: '6px', backgroundColor: tokens.colorNeutralBackground2,
+  },
+  approverName: { fontWeight: tokens.fontWeightSemibold },
 })
 
+// --- Approval (global default policy) ------------------------------------------------------
+
+const approvalSourceLabels: Record<ApprovalSourceScope, string> = {
+  Both: 'Both manual and API submissions',
+  ManualOnly: 'Manual (web console) submissions only',
+  ApiOnly: 'API submissions only',
+}
+
+function ApprovalSettingsSection() {
+  const { data, isLoading } = useApprovalSettings()
+  const { data: accountsPage } = useAccounts()
+  if (isLoading || !data) return <Spinner label="Loading…" />
+  const approvers = (accountsPage?.items ?? []).filter(a => accountHasCapability(a, 'submissions:approve') && !a.isDeleted)
+  return <ApprovalSettingsForm initial={data} accounts={approvers} />
+}
+
+function ApprovalSettingsForm({ initial, accounts }: { initial: ApprovalPolicy; accounts: Account[] }) {
+  const s = useStyles()
+  const update = useUpdateApprovalSettings()
+  // The global default may only be "no approval" or "approval required" — `UseGlobalDefault` is a
+  // per-schema concept (a schema deferring to *this* policy) and is normalised to None here.
+  const [mode, setMode] = useState<ApprovalMode>(initial.mode === 'Required' ? 'Required' : 'None')
+  const [appliesToSources, setAppliesToSources] = useState<ApprovalSourceScope>(initial.appliesToSources ?? 'Both')
+  const [approvers, setApprovers] = useState<ApprovalPolicy['approvers']>(initial.approvers ?? [])
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  const accountsById = new Map(accounts.map(a => [a.id, a]))
+  const hasRequiredApprover = approvers.some(a => a.requirement === 'Required')
+
+  function toggleApprover(key: string, selected: boolean) {
+    if (selected) {
+      if (approvers.some(a => approverKey(a) === key)) return
+      setApprovers([...approvers, approverFromKey(key)])
+    } else {
+      setApprovers(approvers.filter(a => approverKey(a) !== key))
+    }
+  }
+  function setRequirement(key: string, requirement: ApproverRequirement) {
+    setApprovers(approvers.map(a => approverKey(a) === key ? { ...a, requirement } : a))
+  }
+
+  async function onSave() {
+    setError(null); setSaved(false)
+    try {
+      await update.mutateAsync({ mode, appliesToSources, approvers: mode === 'Required' ? approvers : [] })
+      setSaved(true)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  return (
+    <Card className={s.card}>
+      <div>
+        <Title3 className={s.sectionTitle}>Default approval policy</Title3>
+        <Body1 className={s.help}>
+          Schemas set to “Use the global default” fall back to this policy. Changing it affects only
+          new submissions; in-flight ones keep the approvers they were created with.
+        </Body1>
+      </div>
+
+      {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Approval policy saved.</MessageBarBody></AutoScrollMessageBar>}
+
+      <Field label="When a schema defers to the default">
+        <RadioGroup value={mode} onChange={(_, d) => setMode(d.value as ApprovalMode)}>
+          <Radio value="None" label="Don’t require approval" />
+          <Radio value="Required" label="Require approval" />
+        </RadioGroup>
+      </Field>
+
+      {mode === 'Required' && (
+        <>
+          <Field label="Applies to">
+            <Dropdown
+              value={approvalSourceLabels[appliesToSources]}
+              selectedOptions={[appliesToSources]}
+              onOptionSelect={(_, d) => setAppliesToSources(d.optionValue as ApprovalSourceScope)}
+            >
+              {(Object.keys(approvalSourceLabels) as ApprovalSourceScope[]).map(sc => (
+                <Option key={sc} value={sc}>{approvalSourceLabels[sc]}</Option>
+              ))}
+            </Dropdown>
+          </Field>
+
+          <Field
+            label="Approvers"
+            hint="Approver/Admin accounts who may review, and/or the service owner (the account that sent the submission). Mark at least one as Required."
+            validationState={hasRequiredApprover ? 'none' : 'warning'}
+            validationMessage={hasRequiredApprover ? undefined : 'Add at least one Required approver.'}
+          >
+            <Dropdown
+              multiselect
+              placeholder="Select approvers"
+              selectedOptions={approvers.map(approverKey)}
+              value={approvers.map(a => approverLabel(a, accountsById)).join(', ')}
+              onOptionSelect={(_, d) => toggleApprover(d.optionValue!, d.selectedOptions.includes(d.optionValue!))}
+            >
+              <Option value={SERVICE_OWNER_KEY}>{SERVICE_OWNER_LABEL}</Option>
+              {accounts.map(a => (
+                <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
+              ))}
+            </Dropdown>
+          </Field>
+
+          {approvers.length > 0 && (
+            <div className={s.approverList}>
+              {approvers.map(a => {
+                const key = approverKey(a)
+                return (
+                  <div key={key} className={s.approverRow}>
+                    <span className={s.approverName}>{approverLabel(a, accountsById)}</span>
+                    <RadioGroup layout="horizontal" value={a.requirement} onChange={(_, d) => setRequirement(key, d.value as ApproverRequirement)}>
+                      <Radio value="Required" label="Required" />
+                      <Radio value="Optional" label="Optional" />
+                    </RadioGroup>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      <div className={s.actions}>
+        <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
+          {update.isPending ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
 export function SettingsPage() {
-  const { data: me, isLoading } = useMe()
+  const { me, hasAny, isLoading } = useCapabilities()
 
   if (isLoading) return <Spinner label="Loading…" />
-  if (me?.role !== 'Admin') {
+
+  const canConfigureSettings = hasAny('settings:read', 'settings:manage')
+  const canConfigureNotifications = hasAny('notifications:read', 'notifications:manage')
+  const canConfigureWebhooks = hasAny('webhooks:read', 'webhooks:manage')
+
+  if (!canConfigureSettings && !canConfigureNotifications && !canConfigureWebhooks) {
     return (
       <AutoScrollMessageBar intent="error">
-        <MessageBarBody>Settings are available to administrators only.</MessageBarBody>
+        <MessageBarBody>You don't have permission to manage any settings.</MessageBarBody>
       </AutoScrollMessageBar>
     )
   }
 
   const emailEnabled = me?.emailEnabled === true
   const webhooksEnabled = me?.webhooksEnabled === true
+  const approvalEnabled = me?.approvalEnabled === true
 
   const sections: LayoutSection[] = [
-    ...(emailEnabled ? [
+    ...(approvalEnabled && canConfigureSettings ? [
+      { id: 'approval', label: 'Approval', icon: <CheckmarkCircle24Regular />, render: () => <ApprovalSettingsSection /> },
+    ] as LayoutSection[] : []),
+    ...(emailEnabled && canConfigureNotifications ? [
       { id: 'email', label: 'Email', icon: <Mail24Regular />, render: () => <EmailSettingsSection /> },
       { id: 'templates', label: 'Email templates', icon: <DocumentText24Regular />, render: () => <EmailTemplatesSection /> },
       { id: 'notifications', label: 'Notifications', icon: <Alert24Regular />, render: () => <NotificationsSection /> },
     ] as LayoutSection[] : []),
-    ...(webhooksEnabled ? [
+    ...(webhooksEnabled && canConfigureWebhooks ? [
       { id: 'webhooks', label: 'Webhooks', icon: <PlugConnected24Regular />, render: () => <WebhooksSection /> },
     ] as LayoutSection[] : []),
   ]
@@ -86,8 +239,8 @@ export function SettingsPage() {
     return (
       <AutoScrollMessageBar intent="info">
         <MessageBarBody>
-          No configurable settings are enabled. Turn on email or webhooks in the server
-          configuration to manage them here.
+          No configurable settings are enabled. Turn on email, webhooks, or the approval workflow in
+          the server configuration to manage them here.
         </MessageBarBody>
       </AutoScrollMessageBar>
     )
@@ -354,10 +507,15 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
   const update = useUpdateNotificationSettings()
   const run = useRunNotifications()
   const { data: accountsPage } = useAccounts()
+  const { me } = useCapabilities()
+  const approvalEnabled = !!me?.approvalEnabled
 
   const [upcoming, setUpcoming] = useState<NotificationRule>(initial.upcoming)
   const [missed, setMissed] = useState<NotificationRule>(initial.missed)
   const [warnings, setWarnings] = useState<NotificationRule>(initial.warnings)
+  const [pendingApproval, setPendingApproval] = useState<NotificationRule>(initial.pendingApproval)
+  const [approved, setApproved] = useState<NotificationRule>(initial.approved)
+  const [rejected, setRejected] = useState<NotificationRule>(initial.rejected)
   const [leadHours, setLeadHours] = useState(String(initial.upcomingLeadHours))
   const [recipients, setRecipients] = useState<string[]>(initial.adminRecipientAccountIds ?? [])
   const [error, setError] = useState<string | null>(null)
@@ -373,6 +531,7 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
     try {
       await update.mutateAsync({
         upcoming, missed, warnings,
+        pendingApproval, approved, rejected,
         upcomingLeadHours: Number(leadHours) || 24,
         adminRecipientAccountIds: recipients,
       })
@@ -415,6 +574,19 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
       <RuleEditor title="Missed submission alert" rule={missed} onChange={setMissed} />
       <RuleEditor title="Submission with warnings notice" rule={warnings} onChange={setWarnings} />
 
+      {approvalEnabled && (
+        <>
+          <RuleEditor
+            title="Submission pending approval notice"
+            rule={pendingApproval}
+            onChange={setPendingApproval}
+            hint="The submission's designated approvers are always emailed; these switches add the submitter and/or admin list."
+          />
+          <RuleEditor title="Submission approved notice" rule={approved} onChange={setApproved} />
+          <RuleEditor title="Submission rejected notice" rule={rejected} onChange={setRejected} />
+        </>
+      )}
+
       <Field label="Admin / operator recipient list" hint="Accounts (with an email) that receive the copy when a trigger has 'admin list' on.">
         <Dropdown
           multiselect
@@ -447,10 +619,11 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
   )
 }
 
-function RuleEditor({ title, rule, onChange }: {
+function RuleEditor({ title, rule, onChange, hint }: {
   title: string
   rule: NotificationRule
   onChange: (r: NotificationRule) => void
+  hint?: string
 }) {
   const s = useStyles()
   return (
@@ -458,6 +631,7 @@ function RuleEditor({ title, rule, onChange }: {
       <Switch label={title} checked={rule.enabled} onChange={(_, d) => onChange({ ...rule, enabled: d.checked })} />
       {rule.enabled && (
         <div className={s.ruleChildren}>
+          {hint && <Body1 className={s.help}>{hint}</Body1>}
           <Checkbox
             label="Notify the service account"
             checked={rule.notifyServiceAccount}

@@ -1,11 +1,65 @@
+import type { Capability } from './capabilities'
+
 /**
  * 'User' = interactive account: can log in to the admin UI and call APIs.
  * 'Application' = automated credential: API-only, blocked from the UI sign-in path.
- * The role (Service/Operator/Admin) determines what the account can DO and is orthogonal to the kind.
+ * The role is a decorative template that seeds a default capability bundle; the effective
+ * capability set (orthogonal to the kind) is what actually governs what the account can DO.
  */
 export type AccountKind = 'User' | 'Application'
-export type AccountRole = 'Service' | 'Operator' | 'Admin'
+export type AccountRole = 'Service' | 'Operator' | 'Admin' | 'Approver'
 export type SchemaValueType = 'String' | 'Integer' | 'Number' | 'Date' | 'Boolean'
+
+// --- Approval workflow ---------------------------------------------------------------------
+
+/** Approval lifecycle state of a submission. `NotRequired` is the legacy/never-gated default. */
+export type ApprovalStatus = 'NotRequired' | 'Pending' | 'Approved' | 'Rejected'
+
+/** Where a submission originated: programmatic API call vs. the web console. */
+export type SubmissionSource = 'Api' | 'Manual'
+
+/** How a schema (or the global default) decides whether submissions need approval. */
+export type ApprovalMode = 'None' | 'UseGlobalDefault' | 'Required'
+
+/** Which submission sources an approval policy applies to. */
+export type ApprovalSourceScope = 'Both' | 'ManualOnly' | 'ApiOnly'
+
+/** Whether a designated approver must approve or may approve. */
+export type ApproverRequirement = 'Required' | 'Optional'
+
+/** The decision a reviewer recorded. */
+export type ApprovalDecision = 'Approved' | 'Rejected'
+
+/**
+ * What kind of approver a spec designates: a named account, or the dynamic "service owner" that
+ * resolves per submission to the account that sent it (so the submitting service can review its own data).
+ */
+export type ApproverKind = 'Account' | 'ServiceOwner'
+
+/** A designated approver in an approval policy. */
+export interface ApproverSpec {
+  accountId: string
+  requirement: ApproverRequirement
+  /** Defaults to `Account`; `ServiceOwner` ignores `accountId` and binds to the submitter. */
+  kind?: ApproverKind
+}
+
+/** An approval policy (per-schema or the global default). */
+export interface ApprovalPolicy {
+  mode: ApprovalMode
+  appliesToSources: ApprovalSourceScope
+  approvers: ApproverSpec[]
+}
+
+/** One recorded approval/rejection decision on a submission. */
+export interface SubmissionApproval {
+  approverAccountId: string
+  approverName?: string | null
+  decision: ApprovalDecision
+  decidedAt: string
+  /** Optional note; carries the reject reason. */
+  note?: string | null
+}
 export type Cadence =
   | 'Daily'
   | 'Weekly'
@@ -45,6 +99,10 @@ export interface Account {
   isDeleted: boolean
   /** SSO identity links. Only ever populated for User-kind accounts; empty otherwise. */
   externalLogins?: ExternalLogin[]
+  /** Stored capability overrides. Empty means "follow the role default bundle". */
+  capabilities?: Capability[]
+  /** Resolved capability set actually in force (read-only; set `capabilities` to change it). */
+  effectiveCapabilities?: Capability[]
 }
 
 export interface CreateAccountRequest {
@@ -58,6 +116,8 @@ export interface CreateAccountRequest {
   enabled?: boolean
   /** SSO identity links. Only valid for User-kind accounts. */
   externalLogins?: ExternalLogin[]
+  /** Capability overrides. Omit/empty seeds the role default bundle; a non-empty list is stored verbatim. Ignored for Admins. */
+  capabilities?: Capability[]
 }
 
 export interface UpdateAccountRequest {
@@ -69,6 +129,8 @@ export interface UpdateAccountRequest {
   enabled: boolean
   /** Replacement set of SSO identity links. Omit to leave links untouched; pass [] to clear. */
   externalLogins?: ExternalLogin[]
+  /** Replacement capability override set. Omit to leave untouched; [] clears (reverts to role defaults). Ignored for Admins. */
+  capabilities?: Capability[]
 }
 
 /**
@@ -192,6 +254,11 @@ export interface Schema {
   createdBy?: string | null
   modifiedAt: string
   modifiedBy?: string | null
+  /**
+   * Optional approval policy. Null (the default) means no approval. Only consulted when the
+   * `approvalEnabled` master switch is on.
+   */
+  approval?: ApprovalPolicy | null
 }
 
 export type UpsertSchemaRequest = Omit<Schema, 'id' | 'createdAt' | 'modifiedAt' | 'versionModifiedAt'>
@@ -218,6 +285,14 @@ export interface Submission {
   modifiedAt: string
   modifiedBy?: string | null
   isDeleted: boolean
+  /** Where the submission came from. Defaults to `Api` on legacy rows. */
+  source: SubmissionSource
+  /** Approval lifecycle state. `NotRequired` on legacy rows and whenever approval doesn't apply. */
+  approvalStatus: ApprovalStatus
+  /** Snapshot of the approvers required when approval was triggered (frozen against later policy edits). */
+  requiredApprovers: ApproverSpec[]
+  /** Recorded approve/reject decisions, newest last. */
+  approvals: SubmissionApproval[]
 }
 
 /** Body shape for admin-on-behalf-of submission create/replace. */
@@ -370,10 +445,16 @@ export interface Me {
   label?: string | null
   role: AccountRole
   kind: AccountKind
+  /** The effective capability set in force for this account; drives every capability gate in the UI. */
+  capabilities?: Capability[]
   /** Whether the email + notification feature is enabled server-side. Drives whether the related UI shows at all. */
   emailEnabled?: boolean
   /** Whether outbound webhooks are enabled server-side. Drives whether the Webhooks settings section shows. */
   webhooksEnabled?: boolean
+  /** Whether the submission approval workflow is enabled server-side. Drives all approval-related UI. */
+  approvalEnabled?: boolean
+  /** Whether the global default approval policy currently requires approval (so schemas deferring to it are gated). */
+  approvalDefaultRequired?: boolean
   /** Server application version (from Directory.Build.props), shown in the dashboard footer. */
   version?: string
 }
@@ -471,6 +552,9 @@ export interface NotificationSettings {
   upcoming: NotificationRule
   missed: NotificationRule
   warnings: NotificationRule
+  pendingApproval: NotificationRule
+  approved: NotificationRule
+  rejected: NotificationRule
   upcomingLeadHours: number
   adminRecipientAccountIds: string[]
 }
@@ -487,7 +571,7 @@ export interface NotificationRunResult {
 }
 
 /** The kind of change recorded in the audit log. */
-export type AuditChangeType = 'Create' | 'Edit' | 'Delete'
+export type AuditChangeType = 'Create' | 'Edit' | 'Delete' | 'Approve' | 'Reject'
 
 /**
  * The type of object an audit entry targets. 'User' and 'Account' are both accounts, told apart
@@ -505,6 +589,8 @@ export interface AuditLog {
   change: AuditChangeType
   actorId?: string | null
   actorName?: string | null
+  /** Free-form note attached to the entry (e.g. a reject reason). */
+  note?: string | null
 }
 
 export interface HistoryBucket {
@@ -655,6 +741,9 @@ export type WebhookEventKind =
   | 'SubmissionWarnings'
   | 'WindowUpcoming'
   | 'WindowMissed'
+  | 'SubmissionPendingApproval'
+  | 'SubmissionApproved'
+  | 'SubmissionRejected'
 
 /** Delivery state of a queued webhook POST. Mirrors the email outbox states. */
 export type WebhookDeliveryStatus = 'Pending' | 'Sending' | 'Sent' | 'Failed'

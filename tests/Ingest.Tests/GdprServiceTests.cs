@@ -261,9 +261,12 @@ public class GdprServiceTests
     {
         public List<AuditLog> Records { get; } = new();
 
-        public Task RecordAsync(AuditTargetType targetType, AuditChangeType change, Guid targetId, string? targetName, CancellationToken ct = default)
+        public Task RecordAsync(AuditTargetType targetType, AuditChangeType change, Guid targetId, string? targetName, CancellationToken ct = default) =>
+            RecordAsync(targetType, change, targetId, targetName, null, ct);
+
+        public Task RecordAsync(AuditTargetType targetType, AuditChangeType change, Guid targetId, string? targetName, string? note, CancellationToken ct = default)
         {
-            Records.Add(new AuditLog { TargetType = targetType, Change = change, TargetId = targetId, TargetName = targetName });
+            Records.Add(new AuditLog { TargetType = targetType, Change = change, TargetId = targetId, TargetName = targetName, Note = note });
             return Task.CompletedTask;
         }
 
@@ -318,8 +321,9 @@ public class GdprServiceTests
         public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) =>
             Task.FromResult((long)Store.RemoveAll(s => s.IsDeleted && s.DeletedAt < olderThanUtc));
         public Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, ApprovalStatus? approvalStatus = null, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<long> CountBySchemaAsync(string schemaName, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<long> CountByApprovalStatusAsync(ApprovalStatus status, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(Submission submission, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
     }

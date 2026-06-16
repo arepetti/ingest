@@ -39,7 +39,7 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] SubmissionInput input, CancellationToken ct)
     {
-        var written = await service.CreateMineAsync(User.CurrentAccountId(), input, ct);
+        var written = await service.CreateMineAsync(User.CurrentAccountId(), input, Request.ResolveSource(), ct);
         return Created($"/api/submissions/{written.Submission.Id}",
             new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
@@ -66,7 +66,7 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Replace(Guid id, [FromBody] SubmissionInput input, CancellationToken ct)
     {
-        var written = await service.ReplaceMineAsync(User.CurrentAccountId(), id, input, ct);
+        var written = await service.ReplaceMineAsync(User.CurrentAccountId(), id, input, Request.ResolveSource(), ct);
         return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
 

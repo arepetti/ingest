@@ -256,6 +256,7 @@ public interface ISubmissionRepository
         DateTime? from = null,
         DateTime? to = null,
         string? schemaName = null,
+        ApprovalStatus? approvalStatus = null,
         CancellationToken ct = default);
 
     /// <summary>
@@ -267,6 +268,12 @@ public interface ISubmissionRepository
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The number of matching submissions.</returns>
     Task<long> CountBySchemaAsync(string schemaName, CancellationToken ct = default);
+
+    /// <summary>Count the live (non-deleted) submissions in the given approval state. Backs the pending-approvals dashboard card.</summary>
+    /// <param name="status">Approval status to count.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of matching submissions.</returns>
+    Task<long> CountByApprovalStatusAsync(ApprovalStatus status, CancellationToken ct = default);
 
     /// <summary>Insert a new submission.</summary>
     /// <param name="submission">Submission to persist.</param>

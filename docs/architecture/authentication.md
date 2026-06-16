@@ -85,9 +85,10 @@ Client                              Ingest API
   │                                   │   6. Emit ClaimsPrincipal:
   │                                   │        NameIdentifier = accountId
   │                                   │        Name           = account.Name
-  │                                   │        Role           = "Service" | "Operator" | "Admin"
+  │                                   │        Role           = "Service" | "Operator" | "Approver" | "Admin"
   │                                   │        ingest:kind    = "User" | "Application"
   │                                   │        ingest:accountLabel = account.Label
+  │                                   │        ingest:cap     = one claim per effective capability
   │
   │   200 OK / 401 / 403              │
   │  ◄─────────────────────────────────
@@ -97,25 +98,79 @@ Each verification touches one index lookup on `apiKeys.KeyId` and one on `accoun
 
 If the header is missing entirely the handler returns `NoResult()` so anonymous endpoints still work. Today only `POST /api/expressions/translate` is anonymous (the SPA's expression-translator helper — see [architecture.md § Live feedback in the admin UI](architecture.md#live-feedback-in-the-admin-ui)). If the header is present but invalid, the handler returns `401` with a `WWW-Authenticate` header.
 
-## Roles
+## Authorisation: capabilities
 
-The `Role` claim drives every authorisation decision. Three roles, with progressively wider scope:
+Authorisation is **capability-based**. The real unit of permission is a fine-grained capability string such as `schemas:read` or `submissions:approve`; a request is allowed when the principal carries the matching capability. Roles still exist but are now **decorative templates** — they only seed a *default bundle* of capabilities when an account is created. After that the effective capability set on the account is what governs what it may do and see, and it can be tuned per account (a single trusted operator can be granted `schemas:manage` without becoming an admin).
 
-| Role       | Intent                                  | Can call |
-|------------|-----------------------------------------|----------|
-| `Service`  | Automated submitter for one local-council service. | `/api/me*`, `/api/schemas*`, `/api/submissions*`. Reads and writes scoped to its own account. |
-| `Operator` | Read-everything back-office user (data analyst). | All `Service` endpoints plus admin **read** endpoints (`/api/admin/submissions` GET, `/api/services/{name}/status`, `/api/admin/query`, `/odata/samples`). |
-| `Admin`    | Full control. | Every endpoint, including account/key CRUD, schema CRUD, on-behalf-of submissions, and delete. |
+### The catalogue
 
-Policies are defined in `Program.cs`:
+Capabilities follow the `"<feature>:<action>"` convention, where action is `read` or `manage` (plus the extra submission verbs `submit`/`delete`/`approve`). The full set lives in `Ingest.Core.Security.Capabilities`:
+
+| Feature | Read | Manage / verbs |
+|---------|------|----------------|
+| Schemas | `schemas:read` | `schemas:manage` |
+| Submissions | `submissions:read` | `submissions:submit`, `submissions:delete`, `submissions:approve` |
+| Query (OData + ad-hoc) | `query:read` | — |
+| Explore | `explore:read` | — |
+| Status / missing analytics | `status:read` | — |
+| Reports | `reports:read` | `reports:manage` |
+| Accounts | `accounts:read` | `accounts:manage` |
+| API keys | `apikeys:read` | `apikeys:manage` |
+| Audit log | `audit:read` | — |
+| Webhooks | `webhooks:read` | `webhooks:manage` |
+| Notifications / email | `notifications:read` | `notifications:manage` |
+| Privacy (DSAR) | `privacy:read` | `privacy:manage` |
+| Backup | `backup:read` | `backup:manage` |
+| Settings | `settings:read` | `settings:manage` |
+
+The strings are the stable wire/claim values and must not change without a migration.
+
+### Roles as templates
+
+| Role | Default bundle (seeded at create) |
+|------|-----------------------------------|
+| `Service` | *none* — a pure submitter, scoped to its own account via `/api/me*`, `/api/schemas*`, `/api/submissions*` (which do not require capabilities). |
+| `Operator` | The read-everything back-office bundle: `schemas:read`, `submissions:read`, `query:read`, `explore:read`, `status:read`, `reports:read`. |
+| `Approver` | `submissions:read` + `submissions:approve` — see the [submission approval workflow](../admin-user-guide/approval-process.md). |
+| `Admin` | The **entire** catalogue, and it is non-reducible (the lockout-safe floor). |
+
+A role's default bundle is just a starting point. An administrator can grant or revoke any capability on a non-admin account from the account editor; the override set then replaces the role default entirely. An empty override set means "follow the role default", so existing accounts keep behaving exactly as before — **no data migration is required**.
+
+### Effective-capability resolution
+
+`RoleCapabilities.Effective(account)` resolves the set a request is checked against:
+
+1. `Admin` → the full catalogue, always (overrides are ignored and normalised away on save).
+2. Otherwise, if the account has a non-empty override set → that set (unknown capability strings are dropped defensively).
+3. Otherwise → the role's default bundle.
+
+### How it is enforced
+
+The authentication handlers emit **one `ingest:cap` claim per effective capability** (built once by `IngestClaims.Build`). `Program.cs` then registers one authorization policy per catalogue capability, named after the capability itself, each backed by a `CapabilityRequirement` that the `CapabilityAuthorizationHandler` satisfies when the principal holds the matching claim:
 
 ```csharp
-.AddPolicy(AuthConstants.ServicePolicy,  p => p.RequireAuthenticatedUser())
-.AddPolicy(AuthConstants.OperatorPolicy, p => p.RequireRole("Operator", "Admin"))
-.AddPolicy(AuthConstants.AdminPolicy,    p => p.RequireRole("Admin"));
+builder.Services.AddSingleton<IAuthorizationHandler, CapabilityAuthorizationHandler>();
+
+var authz = builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(AuthConstants.ServicePolicy, p => { p.AddAuthenticationSchemes(schemes); p.RequireAuthenticatedUser(); });
+
+foreach (var capability in Capabilities.All)
+    authz.AddPolicy(capability, p =>
+    {
+        p.AddAuthenticationSchemes(schemes);
+        p.RequireAuthenticatedUser();
+        p.AddRequirements(new CapabilityRequirement(capability));
+    });
 ```
 
-Controllers attach a single policy at the class level; admin-only mutations override it on individual actions.
+Because the policy name *is* the capability string, controllers read naturally:
+
+```csharp
+[Authorize(Policy = Capabilities.SchemasManage)]  // "schemas:manage"
+public class AdminSchemasController : ControllerBase { … }
+```
+
+Controllers attach the read capability at the class level; mutating actions override it with the corresponding `:manage` (or verb) capability. The `ServicePolicy` (authenticated, no capability) still guards the self-service `/api/me`, `/api/schemas` and `/api/submissions` endpoints that a `Service` account uses against its own data.
 
 ## Kind
 
@@ -156,7 +211,7 @@ sequenceDiagram
 
 ### Claims parity
 
-A successful SSO sign-in **rebuilds** the principal with the *exact same* claim set the API-key handler emits — `NameIdentifier`, `Name`, `ingest:accountId`, `ingest:accountName`, `ingest:kind`, `Role`, and the optional `ingest:accountLabel`. Because both schemes produce identical claims, every controller, policy, and the `HttpAuditContext` work unchanged regardless of which scheme authenticated the request.
+A successful SSO sign-in **rebuilds** the principal with the *exact same* claim set the API-key handler emits — both call `IngestClaims.Build(account)`, which produces `NameIdentifier`, `Name`, `ingest:accountId`, `ingest:accountName`, `ingest:kind`, `Role`, the optional `ingest:accountLabel`, and one `ingest:cap` claim per effective capability. Because both schemes produce identical claims, every controller, capability policy, and the `HttpAuditContext` work unchanged regardless of which scheme authenticated the request.
 
 ### Pre-provisioned linking (no auto-provisioning)
 
@@ -171,15 +226,17 @@ The matched account's **role** is what governs access — there is no group-to-r
 
 ### Multi-scheme policies
 
-When SSO is enabled the three role policies name **both** schemes, so either an API key *or* a session cookie satisfies them:
+When SSO is enabled every policy (the `ServicePolicy` and each per-capability policy) names **both** schemes, so either an API key *or* a session cookie satisfies them. The scheme list is computed once and applied uniformly:
 
 ```csharp
-.AddPolicy(AuthConstants.ServicePolicy,  p => p.AddAuthenticationSchemes("ApiKey","IngestSession").RequireAuthenticatedUser())
-.AddPolicy(AuthConstants.OperatorPolicy, p => p.AddAuthenticationSchemes("ApiKey","IngestSession").RequireRole("Operator","Admin"))
-.AddPolicy(AuthConstants.AdminPolicy,    p => p.AddAuthenticationSchemes("ApiKey","IngestSession").RequireRole("Admin"));
+var schemes = sso.EnableSso ? new[] { "ApiKey", "IngestSession" } : new[] { "ApiKey" };
+
+authz.AddPolicy(AuthConstants.ServicePolicy, p => { p.AddAuthenticationSchemes(schemes); p.RequireAuthenticatedUser(); });
+foreach (var capability in Capabilities.All)
+    authz.AddPolicy(capability, p => { p.AddAuthenticationSchemes(schemes); p.RequireAuthenticatedUser(); p.AddRequirements(new CapabilityRequirement(capability)); });
 ```
 
-When SSO is **off**, the `IngestSession` scheme is never registered, so naming it is a no-op and the policies behave exactly as the API-key-only build.
+When SSO is **off**, the `IngestSession` scheme is never registered, so it is simply omitted from the list and the policies behave exactly as the API-key-only build.
 
 ### Auth endpoints
 

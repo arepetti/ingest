@@ -69,23 +69,12 @@ public static class SsoSignIn
         account is { IsDeleted: false, Enabled: true, Kind: AccountKind.User };
 
     /// <summary>
-    /// Construct the canonical principal carrying exactly the six claims the API-key handler emits
-    /// (plus the optional label), tagged with the cookie scheme.
+    /// Construct the canonical principal (identity, role, optional label and capability claims —
+    /// the same set the API-key handler emits), tagged with the cookie scheme.
     /// </summary>
     private static ClaimsPrincipal BuildCanonicalPrincipal(Account account)
     {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, account.Id.ToString()),
-            new(ClaimTypes.Name, account.Name),
-            new(AuthConstants.AccountIdClaim, account.Id.ToString()),
-            new(AuthConstants.AccountNameClaim, account.Name),
-            new(AuthConstants.KindClaim, account.Kind.ToString()),
-            new(ClaimTypes.Role, account.Role.ToString()),
-        };
-        if (!string.IsNullOrEmpty(account.Label))
-            claims.Add(new Claim(AuthConstants.AccountLabelClaim, account.Label));
-
+        var claims = IngestClaims.Build(account);
         var identity = new ClaimsIdentity(claims, AuthConstants.SessionScheme, ClaimTypes.Name, ClaimTypes.Role);
         return new ClaimsPrincipal(identity);
     }

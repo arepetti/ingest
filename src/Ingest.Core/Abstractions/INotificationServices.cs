@@ -12,12 +12,18 @@ public sealed record NotificationRuleUpdate(bool Enabled, bool NotifyServiceAcco
 /// <param name="Upcoming">Upcoming-reminder rule.</param>
 /// <param name="Missed">Missed-alert rule.</param>
 /// <param name="Warnings">Warnings-notice rule.</param>
+/// <param name="PendingApproval">Pending-approval notice rule.</param>
+/// <param name="Approved">Approved-notice rule.</param>
+/// <param name="Rejected">Rejected-notice rule.</param>
 /// <param name="UpcomingLeadHours">Lead time before a window closes that an upcoming reminder fires.</param>
 /// <param name="AdminRecipientAccountIds">Accounts that receive the admin-list copy.</param>
 public sealed record NotificationSettingsUpdate(
     NotificationRuleUpdate Upcoming,
     NotificationRuleUpdate Missed,
     NotificationRuleUpdate Warnings,
+    NotificationRuleUpdate PendingApproval,
+    NotificationRuleUpdate Approved,
+    NotificationRuleUpdate Rejected,
     int UpcomingLeadHours,
     IReadOnlyList<Guid> AdminRecipientAccountIds);
 
@@ -49,6 +55,25 @@ public interface INotificationService
 {
     /// <summary>Run every enabled trigger once and enqueue any resulting emails.</summary>
     Task<NotificationRunResult> RunAsync(CancellationToken ct = default);
+}
+
+/// <summary>
+/// Event-driven approval notifications. Unlike the scheduled <see cref="INotificationService"/>
+/// triggers, these are fired synchronously by the submission service the moment a submission is
+/// held pending, approved, or rejected — approval latency makes a polling job a poor fit. Every
+/// method is best-effort: it self-gates on the email master switch and the relevant per-trigger
+/// rule, and never throws into the calling write path.
+/// </summary>
+public interface IApprovalNotificationService
+{
+    /// <summary>Notify that a submission is now held awaiting approval (designated approvers + configured copies).</summary>
+    Task NotifyPendingAsync(Submission submission, CancellationToken ct = default);
+
+    /// <summary>Notify that a pending submission was approved and is now live.</summary>
+    Task NotifyApprovedAsync(Submission submission, CancellationToken ct = default);
+
+    /// <summary>Notify that a pending submission was rejected, carrying the reviewer's reason if supplied.</summary>
+    Task NotifyRejectedAsync(Submission submission, string? reason, CancellationToken ct = default);
 }
 
 /// <summary>
