@@ -431,6 +431,8 @@ The settings the deployment commands above pass — and every other knob you can
 - **Recommended behind any reverse proxy:** `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`.
 - **Optional but useful:** the OpenTelemetry / Application Insights variables for telemetry.
 
+For expected throughput, data volume, and response times on the footprint above, see [performance.md](performance.md).
+
 ## Network controls
 
 Ingest authenticates every request with an API key, but it deliberately does **not** implement request/rate limiting or IP allow-listing in-app. These are network-layer concerns and belong in the platform that fronts the container — its ingress, an API gateway, or a reverse proxy. Handle them where you deploy:

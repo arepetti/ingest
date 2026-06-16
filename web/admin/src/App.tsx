@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { SchemasPage } from './pages/SchemasPage'
 import { SchemaEditPage } from './pages/SchemaEditPage'
 import { SchemaHistoryPage } from './pages/SchemaHistoryPage'
+import { SchemaVersionHistoryPage } from './pages/SchemaVersionHistoryPage'
 import { ServicesPage } from './pages/ServicesPage'
 import { ServiceStatusPage } from './pages/ServiceStatusPage'
 import { SubmissionsPage } from './pages/SubmissionsPage'
@@ -34,6 +35,8 @@ export default function App() {
         <Route path="/schemas/new" element={<SchemaEditPage />} />
         <Route path="/schemas/:name/edit" element={<SchemaEditPage />} />
         <Route path="/schemas/:name/history" element={<SchemaHistoryPage />} />
+        <Route path="/schemas/:name/versions" element={<SchemaVersionHistoryPage />} />
+        <Route path="/schemas/:name/versions/:entryId" element={<SchemaEditPage readOnly />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/services/:name/status" element={<ServiceStatusPage />} />
         <Route path="/submissions" element={<SubmissionsPage />} />

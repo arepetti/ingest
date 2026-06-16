@@ -187,6 +187,51 @@ public interface ISchemaRepository
     Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Persistence boundary for <see cref="SchemaVersionHistory"/> snapshots. The store is append-only
+/// in normal operation (one row per schema save), but admins may permanently delete individual
+/// entries or a schema's whole history to reclaim space — there is no soft-delete here.
+/// </summary>
+public interface ISchemaVersionHistoryRepository
+{
+    /// <summary>Append a new snapshot.</summary>
+    /// <param name="entry">The snapshot to persist.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task AddAsync(SchemaVersionHistory entry, CancellationToken ct = default);
+
+    /// <summary>Page through one schema's history, newest change first, with an optional date window.</summary>
+    /// <param name="schemaName">Machine-style schema name.</param>
+    /// <param name="request">Paging parameters.</param>
+    /// <param name="from">Lower bound on the change date (inclusive) when set.</param>
+    /// <param name="to">Upper bound on the change date (exclusive) when set.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A page of snapshots with the total count.</returns>
+    Task<PagedResult<SchemaVersionHistory>> ListAsync(
+        string schemaName,
+        PageRequest request,
+        DateTime? from = null,
+        DateTime? to = null,
+        CancellationToken ct = default);
+
+    /// <summary>Fetch a single snapshot by id.</summary>
+    /// <param name="id">Snapshot id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The snapshot, or <c>null</c>.</returns>
+    Task<SchemaVersionHistory?> GetByIdAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Permanently remove one snapshot. Idempotent.</summary>
+    /// <param name="id">Snapshot id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns><c>true</c> when a row was removed.</returns>
+    Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Permanently remove every snapshot for a schema.</summary>
+    /// <param name="schemaName">Machine-style schema name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of rows removed.</returns>
+    Task<long> DeleteAllForSchemaAsync(string schemaName, CancellationToken ct = default);
+}
+
 /// <summary>Persistence boundary for <see cref="Submission"/> aggregates.</summary>
 public interface ISubmissionRepository
 {
@@ -212,6 +257,16 @@ public interface ISubmissionRepository
         DateTime? to = null,
         string? schemaName = null,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Count the live (non-deleted) submissions that contain at least one sample for the named
+    /// schema. Used to snapshot "submissions at this point" in the version history and to gate the
+    /// "move back to Draft" affordance in the editor.
+    /// </summary>
+    /// <param name="schemaName">Machine-style schema name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of matching submissions.</returns>
+    Task<long> CountBySchemaAsync(string schemaName, CancellationToken ct = default);
 
     /// <summary>Insert a new submission.</summary>
     /// <param name="submission">Submission to persist.</param>

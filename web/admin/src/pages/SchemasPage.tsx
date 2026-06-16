@@ -9,7 +9,7 @@ import {
 } from '@fluentui/react-components'
 import {
   Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, ChartMultiple20Regular,
-  Copy20Regular, Delete20Regular, Edit20Regular, MoreHorizontal20Regular,
+  Copy20Regular, Delete20Regular, Edit20Regular, History20Regular, MoreHorizontal20Regular,
 } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import type { Account, Schema, UpsertSchemaRequest } from '../api/types'
@@ -152,6 +152,10 @@ export function SchemasPage() {
   function historyFromView(sc: Schema) {
     setViewing(null)
     nav(`/schemas/${encodeURIComponent(sc.name)}/history`)
+  }
+  function versionsFromView(sc: Schema) {
+    setViewing(null)
+    nav(`/schemas/${encodeURIComponent(sc.name)}/versions`)
   }
   function deleteFromView(sc: Schema) {
     if (!confirmDelete('schema', sc.label || sc.name)) return
@@ -325,6 +329,11 @@ export function SchemasPage() {
                           label: 'View historical data',
                           icon: <ChartMultiple20Regular />,
                           onClick: () => nav(`/schemas/${encodeURIComponent(sc.name)}/history`),
+                        }, {
+                          key: 'versions',
+                          label: 'View version history',
+                          icon: <History20Regular />,
+                          onClick: () => nav(`/schemas/${encodeURIComponent(sc.name)}/versions`),
                         }]
                       : []),
                     { key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(sc) },
@@ -389,9 +398,31 @@ export function SchemasPage() {
               </MenuPopover>
             </Menu>
             {isAdmin && (
-              <ToolbarButton icon={<ChartMultiple20Regular />} onClick={() => historyFromView(viewing)}>
-                View historical data
-              </ToolbarButton>
+              // Default action stays "view historical data"; the chevron exposes "view version history".
+              <Menu positioning="below-end">
+                <MenuTrigger disableButtonEnhancement>
+                  {(triggerProps) => (
+                    <SplitButton
+                      menuButton={triggerProps}
+                      primaryActionButton={{ onClick: () => historyFromView(viewing) }}
+                      appearance="subtle"
+                      icon={<ChartMultiple20Regular />}
+                    >
+                      View historical data
+                    </SplitButton>
+                  )}
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    <MenuItem icon={<ChartMultiple20Regular />} onClick={() => historyFromView(viewing)}>
+                      View historical data
+                    </MenuItem>
+                    <MenuItem icon={<History20Regular />} onClick={() => versionsFromView(viewing)}>
+                      View version history
+                    </MenuItem>
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
             )}
             <ToolbarButton icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>Delete</ToolbarButton>
           </Toolbar>

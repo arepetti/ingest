@@ -145,4 +145,43 @@ public interface ISchemaService
     /// submitted samples returns a non-null result with empty bucket lists.
     /// </returns>
     Task<SchemaHistory?> GetHistoryAsync(string name, CancellationToken ct = default);
+
+    /// <summary>Page through a schema's saved version snapshots, newest change first.</summary>
+    /// <param name="name">Machine-style schema name.</param>
+    /// <param name="request">Paging parameters.</param>
+    /// <param name="from">Lower bound on the change date (inclusive) when set.</param>
+    /// <param name="to">Upper bound on the change date (exclusive) when set.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A page of snapshots with the total count.</returns>
+    Task<PagedResult<SchemaVersionHistory>> GetVersionHistoryAsync(
+        string name,
+        PageRequest request,
+        DateTime? from = null,
+        DateTime? to = null,
+        CancellationToken ct = default);
+
+    /// <summary>Fetch a single version snapshot by id (the full schema at that point in time).</summary>
+    /// <param name="entryId">Snapshot id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The snapshot, or <c>null</c> if it doesn't exist.</returns>
+    Task<SchemaVersionHistory?> GetVersionSnapshotAsync(Guid entryId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Permanently delete a single version-history entry. Records an audit-log Delete against the
+    /// schema. Never affects the live schema.
+    /// </summary>
+    /// <param name="name">Machine-style schema name the entry belongs to.</param>
+    /// <param name="entryId">Snapshot id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns><c>true</c> when an entry was removed; <c>false</c> when none matched.</returns>
+    Task<bool> DeleteVersionEntryAsync(string name, Guid entryId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Permanently delete the entire version history for a schema. Records an audit-log Delete
+    /// against the schema. Never affects the live schema.
+    /// </summary>
+    /// <param name="name">Machine-style schema name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of entries removed.</returns>
+    Task<long> DeleteVersionHistoryAsync(string name, CancellationToken ct = default);
 }

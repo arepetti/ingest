@@ -15,14 +15,24 @@ public class SchemaServiceTests
     private static SchemaService NewService(out FakeSchemaRepo repo)
     {
         repo = new FakeSchemaRepo();
-        return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService());
+        return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService(),
+            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new ImmediateClock());
     }
 
     private static SchemaService NewService(out FakeSchemaRepo repo, out FakeEmptySampleRepo samples)
     {
         repo = new FakeSchemaRepo();
         samples = new FakeEmptySampleRepo();
-        return new SchemaService(repo, samples, new NoopAuditLogService());
+        return new SchemaService(repo, samples, new NoopAuditLogService(),
+            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new ImmediateClock());
+    }
+
+    private static SchemaService NewServiceWithVersions(out FakeSchemaRepo repo, out FakeVersionHistoryRepo versions)
+    {
+        repo = new FakeSchemaRepo();
+        versions = new FakeVersionHistoryRepo();
+        return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService(),
+            versions, new FakeSubmissionCountRepo(), new ImmediateClock());
     }
 
     private static Schema NewSchema(string name = "demo", int version = 1) => new()
@@ -101,6 +111,85 @@ public class SchemaServiceTests
         var svc = NewService(out _);
         var s = NewSchema(version: -1);
         await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(s));
+    }
+
+    // ── Version history snapshots ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Create_records_initial_history_snapshot()
+    {
+        var svc = NewServiceWithVersions(out _, out var versions);
+        var created = await svc.CreateAsync(NewSchema());
+
+        var entry = Assert.Single(versions.Entries);
+        Assert.Null(entry.OldVersion);
+        Assert.Equal(1, entry.NewVersion);
+        Assert.False(entry.VersionBumped);
+        Assert.True(entry.Enabled);
+        Assert.Equal(0, entry.SubmissionCount);
+        Assert.Equal(created.Id, entry.SchemaId);
+        Assert.Equal(created.Values.Count, entry.Snapshot.Values.Count);
+    }
+
+    [Fact]
+    public async Task Update_records_history_snapshot_with_old_and_new_version()
+    {
+        var svc = NewServiceWithVersions(out _, out var versions);
+        var created = await svc.CreateAsync(NewSchema());
+
+        var update = NewSchema(version: 2);
+        await svc.UpdateAsync(created.Id, update);
+
+        Assert.Equal(2, versions.Entries.Count);
+        // Newest entry (the update) records the bump 1 → 2.
+        var latest = versions.Entries.Last();
+        Assert.Equal(1, latest.OldVersion);
+        Assert.Equal(2, latest.NewVersion);
+        Assert.True(latest.VersionBumped);
+    }
+
+    [Fact]
+    public async Task Update_without_version_change_records_unbumped_history_entry()
+    {
+        var svc = NewServiceWithVersions(out _, out var versions);
+        var created = await svc.CreateAsync(NewSchema());
+
+        var update = NewSchema();
+        update.Label = "Renamed";
+        await svc.UpdateAsync(created.Id, update);
+
+        var latest = versions.Entries.Last();
+        Assert.Equal(1, latest.OldVersion);
+        Assert.Equal(1, latest.NewVersion);
+        Assert.False(latest.VersionBumped);
+    }
+
+    [Fact]
+    public async Task Delete_version_entry_removes_only_that_snapshot()
+    {
+        var svc = NewServiceWithVersions(out _, out var versions);
+        var created = await svc.CreateAsync(NewSchema());
+        await svc.UpdateAsync(created.Id, NewSchema(version: 2));
+        var target = versions.Entries.First();
+
+        var removed = await svc.DeleteVersionEntryAsync(created.Name, target.Id, default);
+
+        Assert.True(removed);
+        Assert.Single(versions.Entries);
+        Assert.DoesNotContain(versions.Entries, e => e.Id == target.Id);
+    }
+
+    [Fact]
+    public async Task Delete_version_history_clears_all_snapshots_for_the_schema()
+    {
+        var svc = NewServiceWithVersions(out _, out var versions);
+        var created = await svc.CreateAsync(NewSchema());
+        await svc.UpdateAsync(created.Id, NewSchema(version: 2));
+
+        var removed = await svc.DeleteVersionHistoryAsync(created.Name, default);
+
+        Assert.Equal(2, removed);
+        Assert.Empty(versions.Entries);
     }
 
     // ── SinceVersion bounds ─────────────────────────────────────────────────────────────────
@@ -584,4 +673,58 @@ public class SchemaServiceTests
         public Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default) => Task.FromResult(0L);
         public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
     }
+
+    /// <summary>In-memory version-history store exposing the captured snapshots to assertions.</summary>
+    private sealed class FakeVersionHistoryRepo : ISchemaVersionHistoryRepository
+    {
+        public List<SchemaVersionHistory> Entries { get; } = new();
+
+        public Task AddAsync(SchemaVersionHistory entry, CancellationToken ct = default)
+        {
+            Entries.Add(entry);
+            return Task.CompletedTask;
+        }
+
+        public Task<PagedResult<SchemaVersionHistory>> ListAsync(string schemaName, PageRequest request, DateTime? from = null, DateTime? to = null, CancellationToken ct = default)
+        {
+            var hits = Entries.Where(e => e.SchemaName == schemaName).OrderByDescending(e => e.ChangeDate).ToList();
+            return Task.FromResult(new PagedResult<SchemaVersionHistory>(hits, hits.Count, request.Page, request.PageSize));
+        }
+
+        public Task<SchemaVersionHistory?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
+            Task.FromResult(Entries.FirstOrDefault(e => e.Id == id));
+
+        public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default) =>
+            Task.FromResult(Entries.RemoveAll(e => e.Id == id) > 0);
+
+        public Task<long> DeleteAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
+            Task.FromResult((long)Entries.RemoveAll(e => e.SchemaName == schemaName));
+    }
+
+    /// <summary>Submission repo stub that only needs to answer the per-schema count (always 0 here).</summary>
+    private sealed class FakeSubmissionCountRepo : ISubmissionRepository
+    {
+        public Task<long> CountBySchemaAsync(string schemaName, CancellationToken ct = default) => Task.FromResult(0L);
+
+        public Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) =>
+            Task.FromResult<Submission?>(null);
+        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, CancellationToken ct = default) =>
+            Task.FromResult(new PagedResult<Submission>(Array.Empty<Submission>(), 0, 1, 0));
+        public Task AddAsync(Submission submission, CancellationToken ct = default) => Task.CompletedTask;
+        public Task UpdateAsync(Submission submission, CancellationToken ct = default) => Task.CompletedTask;
+        public Task SoftDeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<IReadOnlyList<Submission>> ListByServiceAsync(Guid serviceId, bool includeDeleted = false, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Submission>>(Array.Empty<Submission>());
+        public Task<long> HardDeleteByServiceAsync(Guid serviceId, CancellationToken ct = default) => Task.FromResult(0L);
+        public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) => Task.FromResult(0L);
+    }
+
+    /// <summary>Audit context that just reads the wall clock; no authenticated actor.</summary>
+    private sealed class ImmediateClock : IAuditContext
+    {
+        public string? UserName => null;
+        public Guid? AccountId => null;
+        public DateTime UtcNow => DateTime.UtcNow;
+    }
 }
+

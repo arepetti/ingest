@@ -25,16 +25,31 @@ public sealed class SchemaService : ISchemaService
     private readonly ISchemaRepository _schemas;
     private readonly ISampleRepository _samples;
     private readonly IAuditLogService _audit;
+    private readonly ISchemaVersionHistoryRepository _versions;
+    private readonly ISubmissionRepository _submissions;
+    private readonly IAuditContext _auditContext;
 
     /// <summary>Create a new <see cref="SchemaService"/>.</summary>
     /// <param name="schemas">Schema repository.</param>
     /// <param name="samples">Sample projection repository (used only by the history aggregation).</param>
     /// <param name="audit">Audit log used to record create/edit/delete changes.</param>
-    public SchemaService(ISchemaRepository schemas, ISampleRepository samples, IAuditLogService audit)
+    /// <param name="versions">Version-history repository — receives a full snapshot on every save.</param>
+    /// <param name="submissions">Submission repository, used to snapshot the submission count at save time.</param>
+    /// <param name="auditContext">Ambient who/when context for stamping the snapshot author + timestamp.</param>
+    public SchemaService(
+        ISchemaRepository schemas,
+        ISampleRepository samples,
+        IAuditLogService audit,
+        ISchemaVersionHistoryRepository versions,
+        ISubmissionRepository submissions,
+        IAuditContext auditContext)
     {
         _schemas = schemas;
         _samples = samples;
         _audit = audit;
+        _versions = versions;
+        _submissions = submissions;
+        _auditContext = auditContext;
     }
 
     /// <inheritdoc />
@@ -87,6 +102,9 @@ public sealed class SchemaService : ISchemaService
 
         await _schemas.AddAsync(input, ct);
         await _audit.RecordAsync(AuditTargetType.Schema, AuditChangeType.Create, input.Id, input.Name, ct);
+        // A brand-new schema cannot have any live submissions yet (any tombstoned ones were
+        // soft-deleted), so the snapshot's submission count is 0 and there is no "old" version.
+        await RecordHistoryAsync(input, oldVersion: null, versionBumped: false, submissionCount: 0, ct);
         return input;
     }
 
@@ -102,6 +120,9 @@ public sealed class SchemaService : ISchemaService
             {
                 $"Schema version cannot be decreased (was {existing.Version}, got {input.Version}).",
             });
+
+        // Capture the version before we overwrite it so the history snapshot can record old → new.
+        var oldVersion = existing.Version;
 
         // Rename collision: same treatment as Create. If the new name is held by a live schema
         // we reject; if it's held by a soft-deleted one we hard-delete the tombstone so the
@@ -139,8 +160,65 @@ public sealed class SchemaService : ISchemaService
 
         await _schemas.UpdateAsync(existing, ct);
         await _audit.RecordAsync(AuditTargetType.Schema, AuditChangeType.Edit, existing.Id, existing.Name, ct);
+        var submissionCount = await _submissions.CountBySchemaAsync(existing.Name, ct);
+        await RecordHistoryAsync(existing, oldVersion, versionChanged, submissionCount, ct);
         return existing;
     }
+
+    /// <summary>
+    /// Persist a full snapshot of <paramref name="schema"/> to the version history. Called after a
+    /// successful create/update so the admin "version history" page can show who saved what, when,
+    /// the version before/after, whether it was Published (Enabled) or Draft, and how many
+    /// submissions existed at that point — and so "view this version" can reconstruct the schema.
+    /// </summary>
+    private Task RecordHistoryAsync(Schema schema, int? oldVersion, bool versionBumped, long submissionCount, CancellationToken ct)
+    {
+        var entry = new SchemaVersionHistory
+        {
+            SchemaId = schema.Id,
+            SchemaName = schema.Name,
+            ChangeDate = _auditContext.UtcNow,
+            AuthorId = _auditContext.AccountId,
+            AuthorName = _auditContext.UserName,
+            OldVersion = oldVersion,
+            NewVersion = schema.Version,
+            VersionBumped = versionBumped,
+            Enabled = schema.Enabled,
+            SubmissionCount = submissionCount,
+            Snapshot = CloneSchema(schema),
+        };
+        return _versions.AddAsync(entry, ct);
+    }
+
+    /// <summary>
+    /// Deep-copy a schema for an immutable history snapshot. The live entity keeps being mutated on
+    /// later saves, so the snapshot must not share its <see cref="Schema.Values"/> /
+    /// <see cref="Schema.Layout"/> lists.
+    /// </summary>
+    private static Schema CloneSchema(Schema s) => new()
+    {
+        Id = s.Id,
+        Name = s.Name,
+        Label = s.Label,
+        Description = s.Description,
+        Notes = s.Notes,
+        Modifiable = s.Modifiable,
+        Enabled = s.Enabled,
+        SubmissionValidations = s.SubmissionValidations.ToList(),
+        IsGlobal = s.IsGlobal,
+        ServiceIds = s.ServiceIds.ToList(),
+        Values = s.Values.Select(CloneValue).ToList(),
+        Layout = s.Layout.Select(CloneLayoutNode).ToList(),
+        Version = s.Version,
+        VersionModifiedAt = s.VersionModifiedAt,
+        CreatedAt = s.CreatedAt,
+        CreatedBy = s.CreatedBy,
+        ModifiedAt = s.ModifiedAt,
+        ModifiedBy = s.ModifiedBy,
+        IsDeleted = s.IsDeleted,
+        DeletedAt = s.DeletedAt,
+        DeletedBy = s.DeletedBy,
+    };
 
     /// <inheritdoc />
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
@@ -446,5 +524,41 @@ public sealed class SchemaService : ISchemaService
                 .ToList())).ToList();
 
         return new SchemaHistory(schema.Name, schema.Label, valueHistories);
+    }
+
+    /// <inheritdoc />
+    public Task<PagedResult<SchemaVersionHistory>> GetVersionHistoryAsync(
+        string name, PageRequest request, DateTime? from = null, DateTime? to = null, CancellationToken ct = default) =>
+        _versions.ListAsync(name, request, from, to, ct);
+
+    /// <inheritdoc />
+    public Task<SchemaVersionHistory?> GetVersionSnapshotAsync(Guid entryId, CancellationToken ct = default) =>
+        _versions.GetByIdAsync(entryId, ct);
+
+    /// <inheritdoc />
+    public async Task<bool> DeleteVersionEntryAsync(string name, Guid entryId, CancellationToken ct = default)
+    {
+        var entry = await _versions.GetByIdAsync(entryId, ct);
+        // Guard against deleting an entry that belongs to a different schema (defensive — the
+        // route already scopes by name).
+        if (entry is null || !string.Equals(entry.SchemaName, name, StringComparison.Ordinal))
+            return false;
+
+        var removed = await _versions.DeleteAsync(entryId, ct);
+        if (removed)
+            await _audit.RecordAsync(AuditTargetType.SchemaHistory, AuditChangeType.Delete, entry.SchemaId, name, ct);
+        return removed;
+    }
+
+    /// <inheritdoc />
+    public async Task<long> DeleteVersionHistoryAsync(string name, CancellationToken ct = default)
+    {
+        // Resolve the schema id for the audit entry; fall back to the live schema lookup so the
+        // audit row still points at the right object even if history rows were already gone.
+        var schema = await _schemas.GetByNameAsync(name, includeDeleted: true, ct);
+        var removed = await _versions.DeleteAllForSchemaAsync(name, ct);
+        if (removed > 0)
+            await _audit.RecordAsync(AuditTargetType.SchemaHistory, AuditChangeType.Delete, schema?.Id ?? Guid.Empty, name, ct);
+        return removed;
     }
 }

@@ -22,7 +22,7 @@ Go to [**setup/powerbi.md**](setup/powerbi.md). It covers the OData feed, sample
 
 ### "I deploy the service"
 
-[**setup/hosting.md**](setup/hosting.md) walks through an Azure Container Apps + Cosmos DB for MongoDB (vCore) deployment step by step, with alternatives for App Service, AKS, and self-hosted MongoDB. The companion [**setup/configuration.md**](setup/configuration.md) is the reference for every setting the app reads.
+[**setup/hosting.md**](setup/hosting.md) walks through an Azure Container Apps + Cosmos DB for MongoDB (vCore) deployment step by step, with alternatives for App Service, AKS, and self-hosted MongoDB. The companion [**setup/configuration.md**](setup/configuration.md) is the reference for every setting the app reads. [**setup/performance.md**](setup/performance.md) states the expected workload and response times for a typical deployment on that hosting footprint.
 
 ### "I'm a maintainer / contributor"
 
@@ -39,7 +39,7 @@ Read [**gdpr.md**](gdpr.md). It describes the EU GDPR features the product provi
 | [admin-user-guide/](admin-user-guide/README.md)                     | Walkthrough of the admin SPA: accounts, schemas (incl. multi-line validation, `Enabled if` / `Visible if` / `Warning`), submissions, on-behalf-of editing, **reports** (HTML+Liquid templates), validation rule reference, troubleshooting. |
 | [architecture/](architecture/README.md)                             | System overview: solution layout, domain model, request flow, validation pipeline, cadence, Mongo, Aspire, configuration, plus the auth model end-to-end. |
 | [client/](client/README.md)                                         | Everything a service-side developer needs: how to obtain a key, how to use it, full API reference. |
-| [setup/](setup/README.md)                                           | Production deployment to Azure, full configuration reference, plus connecting PowerBI / OData clients. |
+| [setup/](setup/README.md)                                           | Production deployment to Azure, full configuration reference, capacity/performance expectations, plus connecting PowerBI / OData clients. |
 | [gdpr.md](gdpr.md)                                                  | Data-protection (EU GDPR; UK GDPR / DPA 2018 equivalent) features: erasure, retention purge, personal-data export, and what's out of scope. |
 
 ## Conventions used across the docs

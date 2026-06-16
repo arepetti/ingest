@@ -306,6 +306,71 @@ public sealed record UpsertSchemaRequest(
     List<SchemaLayoutNodeDto>? Layout = null,
     int Version = 1);
 
+/// <summary>One row in a schema's version history: metadata about a single save, without the snapshot.</summary>
+/// <param name="Id">Snapshot id.</param>
+/// <param name="SchemaId">Id of the live schema this snapshot belongs to.</param>
+/// <param name="SchemaName">Schema name at the time of the save.</param>
+/// <param name="ChangeDate">When the save happened (UTC).</param>
+/// <param name="AuthorId">Id of the account that performed the save, or <c>null</c>.</param>
+/// <param name="AuthorName">Name of the account that performed the save, or <c>null</c>.</param>
+/// <param name="OldVersion">Version before this save; <c>null</c> for the initial create.</param>
+/// <param name="NewVersion">Version after this save.</param>
+/// <param name="VersionBumped">Whether the version number changed in this save.</param>
+/// <param name="Enabled">Whether the schema was Published (Enabled) at this point; <c>false</c> means Draft.</param>
+/// <param name="SubmissionCount">Number of submissions for this schema at the time of the save.</param>
+public sealed record SchemaVersionHistoryDto(
+    Guid Id,
+    Guid SchemaId,
+    string SchemaName,
+    DateTime ChangeDate,
+    Guid? AuthorId,
+    string? AuthorName,
+    int? OldVersion,
+    int NewVersion,
+    bool VersionBumped,
+    bool Enabled,
+    long SubmissionCount)
+{
+    /// <summary>Project the snapshot entity onto the metadata wire shape (no schema body).</summary>
+    public static SchemaVersionHistoryDto From(SchemaVersionHistory h) => new(
+        h.Id, h.SchemaId, h.SchemaName, h.ChangeDate, h.AuthorId, h.AuthorName,
+        h.OldVersion, h.NewVersion, h.VersionBumped, h.Enabled, h.SubmissionCount);
+}
+
+/// <summary>A version-history entry plus the full schema snapshot, used by the read-only "view this version" page.</summary>
+/// <param name="Id">Snapshot id.</param>
+/// <param name="SchemaId">Id of the live schema this snapshot belongs to.</param>
+/// <param name="SchemaName">Schema name at the time of the save.</param>
+/// <param name="ChangeDate">When the save happened (UTC).</param>
+/// <param name="AuthorId">Id of the account that performed the save, or <c>null</c>.</param>
+/// <param name="AuthorName">Name of the account that performed the save, or <c>null</c>.</param>
+/// <param name="OldVersion">Version before this save; <c>null</c> for the initial create.</param>
+/// <param name="NewVersion">Version after this save.</param>
+/// <param name="VersionBumped">Whether the version number changed in this save.</param>
+/// <param name="Enabled">Whether the schema was Published (Enabled) at this point; <c>false</c> means Draft.</param>
+/// <param name="SubmissionCount">Number of submissions for this schema at the time of the save.</param>
+/// <param name="Schema">Full snapshot of the schema as it was at this point in time.</param>
+public sealed record SchemaVersionSnapshotDto(
+    Guid Id,
+    Guid SchemaId,
+    string SchemaName,
+    DateTime ChangeDate,
+    Guid? AuthorId,
+    string? AuthorName,
+    int? OldVersion,
+    int NewVersion,
+    bool VersionBumped,
+    bool Enabled,
+    long SubmissionCount,
+    SchemaDto Schema)
+{
+    /// <summary>Project the snapshot entity, including the schema body, onto the wire shape.</summary>
+    public static SchemaVersionSnapshotDto From(SchemaVersionHistory h) => new(
+        h.Id, h.SchemaId, h.SchemaName, h.ChangeDate, h.AuthorId, h.AuthorName,
+        h.OldVersion, h.NewVersion, h.VersionBumped, h.Enabled, h.SubmissionCount,
+        SchemaDto.From(h.Snapshot));
+}
+
 /// <summary>Wire representation of one sample inside a submission.</summary>
 /// <param name="SchemaName">Schema the sample belongs to.</param>
 /// <param name="ValueName">Value inside the schema.</param>

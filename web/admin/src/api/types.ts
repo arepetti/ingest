@@ -493,7 +493,7 @@ export type AuditChangeType = 'Create' | 'Edit' | 'Delete'
  * The type of object an audit entry targets. 'User' and 'Account' are both accounts, told apart
  * by the account's kind at the time of the change.
  */
-export type AuditTargetType = 'User' | 'Account' | 'Schema' | 'ApiKey' | 'Submission' | 'Report'
+export type AuditTargetType = 'User' | 'Account' | 'Schema' | 'ApiKey' | 'Submission' | 'Report' | 'SchemaHistory'
 
 /** A single audit-log entry: who changed what, when, and how. */
 export interface AuditLog {
@@ -529,6 +529,32 @@ export interface SchemaHistory {
   schemaName: string
   label?: string | null
   values: SchemaValueHistory[]
+}
+
+/** One row in a schema's version history: metadata about a single save (no schema body). */
+export interface SchemaVersionHistoryEntry {
+  id: string
+  schemaId: string
+  schemaName: string
+  /** ISO-8601 timestamp of when the save happened. */
+  changeDate: string
+  authorId?: string | null
+  authorName?: string | null
+  /** Version before this save; null for the initial create. */
+  oldVersion?: number | null
+  /** Version after this save. */
+  newVersion: number
+  /** Whether the version number changed in this save. */
+  versionBumped: boolean
+  /** Whether the schema was Published (Enabled) at this point; false means Draft. */
+  enabled: boolean
+  /** Number of submissions for this schema at the time of the save. */
+  submissionCount: number
+}
+
+/** A version-history entry plus the full schema snapshot (for the read-only "view this version" page). */
+export interface SchemaVersionSnapshot extends SchemaVersionHistoryEntry {
+  schema: Schema
 }
 
 /**

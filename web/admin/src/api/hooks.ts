@@ -5,7 +5,7 @@ import type {
   ErasureMode, ErasureResult,
   ApiKey, GeneratedApiKey,
   Cadence,
-  Schema, SchemaHistory, UpsertSchemaRequest,
+  Schema, SchemaHistory, SchemaVersionHistoryEntry, SchemaVersionSnapshot, UpsertSchemaRequest,
   Submission, AdminSubmissionInput, SampleInput, ServiceStatus, Me, Paged,
   SubmissionWriteResponse, BulkImportRequest, BulkImportResult, BackupImportResult,
   MissingByCadence, MissingPeriodReport, MissingHistory,
@@ -250,6 +250,58 @@ export const useSchemaHistory = (name?: string) =>
     queryFn: () => api.get<SchemaHistory>(`/api/admin/schemas/${encodeURIComponent(name!)}/history`),
     enabled: !!name,
   })
+
+/** Page through a schema's saved version snapshots (newest change first), with an optional period window. */
+export const useSchemaVersionHistory = (
+  name: string | undefined,
+  params: { page: number; pageSize: number; from?: string; to?: string },
+  enabled: boolean = true,
+) => {
+  const search = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize) })
+  if (params.from) search.set('from', params.from)
+  if (params.to)   search.set('to', params.to)
+  return useQuery({
+    queryKey: ['schema-version-history', name, params],
+    queryFn: () => api.get<Paged<SchemaVersionHistoryEntry>>(`/api/admin/schemas/${encodeURIComponent(name!)}/version-history?${search}`),
+    enabled: !!name && enabled,
+  })
+}
+
+/** Walk every page of a schema's version history for a CSV export (honours the period filter). */
+export const fetchAllSchemaVersionHistory = (name: string, params?: { from?: string; to?: string }) => {
+  const search = new URLSearchParams()
+  if (params?.from) search.set('from', params.from)
+  if (params?.to)   search.set('to', params.to)
+  return fetchAllPaged<SchemaVersionHistoryEntry>(`/api/admin/schemas/${encodeURIComponent(name)}/version-history`, search)
+}
+
+/** Fetch a single version snapshot (full schema at that point in time) for the read-only view. */
+export const useSchemaVersionSnapshot = (name?: string, entryId?: string) =>
+  useQuery({
+    queryKey: ['schema-version-snapshot', name, entryId],
+    queryFn: () => api.get<SchemaVersionSnapshot>(`/api/admin/schemas/${encodeURIComponent(name!)}/version-history/${entryId}`),
+    enabled: !!name && !!entryId,
+  })
+
+/** Permanently delete one version-history entry (audited server-side). */
+export const useDeleteSchemaVersionEntry = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ name, entryId }: { name: string; entryId: string }) =>
+      api.delete<void>(`/api/admin/schemas/${encodeURIComponent(name)}/version-history/${entryId}`),
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['schema-version-history', v.name] }),
+  })
+}
+
+/** Permanently delete a schema's entire version history (audited server-side). */
+export const useDeleteSchemaVersionHistory = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name: string) =>
+      api.delete<void>(`/api/admin/schemas/${encodeURIComponent(name)}/version-history`),
+    onSuccess: (_d, name) => qc.invalidateQueries({ queryKey: ['schema-version-history', name] }),
+  })
+}
 
 export const useSubmissions = (
   params: { page: number; pageSize: number; serviceId?: string; schemaName?: string; from?: string; to?: string },

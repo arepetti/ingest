@@ -9,6 +9,7 @@ Operations-side documentation: standing up the service and hooking reporting too
 | [configuration.md](configuration.md)  | Full reference for every configurable setting — connection string, API-key pepper and header, application behaviour, hosting/observability variables. |
 | [powerbi.md](powerbi.md)              | Connecting Power BI (or any OData v4 client) to the `/odata/samples` feed. Custom-header auth recipe, pre-filtering, data-model tips, refresh schedules. |
 | [excel.md](excel.md)                  | Connecting Excel (Get & Transform / Power Query) to the `/odata/samples` feed — the cheapest analyst on-ramp using existing Microsoft 365. Header recipe, key-in-parameter, flattening, PivotTables, refresh. |
+| [performance.md](performance.md)      | Expected workload, throughput, and response times for a typical council deployment on the standard Azure hosting setup — data volume, QPS, latencies, and when to revisit sizing. |
 
 ## Related reading
 

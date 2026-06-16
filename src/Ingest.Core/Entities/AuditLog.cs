@@ -41,6 +41,13 @@ public enum AuditTargetType
 
     /// <summary>A report.</summary>
     Report = 5,
+
+    /// <summary>
+    /// A schema version-history snapshot (an entry in the schema's saved version history). Distinct
+    /// from <see cref="Schema"/> so cleaning up history entries isn't mistaken for deleting the
+    /// live schema itself.
+    /// </summary>
+    SchemaHistory = 6,
 }
 
 /// <summary>

@@ -1,0 +1,1573 @@
+diff --git a/docs/admin-user-guide/schemas.md b/docs/admin-user-guide/schemas.md
+index 98600b9..7bc7b92 100644
+--- a/docs/admin-user-guide/schemas.md
++++ b/docs/admin-user-guide/schemas.md
+@@ -111,6 +111,20 @@ In the schema editor, scroll to **Layout (UI grouping)** below the values list:
+ - Empty sections **never appear** in the submission form or view drawer — if every descendant is hidden by `Visible if` (or simply missing from a submission), the section vanishes with them.
+ - Values left in the tray still render in the submission form, but they appear first under no heading.
+ 
++## Previewing a schema
++
++Before you save, the **Preview** button (in the editor toolbar and at the bottom of the form) opens a full-screen window that renders the submission form for the schema **exactly as you have it right now** — unsaved. Type values into it to see how the schema behaves:
++
++- **Conditional display.** Values whose `Visible if` evaluates false disappear; values whose `Enabled if` evaluates false render greyed-out with a "disabled" badge. Sections whose every value is hidden fold away, just like the real form.
++- **Warnings.** A value's `Warning` rule shows its message inline under the value as soon as it fires.
++- **Validation results.** A side panel lists, grouped by kind: missing **required** values, basic **shape** problems (min/max, lengths, regex, type), failed per-value **Value validation** rules, and failed **schema-level** rules — recomputed as you type.
++- A **Sample timestamp** picker seeds the samples and any date-based rules that read a `Date` value, and **Reset values** clears the form. Nothing here is saved.
++
++Values with a blank or duplicate name can't be referenced by rules, so the preview skips them and tells you which — give every value a unique name to preview it. Preview also works in the read-only schema view and version snapshots, so you can poke at a published or historical schema without touching it.
++
++> [!IMPORTANT]
++> **The preview is a best-effort, client-side approximation — the server is always authoritative.** Rules are translated and evaluated in your browser, so some behaviour can differ: regular expressions use the browser's engine (not .NET's), and submission helpers such as `sampleTimestamp()`, `sampleNote()`, and `serviceName()` aren't available client-side (they evaluate to empty). Treat a green preview as encouraging, not a guarantee — confirm any rule you rely on with a real submission or an API call before publishing.
++
+ ## Schema versioning
+ 
+ Every schema carries an integer **Version**. New schemas start at `1`. When you introduce a new value to an existing schema:
+diff --git a/docs/admin-user-guide/validation.md b/docs/admin-user-guide/validation.md
+index 3e8754f..614197d 100644
+--- a/docs/admin-user-guide/validation.md
++++ b/docs/admin-user-guide/validation.md
+@@ -11,6 +11,9 @@ You write rules in a tiny expression language explained below. It looks like a c
+ 
+ Long rules can be broken across multiple lines for readability — the system normalises whitespace before evaluation, so indent and line-break however helps you read them.
+ 
++> [!TIP]
++> You don't have to save and submit to try a rule out. The schema editor's **Preview** button (see [Previewing a schema](schemas.md#previewing-a-schema)) renders the live form from your unsaved schema and evaluates these rules in the browser as you type. It's a best-effort approximation — the server stays authoritative, and a few helpers (`sampleTimestamp()`, `serviceName()`) and the regex dialect differ client-side — so verify anything important with a real submission too.
++
+ ## Why bother
+ 
+ The built-in `min`, `max`, `regex` and friends are enough for the obvious shape checks. Validation rules buy you the rest:
+diff --git a/docs/architecture/architecture.md b/docs/architecture/architecture.md
+index 3bdc569..1bcaf35 100644
+--- a/docs/architecture/architecture.md
++++ b/docs/architecture/architecture.md
+@@ -186,6 +186,8 @@ The target language is selected through standard HTTP content negotiation. The S
+ 
+ Translations are deterministic functions of the source string, so the client caches them by source for the lifetime of the page; each unique rule is translated exactly once. Server-side validation remains authoritative — if translation fails or a rule references something the runtime can't resolve, the editor stays permissive (show + no warning) and the real verdict comes back with the submission response.
+ 
++The submission form and its rule machinery are factored into shared pieces — `SchemaSampleFields` (the controlled form renderer) and `utils/sampleRules.ts` (the row model, the variable context the server mirrors, gating, and the `useSampleRules` prefetch hook) — so the same translate runtime also powers the **schema editor's Preview** (`SchemaPreviewDialog`). The preview renders the live form from the in-progress, unsaved schema and additionally evaluates value-level and schema-level validations client-side (via `interpretRuleResult`, mirroring the server's accept/reject contract). It's explicitly best-effort: the dialog carries a disclaimer that the server is authoritative, since the regex dialect and submission-only helpers (`sampleTimestamp()`, `serviceName()`) differ in the browser.
++
+ ## Cadence semantics
+ 
+ `CadenceCalculator.BucketFor(cadence, timestamp)` returns the half-open `[start, end)` window that contains `timestamp` for the given cadence:
+diff --git a/web/admin/src/components/SchemaPreviewDialog.tsx b/web/admin/src/components/SchemaPreviewDialog.tsx
+new file mode 100644
+index 0000000..36ea88c
+--- /dev/null
++++ b/web/admin/src/components/SchemaPreviewDialog.tsx
+@@ -0,0 +1,325 @@
++import { useEffect, useMemo, useState } from 'react'
++import {
++  Badge, Button, Card, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
++  DialogTitle, Field, Input, MessageBar, MessageBarBody, MessageBarTitle, Text,
++  makeStyles, tokens,
++} from '@fluentui/react-components'
++import { CheckmarkCircle20Regular, Warning20Regular } from '@fluentui/react-icons'
++import type { Schema, SchemaValue } from '../api/types'
++import { SchemaSampleFields, fromLocalInput, toLocalInput } from './SchemaSampleFields'
++import {
++  interpretRuleResult, isFilled, safeEval, useSampleRules, type ValueRow,
++} from '../utils/sampleRules'
++
++const useStyles = makeStyles({
++  surface: {
++    // There is no first-class "full screen" Dialog in Fluent, so we stretch the surface to most
++    // of the viewport and let the body scroll. Wide enough for the two-column form/results split.
++    maxWidth: '96vw',
++    width: '1180px',
++    height: '92vh',
++    display: 'flex',
++    flexDirection: 'column',
++  },
++  body: { display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 },
++  content: { display: 'flex', flexDirection: 'column', gap: '12px', overflow: 'hidden', flex: 1, minHeight: 0 },
++  // Two columns on wide screens (form | results), stacking under a narrow surface.
++  grid: {
++    display: 'grid',
++    gridTemplateColumns: 'minmax(0, 2fr) minmax(300px, 1fr)',
++    gap: '16px',
++    flex: 1,
++    minHeight: 0,
++    '@media (max-width: 900px)': { gridTemplateColumns: '1fr' },
++  },
++  formCol: { overflowY: 'auto', minHeight: 0, paddingRight: '4px' },
++  resultsCol: { overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: '12px' },
++  formCard: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' },
++  pickerRow: { maxWidth: '320px' },
++  resultsCard: { padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' },
++  resultsTitle: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
++  findingList: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' },
++  finding: { display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: tokens.fontSizeBase200 },
++  findingFail: { color: tokens.colorPaletteRedForeground1, flexShrink: 0 },
++  findingOk: { color: tokens.colorPaletteGreenForeground1, flexShrink: 0 },
++  findingTarget: { fontWeight: tokens.fontWeightSemibold },
++  okBanner: { display: 'flex', gap: '8px', alignItems: 'center', color: tokens.colorPaletteGreenForeground1, fontSize: tokens.fontSizeBase200 },
++  muted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
++})
++
++/** A single problem the preview surfaces. `scope` groups them; `target` is the value label when relevant. */
++interface Finding {
++  scope: 'required' | 'shape' | 'value' | 'schema'
++  target?: string
++  message: string
++}
++
++/**
++ * Interactive, client-side preview of a schema's submission form. Renders the live form from the
++ * *unsaved* schema definition, lets the author type values, and reports — best-effort — how the
++ * schema's rules would behave: conditional display + inline warnings (via the shared form), plus
++ * a results panel covering missing-required, basic shape checks, per-value validation, and
++ * schema-level validation. The server remains authoritative; a persistent disclaimer says so.
++ */
++export function SchemaPreviewDialog({
++  schema, open, onClose,
++}: {
++  schema: Schema
++  open: boolean
++  onClose: () => void
++}) {
++  const s = useStyles()
++
++  // Default the sample timestamp to "now". Mirrors the submission editor's single-timestamp model;
++  // it also seeds Date-typed inputs that the author leaves blank in their own head.
++  const [timestamp, setTimestamp] = useState(() => new Date().toISOString())
++  const [rows, setRows] = useState<ValueRow[]>([])
++
++  // Drop values with a blank name (can't be referenced by rules) and keep only the first of any
++  // duplicate name (the server would reject a save, but the editor lets you get there transiently).
++  const { usableValues, skipped } = useMemo(() => {
++    const seen = new Set<string>()
++    const usable: SchemaValue[] = []
++    const skip: string[] = []
++    for (const v of schema.values) {
++      const name = (v.name ?? '').trim()
++      if (!name) { skip.push(v.label?.trim() || '(unnamed value)'); continue }
++      if (seen.has(name)) { skip.push(name); continue }
++      seen.add(name)
++      usable.push(v)
++    }
++    return { usableValues: usable, skipped: skip }
++  }, [schema])
++
++  // (Re)seed the row model whenever the dialog opens. We intentionally key only on `open` (not on
++  // every schema-object identity change) so typed values survive incidental re-renders; the editor
++  // isn't interactable while this modal is up, so the schema can't meaningfully change underneath.
++  useEffect(() => {
++    if (!open) return
++    setRows(usableValues.map(v => ({ name: v.name, def: v, value: null, note: '' })))
++    setTimestamp(new Date().toISOString())
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [open])
++
++  // A schema synthesized for the shared form/rule machinery, restricted to the usable values so
++  // the layout walker and rule prefetch never trip over blank/duplicate names.
++  const previewSchema = useMemo<Schema>(() => ({ ...schema, values: usableValues }), [schema, usableValues])
++
++  const { rowStates, ruleVariables, rulesReady } = useSampleRules(open ? previewSchema : undefined, rows)
++
++  function patchRow(name: string, patch: Partial<ValueRow>) {
++    setRows(rs => rs.map(r => r.name === name ? { ...r, ...patch } : r))
++  }
++
++  // Everything in the results panel, recomputed as the user types (and again once rule scripts
++  // finish translating — hence the `rulesReady` dependency).
++  const findings = useMemo<Finding[]>(() => {
++    void rulesReady
++    const out: Finding[] = []
++    const statesByName = new Map(rowStates.map(st => [st.name, st] as const))
++    const dropped = new Set(rowStates.filter(st => st.discarded).map(st => st.name))
++    const filled = rows.filter(r => isFilled(r.value) && !dropped.has(r.name))
++    const filledNames = new Set(filled.map(r => r.name))
++
++    // Missing required — mirrors buildPayload: a required+enabled value that's neither filled nor
++    // dropped by a conditional-display rule.
++    for (const v of usableValues) {
++      if (v.required && v.enabled && !filledNames.has(v.name) && !dropped.has(v.name)) {
++        out.push({ scope: 'required', target: v.label || v.name, message: 'required value is empty' })
++      }
++    }
++
++    // Basic shape checks + per-value validation, for filled, non-dropped rows only (matches the
++    // server's "conditional display runs first, then shape, then value rules" ordering).
++    for (const r of filled) {
++      const def = r.def
++      const label = def.label || def.name
++      for (const m of shapeProblems(def, r.value)) out.push({ scope: 'shape', target: label, message: m })
++
++      if (def.valueValidation && def.valueValidation.trim()) {
++        const verdict = interpretRuleResult(safeEval(def.valueValidation, ruleVariables))
++        if (!verdict.ok) {
++          out.push({ scope: 'value', target: label, message: verdict.message || 'value validation rule rejected this value' })
++        }
++      }
++    }
++
++    // Schema-level rules — each runs once against the unified context.
++    for (const rule of previewSchema.submissionValidations ?? []) {
++      if (!rule || !rule.trim()) continue
++      const verdict = interpretRuleResult(safeEval(rule, ruleVariables))
++      if (!verdict.ok) {
++        out.push({ scope: 'schema', message: verdict.message || 'schema-level rule rejected this submission' })
++      }
++    }
++
++    void statesByName
++    return out
++  }, [rows, rowStates, ruleVariables, rulesReady, usableValues, previewSchema])
++
++  const hasValues = usableValues.length > 0
++
++  return (
++    <Dialog open={open} onOpenChange={(_, d) => { if (!d.open) onClose() }}>
++      <DialogSurface className={s.surface}>
++        <DialogBody className={s.body}>
++          <DialogTitle>Preview: {schema.label || schema.name || 'Untitled schema'}</DialogTitle>
++          <DialogContent className={s.content}>
++            <MessageBar intent="info">
++              <MessageBarBody>
++                <MessageBarTitle>Best-effort preview</MessageBarTitle>
++                This renders the form and evaluates rules <strong>in your browser</strong> against the
++                unsaved schema. The server stays authoritative — some semantics differ here
++                (regex dialect, and helpers like <code>sampleTimestamp()</code>/<code>serviceName()</code> aren&apos;t
++                available client-side), so always confirm with a real submission or the API before relying on a rule.
++              </MessageBarBody>
++            </MessageBar>
++
++            {skipped.length > 0 && (
++              <MessageBar intent="warning">
++                <MessageBarBody>
++                  Skipped {skipped.length} value{skipped.length === 1 ? '' : 's'} with a blank or duplicate
++                  name: {skipped.join(', ')}. Give every value a unique name to preview it.
++                </MessageBarBody>
++              </MessageBar>
++            )}
++
++            {!hasValues ? (
++              <MessageBar intent="warning">
++                <MessageBarBody>This schema has no usable values to preview yet. Add a value first.</MessageBarBody>
++              </MessageBar>
++            ) : (
++              <div className={s.grid}>
++                <div className={s.formCol}>
++                  <Card className={s.formCard}>
++                    <Field label="Sample timestamp" className={s.pickerRow}
++                      hint="Used for the samples and any date-based rules that read a Date value.">
++                      <Input
++                        type="datetime-local"
++                        value={toLocalInput(timestamp)}
++                        onChange={(_, v) => setTimestamp(v.value ? fromLocalInput(v.value) : new Date().toISOString())}
++                      />
++                    </Field>
++                    <SchemaSampleFields
++                      schema={previewSchema}
++                      rows={rows}
++                      rowStates={rowStates}
++                      onPatchRow={patchRow}
++                    />
++                  </Card>
++                </div>
++
++                <div className={s.resultsCol}>
++                  <Card className={s.resultsCard}>
++                    <span className={s.resultsTitle}>Validation results</span>
++                    {findings.length === 0 ? (
++                      <div className={s.okBanner}>
++                        <CheckmarkCircle20Regular />
++                        <span>No problems with the current values.</span>
++                      </div>
++                    ) : (
++                      <FindingGroupList findings={findings} styles={s} />
++                    )}
++                    <Text className={s.muted}>
++                      Conditional display (hide/grey) and inline warnings appear on the form to the left.
++                    </Text>
++                  </Card>
++                </div>
++              </div>
++            )}
++          </DialogContent>
++          <DialogActions>
++            {hasValues && (
++              <Button
++                appearance="secondary"
++                onClick={() => {
++                  setRows(usableValues.map(v => ({ name: v.name, def: v, value: null, note: '' })))
++                  setTimestamp(new Date().toISOString())
++                }}
++              >
++                Reset values
++              </Button>
++            )}
++            <Button appearance="primary" onClick={onClose}>Close</Button>
++          </DialogActions>
++        </DialogBody>
++      </DialogSurface>
++    </Dialog>
++  )
++}
++
++const scopeLabels: Record<Finding['scope'], string> = {
++  required: 'Missing required',
++  shape: 'Shape checks',
++  value: 'Value validation',
++  schema: 'Schema-level validation',
++}
++
++function FindingGroupList({ findings, styles }: { findings: Finding[]; styles: ReturnType<typeof useStyles> }) {
++  // Group by scope so the panel reads "Missing required → Shape → Value → Schema", matching the
++  // order the server evaluates them in.
++  const order: Finding['scope'][] = ['required', 'shape', 'value', 'schema']
++  return (
++    <>
++      {order.map(scope => {
++        const items = findings.filter(f => f.scope === scope)
++        if (items.length === 0) return null
++        return (
++          <div key={scope} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
++            <Badge appearance="tint" color="danger" size="small">{scopeLabels[scope]}</Badge>
++            <ul className={styles.findingList}>
++              {items.map((f, i) => (
++                <li key={i} className={styles.finding}>
++                  <Warning20Regular className={styles.findingFail} />
++                  <span>
++                    {f.target && <span className={styles.findingTarget}>{f.target}: </span>}
++                    {f.message}
++                  </span>
++                </li>
++              ))}
++            </ul>
++          </div>
++        )
++      })}
++    </>
++  )
++}
++
++/**
++ * Client-side approximation of the server's shape checks for one filled value. Best-effort: regex
++ * is evaluated with the JS engine (dialect may differ from .NET), and we only flag what we can be
++ * reasonably confident about. Conditional-display and required checks are handled by the caller.
++ */
++function shapeProblems(def: SchemaValue, value: unknown): string[] {
++  const problems: string[] = []
++  if (def.type === 'Integer' || def.type === 'Number') {
++    const n = typeof value === 'number' ? value : Number(value)
++    if (Number.isNaN(n)) {
++      problems.push('value is not a number')
++    } else {
++      if (def.type === 'Integer' && !Number.isInteger(n)) problems.push('value must be a whole number')
++      if (def.min != null && n < def.min) problems.push(`below the minimum of ${def.min}`)
++      if (def.max != null && n > def.max) problems.push(`above the maximum of ${def.max}`)
++    }
++  } else if (def.type === 'String') {
++    const str = String(value)
++    if (def.minLength != null && str.length < def.minLength) problems.push(`shorter than the minimum length of ${def.minLength}`)
++    if (def.maxLength != null && str.length > def.maxLength) problems.push(`longer than the maximum length of ${def.maxLength}`)
++    if (def.regexPattern && def.regexPattern.trim()) {
++      try {
++        if (!new RegExp(def.regexPattern).test(str)) problems.push(`does not match the pattern ${def.regexPattern}`)
++      } catch {
++        problems.push('regex pattern could not be evaluated in the browser (will be checked on the server)')
++      }
++    }
++  } else if (def.type === 'Date') {
++    const d = typeof value === 'string' ? new Date(value) : null
++    if (!d || Number.isNaN(d.getTime())) {
++      problems.push('value is not a valid date')
++    } else {
++      if (def.minDate) { const min = new Date(def.minDate); if (!Number.isNaN(min.getTime()) && d < min) problems.push(`earlier than ${def.minDate}`) }
++      if (def.maxDate) { const max = new Date(def.maxDate); if (!Number.isNaN(max.getTime()) && d > max) problems.push(`later than ${def.maxDate}`) }
++    }
++  }
++  return problems
++}
+diff --git a/web/admin/src/components/SchemaSampleFields.tsx b/web/admin/src/components/SchemaSampleFields.tsx
+new file mode 100644
+index 0000000..9e0381b
+--- /dev/null
++++ b/web/admin/src/components/SchemaSampleFields.tsx
+@@ -0,0 +1,351 @@
++import { useState } from 'react'
++import {
++  Badge, Button, Dropdown, Field, Input, Option, Textarea, makeStyles, tokens,
++} from '@fluentui/react-components'
++import { Add20Regular } from '@fluentui/react-icons'
++import type { Schema, SchemaValue, SchemaValueType } from '../api/types'
++import { ValueLabel } from './ValueLabel'
++import { cadenceLabel } from '../utils/cadence'
++import { walkLayout } from '../utils/layout'
++import type { RowState, ValueRow } from '../utils/sampleRules'
++
++const useStyles = makeStyles({
++  valueRow: {
++    display: 'grid',
++    gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1.4fr) minmax(0, 1fr)',
++    gap: '12px',
++    alignItems: 'flex-start',
++    padding: '12px 0',
++    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
++  },
++  valueRowFirst: { borderTop: 'none' },
++  // Section headings rendered as `<h2>` / `<h3>` per nesting depth. Tone is a bit lighter than
++  // the per-value Caption so the hierarchy "Section > Caption > Field" reads top to bottom.
++  sectionHeading: {
++    margin: '20px 0 0',
++    fontSize: tokens.fontSizeBase500,
++    fontWeight: tokens.fontWeightSemibold,
++    color: tokens.colorNeutralForeground1,
++  },
++  subsectionHeading: {
++    margin: '14px 0 0',
++    fontSize: tokens.fontSizeBase400,
++    fontWeight: tokens.fontWeightSemibold,
++    color: tokens.colorNeutralForeground1,
++  },
++  sectionDescription: {
++    margin: '2px 0 6px',
++    color: tokens.colorNeutralForeground3,
++    fontSize: tokens.fontSizeBase200,
++  },
++  // Schema-author-provided heading rendered above a value's row (think <h2>). Display-only.
++  valueCaption: {
++    fontSize: tokens.fontSizeBase500,
++    fontWeight: tokens.fontWeightSemibold,
++    lineHeight: tokens.lineHeightBase500,
++    color: tokens.colorNeutralForeground1,
++    margin: '16px 0 4px',
++  },
++  valueLabel: { display: 'flex', flexDirection: 'column', gap: '4px' },
++  valueLabelTitle: { fontWeight: 600 },
++  valueLabelMeta: { color: tokens.colorNeutralForeground3, fontSize: '12px' },
++  badges: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' },
++  // When the textarea is hidden, the "Add notes" button sits in the same column the textarea
++  // would occupy. The top padding lines it up with the value input (i.e. below the field labels).
++  notesPlaceholder: { paddingTop: '24px' },
++  // Live warning text shown under the value label when a per-value Warning rule fires.
++  warningInline: {
++    color: tokens.colorPaletteDarkOrangeForeground1,
++    fontSize: '12px',
++    fontStyle: 'italic',
++  },
++})
++
++/**
++ * Controlled renderer for the per-value inputs of a submission/preview form. Walks the schema's
++ * layout (folding away sections whose every descendant is hidden by VisibleIf), renders one row
++ * per value with its captions/units/badges, and reflects the precomputed `rowStates` (hidden →
++ * skipped, disabled → greyed, warning → inline note). State (the typed values and gating) is
++ * owned by the caller and threaded in via `rows` / `rowStates` / `onPatchRow`, so the submission
++ * editor and the schema-editor preview can share the exact same look and behaviour.
++ */
++export function SchemaSampleFields({
++  schema, rows, rowStates, readOnly = false, onPatchRow,
++}: {
++  schema: Schema
++  rows: ValueRow[]
++  rowStates: RowState[]
++  readOnly?: boolean
++  onPatchRow: (name: string, patch: Partial<ValueRow>) => void
++}) {
++  const s = useStyles()
++
++  // Index rows/states by value name so the layout walker can look them up.
++  const rowsByName = new Map(rows.map(r => [r.name, r] as const))
++  const statesByName = new Map(rowStates.map(st => [st.name, st] as const))
++
++  // walkLayout drives the order + grouping. The predicate hides values whose VisibleIf rule
++  // evaluates falsy, and the walker folds away sections whose every descendant is hidden — no
++  // "Optional notes" heading sitting above nothing.
++  const items = walkLayout(schema, {
++    isValueVisible: (name) => !(statesByName.get(name)?.hidden ?? false),
++  })
++
++  // Track the first visible value globally so its top border is suppressed; a fresh section
++  // start also suppresses the border on the first child for the same reason.
++  let visibleSoFar = 0
++  let suppressNextBorder = false
++
++  return (
++    <>
++      {items.map((item, idx) => {
++        if (item.kind === 'section-end') return null
++        if (item.kind === 'section-start') {
++          suppressNextBorder = true
++          const HeadingTag = item.depth === 0 ? 'h2' : 'h3'
++          const headingClass = item.depth === 0 ? s.sectionHeading : s.subsectionHeading
++          return (
++            <div key={`section-${idx}`}>
++              <HeadingTag className={headingClass} style={{ paddingLeft: `${item.depth * 8}px` }}>
++                {item.caption}
++              </HeadingTag>
++              {item.description && (
++                <p className={s.sectionDescription} style={{ paddingLeft: `${item.depth * 8}px` }}>
++                  {item.description}
++                </p>
++              )}
++            </div>
++          )
++        }
++        const row = rowsByName.get(item.value.name)
++        const state = statesByName.get(item.value.name)
++        if (!row || !state) return null
++        const caption = item.value.caption?.trim() || ''
++        const isFirstVisible = visibleSoFar === 0
++        const borderless = isFirstVisible || !!caption || suppressNextBorder
++        suppressNextBorder = false
++        visibleSoFar++
++        return (
++          <div key={item.value.name} style={item.depth > 0 ? { paddingLeft: `${item.depth * 8}px` } : undefined}>
++            {caption && <h2 className={s.valueCaption}>{caption}</h2>}
++            <SchemaValueRow
++              row={row}
++              first={borderless}
++              schemaEnabled={schema.enabled}
++              schema={schema}
++              state={state}
++              readOnly={readOnly}
++              onChange={patch => onPatchRow(row.name, patch)}
++            />
++          </div>
++        )
++      })}
++    </>
++  )
++}
++
++function SchemaValueRow({
++  row, first, schemaEnabled, schema, state, readOnly, onChange,
++}: {
++  row: ValueRow
++  first: boolean
++  schemaEnabled: boolean
++  /** Parent schema — needed by `ValueLabel` for the version-bump anchor + cadence. */
++  schema: Schema
++  state: RowState
++  /** View mode: every input disabled, "Add notes" button suppressed when there's no existing note. */
++  readOnly?: boolean
++  onChange: (patch: Partial<ValueRow>) => void
++}) {
++  const s = useStyles()
++  const def = row.def
++  // The row is "inert" (not editable) when the page is read-only, the schema/value is disabled,
++  // or an EnabledIf rule says so. We still render the row in the latter case so the user sees
++  // why it's locked.
++  const inert = !!readOnly || !schemaEnabled || !def.enabled || state.disabled
++  // Keep the row compact by default. The textarea pops out either when the user opts in,
++  // or when the row already carries a note (e.g. while editing an existing submission).
++  const [notesOpened, setNotesOpened] = useState(false)
++  const showNotes = notesOpened || !!row.note
++
++  return (
++    <div className={first ? `${s.valueRow} ${s.valueRowFirst}` : s.valueRow}>
++      <div className={s.valueLabel}>
++        <span className={s.valueLabelTitle}>
++          <ValueLabel value={def} schema={schema} descriptionMode="none" showRequired />
++        </span>
++        {def.description && <span className={s.valueLabelMeta}>{def.description}</span>}
++        <div className={s.badges}>
++          {/* Same visual treatment as the cadence badge — both are neutral metadata pills. */}
++          <Badge appearance="outline" color="informative" size="small">{friendlyTypeLabel(def.type)}</Badge>
++          <Badge appearance="outline" color="informative" size="small">{cadenceLabel(def.cadence)}</Badge>
++          {def.required && <Badge appearance="outline" color="severe" size="small">required</Badge>}
++          {!def.required && <Badge appearance="outline" color="subtle" size="small">optional</Badge>}
++          {inert && <Badge appearance="outline" color="subtle" size="small">disabled</Badge>}
++        </div>
++        <span className={s.valueLabelMeta}>{valueHint(def)}</span>
++        {state.warning && (
++          <span className={s.warningInline}>{state.warning}</span>
++        )}
++      </div>
++
++      <Field label={`Value${def.unit ? ` (${def.unit})` : ''}`}>
++        <SampleValueInput
++          valueDef={def}
++          value={row.value}
++          onChange={v => onChange({ value: v })}
++          disabled={inert}
++        />
++      </Field>
++
++      {showNotes ? (
++        <Field label="Note">
++          <Textarea
++            value={row.note}
++            onChange={(_, v) => onChange({ note: v.value })}
++            disabled={inert}
++            rows={2}
++          />
++        </Field>
++      ) : readOnly ? (
++        // No note on this sample and we're in view mode — leave the column blank rather than
++        // showing a perpetually-disabled "Add notes" button.
++        <div />
++      ) : (
++        <div className={s.notesPlaceholder}>
++          <Button
++            appearance="transparent"
++            icon={<Add20Regular />}
++            disabled={inert}
++            onClick={() => setNotesOpened(true)}
++          >
++            Add notes
++          </Button>
++        </div>
++      )}
++    </div>
++  )
++}
++
++function SampleValueInput({
++  valueDef, value, onChange, disabled,
++}: {
++  valueDef: SchemaValue
++  value: unknown
++  onChange: (v: unknown) => void
++  disabled?: boolean
++}) {
++  switch (valueDef.type as SchemaValueType) {
++    case 'Boolean':
++      // Tri-state: "(empty)" means "not provided" — distinct from explicit false. We surface
++      // the choices as "Yes" / "No" to operators because non-technical users don't think in
++      // booleans; the underlying option values stay 'true'/'false' so the wire shape doesn't
++      // change.
++      return (
++        <Dropdown
++          disabled={disabled}
++          selectedOptions={value === true ? ['true'] : value === false ? ['false'] : ['']}
++          value={value === true ? 'Yes' : value === false ? 'No' : ''}
++          onOptionSelect={(_, d) => {
++            const v = d.optionValue
++            onChange(v === 'true' ? true : v === 'false' ? false : null)
++          }}
++        >
++          <Option value="">(not provided)</Option>
++          <Option value="true">Yes</Option>
++          <Option value="false">No</Option>
++        </Dropdown>
++      )
++    case 'Integer':
++      return (
++        <Input
++          disabled={disabled}
++          type="number"
++          value={value == null ? '' : String(value)}
++          onChange={(_, v) => onChange(v.value === '' ? null : Math.trunc(Number(v.value)))}
++        />
++      )
++    case 'Number':
++      return (
++        <Input
++          disabled={disabled}
++          type="number"
++          value={value == null ? '' : String(value)}
++          onChange={(_, v) => onChange(v.value === '' ? null : Number(v.value))}
++        />
++      )
++    case 'Date':
++      return (
++        <Input
++          disabled={disabled}
++          type="datetime-local"
++          value={typeof value === 'string' ? toLocalInput(value) : ''}
++          onChange={(_, v) => onChange(v.value ? fromLocalInput(v.value) : null)}
++        />
++      )
++    case 'String':
++    default: {
++      // Promote to a multi-line Textarea when the schema author hints that the value can be
++      // long (MaxLength > 40 characters). Single-line Input stays the default — most string
++      // values are short identifiers, codes, or names that don't benefit from the extra space.
++      const multiline = valueDef.maxLength != null && valueDef.maxLength > 40
++      const common = {
++        disabled,
++        value: value == null ? '' : String(value),
++        onChange: (_: unknown, v: { value: string }) =>
++          onChange(v.value === '' ? null : v.value),
++      }
++      return multiline
++        ? <Textarea {...common} rows={3} />
++        : <Input {...common} />
++    }
++  }
++}
++
++/**
++ * Map a wire-level `SchemaValueType` to the friendlier wording shown to operators in the
++ * submission editor. The schema editor still shows the raw type — that audience cares about
++ * the precise wire shape, this audience doesn't.
++ */
++function friendlyTypeLabel(type: SchemaValueType): string {
++  switch (type) {
++    case 'String':  return 'Text'
++    case 'Integer': return 'Whole number'
++    case 'Number':  return 'Number'
++    case 'Date':    return 'Date'
++    case 'Boolean': return 'Yes/No'
++  }
++}
++
++function valueHint(v: SchemaValue): string {
++  const bits: string[] = []
++  if (v.type === 'Number' || v.type === 'Integer') {
++    if (v.min != null) bits.push(`min ${v.min}`)
++    if (v.max != null) bits.push(`max ${v.max}`)
++  }
++  if (v.type === 'String') {
++    if (v.minLength != null) bits.push(`min length ${v.minLength}`)
++    if (v.maxLength != null) bits.push(`max length ${v.maxLength}`)
++    if (v.regexPattern) bits.push(`regex: ${v.regexPattern}`)
++  }
++  if (v.type === 'Date') {
++    if (v.minDate) bits.push(`from ${v.minDate}`)
++    if (v.maxDate) bits.push(`to ${v.maxDate}`)
++  }
++  return bits.join(' · ')
++}
++
++// <input type="datetime-local"> wants 'YYYY-MM-DDTHH:mm' in local time; we round-trip via UTC ISO.
++export function toLocalInput(iso: string): string {
++  if (!iso) return ''
++  const d = new Date(iso)
++  if (Number.isNaN(d.getTime())) return ''
++  const pad = (n: number) => n.toString().padStart(2, '0')
++  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
++}
++
++export function fromLocalInput(local: string): string {
++  if (!local) return ''
++  const d = new Date(local)
++  return d.toISOString()
++}
+diff --git a/web/admin/src/pages/SchemaEditPage.tsx b/web/admin/src/pages/SchemaEditPage.tsx
+index 7563fcd..53b065d 100644
+--- a/web/admin/src/pages/SchemaEditPage.tsx
++++ b/web/admin/src/pages/SchemaEditPage.tsx
+@@ -8,15 +8,16 @@ import {
+   Option, Radio, RadioGroup, Spinner, Tab, TabList, Textarea, Title2, Toolbar, ToolbarButton, Tooltip,
+   makeStyles, tokens,
+ } from '@fluentui/react-components'
+-import { Add20Regular, ArrowLeft20Regular, Delete20Regular, Dismiss16Regular } from '@fluentui/react-icons'
++import { Add20Regular, ArrowLeft20Regular, Delete20Regular, Dismiss16Regular, Eye20Regular } from '@fluentui/react-icons'
+ import type {
+   Account, ApprovalMode, ApprovalPolicy, ApprovalSourceScope, ApproverRequirement,
+-  Cadence, SchemaLayoutNode, SchemaValue, SchemaValueType, UpsertSchemaRequest,
++  Cadence, Schema, SchemaLayoutNode, SchemaValue, SchemaValueType, UpsertSchemaRequest,
+ } from '../api/types'
+ import { useAccounts, useCreateSchema, useMe, useSchemas, useSchemaVersionSnapshot, useSubmissions, useUpdateSchema } from '../api/hooks'
+ import { accountHasCapability } from '../api/capabilities'
+ import { formatApiError } from '../api/client'
+ import { LayoutTreeEditor } from '../components/LayoutTreeEditor'
++import { SchemaPreviewDialog } from '../components/SchemaPreviewDialog'
+ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+ import { cadenceLabel } from '../utils/cadence'
+ import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY, SERVICE_OWNER_LABEL } from '../utils/approvers'
+@@ -111,6 +112,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
+   const update = useUpdateSchema()
+ 
+   const [req, setReq] = useState<UpsertSchemaRequest | null>(null)
++  const [previewOpen, setPreviewOpen] = useState(false)
+   // Which editor section is showing. The form is split into three tabs that mirror the old
+   // top-to-bottom sections (General settings, Values, Layout).
+   const [tab, setTab] = useState<SchemaTab>('general')
+@@ -279,6 +281,30 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
+ 
+   const title = isSnapshot ? 'View schema version' : isEdit ? 'Edit schema' : 'New schema'
+ 
++  // Synthesise a full `Schema` from the in-progress request so the layout editor and the preview
++  // dialog can share one definition. Just enough of a Schema for their needs — pulling the actual
++  // entity in would force a round-trip for IDs we don't need at edit time.
++  const previewSchema = useMemo<Schema | null>(() => {
++    if (!req) return null
++    return {
++      id: schemaId ?? '',
++      name: req.name,
++      label: req.label,
++      description: req.description,
++      notes: req.notes,
++      modifiable: req.modifiable,
++      enabled: req.enabled,
++      submissionValidations: req.submissionValidations,
++      isGlobal: req.isGlobal,
++      serviceIds: req.serviceIds,
++      values: req.values,
++      layout: req.layout ?? [],
++      version: req.version ?? 1,
++      versionModifiedAt: null,
++      createdAt: '', modifiedAt: '',
++    }
++  }, [req, schemaId])
++
+   return (
+     <div className={s.root}>
+       <div className={s.toolbar}>
+@@ -286,10 +312,15 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
+           <Button appearance="subtle" icon={<ArrowLeft20Regular />} onClick={() => nav(isSnapshot ? `/schemas/${encodeURIComponent(name!)}/versions` : '/schemas')}>Back</Button>
+           <Title2>{title}</Title2>
+         </div>
+-        {req && !readOnly && (
++        {req && (
+           <Toolbar>
+-            <ToolbarButton appearance="primary" disabled={isBusy} onClick={onSave}>
+-              {isEdit ? 'Save changes' : 'Create schema'}
++            {!readOnly && (
++              <ToolbarButton appearance="primary" disabled={isBusy} onClick={onSave}>
++                {isEdit ? 'Save changes' : 'Create schema'}
++              </ToolbarButton>
++            )}
++            <ToolbarButton icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>
++              Preview
+             </ToolbarButton>
+           </Toolbar>
+         )}
+@@ -497,26 +528,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
+               {/* `inert` makes the whole subtree non-interactive in the read-only snapshot view. */}
+               <div className={readOnly ? s.readOnlyLayout : undefined} {...(readOnly ? { inert: true } : {})}>
+                 <LayoutTreeEditor
+-                  schema={{
+-                    // Synthesise just enough of a Schema for the editor's needs. Pulling the
+-                    // actual entity in would force us to round-trip through the server for IDs
+-                    // we don't need at edit time.
+-                    id: schemaId ?? '',
+-                    name: req.name,
+-                    label: req.label,
+-                    description: req.description,
+-                    notes: req.notes,
+-                    modifiable: req.modifiable,
+-                    enabled: req.enabled,
+-                    submissionValidations: req.submissionValidations,
+-                    isGlobal: req.isGlobal,
+-                    serviceIds: req.serviceIds,
+-                    values: req.values,
+-                    layout: req.layout ?? [],
+-                    version: req.version ?? 1,
+-                    versionModifiedAt: null,
+-                    createdAt: '', modifiedAt: '',
+-                  }}
++                  schema={previewSchema!}
+                   onChange={patchLayout}
+                 />
+               </div>
+@@ -535,6 +547,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
+                 <Divider />
+                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                   <Button onClick={() => nav('/schemas')}>Cancel</Button>
++                  <Button appearance="secondary" icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>Preview</Button>
+                   <Button appearance="primary" disabled={isBusy} onClick={onSave}>
+                     {isEdit ? 'Save changes' : 'Create schema'}
+                   </Button>
+@@ -575,6 +588,10 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
+           </DialogBody>
+         </DialogSurface>
+       </Dialog>
++
++      {previewSchema && (
++        <SchemaPreviewDialog schema={previewSchema} open={previewOpen} onClose={() => setPreviewOpen(false)} />
++      )}
+     </div>
+   )
+ }
+diff --git a/web/admin/src/pages/SubmissionEditPage.tsx b/web/admin/src/pages/SubmissionEditPage.tsx
+index 40d2364..5926a51 100644
+--- a/web/admin/src/pages/SubmissionEditPage.tsx
++++ b/web/admin/src/pages/SubmissionEditPage.tsx
+@@ -1,12 +1,12 @@
+ import { useEffect, useMemo, useState } from 'react'
+ import { useNavigate, useParams } from 'react-router-dom'
+ import {
+-  Badge, Button, Card, Dropdown, Field, Input,
++  Button, Card, Dropdown, Field, Input,
+   MessageBar, MessageBarBody, MessageBarTitle,
+-  Option, Textarea, Title2, Toolbar, ToolbarButton,
++  Option, Title2, Toolbar, ToolbarButton,
+   makeStyles, tokens,
+ } from '@fluentui/react-components'
+-import { Add20Regular, ArrowLeft20Regular } from '@fluentui/react-icons'
++import { ArrowLeft20Regular } from '@fluentui/react-icons'
+ import {
+   useAccounts, useAdminCreateSubmission, useAdminUpdateSubmission,
+   useCreateMySubmission, useCapabilities, useMySchemas, useMySubmission,
+@@ -14,15 +14,11 @@ import {
+ } from '../api/hooks'
+ import { formatApiError } from '../api/client'
+ import type {
+-  AdminSubmissionInput, SampleInput, Schema, SchemaValue, SchemaValueType,
++  AdminSubmissionInput, SampleInput, Schema,
+ } from '../api/types'
+ import { AccountAvatar, SchemaAvatar } from '../components/Avatars'
+-import { ValueLabel } from '../components/ValueLabel'
+-import {
+-  ExpressionError, isTruthy, prefetchExpressions, tryEvaluateExpression,
+-} from '../utils/expression'
+-import { walkLayout } from '../utils/layout'
+-import { cadenceLabel } from '../utils/cadence'
++import { SchemaSampleFields, fromLocalInput, toLocalInput } from '../components/SchemaSampleFields'
++import { isFilled, useSampleRules, type ValueRow } from '../utils/sampleRules'
+ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+ 
+ const useStyles = makeStyles({
+@@ -34,79 +30,8 @@ const useStyles = makeStyles({
+   pickers: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', padding: '16px', alignItems: 'start' },
+   valuesCard: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' },
+   valuesHeader: { display: 'flex', alignItems: 'center', gap: '12px' },
+-  valueRow: {
+-    display: 'grid',
+-    gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1.4fr) minmax(0, 1fr)',
+-    gap: '12px',
+-    alignItems: 'flex-start',
+-    padding: '12px 0',
+-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+-  },
+-  valueRowFirst: { borderTop: 'none' },
+-  // Section headings rendered as `<h2>` / `<h3>` per nesting depth. Tone is a bit lighter than
+-  // the per-value Caption so the hierarchy "Section > Caption > Field" reads top to bottom.
+-  sectionHeading: {
+-    margin: '20px 0 0',
+-    fontSize: tokens.fontSizeBase500,
+-    fontWeight: tokens.fontWeightSemibold,
+-    color: tokens.colorNeutralForeground1,
+-  },
+-  subsectionHeading: {
+-    margin: '14px 0 0',
+-    fontSize: tokens.fontSizeBase400,
+-    fontWeight: tokens.fontWeightSemibold,
+-    color: tokens.colorNeutralForeground1,
+-  },
+-  sectionDescription: {
+-    margin: '2px 0 6px',
+-    color: tokens.colorNeutralForeground3,
+-    fontSize: tokens.fontSizeBase200,
+-  },
+-  // Schema-author-provided heading rendered above a value's row (think <h2>). Display-only.
+-  valueCaption: {
+-    fontSize: tokens.fontSizeBase500,
+-    fontWeight: tokens.fontWeightSemibold,
+-    lineHeight: tokens.lineHeightBase500,
+-    color: tokens.colorNeutralForeground1,
+-    margin: '16px 0 4px',
+-  },
+-  valueLabel: { display: 'flex', flexDirection: 'column', gap: '4px' },
+-  valueLabelTitle: { fontWeight: 600 },
+-  valueLabelMeta: { color: tokens.colorNeutralForeground3, fontSize: '12px' },
+-  badges: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' },
+-  // When the textarea is hidden, the "Add notes" button sits in the same column the textarea
+-  // would occupy. The top padding lines it up with the value input (i.e. below the field labels).
+-  notesPlaceholder: { paddingTop: '24px' },
+-  // Live warning text shown under the value label when a per-value Warning rule fires.
+-  warningInline: {
+-    color: tokens.colorPaletteDarkOrangeForeground1,
+-    fontSize: '12px',
+-    fontStyle: 'italic',
+-  },
+ })
+ 
+-interface ValueRow {
+-  /** value name (unique within the schema) */
+-  name: string
+-  def: SchemaValue
+-  /** Raw value as the user typed it; we serialize it on save. */
+-  value: unknown
+-  note: string
+-}
+-
+-/** Outcome of client-side EnabledIf/VisibleIf/Warning evaluation for a single row. */
+-interface RowState {
+-  name: string
+-  /** True when VisibleIf is set and evaluates falsy — the row is not rendered at all. */
+-  hidden: boolean
+-  /** True when EnabledIf is set and evaluates falsy — the row is rendered read-only. */
+-  disabled: boolean
+-  /** True when this row is effectively dropped from the payload (hidden OR disabled). */
+-  discarded: boolean
+-  /** Optional live warning text from the per-value Warning rule. */
+-  warning: string | null
+-}
+-
+ /**
+  * Same page, three personalities:
+  *  - `new`   → blank form, pickers active, Save submits a new submission.
+@@ -155,10 +80,6 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
+   const [missingRequired, setMissingRequired] = useState<string[]>([])
+   const [serverWarnings, setServerWarnings] = useState<string[]>([])
+   const [prefilled, setPrefilled] = useState(false)
+-  // Bumped after the translator has fetched all rule scripts for the current schema. Used
+-  // purely as a re-render trigger so `evaluateGating` (which reads from a module-level
+-  // cache) re-runs and starts producing concrete results.
+-  const [rulesReady, setRulesReady] = useState(0)
+ 
+   // For services the service is always "me" — pin it.
+   useEffect(() => {
+@@ -194,23 +115,6 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
+     /* eslint-enable react-hooks/set-state-in-effect */
+   }, [schema])
+ 
+-  // Ask the server to translate every per-value rule on this schema into JavaScript. The
+-  // helper caches results so subsequent visits to the same schema don't hit the network.
+-  // The component re-renders once translations have settled (rulesReady tick), at which
+-  // point evaluateGating switches from "no opinion" to actual hide/disable/warning verdicts.
+-  useEffect(() => {
+-    if (!schema) return
+-    const exprs: (string | null | undefined)[] = []
+-    for (const v of schema.values) {
+-      exprs.push(v.enabledIf, v.visibleIf, v.warning)
+-    }
+-    let cancelled = false
+-    prefetchExpressions(exprs).then(() => {
+-      if (!cancelled) setRulesReady(t => t + 1)
+-    })
+-    return () => { cancelled = true }
+-  }, [schema])
+-
+   // On edit, hydrate state from the existing submission once it has loaded.
+   useEffect(() => {
+     if (!isEdit || prefilled) return
+@@ -251,31 +155,9 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
+     setRows(rs => rs.map(r => r.name === name ? { ...r, ...patch } : r))
+   }
+ 
+-  // Build the variable context used for client-side EnabledIf/VisibleIf/Warning evaluation.
+-  // Mirrors the server's `BuildRuleContext`: every declared value is exposed by name (null when
+-  // the row is empty), and each numeric value with bounds also contributes `<name>.minimum` and
+-  // `<name>.maximum` keys. The dotted keys are unreachable as plain identifiers in NCalc — the
+-  // server registers them under the bracket form `[name.minimum]`, which `helpers.var` looks up
+-  // case-insensitively in this bag.
+-  const ruleVariables = useMemo(() => {
+-    const ctx: Record<string, unknown> = {}
+-    for (const r of rows) {
+-      ctx[r.name] = isFilled(r.value) ? r.value : null
+-      const isNumeric = r.def.type === 'Integer' || r.def.type === 'Number'
+-      if (isNumeric) {
+-        if (r.def.min !== null && r.def.min !== undefined) ctx[`${r.name}.minimum`] = r.def.min
+-        if (r.def.max !== null && r.def.max !== undefined) ctx[`${r.name}.maximum`] = r.def.max
+-      }
+-    }
+-    return ctx
+-  }, [rows])
+-
+-  const rowStates = useMemo(() => {
+-    // `rulesReady` is read here so the memo invalidates once new translations land in the
+-    // cache. The cache lookup itself happens inside evaluateGating.
+-    void rulesReady
+-    return rows.map(r => evaluateGating(r, ruleVariables))
+-  }, [rows, ruleVariables, rulesReady])
++  // Prefetch + evaluate the schema's rules client-side (mirrors the server) so EnabledIf /
++  // VisibleIf hide/grey values and Warning rules surface inline as the user types.
++  const { rowStates } = useSampleRules(schema, rows)
+ 
+   function buildPayload(): SampleInput[] | null {
+     if (!schema) return null
+@@ -468,68 +350,13 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
+             </MessageBar>
+           )}
+ 
+-          {(() => {
+-            // Index rows/states by value name so the layout walker can look them up.
+-            const rowsByName  = new Map(rows.map(r => [r.name, r] as const))
+-            const statesByName = new Map(rowStates.map(st => [st.name, st] as const))
+-
+-            // walkLayout drives the order + grouping. The predicate hides values whose
+-            // VisibleIf rule evaluates falsy, and the walker folds away sections whose every
+-            // descendant is hidden — no "Optional notes" heading sitting above nothing.
+-            const items = walkLayout(schema, {
+-              isValueVisible: (name) => !(statesByName.get(name)?.hidden ?? false),
+-            })
+-
+-            // Track the first visible value globally so its top border is suppressed; a fresh
+-            // section start also suppresses the border on the first child for the same reason.
+-            let visibleSoFar = 0
+-            let suppressNextBorder = false
+-
+-            return items.map((item, idx) => {
+-              if (item.kind === 'section-end') return null
+-              if (item.kind === 'section-start') {
+-                suppressNextBorder = true
+-                const HeadingTag = item.depth === 0 ? 'h2' : 'h3'
+-                const headingClass = item.depth === 0 ? s.sectionHeading : s.subsectionHeading
+-                return (
+-                  <div key={`section-${idx}`}>
+-                    <HeadingTag className={headingClass} style={{ paddingLeft: `${item.depth * 8}px` }}>
+-                      {item.caption}
+-                    </HeadingTag>
+-                    {item.description && (
+-                      <p className={s.sectionDescription} style={{ paddingLeft: `${item.depth * 8}px` }}>
+-                        {item.description}
+-                      </p>
+-                    )}
+-                  </div>
+-                )
+-              }
+-              const row = rowsByName.get(item.value.name)
+-              const state = statesByName.get(item.value.name)
+-              if (!row || !state) return null
+-              const caption = item.value.caption?.trim() || ''
+-              const isFirstVisible = visibleSoFar === 0
+-              const borderless = isFirstVisible || !!caption || suppressNextBorder
+-              suppressNextBorder = false
+-              visibleSoFar++
+-              return (
+-                <div key={item.value.name} style={item.depth > 0 ? { paddingLeft: `${item.depth * 8}px` } : undefined}>
+-                  {caption && (
+-                    <h2 className={s.valueCaption}>{caption}</h2>
+-                  )}
+-                  <SchemaValueRow
+-                    row={row}
+-                    first={borderless}
+-                    schemaEnabled={schema.enabled}
+-                    schema={schema}
+-                    state={state}
+-                    readOnly={readOnly}
+-                    onChange={patch => patchRow(row.name, patch)}
+-                  />
+-                </div>
+-              )
+-            })
+-          })()}
++          <SchemaSampleFields
++            schema={schema}
++            rows={rows}
++            rowStates={rowStates}
++            readOnly={readOnly}
++            onPatchRow={patchRow}
++          />
+         </Card>
+       )}
+ 
+@@ -565,258 +392,3 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
+   )
+ }
+ 
+-function SchemaValueRow({
+-  row, first, schemaEnabled, schema, state, readOnly, onChange,
+-}: {
+-  row: ValueRow
+-  first: boolean
+-  schemaEnabled: boolean
+-  /** Parent schema — needed by `ValueLabel` for the version-bump anchor + cadence. */
+-  schema: Schema
+-  state: RowState
+-  /** View mode: every input disabled, "Add notes" button suppressed when there's no existing note. */
+-  readOnly?: boolean
+-  onChange: (patch: Partial<ValueRow>) => void
+-}) {
+-  const s = useStyles()
+-  const def = row.def
+-  // The row is "inert" (not editable) when the page is read-only, the schema/value is disabled,
+-  // or an EnabledIf rule says so. We still render the row in the latter case so the user sees
+-  // why it's locked.
+-  const inert = !!readOnly || !schemaEnabled || !def.enabled || state.disabled
+-  // Keep the row compact by default. The textarea pops out either when the user opts in,
+-  // or when the row already carries a note (e.g. while editing an existing submission).
+-  const [notesOpened, setNotesOpened] = useState(false)
+-  const showNotes = notesOpened || !!row.note
+-
+-  return (
+-    <div className={first ? `${s.valueRow} ${s.valueRowFirst}` : s.valueRow}>
+-      <div className={s.valueLabel}>
+-        <span className={s.valueLabelTitle}>
+-          <ValueLabel value={def} schema={schema} descriptionMode="none" showRequired />
+-        </span>
+-        {def.description && <span className={s.valueLabelMeta}>{def.description}</span>}
+-        <div className={s.badges}>
+-          {/* Same visual treatment as the cadence badge — both are neutral metadata pills. */}
+-          <Badge appearance="outline" color="informative" size="small">{friendlyTypeLabel(def.type)}</Badge>
+-          <Badge appearance="outline" color="informative" size="small">{cadenceLabel(def.cadence)}</Badge>
+-          {def.required && <Badge appearance="outline" color="severe" size="small">required</Badge>}
+-          {!def.required && <Badge appearance="outline" color="subtle" size="small">optional</Badge>}
+-          {inert && <Badge appearance="outline" color="subtle" size="small">disabled</Badge>}
+-        </div>
+-        <span className={s.valueLabelMeta}>{valueHint(def)}</span>
+-        {state.warning && (
+-          <span className={s.warningInline}>{state.warning}</span>
+-        )}
+-      </div>
+-
+-      <Field label={`Value${def.unit ? ` (${def.unit})` : ''}`}>
+-        <SampleValueInput
+-          valueDef={def}
+-          value={row.value}
+-          onChange={v => onChange({ value: v })}
+-          disabled={inert}
+-        />
+-      </Field>
+-
+-      {showNotes ? (
+-        <Field label="Note">
+-          <Textarea
+-            value={row.note}
+-            onChange={(_, v) => onChange({ note: v.value })}
+-            disabled={inert}
+-            rows={2}
+-          />
+-        </Field>
+-      ) : readOnly ? (
+-        // No note on this sample and we're in view mode — leave the column blank rather than
+-        // showing a perpetually-disabled "Add notes" button.
+-        <div />
+-      ) : (
+-        <div className={s.notesPlaceholder}>
+-          <Button
+-            appearance="transparent"
+-            icon={<Add20Regular />}
+-            disabled={inert}
+-            onClick={() => setNotesOpened(true)}
+-          >
+-            Add notes
+-          </Button>
+-        </div>
+-      )}
+-    </div>
+-  )
+-}
+-
+-function SampleValueInput({
+-  valueDef, value, onChange, disabled,
+-}: {
+-  valueDef: SchemaValue
+-  value: unknown
+-  onChange: (v: unknown) => void
+-  disabled?: boolean
+-}) {
+-  switch (valueDef.type as SchemaValueType) {
+-    case 'Boolean':
+-      // Tri-state: "(empty)" means "not provided" — distinct from explicit false. We surface
+-      // the choices as "Yes" / "No" to operators because non-technical users don't think in
+-      // booleans; the underlying option values stay 'true'/'false' so the wire shape doesn't
+-      // change.
+-      return (
+-        <Dropdown
+-          disabled={disabled}
+-          selectedOptions={value === true ? ['true'] : value === false ? ['false'] : ['']}
+-          value={value === true ? 'Yes' : value === false ? 'No' : ''}
+-          onOptionSelect={(_, d) => {
+-            const v = d.optionValue
+-            onChange(v === 'true' ? true : v === 'false' ? false : null)
+-          }}
+-        >
+-          <Option value="">(not provided)</Option>
+-          <Option value="true">Yes</Option>
+-          <Option value="false">No</Option>
+-        </Dropdown>
+-      )
+-    case 'Integer':
+-      return (
+-        <Input
+-          disabled={disabled}
+-          type="number"
+-          value={value == null ? '' : String(value)}
+-          onChange={(_, v) => onChange(v.value === '' ? null : Math.trunc(Number(v.value)))}
+-        />
+-      )
+-    case 'Number':
+-      return (
+-        <Input
+-          disabled={disabled}
+-          type="number"
+-          value={value == null ? '' : String(value)}
+-          onChange={(_, v) => onChange(v.value === '' ? null : Number(v.value))}
+-        />
+-      )
+-    case 'Date':
+-      return (
+-        <Input
+-          disabled={disabled}
+-          type="datetime-local"
+-          value={typeof value === 'string' ? toLocalInput(value) : ''}
+-          onChange={(_, v) => onChange(v.value ? fromLocalInput(v.value) : null)}
+-        />
+-      )
+-    case 'String':
+-    default: {
+-      // Promote to a multi-line Textarea when the schema author hints that the value can be
+-      // long (MaxLength > 40 characters). Single-line Input stays the default — most string
+-      // values are short identifiers, codes, or names that don't benefit from the extra space.
+-      const multiline = valueDef.maxLength != null && valueDef.maxLength > 40
+-      const common = {
+-        disabled,
+-        value: value == null ? '' : String(value),
+-        onChange: (_: unknown, v: { value: string }) =>
+-          onChange(v.value === '' ? null : v.value),
+-      }
+-      return multiline
+-        ? <Textarea {...common} rows={3} />
+-        : <Input {...common} />
+-    }
+-  }
+-}
+-
+-function isFilled(v: unknown): boolean {
+-  if (v === null || v === undefined) return false
+-  if (typeof v === 'string') return v.trim() !== ''
+-  // false/0 are valid filled values for booleans and numbers
+-  return true
+-}
+-
+-/**
+- * Map a wire-level `SchemaValueType` to the friendlier wording shown to operators in the
+- * submission editor. The schema editor still shows the raw type — that audience cares about
+- * the precise wire shape, this audience doesn't.
+- */
+-function friendlyTypeLabel(type: SchemaValueType): string {
+-  switch (type) {
+-    case 'String':  return 'Text'
+-    case 'Integer': return 'Whole number'
+-    case 'Number':  return 'Number'
+-    case 'Date':    return 'Date'
+-    case 'Boolean': return 'Yes/No'
+-  }
+-}
+-
+-function valueHint(v: SchemaValue): string {
+-  const bits: string[] = []
+-  if (v.type === 'Number' || v.type === 'Integer') {
+-    if (v.min != null) bits.push(`min ${v.min}`)
+-    if (v.max != null) bits.push(`max ${v.max}`)
+-  }
+-  if (v.type === 'String') {
+-    if (v.minLength != null) bits.push(`min length ${v.minLength}`)
+-    if (v.maxLength != null) bits.push(`max length ${v.maxLength}`)
+-    if (v.regexPattern) bits.push(`regex: ${v.regexPattern}`)
+-  }
+-  if (v.type === 'Date') {
+-    if (v.minDate) bits.push(`from ${v.minDate}`)
+-    if (v.maxDate) bits.push(`to ${v.maxDate}`)
+-  }
+-  return bits.join(' · ')
+-}
+-
+-// <input type="datetime-local"> wants 'YYYY-MM-DDTHH:mm' in local time; we round-trip via UTC ISO.
+-function toLocalInput(iso: string): string {
+-  if (!iso) return ''
+-  const d = new Date(iso)
+-  if (Number.isNaN(d.getTime())) return ''
+-  const pad = (n: number) => n.toString().padStart(2, '0')
+-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+-}
+-function fromLocalInput(local: string): string {
+-  if (!local) return ''
+-  const d = new Date(local)
+-  return d.toISOString()
+-}
+-
+-/**
+- * Evaluate the three rule fields against the live submission context. Returns a
+- * `RowState` describing whether the row should be hidden, disabled, or carrying a warning.
+- * When a rule fails to parse/evaluate we fall back to "show + no warning" — the server
+- * remains authoritative so a buggy rule never makes data silently disappear from the editor.
+- */
+-function evaluateGating(row: ValueRow, variables: Record<string, unknown>): RowState {
+-  // The unified `variables` bag already carries every value by its name (including this row's
+-  // own current input) plus the `<name>.minimum` / `<name>.maximum` bound keys. No alias
+-  // injection needed — rules reference values explicitly. tryEvaluateExpression returns
+-  // undefined when translation hasn't landed yet; we treat that the same as "no rule" so the
+-  // UI stays permissive until the verdict is in.
+-  const safeEval = (expr: string | null | undefined): unknown | undefined => {
+-    if (!expr || !expr.trim()) return undefined
+-    try {
+-      return tryEvaluateExpression(expr, variables)
+-    } catch (e) {
+-      if (e instanceof ExpressionError) return undefined
+-      return undefined
+-    }
+-  }
+-
+-  const visEval = safeEval(row.def.visibleIf)
+-  const enaEval = safeEval(row.def.enabledIf)
+-  const warnEval = safeEval(row.def.warning)
+-
+-  const hidden  = visEval !== undefined && !isTruthy(visEval)
+-  const disabled = enaEval !== undefined && !isTruthy(enaEval)
+-
+-  let warning: string | null = null
+-  if (warnEval !== undefined) {
+-    if (typeof warnEval === 'string' && warnEval.trim().length > 0) warning = warnEval
+-    else if (warnEval === true) warning = 'Warning rule triggered.'
+-  }
+-
+-  return {
+-    name: row.name,
+-    hidden,
+-    disabled,
+-    discarded: hidden || disabled,
+-    warning,
+-  }
+-}
+diff --git a/web/admin/src/utils/sampleRules.ts b/web/admin/src/utils/sampleRules.ts
+new file mode 100644
+index 0000000..7c0a176
+--- /dev/null
++++ b/web/admin/src/utils/sampleRules.ts
+@@ -0,0 +1,175 @@
++/**
++ * Shared rule-evaluation logic for the submission form and the schema editor preview.
++ *
++ * Both surfaces render a form from a `Schema`, collect a value per row, and evaluate the
++ * schema's expression rules client-side so the user gets live feedback (hide/grey/warning,
++ * and — in the preview — value/schema validation pass/fail). The actual translation +
++ * evaluation lives in `expression.ts`; this module owns the submission-shaped glue: the row
++ * model, the variable context the server mirrors, the gating verdict, and a hook that
++ * prefetches every rule on a schema and re-renders once translations land.
++ *
++ * The server remains authoritative — every helper here falls back to a permissive verdict
++ * when a rule can't be translated/evaluated, so a buggy or not-yet-translated rule never makes
++ * the UI lie in the rejecting direction.
++ */
++import { useEffect, useMemo, useState } from 'react'
++import type { Schema, SchemaValue } from '../api/types'
++import { ExpressionError, isTruthy, prefetchExpressions, tryEvaluateExpression } from './expression'
++
++/** One editable row in a submission/preview form: the value definition plus what the user typed. */
++export interface ValueRow {
++  /** value name (unique within the schema) */
++  name: string
++  def: SchemaValue
++  /** Raw value as the user typed it; serialized on save. */
++  value: unknown
++  note: string
++}
++
++/** Outcome of client-side EnabledIf/VisibleIf/Warning evaluation for a single row. */
++export interface RowState {
++  name: string
++  /** True when VisibleIf is set and evaluates falsy — the row is not rendered at all. */
++  hidden: boolean
++  /** True when EnabledIf is set and evaluates falsy — the row is rendered read-only. */
++  disabled: boolean
++  /** True when this row is effectively dropped from the payload (hidden OR disabled). */
++  discarded: boolean
++  /** Optional live warning text from the per-value Warning rule. */
++  warning: string | null
++}
++
++/** Verdict for a validation rule (value-level or schema-level), mirroring the server's contract. */
++export interface RuleVerdict {
++  ok: boolean
++  /** Set when the rule rejected with a custom (non-empty string) message. */
++  message?: string
++}
++
++/** A value counts as "filled" when it isn't null/undefined/blank. false/0 are valid filled values. */
++export function isFilled(v: unknown): boolean {
++  if (v === null || v === undefined) return false
++  if (typeof v === 'string') return v.trim() !== ''
++  return true
++}
++
++/**
++ * Build the variable context client-side rules evaluate against. Mirrors the server's
++ * `BuildRuleContext`: every declared value is exposed by name (null when the row is empty),
++ * and each numeric value with bounds also contributes `<name>.minimum` / `<name>.maximum`
++ * keys. The dotted keys are unreachable as plain identifiers in NCalc — the server registers
++ * them under the bracket form `[name.minimum]`, which `helpers.var` looks up case-insensitively.
++ */
++export function buildRuleVariables(rows: ValueRow[]): Record<string, unknown> {
++  const ctx: Record<string, unknown> = {}
++  for (const r of rows) {
++    ctx[r.name] = isFilled(r.value) ? r.value : null
++    const isNumeric = r.def.type === 'Integer' || r.def.type === 'Number'
++    if (isNumeric) {
++      if (r.def.min !== null && r.def.min !== undefined) ctx[`${r.name}.minimum`] = r.def.min
++      if (r.def.max !== null && r.def.max !== undefined) ctx[`${r.name}.maximum`] = r.def.max
++    }
++  }
++  return ctx
++}
++
++/**
++ * Evaluate the three display/warning rule fields against the live submission context. Returns a
++ * `RowState` describing whether the row should be hidden, disabled, or carrying a warning.
++ * When a rule fails to parse/evaluate we fall back to "show + no warning" — the server remains
++ * authoritative so a buggy rule never makes data silently disappear from the editor.
++ */
++export function evaluateGating(row: ValueRow, variables: Record<string, unknown>): RowState {
++  // The unified `variables` bag already carries every value by its name (including this row's
++  // own current input) plus the `<name>.minimum` / `<name>.maximum` bound keys. No alias
++  // injection needed — rules reference values explicitly. tryEvaluateExpression returns
++  // undefined when translation hasn't landed yet; we treat that the same as "no rule" so the
++  // UI stays permissive until the verdict is in.
++  const visEval = safeEval(row.def.visibleIf, variables)
++  const enaEval = safeEval(row.def.enabledIf, variables)
++  const warnEval = safeEval(row.def.warning, variables)
++
++  const hidden = visEval !== undefined && !isTruthy(visEval)
++  const disabled = enaEval !== undefined && !isTruthy(enaEval)
++
++  let warning: string | null = null
++  if (warnEval !== undefined) {
++    if (typeof warnEval === 'string' && warnEval.trim().length > 0) warning = warnEval
++    else if (warnEval === true) warning = 'Warning rule triggered.'
++  }
++
++  return {
++    name: row.name,
++    hidden,
++    disabled,
++    discarded: hidden || disabled,
++    warning,
++  }
++}
++
++/**
++ * Interpret a validation rule's result the way the server does (see admin-user-guide/validation.md):
++ * `true` / `null` / `''` (and "not translated yet" → undefined) accept; `false` rejects with a
++ * generic message; a non-empty string rejects and is surfaced verbatim. Any other truthy value
++ * accepts, any other falsy value rejects — defensive only; rules normally return bool or string.
++ */
++export function interpretRuleResult(result: unknown): RuleVerdict {
++  if (result === undefined || result === null) return { ok: true }
++  if (typeof result === 'string') {
++    return result.trim().length > 0 ? { ok: false, message: result } : { ok: true }
++  }
++  if (result === true) return { ok: true }
++  if (result === false) return { ok: false }
++  return isTruthy(result) ? { ok: true } : { ok: false }
++}
++
++/**
++ * Best-effort synchronous evaluation that swallows translation/runtime errors into `undefined`
++ * (= "no decision yet"), so callers can treat a not-yet-translated or broken rule as "no rule".
++ */
++export function safeEval(expr: string | null | undefined, variables: Record<string, unknown>): unknown | undefined {
++  if (!expr || !expr.trim()) return undefined
++  try {
++    return tryEvaluateExpression(expr, variables)
++  } catch (e) {
++    if (e instanceof ExpressionError) return undefined
++    return undefined
++  }
++}
++
++/**
++ * Prefetch every rule on `schema` (display, warning, value-validation, and schema-level
++ * validations), recompute the per-row gating against the current `rows`, and re-render once
++ * translations settle. Returns the gating verdicts plus the shared variable context so callers
++ * can evaluate additional rules (e.g. the preview's validation panel) against the same bag.
++ */
++export function useSampleRules(schema: Schema | undefined, rows: ValueRow[]) {
++  // Bumped after the translator has fetched all rule scripts for the current schema. Used purely
++  // as a re-render trigger so the gating memo re-runs once concrete results are available.
++  const [rulesReady, setRulesReady] = useState(0)
++
++  useEffect(() => {
++    if (!schema) return
++    const exprs: (string | null | undefined)[] = []
++    for (const v of schema.values) {
++      exprs.push(v.enabledIf, v.visibleIf, v.warning, v.valueValidation)
++    }
++    for (const rule of schema.submissionValidations ?? []) exprs.push(rule)
++    let cancelled = false
++    prefetchExpressions(exprs).then(() => {
++      if (!cancelled) setRulesReady(t => t + 1)
++    })
++    return () => { cancelled = true }
++  }, [schema])
++
++  const ruleVariables = useMemo(() => buildRuleVariables(rows), [rows])
++
++  const rowStates = useMemo(() => {
++    // `rulesReady` is read here so the memo invalidates once new translations land in the
++    // cache. The cache lookup itself happens inside evaluateGating.
++    void rulesReady
++    return rows.map(r => evaluateGating(r, ruleVariables))
++  }, [rows, ruleVariables, rulesReady])
++
++  return { rowStates, ruleVariables, rulesReady }
++}

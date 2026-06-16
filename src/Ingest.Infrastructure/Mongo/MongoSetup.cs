@@ -74,6 +74,15 @@ public static class MongoSetup
                 new CreateIndexOptions { Unique = true, Name = "uniq_name" }),
             cancellationToken: ct);
 
+        await ctx.SchemaVersionHistories.Indexes.CreateOneAsync(
+            new CreateIndexModel<SchemaVersionHistory>(
+                // The version-history page browses a single schema newest-change-first.
+                Builders<SchemaVersionHistory>.IndexKeys
+                    .Ascending(h => h.SchemaName)
+                    .Descending(h => h.ChangeDate),
+                new CreateIndexOptions { Name = "by_schema_change" }),
+            cancellationToken: ct);
+
         await ctx.Submissions.Indexes.CreateManyAsync(new[]
         {
             new CreateIndexModel<Submission>(

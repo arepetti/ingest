@@ -58,6 +58,17 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
     }
 
     /// <inheritdoc />
+    public Task<long> CountBySchemaAsync(string schemaName, CancellationToken ct = default)
+    {
+        // Mirror the schemaName branch of ListAsync: any live submission with at least one sample
+        // for this schema counts once.
+        var filter = Builders<Submission>.Filter.And(
+            ApplySoftDelete(Builders<Submission>.Filter.Empty, includeDeleted: false),
+            Builders<Submission>.Filter.ElemMatch(s => s.Samples, Builders<Sample>.Filter.Eq(x => x.SchemaName, schemaName)));
+        return Collection.CountDocumentsAsync(filter, cancellationToken: ct);
+    }
+
+    /// <inheritdoc />
     public Task AddAsync(Submission submission, CancellationToken ct = default)
     {
         StampForCreate(submission);

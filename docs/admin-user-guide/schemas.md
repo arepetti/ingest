@@ -34,7 +34,7 @@ Each value has its own cadence: a monthly schema can contain weekly KPIs perfect
    - **Name** — stable machine-style identifier (e.g. `monthly_kpis`). Must be globally unique.
    - **Label** / **Description** / **Notes** — friendly fields used by the UI and reports.
    - **Modifiable** — when off, samples already submitted against this schema cannot be replaced (even by Admins — see *Per-value modifiability* below).
-   - **Enabled** — when off, submissions against this schema are rejected.
+   - **Enabled (Published)** — the schema's publication state. **Enabled = Published**: services can submit against it. **Enabled off = Draft**: submissions are rejected. A freshly created schema is Published if you leave the box ticked. Throughout the app and this guide, "Published" and "Draft" are just friendly names for this single flag.
    - **Audience** — *Global* (every service sees it) or *Restricted to specific services* (you pick from a dropdown of Service-role accounts).
    - **Schema-level validations** — a list editor where each row is one validation rule. Add as many as you like; each runs once per submission with every value of the schema in scope. Use these for cross-value checks like `revenue >= expenses` or `total == a + b`. See [validation.md § Schema-level rules](validation.md#schema-level-rules-cross-value) for the full syntax.
 3. Add at least one **value** (the actual KPIs). For each value:
@@ -125,6 +125,20 @@ Rules:
 - **Since version** must be in `[0, Version]`. Leave it empty for values that have always been part of the schema.
 - Cloning a schema (see below) resets `versionModifiedAt` to "now" so the clone gets a fresh window.
 
+### The publish prompt
+
+You aren't *forced* to bump the version on every edit. But changing a **Published** schema without bumping the version can silently shift what services see, so the editor nudges you. When you save and **all** of these are true — the schema is **Published** (Enabled), you made changes, and you left the version number unchanged — a dialog appears asking what to do:
+
+| Option | What it does |
+|--------|--------------|
+| **Automatically increment the version number** | Bumps the version by one, then saves. The recommended choice when you added or changed values. |
+| **Publish as-is without changing the version** | Saves your changes against the same version number. Use for cosmetic edits (labels, descriptions). |
+| **Move the schema back to Draft and apply the changes** | Unpublishes the schema (Enabled → off) and saves. **Only available when no submissions exist yet** — once data has arrived against the schema, you can't quietly pull it back to Draft. |
+| **Discard the changes** | Throws your edits away and returns to the schema list. |
+| **Cancel and keep editing** | Closes the dialog and leaves you in the editor with your changes intact. |
+
+The prompt is purely a guard rail in the UI — it never appears for **Draft** schemas, for brand-new schemas, or when you've already changed the version yourself.
+
 ## Description info icon
 
 When a value has a non-empty **Description**, the submission editor and view drawer render a small **(i)** icon next to the value's label. Hover the icon to see the description in a tooltip. Use it for short explanatory text — "Tonnes collected at the gate before sorting" — that you don't want competing with the input for vertical space.
@@ -156,7 +170,7 @@ A few subtleties:
 
 ## Disabling vs deleting
 
-- **Disable** (uncheck *Enabled* on the schema) — the schema row stays and incoming submissions against it are rejected, but every existing sample remains visible to status, the OData feed, charts, and reports. Reversible.
+- **Disable / move to Draft** (uncheck *Enabled (Published)* on the schema) — the schema row stays and incoming submissions against it are rejected, but every existing sample remains visible to status, the OData feed, charts, and reports. Reversible: re-tick *Enabled* to Publish it again.
 - **Delete** (row menu → *Delete*) — soft-delete. The schema disappears from the default listing and no further data can be submitted against it. Recovery requires manual database surgery.
 
 > The server refuses to delete a schema that has any live submission referencing it (HTTP 409, "Schema '…' is referenced by one or more submissions and cannot be deleted. Disable it instead…"). This protects historical samples from becoming orphaned. If you really want the schema gone, hard-delete the submissions first; otherwise just disable it.
@@ -175,6 +189,34 @@ Admins bypass restriction (1) via the on-behalf-of submission endpoints. Restric
 ## Viewing historical data
 
 Row menu → **View historical data** opens a per-value time series chart, one chart per numeric value in the schema, with min/max/average per cadence bucket. Useful for sanity-checking that data has been arriving steadily.
+
+In the schema view drawer the same affordance is a **split button**: the primary action still opens the historical-data charts, and the chevron menu adds **View version history** (also available from the row menu).
+
+## Viewing version history
+
+Every time a schema is saved — on first creation and on each later edit — the server records a **snapshot** of the whole schema in a separate history log. This is independent of the live schema: browsing, exporting, or deleting history **never changes the current schema**.
+
+Open it from the row menu → **View version history**, or the **View historical data** split button → **View version history**. The page is a standard data table with the usual three-dots menu (Refresh, Export CSV) and a period filter. Columns:
+
+| Column | Meaning |
+|--------|---------|
+| **Change date** | When the save happened. |
+| **Author** | Who saved it (blank for changes made outside an authenticated session). |
+| **Old version** | The version before the save (blank for the initial create). |
+| **New version** | The version after the save. A **bumped** badge marks saves that changed the number. |
+| **Status** | Whether the schema was **Published** or **Draft** at that point. |
+| **Submissions** | How many submissions existed for the schema at the time of the save. |
+
+Click a row (or row menu → **View this version**) to open a **read-only** copy of the editor showing the schema exactly as it was at that point in time. Nothing on that page can be changed — it's purely for inspection.
+
+### Cleaning up history (Admins)
+
+Administrators can prune the history to reclaim space or cut noise:
+
+- **Row menu → Delete this entry** removes a single snapshot.
+- **Three-dots menu → Delete all history** clears every snapshot for the schema (after a confirmation).
+
+Both actions are **recorded in the audit log** (as a Delete against the schema), so cleanup is itself traceable. As above, deleting history has no effect on the live schema or its current version.
 
 ## Where to go next
 

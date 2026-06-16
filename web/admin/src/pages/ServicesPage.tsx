@@ -6,10 +6,10 @@ import {
   RadioGroup, Radio,
   Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TableCellLayout,
   Title2, Tooltip, makeStyles, MessageBarBody, MessageBarTitle,
-  Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger,
+  Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, SplitButton,
   Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, Delete20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, Delete20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, PersonAdd20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { useNavigate } from 'react-router-dom'
 import { fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCreateAccount, useDeleteAccount, useEraseAccount, useMe, useRevokeApiKey, useRotateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
@@ -17,6 +17,7 @@ import type { Account, AccountKind, AccountRole, AuthProvider, CreateAccountRequ
 import { downloadFromUrl } from '../utils/download'
 import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
+import { OnboardAccountWizard } from '../components/OnboardAccountWizard'
 import { AccountAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
@@ -118,6 +119,8 @@ export function ServicesPage() {
   const [eraseDialogFor, setEraseDialogFor] = useState<Account | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [rotatedPlaintext, setRotatedPlaintext] = useState<string | null>(null)
+  // Which "onboard new …" wizard is open (role drives the wizard config), or null when none.
+  const [onboarding, setOnboarding] = useState<AccountRole | null>(null)
   const accountsExport = useCsvExport({
     filename: 'accounts.csv',
     columns: ACCOUNT_EXPORT_COLUMNS,
@@ -216,6 +219,9 @@ export function ServicesPage() {
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
+                <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Service')}>Onboard new service</MenuItem>
+                <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Operator')}>Onboard new operator</MenuItem>
+                <MenuDivider />
                 <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
                 <MenuDivider />
                 <MenuItem
@@ -437,8 +443,35 @@ export function ServicesPage() {
               <ToolbarButton icon={<Status20Regular />} onClick={() => statusFromView(viewing)}>View status</ToolbarButton>
             )}
             <ToolbarButton icon={<ArrowDownload20Regular />} onClick={() => exportPersonalData(viewing)}>Export data</ToolbarButton>
-            <ToolbarButton icon={<ShieldPerson20Regular />} onClick={() => eraseFromView(viewing)}>Erase (GDPR)</ToolbarButton>
-            <ToolbarButton icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>Delete</ToolbarButton>
+            {/* Default action is Delete; the chevron exposes the heavier GDPR erase as a subitem. */}
+            <Menu positioning="below-end">
+              <MenuTrigger disableButtonEnhancement>
+                {(triggerProps) => (
+                  <SplitButton
+                    menuButton={triggerProps}
+                    primaryActionButton={{ onClick: () => deleteFromView(viewing) }}
+                    appearance="subtle"
+                    icon={<Delete20Regular />}
+                  >
+                    Delete
+                  </SplitButton>
+                )}
+              </MenuTrigger>
+              <MenuPopover>
+                <MenuList>
+                  <MenuItem icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>
+                    Delete
+                  </MenuItem>
+                  <MenuItem
+                    icon={<ShieldPerson20Regular />}
+                    onClick={() => eraseFromView(viewing)}
+                    style={{ color: 'var(--colorPaletteRedForeground1)' }}
+                  >
+                    Erase (GDPR)
+                  </MenuItem>
+                </MenuList>
+              </MenuPopover>
+            </Menu>
           </Toolbar>
         )}
         <DrawerBody>
@@ -451,6 +484,18 @@ export function ServicesPage() {
       <SendEmailDialog account={emailDialogFor} onClose={() => setEmailDialogFor(null)} />
 
       <EraseDialog account={eraseDialogFor} onClose={() => setEraseDialogFor(null)} />
+
+      {onboarding && (
+        <OnboardAccountWizard
+          open
+          onClose={() => setOnboarding(null)}
+          role={onboarding}
+          title={onboarding === 'Operator' ? 'Onboard a new operator' : 'Onboard a new service'}
+          // Operators are always interactive User accounts, so lock the Kind for that flow.
+          defaultKind={onboarding === 'Operator' ? 'User' : 'Application'}
+          lockKind={onboarding === 'Operator'}
+        />
+      )}
     </div>
   )
 }

@@ -152,6 +152,87 @@ public sealed class AdminSchemasController(ISchemaService service) : ControllerB
         return history is null ? NotFound() : Ok(SchemaHistoryMapper.ToDto(history));
     }
 
+    /// <summary>Page through a schema's saved version snapshots, newest change first.</summary>
+    /// <remarks>
+    /// One snapshot is written on every schema save (create or update). Each row records who saved
+    /// it, when, the version before/after, whether the version was bumped, whether the schema was
+    /// Published (Enabled) or Draft, and the submission count at that point. The schema body itself
+    /// is omitted here — fetch a single entry to get the full snapshot.
+    /// </remarks>
+    /// <param name="name">Schema name.</param>
+    /// <param name="page">1-based page number; defaults to 1.</param>
+    /// <param name="pageSize">Page size; defaults to 50.</param>
+    /// <param name="from">Lower bound on the change date (inclusive).</param>
+    /// <param name="to">Upper bound on the change date (exclusive).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">A page of version-history entries.</response>
+    [HttpGet("{name}/version-history")]
+    [ProducesResponseType(typeof(PagedResponse<SchemaVersionHistoryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetVersionHistory(
+        string name,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        CancellationToken ct)
+    {
+        var result = await service.GetVersionHistoryAsync(
+            name, RequestHelpers.ToPageRequest(page, pageSize, null, false), from, to, ct);
+        return Ok(result.Map(SchemaVersionHistoryDto.From));
+    }
+
+    /// <summary>Fetch a single version-history entry, including the full schema snapshot.</summary>
+    /// <param name="name">Schema name the entry belongs to.</param>
+    /// <param name="entryId">Snapshot id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The snapshot and its metadata.</response>
+    /// <response code="404">No entry with that id under this schema.</response>
+    [HttpGet("{name}/version-history/{entryId:guid}")]
+    [ProducesResponseType(typeof(SchemaVersionSnapshotDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetVersionSnapshot(string name, Guid entryId, CancellationToken ct)
+    {
+        var entry = await service.GetVersionSnapshotAsync(entryId, ct);
+        if (entry is null || !string.Equals(entry.SchemaName, name, StringComparison.Ordinal))
+            return NotFound();
+        return Ok(SchemaVersionSnapshotDto.From(entry));
+    }
+
+    /// <summary>Permanently delete one version-history entry.</summary>
+    /// <remarks>
+    /// Audited (recorded as a Delete against the schema). Never affects the live schema or its
+    /// current version — this only cleans up the history log.
+    /// </remarks>
+    /// <param name="name">Schema name the entry belongs to.</param>
+    /// <param name="entryId">Snapshot id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="204">Entry deleted.</response>
+    /// <response code="404">No entry with that id under this schema.</response>
+    [HttpDelete("{name}/version-history/{entryId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteVersionEntry(string name, Guid entryId, CancellationToken ct)
+    {
+        var ok = await service.DeleteVersionEntryAsync(name, entryId, ct);
+        return ok ? NoContent() : NotFound();
+    }
+
+    /// <summary>Permanently delete the entire version history for a schema.</summary>
+    /// <remarks>
+    /// Audited (recorded as a Delete against the schema). Never affects the live schema or its
+    /// current version — this only clears the history log.
+    /// </remarks>
+    /// <param name="name">Schema name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="204">History cleared (or already empty — call is idempotent).</response>
+    [HttpDelete("{name}/version-history")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteVersionHistory(string name, CancellationToken ct)
+    {
+        await service.DeleteVersionHistoryAsync(name, ct);
+        return NoContent();
+    }
+
     /// <summary>Maps the wire-format <see cref="UpsertSchemaRequest"/> onto a fresh <see cref="Schema"/> entity.</summary>
     /// <remarks>
     /// No business rules here — that's the service's job. This method only copies fields and

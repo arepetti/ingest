@@ -22,6 +22,9 @@ public sealed class MongoContext
     /// <summary><c>schemas</c> collection (KPI definitions).</summary>
     public IMongoCollection<Schema> Schemas => Database.GetCollection<Schema>("schemas");
 
+    /// <summary><c>schemaVersionHistories</c> collection — one snapshot per schema save (create/update).</summary>
+    public IMongoCollection<SchemaVersionHistory> SchemaVersionHistories => Database.GetCollection<SchemaVersionHistory>("schemaVersionHistories");
+
     /// <summary><c>submissions</c> collection (raw batches as received).</summary>
     public IMongoCollection<Submission> Submissions => Database.GetCollection<Submission>("submissions");
 

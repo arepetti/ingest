@@ -1,0 +1,2014 @@
+From 0797e4cc4696032fe62fef73fc0e2e65e9478f88 Mon Sep 17 00:00:00 2001
+From: Adriano Repetti <adriano.repetti@pwc.com>
+Date: Mon, 15 Jun 2026 11:42:17 +0200
+Subject: [PATCH] Data explorer
+
+---
+ CHANGELOG.md                                  |  48 ++
+ Directory.Build.props                         |   2 +-
+ docs/admin-user-guide/README.md               |   5 +-
+ docs/admin-user-guide/explore.md              | 105 +++
+ docs/architecture/architecture.md             |   4 +
+ .../Controllers/ExploreController.cs          |  56 ++
+ src/Ingest.Api/Models/Dtos.cs                 |  84 ++
+ .../Abstractions/IExploreService.cs           | 119 +++
+ src/Ingest.Core/Abstractions/IRepositories.cs |  20 +
+ .../DependencyInjection.cs                    |   1 +
+ .../Mongo/SampleRepository.cs                 |  32 +
+ .../Services/ExploreService.cs                | 130 +++
+ tests/Ingest.Tests/AccountServiceTests.cs     |   3 +
+ tests/Ingest.Tests/GdprServiceTests.cs        |   1 +
+ tests/Ingest.Tests/ReportServiceTests.cs      |   2 +
+ tests/Ingest.Tests/SchemaServiceTests.cs      |   3 +
+ .../Ingest.Tests/StatusServiceMissingTests.cs |   3 +
+ web/admin/src/App.tsx                         |   2 +
+ web/admin/src/api/hooks.ts                    |  33 +
+ web/admin/src/api/types.ts                    |  54 ++
+ web/admin/src/components/TopBar.tsx           |   5 +
+ web/admin/src/pages/ExplorePage.tsx           | 792 ++++++++++++++++++
+ web/admin/src/pages/SchemaHistoryPage.tsx     |  52 +-
+ web/admin/src/pages/Shell.tsx                 |   5 +-
+ web/admin/src/utils/chartExport.ts            |  63 ++
+ web/admin/src/utils/periodFormat.ts           |  53 ++
+ 26 files changed, 1624 insertions(+), 53 deletions(-)
+ create mode 100644 CHANGELOG.md
+ create mode 100644 docs/admin-user-guide/explore.md
+ create mode 100644 src/Ingest.Api/Controllers/ExploreController.cs
+ create mode 100644 src/Ingest.Core/Abstractions/IExploreService.cs
+ create mode 100644 src/Ingest.Infrastructure/Services/ExploreService.cs
+ create mode 100644 web/admin/src/pages/ExplorePage.tsx
+ create mode 100644 web/admin/src/utils/chartExport.ts
+ create mode 100644 web/admin/src/utils/periodFormat.ts
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+new file mode 100644
+index 0000000..8a96d41
+--- /dev/null
++++ b/CHANGELOG.md
+@@ -0,0 +1,48 @@
++# Changelog
++
++Notable changes per release. Versions are newest-first. No breaking changes have been released so far.
++
++## 0.3.0
++
++### Added
++
++- Explore page: lightweight in-app analytics for numeric KPIs (trend, service comparison, and latest-value snapshot), with an optional trend projection, CSV/PNG export, and shareable filter links. A convenience for deployments without a BI tool; Power BI remains the primary analytics surface.
++- Data export: download lists and reports as CSV, with reusable period filters.
++- Outbound webhooks so external systems can react to events.
++- Schema version history: track and review how schemas change over time.
++
++## 0.2.0
++
++### Added
++
++- Single sign-on (SSO) for signing in to the admin console.
++- Audit log of administrative actions, browsable from the console.
++- Email addresses on accounts, plus SMTP-based email notifications.
++- Bulk import of submissions.
++- Backup and restore of system data.
++- Expiration dates for API keys.
++- GDPR support: per-subject data export and erasure.
++- Recording of validation warnings, so unusual-but-valid values are retained and surfaced.
++- Dedicated analytics for missing submissions, including dashboard widgets.
++
++### Changed
++
++- Reworked and polished the admin console UI.
++- Improved accessibility across the admin console.
++- Added safeguards that prevent accidental destructive edits to submitted data.
++
++## 0.1.0
++
++### Added
++
++Initial release. Core capabilities:
++
++- KPI schema catalogue: typed values with units, per-value reporting cadences, and required flags.
++- Server-side validation: type/range/regex checks, custom rule expressions, conditional fields, soft warnings, and cadence (one-submission-per-window) enforcement.
++- Data submission via a REST API or the bundled admin web console, including entry on behalf of a service.
++- Admin SPA (Fluent UI) for managing services, schemas, and submissions, with per-service status tracking.
++- API-key authentication with Service / Operator / Admin roles, plus key rotation and revocation.
++- OData v4 feed for Power BI and other reporting tools.
++- HTML + Liquid report templates.
++- Ships as a single Docker image (API + admin SPA) backed by MongoDB.
++
+diff --git a/Directory.Build.props b/Directory.Build.props
+index aac6809..f335d59 100644
+--- a/Directory.Build.props
++++ b/Directory.Build.props
+@@ -5,7 +5,7 @@
+     GET /api/me (shown in the dashboard footer).
+   -->
+   <PropertyGroup>
+-    <Version>0.1.0</Version>
++    <Version>0.3.0</Version>
+     <Product>Ingest</Product>
+   </PropertyGroup>
+ </Project>
+diff --git a/docs/admin-user-guide/README.md b/docs/admin-user-guide/README.md
+index b2ef9d5..a0ce249 100644
+--- a/docs/admin-user-guide/README.md
++++ b/docs/admin-user-guide/README.md
+@@ -10,6 +10,7 @@ The guide is split into focused pages — pick whichever matches the task at han
+ | [schemas.md](schemas.md)                      | Designing schemas: per-value type/cadence flags, multi-line validation rules, conditional display (`Enabled if` / `Visible if`), warnings, historical-data view. |
+ | [submissions.md](submissions.md)              | Browsing submissions with filters, editing/creating on behalf of a service, bulk-importing history from JSON/CSV, deleting submissions. |
+ | [reports.md](reports.md)                      | Uploading HTML+Liquid report templates, what data they receive, the viewer's filter bar. |
++| [explore.md](explore.md)                      | Lightweight in-app analytics: charting numeric KPIs by period and service (Trend / Compare / Snapshot). A convenience for deployments without a BI tool — PowerBI is still the primary analytics surface. |
+ | [settings.md](settings.md)                    | Admin-only settings hub: email (SMTP) settings, editable notification templates, notification triggers & recipients, ad-hoc email send, and retention policy. |
+ | [webhooks.md](webhooks.md)                    | Outbound webhooks: registering signed endpoints, subscribing to submission/window events, signature verification, retries and the delivery log. |
+ | [tools.md](tools.md)                          | Admin-only operational utilities — currently backup & restore (a convenience tool, *not* the primary backup). |
+@@ -34,7 +35,7 @@ If your deployment has [SSO](../architecture/authentication.md#single-sign-on-op
+ 
+ Once logged in:
+ 
+-- The left sidebar carries **Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Missing**, **Reports**, and (admins only) **Audit**, **Tools** and **Settings**.
++- The left sidebar carries **Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Missing**, **Explore**, **Reports**, and (admins only) **Audit**, **Tools** and **Settings**.
+ - Service-role users see a stripped-down sidebar (Dashboard + Submissions only) — Schemas, Accounts and Reports call admin endpoints.
+ - Your friendly **label** (or **name** as a fallback) and role show at the bottom.
+ - **Sign out** is the icon next to your name.
+@@ -67,7 +68,7 @@ The dashboard greets you by **label** (or **name**) and surfaces a few at-a-glan
+ - For Admins / Operators: total counts of services, schemas and submissions, plus a **Missing submissions** section showing one card per cadence (Daily / Weekly / Fortnightly / Monthly / Quarterly / Semi-annually / Yearly) that currently has work outstanding. Each card lists the affected `service • schema` rows with a `missing/total` count, and each row links straight to that service's status page so you can drill in. Cadences with nothing missing are simply omitted — if the whole section is gone, everyone is up to date for the current windows.
+ - For Services: their own status (same data as `/api/me/status`).
+ 
+-The dashboard is intentionally lightweight — a health check, not an analytics surface. The **Missing submissions** section can take a few seconds to load on a full registry because it evaluates every required KPI across all services; see [setup/performance.md § Response times](../setup/performance.md#response-times). The **primary way to explore the data is PowerBI** (or any similar BI/OData client) pointed at the OData feed — see [setup/powerbi.md](../setup/powerbi.md) — or `/api/admin/query` from a custom dashboard. The built-in [reports](reports.md) are likewise a basic, developer-authored convenience, **not** an operator analytics tool. Use PowerBI for real exploration, slicing and charting.
++The dashboard is intentionally lightweight — a health check, not an analytics surface. The **Missing submissions** section can take a few seconds to load on a full registry because it evaluates every required KPI across all services; see [setup/performance.md § Response times](../setup/performance.md#response-times). The **primary way to explore the data is PowerBI** (or any similar BI/OData client) pointed at the OData feed — see [setup/powerbi.md](../setup/powerbi.md) — or `/api/admin/query` from a custom dashboard. The built-in [Explore](explore.md) page (quick in-app charts) and [reports](reports.md) are likewise basic conveniences, **not** a full analytics tool. Use PowerBI for real exploration, slicing and charting.
+ 
+ ## Services console (Service-role users)
+ 
+diff --git a/docs/admin-user-guide/explore.md b/docs/admin-user-guide/explore.md
+new file mode 100644
+index 0000000..77625d9
+--- /dev/null
++++ b/docs/admin-user-guide/explore.md
+@@ -0,0 +1,105 @@
++# Explore
++
++> **Explore is not a BI tool.** It's a deliberately small, in-app convenience for getting a quick
++> read on your numeric KPIs without leaving the admin console — a few charts, a comparison, a
++> snapshot table. It has no pivoting, no cross-schema analysis, no calculated measures and no large
++> result sets.
++>
++> **The primary way to explore the data is PowerBI (or any similar BI/OData client) pointed at the
++> OData feed** — see [setup/powerbi.md](../setup/powerbi.md). That's where real filtering, slicing,
++> charting and big datasets belong. Reach for Explore when you just want a fast look from inside the
++> console (handy when a deployment has no BI tooling or a tight budget); reach for PowerBI for
++> everything else.
++
++The **Explore** page (operators and admins) charts the numeric values of a single schema, broken
++down by reporting period and by service. Everything is aggregated **server-side** — the browser
++never downloads raw samples — so it stays responsive at the reference data volumes (see
++[setup/performance.md](../setup/performance.md)).
++
++## The filter bar
++
++Every view shares one filter bar at the top. The current selection is encoded in the page URL, so
++you can bookmark a view or paste the link to a colleague and they'll land on exactly the same
++chart.
++
++| Filter        | What it does |
++|---------------|--------------|
++| **Schema**    | The schema to explore. Only one at a time. |
++| **Value**     | Which numeric value to chart (Trend and Compare only). Only `Number` and `Integer` values appear — text, date and boolean values can't be aggregated. |
++| **Services**  | Restrict to one or more services. Empty means *all services*. |
++| **Aggregation** | How the samples in each period bucket are reduced: **Average**, **Sum**, **Minimum**, **Maximum**, or **Sample count**. |
++| **Period**    | A relative range (last day / week / month) or a custom from/to window. *All time* by default. |
++
++Samples are grouped into buckets by each value's own **cadence** (Daily, Weekly, Monthly, …), the
++same boundaries the rest of the system uses. Submissions from different services in the same window
++collapse onto the same bucket automatically.
++
++## The three views
++
++### Trend
++
++A line chart of the chosen value over time, **one line per service**. Toggle **Combine services**
++to collapse them into a single line for the whole registry. Use this to answer "is this number
++going up or down?".
++
++The **Average** aggregation across the whole range is an exact, count-weighted mean (each period is
++weighted by how many samples it held), not a naive average of the per-period averages.
++
++Toggle **Projection** to extend the chart by the next two periods. Each line gains a dashed
++continuation fitted from its own history (a simple straight-line / least-squares trend), and in
++per-service mode a single grey **Overall trend** line shows the aggregate direction. It's a rough
++"if the recent trend continued" guide for conversation, not a forecast — it ignores seasonality and
++one-off spikes, so treat it as indicative only.
++
++### Compare
++
++A horizontal bar chart, **one bar per service**, ranking services by the chosen aggregation over the
++whole selected period. Use this to answer "who's highest / lowest?".
++
++### Snapshot
++
++A table of the **latest period's value for every service and every numeric value** on the schema.
++Each column header shows the value and which period it's reporting. Use this as a current-state
++scoreboard.
++
++## Stat cards
++
++Above the Trend and Compare charts a row of cards summarises the current selection: the overall
++aggregate, the latest period's figure, the total number of samples, and how many periods and
++services are in scope.
++
++## Reading the numbers another way
++
++- **View as table.** Each chart has a **View as table** toggle that swaps the chart for the same
++  numbers in a grid — useful for copy-pasting or for screen-reader users.
++- **Export CSV (this view).** The **⋮** menu exports exactly what the active view shows
++  (per-period per-service for Trend, per-service for Compare, the latest-value matrix for Snapshot).
++- **Export chart (PNG).** Saves the current Trend or Compare chart as an image for a slide or email.
++
++## Limits and caveats
++
++- **Numeric values only.** String, date and boolean values are skipped — there's nothing to chart.
++- **One schema at a time.** There is no cross-schema view by design.
++- **Capped result set.** The query is bounded (well above the reference volume for one schema over a
++  couple of years). If you somehow exceed it, narrow the period or the service list — or, better,
++  use PowerBI for analysis at that scale.
++- **Aggregated, not raw.** Explore shows reduced figures per period. To see or export individual
++  samples, use the [submissions](submissions.md) page, the OData feed, or `POST /api/admin/query`.
++
++## API
++
++The page is backed by a single read-only endpoint (operator/admin):
++
++```
++GET /api/admin/explore/series
++    ?schema={name}            # required
++    &value={valueName}        # repeatable; omit for every numeric value
++    &serviceIds={guid}        # repeatable; omit for every service
++    &from={iso}&to={iso}      # optional half-open window [from, to)
++    &agg={Average|Sum|Min|Max|Count}   # defaults to Average
++```
++
++It returns one timeline per in-scope numeric value, each as a list of cadence buckets carrying the
++overall reduced value plus a per-service breakdown, along with the resolved service list. A `404`
++means no schema with that name. This is the same endpoint the SPA calls, so you can drive it from
++your own tooling if you'd rather not build against OData for a simple chart.
+diff --git a/docs/architecture/architecture.md b/docs/architecture/architecture.md
+index d844b71..34202c8 100644
+--- a/docs/architecture/architecture.md
++++ b/docs/architecture/architecture.md
+@@ -247,6 +247,10 @@ Indexes are ensured on startup by `MongoSetup.EnsureIndexesAsync`:
+ 
+ `Report` documents are HTML+Liquid templates uploaded by admins and stored verbatim alongside their parsed YAML front-matter metadata (`Name`, `Label`, `Description`, `Type`, `TargetSchemaNames`). Rendering is server-side via [Fluid](https://github.com/sebastienros/fluid) running with an `UnsafeMemberAccessStrategy` so templates can reach into the curated data envelope (schema, services, value buckets, samples) without per-type registration. The envelope shape depends on `ReportType`: `Single` carries one submission and the owning schema/service; `Aggregate` carries the per-value bucketed history of a schema over a date range. Render output is dropped into a `sandbox=""` iframe in the SPA so any script/style hostility in the template is neutralised. See [admin-user-guide/reports.md](../admin-user-guide/reports.md) for the author-facing reference.
+ 
++## Explore (in-app analytics)
++
++`ExploreService` powers the operator-facing **Explore** page (`GET /api/admin/explore/series`). It loads the live sample projections for one schema — narrowed by value name, service and timestamp window through `ISampleRepository.GetForExploreAsync` (a bounded `Find`, capped well above the reference volume) — and folds them in memory into per-cadence buckets, each carrying an overall reduction and a per-service breakdown for the requested aggregation (Average/Sum/Min/Max/Count). Because period boundaries are pre-computed at submission time, samples from different services in the same window collapse onto the same bucket for free. It's a deliberately small convenience over the projection (Trend/Compare/Snapshot charts), not a BI engine — serious analysis still belongs in Power BI against the OData feed. See [admin-user-guide/explore.md](../admin-user-guide/explore.md).
++
+ ## Email & notifications
+ 
+ The subsystem is split into two deliberately decoupled halves so the *delivery* mechanism and the *decision* logic can evolve (or be swapped/extracted) independently. The whole subsystem is gated by `Email:Enabled` (default on) — when off, the services, workers, controllers' effects, and the related SPA surfaces all stand down.
+diff --git a/src/Ingest.Api/Controllers/ExploreController.cs b/src/Ingest.Api/Controllers/ExploreController.cs
+new file mode 100644
+index 0000000..88d5f20
+--- /dev/null
++++ b/src/Ingest.Api/Controllers/ExploreController.cs
+@@ -0,0 +1,56 @@
++using Ingest.Api.Auth;
++using Ingest.Api.Models;
++using Ingest.Core.Abstractions;
++using Microsoft.AspNetCore.Authorization;
++using Microsoft.AspNetCore.Mvc;
++
++namespace Ingest.Api.Controllers;
++
++/// <summary>
++/// Lightweight in-app analytics for the bundled "Explore" page. Aggregates the denormalised sample
++/// projection into per-cadence buckets with a per-service breakdown so operators can chart trends,
++/// compare services and read off the latest period without an external BI tool. Operator/Admin.
++/// </summary>
++/// <remarks>
++/// This is a convenience for deployments without Power BI/Excel, not a replacement for them: the
++/// query is capped and intentionally narrow (one schema, numeric values, server-side aggregation).
++/// For ad-hoc analysis at scale use the OData feed or <c>POST /api/admin/query</c>.
++/// </remarks>
++[ApiController]
++[Route("api/admin/explore")]
++[Authorize(Policy = AuthConstants.OperatorPolicy)]
++public sealed class ExploreController(IExploreService explore) : ControllerBase
++{
++    /// <summary>
++    /// Build a per-value, per-cadence, per-service series for one schema. Only numeric values are
++    /// returned; non-numeric and unknown value names are ignored.
++    /// </summary>
++    /// <param name="schema">Machine-style schema name to explore. Required.</param>
++    /// <param name="value">Restrict to these value names (repeatable). Omit for every numeric value.</param>
++    /// <param name="serviceIds">Restrict to these services (repeatable). Omit for every service.</param>
++    /// <param name="from">Inclusive lower bound on the sample timestamp.</param>
++    /// <param name="to">Exclusive upper bound on the sample timestamp.</param>
++    /// <param name="agg">How each bucket reduces its samples; defaults to <see cref="ExploreAggregation.Average"/>.</param>
++    /// <param name="ct">Cancellation token.</param>
++    /// <response code="200">The series. <see cref="ExploreSeriesResponse"/>.</response>
++    /// <response code="404">No schema with that name.</response>
++    [HttpGet("series")]
++    [ProducesResponseType(typeof(ExploreSeriesResponse), StatusCodes.Status200OK)]
++    [ProducesResponseType(StatusCodes.Status404NotFound)]
++    public async Task<IActionResult> GetSeries(
++        [FromQuery] string schema,
++        [FromQuery(Name = "value")] List<string>? value,
++        [FromQuery] List<Guid>? serviceIds,
++        [FromQuery] DateTime? from,
++        [FromQuery] DateTime? to,
++        [FromQuery] ExploreAggregation agg,
++        CancellationToken ct)
++    {
++        if (string.IsNullOrWhiteSpace(schema))
++            return BadRequest(new { error = "The 'schema' query parameter is required." });
++
++        var query = new ExploreSeriesQuery(schema, value, serviceIds, from, to, agg);
++        var result = await explore.GetSeriesAsync(query, ct);
++        return result is null ? NotFound() : Ok(ExploreSeriesResponse.FromResult(result));
++    }
++}
+diff --git a/src/Ingest.Api/Models/Dtos.cs b/src/Ingest.Api/Models/Dtos.cs
+index a256013..85864dd 100644
+--- a/src/Ingest.Api/Models/Dtos.cs
++++ b/src/Ingest.Api/Models/Dtos.cs
+@@ -855,6 +855,90 @@ public sealed record SchemaHistoryDto(
+     string? Label,
+     List<SchemaValueHistoryDto> Values);
+ 
++/// <summary>One service's reduced value inside an Explore bucket.</summary>
++/// <param name="ServiceId">Service account id (join key back to <see cref="ExploreSeriesResponse.Services"/>).</param>
++/// <param name="Value">The bucket reduced by the requested aggregation, for this service only.</param>
++/// <param name="Count">Number of samples this service contributed to the bucket.</param>
++public sealed record ExploreServicePointDto(Guid ServiceId, double Value, int Count)
++{
++    /// <summary>Project the domain entity onto the wire shape.</summary>
++    public static ExploreServicePointDto From(ExploreServicePoint p) => new(p.ServiceId, p.Value, p.Count);
++}
++
++/// <summary>One cadence bucket of an Explore value series, with the overall and per-service reductions.</summary>
++/// <param name="PeriodStart">Inclusive bucket start.</param>
++/// <param name="PeriodEnd">Exclusive bucket end.</param>
++/// <param name="Value">The bucket reduced across every in-scope service.</param>
++/// <param name="Count">Total samples folded into the bucket.</param>
++/// <param name="Services">Per-service reductions.</param>
++public sealed record ExploreBucketDto(
++    DateTime PeriodStart,
++    DateTime PeriodEnd,
++    double Value,
++    int Count,
++    List<ExploreServicePointDto> Services)
++{
++    /// <summary>Project the domain entity onto the wire shape.</summary>
++    public static ExploreBucketDto From(ExploreBucket b) => new(
++        b.PeriodStart, b.PeriodEnd, b.Value, b.Count,
++        b.Services.Select(ExploreServicePointDto.From).ToList());
++}
++
++/// <summary>A single value's bucketed Explore timeline.</summary>
++/// <param name="ValueName">Machine-style value name.</param>
++/// <param name="Label">Friendly label.</param>
++/// <param name="Type">Value type (always numeric).</param>
++/// <param name="Cadence">Cadence the buckets follow.</param>
++/// <param name="Unit">Unit of measure.</param>
++/// <param name="Buckets">Buckets ordered chronologically.</param>
++public sealed record ExploreValueSeriesDto(
++    string ValueName,
++    string? Label,
++    SchemaValueType Type,
++    Cadence Cadence,
++    string? Unit,
++    List<ExploreBucketDto> Buckets)
++{
++    /// <summary>Project the domain entity onto the wire shape.</summary>
++    public static ExploreValueSeriesDto From(ExploreValueSeries v) => new(
++        v.ValueName, v.Label, v.Type, v.Cadence, v.Unit,
++        v.Buckets.Select(ExploreBucketDto.From).ToList());
++}
++
++/// <summary>A service appearing in an Explore result, with its label resolved.</summary>
++/// <param name="ServiceId">Service account id.</param>
++/// <param name="ServiceName">Machine-style service name.</param>
++/// <param name="ServiceLabel">Friendly label, or <c>null</c>.</param>
++public sealed record ExploreServiceRefDto(Guid ServiceId, string ServiceName, string? ServiceLabel)
++{
++    /// <summary>Project the domain entity onto the wire shape.</summary>
++    public static ExploreServiceRefDto From(ExploreServiceRef s) => new(s.ServiceId, s.ServiceName, s.ServiceLabel);
++}
++
++/// <summary>Wire shape of <c>GET /api/admin/explore/series</c>: a per-value, per-cadence, per-service breakdown.</summary>
++/// <param name="SchemaName">Schema that was explored.</param>
++/// <param name="SchemaLabel">Friendly schema label.</param>
++/// <param name="Aggregation">The aggregation applied to every bucket.</param>
++/// <param name="From">Resolved lower bound echoed back from the request.</param>
++/// <param name="To">Resolved upper bound echoed back from the request.</param>
++/// <param name="Services">Every service appearing in the result.</param>
++/// <param name="Values">One timeline per in-scope numeric value.</param>
++public sealed record ExploreSeriesResponse(
++    string SchemaName,
++    string? SchemaLabel,
++    ExploreAggregation Aggregation,
++    DateTime? From,
++    DateTime? To,
++    List<ExploreServiceRefDto> Services,
++    List<ExploreValueSeriesDto> Values)
++{
++    /// <summary>Project the domain result onto the wire shape. (Named <c>FromResult</c> rather than the usual <c>From</c> because the record already carries a <c>From</c> date property.)</summary>
++    public static ExploreSeriesResponse FromResult(ExploreSeriesResult r) => new(
++        r.SchemaName, r.SchemaLabel, r.Aggregation, r.From, r.To,
++        r.Services.Select(ExploreServiceRefDto.From).ToList(),
++        r.Values.Select(ExploreValueSeriesDto.From).ToList());
++}
++
+ /// <summary>Wire representation of a stored Liquid report.</summary>
+ /// <param name="Id">Stable identifier.</param>
+ /// <param name="Name">Machine-style unique name (URL segment).</param>
+diff --git a/src/Ingest.Core/Abstractions/IExploreService.cs b/src/Ingest.Core/Abstractions/IExploreService.cs
+new file mode 100644
+index 0000000..d5bf8e2
+--- /dev/null
++++ b/src/Ingest.Core/Abstractions/IExploreService.cs
+@@ -0,0 +1,119 @@
++using Ingest.Core.Entities;
++
++namespace Ingest.Core.Abstractions;
++
++/// <summary>
++/// The aggregation a single <see cref="IExploreService"/> bucket reduces its samples to. Picked
++/// by the caller; the same query shape supports every option so the UI can switch without a
++/// round-trip change.
++/// </summary>
++public enum ExploreAggregation
++{
++    /// <summary>Arithmetic mean of the samples in the bucket.</summary>
++    Average = 0,
++
++    /// <summary>Sum of the samples in the bucket.</summary>
++    Sum = 1,
++
++    /// <summary>Smallest sample in the bucket.</summary>
++    Min = 2,
++
++    /// <summary>Largest sample in the bucket.</summary>
++    Max = 3,
++
++    /// <summary>Number of samples in the bucket (the reduced value equals the count).</summary>
++    Count = 4,
++}
++
++/// <summary>Filter + shaping options for an <see cref="IExploreService.GetSeriesAsync"/> call.</summary>
++/// <param name="SchemaName">Machine-style schema name to explore. Required.</param>
++/// <param name="ValueNames">
++/// Restrict to these value names. <c>null</c> or empty means "every numeric value on the schema".
++/// Non-numeric and unknown names are ignored.
++/// </param>
++/// <param name="ServiceIds">Restrict to samples from these services. <c>null</c> or empty means "every service".</param>
++/// <param name="From">Inclusive lower bound on the sample timestamp.</param>
++/// <param name="To">Exclusive upper bound on the sample timestamp.</param>
++/// <param name="Aggregation">How each cadence bucket reduces its samples.</param>
++public sealed record ExploreSeriesQuery(
++    string SchemaName,
++    IReadOnlyList<string>? ValueNames,
++    IReadOnlyList<Guid>? ServiceIds,
++    DateTime? From,
++    DateTime? To,
++    ExploreAggregation Aggregation);
++
++/// <summary>A service that appears in an explore result, with its friendly label resolved.</summary>
++/// <param name="ServiceId">Service account id.</param>
++/// <param name="ServiceName">Machine-style service name (snapshot from the samples).</param>
++/// <param name="ServiceLabel">Friendly label, or <c>null</c> when none is set.</param>
++public sealed record ExploreServiceRef(Guid ServiceId, string ServiceName, string? ServiceLabel);
++
++/// <summary>One service's reduced value inside a single cadence bucket.</summary>
++/// <param name="ServiceId">Service account id (join key back to <see cref="ExploreServiceRef"/>).</param>
++/// <param name="Value">The bucket reduced by the query's <see cref="ExploreAggregation"/>.</param>
++/// <param name="Count">Number of samples this service contributed to the bucket.</param>
++public sealed record ExploreServicePoint(Guid ServiceId, double Value, int Count);
++
++/// <summary>One cadence bucket of a value's timeline, carrying the overall and per-service reductions.</summary>
++/// <param name="PeriodStart">Inclusive bucket start, aligned to the value's cadence.</param>
++/// <param name="PeriodEnd">Exclusive bucket end.</param>
++/// <param name="Value">The bucket reduced across every in-scope service.</param>
++/// <param name="Count">Total samples folded into the bucket across every service.</param>
++/// <param name="Services">Per-service reductions, ordered by service name.</param>
++public sealed record ExploreBucket(
++    DateTime PeriodStart,
++    DateTime PeriodEnd,
++    double Value,
++    int Count,
++    IReadOnlyList<ExploreServicePoint> Services);
++
++/// <summary>A single value's bucketed timeline.</summary>
++/// <param name="ValueName">Machine-style value name.</param>
++/// <param name="Label">Friendly label, if one was set on the schema.</param>
++/// <param name="Type">Value type (always numeric — non-numeric values never produce a series).</param>
++/// <param name="Cadence">Cadence the buckets follow.</param>
++/// <param name="Unit">Unit of measure carried on the schema definition.</param>
++/// <param name="Buckets">Buckets ordered chronologically.</param>
++public sealed record ExploreValueSeries(
++    string ValueName,
++    string? Label,
++    SchemaValueType Type,
++    Cadence Cadence,
++    string? Unit,
++    IReadOnlyList<ExploreBucket> Buckets);
++
++/// <summary>The result of an <see cref="IExploreService.GetSeriesAsync"/> call.</summary>
++/// <param name="SchemaName">Schema that was explored.</param>
++/// <param name="SchemaLabel">Friendly schema label.</param>
++/// <param name="Aggregation">The aggregation applied to every bucket.</param>
++/// <param name="From">Resolved lower bound echoed back from the request.</param>
++/// <param name="To">Resolved upper bound echoed back from the request.</param>
++/// <param name="Services">Every service appearing in the result, with labels resolved.</param>
++/// <param name="Values">One timeline per in-scope numeric value.</param>
++public sealed record ExploreSeriesResult(
++    string SchemaName,
++    string? SchemaLabel,
++    ExploreAggregation Aggregation,
++    DateTime? From,
++    DateTime? To,
++    IReadOnlyList<ExploreServiceRef> Services,
++    IReadOnlyList<ExploreValueSeries> Values);
++
++/// <summary>
++/// Lightweight, in-app analytics over the denormalised sample projection: per-value, per-cadence
++/// buckets with a per-service breakdown, for the bundled "Explore" page. Deliberately small — it
++/// is a budget convenience for deployments without Power BI/Excel, not a BI engine. Serious
++/// analysis still belongs in a BI tool against the OData feed.
++/// </summary>
++public interface IExploreService
++{
++    /// <summary>Build a bucketed, per-service series for one schema.</summary>
++    /// <param name="query">Filter + aggregation options.</param>
++    /// <param name="ct">Cancellation token.</param>
++    /// <returns>
++    /// The series, or <c>null</c> when no schema with that name exists. A schema with no matching
++    /// numeric values (or no samples) returns a non-null result with empty <see cref="ExploreSeriesResult.Values"/>.
++    /// </returns>
++    Task<ExploreSeriesResult?> GetSeriesAsync(ExploreSeriesQuery query, CancellationToken ct = default);
++}
+diff --git a/src/Ingest.Core/Abstractions/IRepositories.cs b/src/Ingest.Core/Abstractions/IRepositories.cs
+index 1c10e6e..710581b 100644
+--- a/src/Ingest.Core/Abstractions/IRepositories.cs
++++ b/src/Ingest.Core/Abstractions/IRepositories.cs
+@@ -374,6 +374,26 @@ public interface ISampleRepository
+     /// <returns>Every live projection for the schema.</returns>
+     Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default);
+ 
++    /// <summary>
++    /// Return the live projections for a schema, narrowed to the given value names and optionally to
++    /// a set of services and a timestamp window. Backs the "Explore" analytics aggregation, which
++    /// groups these rows by cadence bucket and service in memory. Ordered by period start.
++    /// </summary>
++    /// <param name="schemaName">Machine-style schema name.</param>
++    /// <param name="valueNames">Value names to include; an empty list returns nothing.</param>
++    /// <param name="serviceIds">Restrict to these services when non-null and non-empty; otherwise every service.</param>
++    /// <param name="from">Inclusive lower bound on the sample timestamp when set.</param>
++    /// <param name="to">Exclusive upper bound on the sample timestamp when set.</param>
++    /// <param name="ct">Cancellation token.</param>
++    /// <returns>The matching live projections.</returns>
++    Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(
++        string schemaName,
++        IReadOnlyList<string> valueNames,
++        IReadOnlyList<Guid>? serviceIds,
++        DateTime? from,
++        DateTime? to,
++        CancellationToken ct = default);
++
+     /// <summary>Atomically replace every projection belonging to a submission. Used on create/update.</summary>
+     /// <param name="submissionId">Submission whose projections should be rebuilt.</param>
+     /// <param name="projections">The new projection rows.</param>
+diff --git a/src/Ingest.Infrastructure/DependencyInjection.cs b/src/Ingest.Infrastructure/DependencyInjection.cs
+index a2623ef..7d0e9cc 100644
+--- a/src/Ingest.Infrastructure/DependencyInjection.cs
++++ b/src/Ingest.Infrastructure/DependencyInjection.cs
+@@ -89,6 +89,7 @@ public static class DependencyInjection
+         services.AddScoped<IBackupService, BackupService>();
+         services.AddScoped<IReportService, ReportService>();
+         services.AddScoped<IAuditLogService, AuditLogService>();
++        services.AddScoped<IExploreService, ExploreService>();
+ 
+         // GDPR data-rights services (erasure, retention purge, DSAR export).
+         services.AddScoped<IErasureService, ErasureService>();
+diff --git a/src/Ingest.Infrastructure/Mongo/SampleRepository.cs b/src/Ingest.Infrastructure/Mongo/SampleRepository.cs
+index 2e2b1ef..825252d 100644
+--- a/src/Ingest.Infrastructure/Mongo/SampleRepository.cs
++++ b/src/Ingest.Infrastructure/Mongo/SampleRepository.cs
+@@ -105,6 +105,38 @@ public sealed class SampleRepository : RepositoryBase<SampleProjection>, ISample
+             .ToListAsync(ct);
+     }
+ 
++    /// <inheritdoc />
++    public async Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(
++        string schemaName,
++        IReadOnlyList<string> valueNames,
++        IReadOnlyList<Guid>? serviceIds,
++        DateTime? from,
++        DateTime? to,
++        CancellationToken ct = default)
++    {
++        if (valueNames.Count == 0) return Array.Empty<SampleProjection>();
++
++        var filter = Builders<SampleProjection>.Filter.And(
++            NotDeleted,
++            Builders<SampleProjection>.Filter.Eq(s => s.SchemaName, schemaName),
++            Builders<SampleProjection>.Filter.In(s => s.ValueName, valueNames));
++
++        if (serviceIds is { Count: > 0 })
++            filter = Builders<SampleProjection>.Filter.And(filter, Builders<SampleProjection>.Filter.In(s => s.ServiceAccountId, serviceIds));
++        if (from is { } f)
++            filter = Builders<SampleProjection>.Filter.And(filter, Builders<SampleProjection>.Filter.Gte(s => s.Timestamp, f));
++        if (to is { } t)
++            filter = Builders<SampleProjection>.Filter.And(filter, Builders<SampleProjection>.Filter.Lt(s => s.Timestamp, t));
++
++        // Hard cap so a pathological query can't pull an unbounded result into memory. Well above
++        // the documented reference volume (a couple of years of samples for one schema), so a
++        // normal Explore query is never truncated.
++        return await Collection.Find(filter)
++            .Sort(Builders<SampleProjection>.Sort.Ascending(s => s.PeriodStart))
++            .Limit(200_000)
++            .ToListAsync(ct);
++    }
++
+     /// <inheritdoc />
+     public async Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default)
+     {
+diff --git a/src/Ingest.Infrastructure/Services/ExploreService.cs b/src/Ingest.Infrastructure/Services/ExploreService.cs
+new file mode 100644
+index 0000000..9c15016
+--- /dev/null
++++ b/src/Ingest.Infrastructure/Services/ExploreService.cs
+@@ -0,0 +1,130 @@
++using Ingest.Core.Abstractions;
++using Ingest.Core.Entities;
++
++namespace Ingest.Infrastructure.Services;
++
++/// <summary>
++/// Default <see cref="IExploreService"/>. Loads the live sample projections for a schema (narrowed
++/// by value, service and date) and folds them, in memory, into per-cadence buckets with a
++/// per-service breakdown. Period boundaries are pre-computed at submission time, so samples from
++/// different services in the same cadence window collapse onto the same bucket automatically.
++/// </summary>
++public sealed class ExploreService : IExploreService
++{
++    private readonly ISchemaRepository _schemas;
++    private readonly ISampleRepository _samples;
++    private readonly IAccountRepository _accounts;
++
++    /// <summary>Create a new <see cref="ExploreService"/>.</summary>
++    /// <param name="schemas">Schema repository — resolves the value definitions (type, cadence, unit, label).</param>
++    /// <param name="samples">Sample projection repository — supplies the rows to aggregate.</param>
++    /// <param name="accounts">Account repository — resolves friendly service labels for the breakdown.</param>
++    public ExploreService(ISchemaRepository schemas, ISampleRepository samples, IAccountRepository accounts)
++    {
++        _schemas = schemas;
++        _samples = samples;
++        _accounts = accounts;
++    }
++
++    /// <inheritdoc />
++    public async Task<ExploreSeriesResult?> GetSeriesAsync(ExploreSeriesQuery query, CancellationToken ct = default)
++    {
++        var schema = await _schemas.GetByNameAsync(query.SchemaName, ct: ct);
++        if (schema is null) return null;
++
++        // Only numeric values can be reduced; everything else is silently dropped from the scope.
++        var numericValues = schema.Values
++            .Where(v => v.Type is SchemaValueType.Number or SchemaValueType.Integer)
++            .ToList();
++
++        // Intersect the requested names (when any) with the numeric set, preserving the schema's
++        // declaration order so the UI shows values the way the author laid them out.
++        IReadOnlyList<SchemaValue> scoped;
++        if (query.ValueNames is { Count: > 0 })
++        {
++            var wanted = new HashSet<string>(query.ValueNames, StringComparer.OrdinalIgnoreCase);
++            scoped = numericValues.Where(v => wanted.Contains(v.Name)).ToList();
++        }
++        else
++        {
++            scoped = numericValues;
++        }
++
++        if (scoped.Count == 0)
++            return new ExploreSeriesResult(
++                schema.Name, schema.Label, query.Aggregation, query.From, query.To,
++                Array.Empty<ExploreServiceRef>(), Array.Empty<ExploreValueSeries>());
++
++        var scopedNames = scoped.Select(v => v.Name).ToList();
++        var rows = await _samples.GetForExploreAsync(
++            schema.Name, scopedNames, query.ServiceIds, query.From, query.To, ct);
++
++        // Resolve labels for the services that actually appear, newest snapshot name as a fallback.
++        var serviceNameById = rows
++            .GroupBy(r => r.ServiceAccountId)
++            .ToDictionary(g => g.Key, g => g.Last().ServiceName);
++        var serviceRefs = new List<ExploreServiceRef>(serviceNameById.Count);
++        foreach (var (id, name) in serviceNameById)
++        {
++            var acc = await _accounts.GetByIdAsync(id, includeDeleted: true, ct);
++            serviceRefs.Add(new ExploreServiceRef(id, acc?.Name ?? name, acc?.Label));
++        }
++        serviceRefs.Sort((a, b) => string.Compare(
++            a.ServiceLabel ?? a.ServiceName, b.ServiceLabel ?? b.ServiceName, StringComparison.OrdinalIgnoreCase));
++
++        var rowsByValue = rows
++            .Where(r => Numeric(r).HasValue)
++            .ToLookup(r => r.ValueName, StringComparer.OrdinalIgnoreCase);
++
++        var valueSeries = scoped.Select(v =>
++        {
++            var buckets = rowsByValue[v.Name]
++                .GroupBy(r => (r.PeriodStart, r.PeriodEnd))
++                .OrderBy(g => g.Key.PeriodStart)
++                .Select(bucket =>
++                {
++                    var perService = bucket
++                        .GroupBy(r => r.ServiceAccountId)
++                        .Select(g => new ExploreServicePoint(
++                            g.Key,
++                            Reduce(g.Select(r => Numeric(r)!.Value), query.Aggregation),
++                            g.Count()))
++                        .OrderBy(p => p.ServiceId)
++                        .ToList();
++
++                    var all = bucket.Select(r => Numeric(r)!.Value).ToList();
++                    return new ExploreBucket(
++                        bucket.Key.PeriodStart,
++                        bucket.Key.PeriodEnd,
++                        Reduce(all, query.Aggregation),
++                        all.Count,
++                        perService);
++                })
++                .ToList();
++
++            return new ExploreValueSeries(v.Name, v.Label, v.Type, v.Cadence, v.Unit, buckets);
++        }).ToList();
++
++        return new ExploreSeriesResult(
++            schema.Name, schema.Label, query.Aggregation, query.From, query.To, serviceRefs, valueSeries);
++    }
++
++    /// <summary>Pull a numeric value out of a projection regardless of whether it was a Number or an Integer.</summary>
++    private static double? Numeric(SampleProjection s) => s.NumberValue ?? (double?)s.IntegerValue;
++
++    /// <summary>Reduce a set of samples to a single number per the requested aggregation.</summary>
++    private static double Reduce(IEnumerable<double> values, ExploreAggregation agg)
++    {
++        // Materialise once: every branch needs more than a single pass or the count.
++        var list = values as IReadOnlyCollection<double> ?? values.ToList();
++        if (list.Count == 0) return 0d;
++        return agg switch
++        {
++            ExploreAggregation.Sum => list.Sum(),
++            ExploreAggregation.Min => list.Min(),
++            ExploreAggregation.Max => list.Max(),
++            ExploreAggregation.Count => list.Count,
++            _ => list.Average(),
++        };
++    }
++}
+diff --git a/tests/Ingest.Tests/AccountServiceTests.cs b/tests/Ingest.Tests/AccountServiceTests.cs
+index 3553db1..9d03c73 100644
+--- a/tests/Ingest.Tests/AccountServiceTests.cs
++++ b/tests/Ingest.Tests/AccountServiceTests.cs
+@@ -321,6 +321,9 @@ public class AccountServiceTests
+         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
+             Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
+ 
++        public Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(string schemaName, IReadOnlyList<string> valueNames, IReadOnlyList<Guid>? serviceIds, DateTime? from, DateTime? to, CancellationToken ct = default) =>
++            Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
++
+         public Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default) =>
+             Task.CompletedTask;
+ 
+diff --git a/tests/Ingest.Tests/GdprServiceTests.cs b/tests/Ingest.Tests/GdprServiceTests.cs
+index 98e4250..a0b20e5 100644
+--- a/tests/Ingest.Tests/GdprServiceTests.cs
++++ b/tests/Ingest.Tests/GdprServiceTests.cs
+@@ -346,6 +346,7 @@ public class GdprServiceTests
+         public Task<SampleProjection?> GetLatestAsync(Guid serviceId, string schemaName, string valueName, CancellationToken ct = default) => throw new NotSupportedException();
+         public Task<bool> ExistsInWindowAsync(Guid serviceId, string schemaName, string valueName, DateTime start, DateTime end, CancellationToken ct = default) => throw new NotSupportedException();
+         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) => throw new NotSupportedException();
++        public Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(string schemaName, IReadOnlyList<string> valueNames, IReadOnlyList<Guid>? serviceIds, DateTime? from, DateTime? to, CancellationToken ct = default) => throw new NotSupportedException();
+         public Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default) => throw new NotSupportedException();
+         public Task SoftDeleteForSubmissionAsync(Guid submissionId, CancellationToken ct = default) => throw new NotSupportedException();
+         public Task<bool> IsSchemaInUseAsync(string schemaName, CancellationToken ct = default) => throw new NotSupportedException();
+diff --git a/tests/Ingest.Tests/ReportServiceTests.cs b/tests/Ingest.Tests/ReportServiceTests.cs
+index fc4d44e..4bf0cf8 100644
+--- a/tests/Ingest.Tests/ReportServiceTests.cs
++++ b/tests/Ingest.Tests/ReportServiceTests.cs
+@@ -285,6 +285,8 @@ public class ReportServiceTests
+             Task.FromResult(_store.Any(s => s.ServiceAccountId == serviceId && s.SchemaName == schemaName && s.ValueName == valueName && s.Timestamp >= start && s.Timestamp < end));
+         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
+             Task.FromResult<IReadOnlyList<SampleProjection>>(_store.Where(s => string.Equals(s.SchemaName, schemaName, StringComparison.OrdinalIgnoreCase)).ToList());
++        public Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(string schemaName, IReadOnlyList<string> valueNames, IReadOnlyList<Guid>? serviceIds, DateTime? from, DateTime? to, CancellationToken ct = default) =>
++            Task.FromResult<IReadOnlyList<SampleProjection>>(_store.Where(s => string.Equals(s.SchemaName, schemaName, StringComparison.OrdinalIgnoreCase) && valueNames.Contains(s.ValueName)).ToList());
+         public Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default) => Task.CompletedTask;
+         public Task SoftDeleteForSubmissionAsync(Guid submissionId, CancellationToken ct = default) => Task.CompletedTask;
+         public Task<bool> IsSchemaInUseAsync(string schemaName, CancellationToken ct = default) =>
+diff --git a/tests/Ingest.Tests/SchemaServiceTests.cs b/tests/Ingest.Tests/SchemaServiceTests.cs
+index 34676f8..cf2674e 100644
+--- a/tests/Ingest.Tests/SchemaServiceTests.cs
++++ b/tests/Ingest.Tests/SchemaServiceTests.cs
+@@ -652,6 +652,9 @@ public class SchemaServiceTests
+         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
+             Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
+ 
++        public Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(string schemaName, IReadOnlyList<string> valueNames, IReadOnlyList<Guid>? serviceIds, DateTime? from, DateTime? to, CancellationToken ct = default) =>
++            Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
++
+         public Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default) =>
+             Task.CompletedTask;
+ 
+diff --git a/tests/Ingest.Tests/StatusServiceMissingTests.cs b/tests/Ingest.Tests/StatusServiceMissingTests.cs
+index ef3898e..863599b 100644
+--- a/tests/Ingest.Tests/StatusServiceMissingTests.cs
++++ b/tests/Ingest.Tests/StatusServiceMissingTests.cs
+@@ -436,6 +436,9 @@ public class StatusServiceMissingTests
+         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
+             Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
+ 
++        public Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(string schemaName, IReadOnlyList<string> valueNames, IReadOnlyList<Guid>? serviceIds, DateTime? from, DateTime? to, CancellationToken ct = default) =>
++            Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
++
+         public Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default) =>
+             Task.CompletedTask;
+ 
+diff --git a/web/admin/src/App.tsx b/web/admin/src/App.tsx
+index a21b95a..e26af00 100644
+--- a/web/admin/src/App.tsx
++++ b/web/admin/src/App.tsx
+@@ -10,6 +10,7 @@ import { ServicesPage } from './pages/ServicesPage'
+ import { ServiceStatusPage } from './pages/ServiceStatusPage'
+ import { SubmissionsPage } from './pages/SubmissionsPage'
+ import { MissingSubmissionsPage } from './pages/MissingSubmissionsPage'
++import { ExplorePage } from './pages/ExplorePage'
+ import { SubmissionDetailPage } from './pages/SubmissionDetailPage'
+ import { SubmissionEditPage } from './pages/SubmissionEditPage'
+ import { ReportsPage } from './pages/ReportsPage'
+@@ -41,6 +42,7 @@ export default function App() {
+         <Route path="/services/:name/status" element={<ServiceStatusPage />} />
+         <Route path="/submissions" element={<SubmissionsPage />} />
+         <Route path="/missing" element={<MissingSubmissionsPage />} />
++        <Route path="/explore" element={<ExplorePage />} />
+         <Route path="/submissions/new" element={<SubmissionEditPage />} />
+         <Route path="/submissions/:id/edit" element={<SubmissionEditPage />} />
+         <Route path="/submissions/:id/view" element={<SubmissionEditPage readOnly />} />
+diff --git a/web/admin/src/api/hooks.ts b/web/admin/src/api/hooks.ts
+index fdfa4a0..5d5ffb2 100644
+--- a/web/admin/src/api/hooks.ts
++++ b/web/admin/src/api/hooks.ts
+@@ -5,6 +5,7 @@ import type {
+   ErasureMode, ErasureResult,
+   ApiKey, GeneratedApiKey,
+   Cadence,
++  ExploreAggregation, ExploreSeries,
+   Schema, SchemaHistory, SchemaVersionHistoryEntry, SchemaVersionSnapshot, UpsertSchemaRequest,
+   Submission, AdminSubmissionInput, SampleInput, ServiceStatus, Me, Paged,
+   SubmissionWriteResponse, BulkImportRequest, BulkImportResult, BackupImportResult,
+@@ -303,6 +304,38 @@ export const useDeleteSchemaVersionHistory = () => {
+   })
+ }
+ 
++// --- Explore (in-app analytics) -----------------------------------------------------------
++
++/** Options for the Explore series query. Empty `valueNames`/`serviceIds` mean "all". */
++export interface ExploreSeriesParams {
++  schema: string
++  valueNames?: string[]
++  serviceIds?: string[]
++  from?: string
++  to?: string
++  agg: ExploreAggregation
++}
++
++/**
++ * Per-value, per-cadence, per-service breakdown for one schema, powering the Explore page's
++ * Trend/Compare/Snapshot views. Only numeric values come back; the server aggregates so the
++ * browser never sees raw rows. Disabled until a schema is chosen.
++ */
++export const useExploreSeries = (params: ExploreSeriesParams, enabled: boolean = true) => {
++  const search = new URLSearchParams()
++  search.set('schema', params.schema)
++  search.set('agg', params.agg)
++  for (const v of params.valueNames ?? []) search.append('value', v)
++  for (const sid of params.serviceIds ?? []) search.append('serviceIds', sid)
++  if (params.from) search.set('from', params.from)
++  if (params.to)   search.set('to', params.to)
++  return useQuery({
++    queryKey: ['explore-series', params],
++    queryFn: () => api.get<ExploreSeries>(`/api/admin/explore/series?${search}`),
++    enabled: enabled && !!params.schema,
++  })
++}
++
+ export const useSubmissions = (
+   params: { page: number; pageSize: number; serviceId?: string; schemaName?: string; from?: string; to?: string },
+   enabled: boolean = true,
+diff --git a/web/admin/src/api/types.ts b/web/admin/src/api/types.ts
+index 5d585e1..3deacec 100644
+--- a/web/admin/src/api/types.ts
++++ b/web/admin/src/api/types.ts
+@@ -557,6 +557,60 @@ export interface SchemaVersionSnapshot extends SchemaVersionHistoryEntry {
+   schema: Schema
+ }
+ 
++// --- Explore (in-app analytics) ------------------------------------------------------------
++
++/** How an Explore bucket reduces its samples. Wire values mirror the C# enum member names. */
++export type ExploreAggregation = 'Average' | 'Sum' | 'Min' | 'Max' | 'Count'
++
++/** One service's reduced value inside an Explore bucket. */
++export interface ExploreServicePoint {
++  serviceId: string
++  /** The bucket reduced by the requested aggregation, for this service only. */
++  value: number
++  /** Number of samples this service contributed to the bucket. */
++  count: number
++}
++
++/** One cadence bucket of an Explore value series, with the overall and per-service reductions. */
++export interface ExploreBucket {
++  periodStart: string
++  periodEnd: string
++  /** The bucket reduced across every in-scope service. */
++  value: number
++  /** Total samples folded into the bucket. */
++  count: number
++  services: ExploreServicePoint[]
++}
++
++/** A single value's bucketed Explore timeline. */
++export interface ExploreValueSeries {
++  valueName: string
++  label?: string | null
++  /** Always numeric (Number or Integer) — non-numeric values never produce a series. */
++  type: SchemaValueType
++  cadence: Cadence
++  unit?: string | null
++  buckets: ExploreBucket[]
++}
++
++/** A service appearing in an Explore result, with its label resolved. */
++export interface ExploreServiceRef {
++  serviceId: string
++  serviceName: string
++  serviceLabel?: string | null
++}
++
++/** Response shape of `GET /api/admin/explore/series`. */
++export interface ExploreSeries {
++  schemaName: string
++  schemaLabel?: string | null
++  aggregation: ExploreAggregation
++  from?: string | null
++  to?: string | null
++  services: ExploreServiceRef[]
++  values: ExploreValueSeries[]
++}
++
+ /**
+  * Data envelope shape a Liquid report expects. `Single` renders one specific submission,
+  * `Aggregate` renders the per-value bucketed history of a schema over a date range.
+diff --git a/web/admin/src/components/TopBar.tsx b/web/admin/src/components/TopBar.tsx
+index b718620..284710b 100644
+--- a/web/admin/src/components/TopBar.tsx
++++ b/web/admin/src/components/TopBar.tsx
+@@ -157,6 +157,11 @@ function buildBreadcrumbs(pathname: string, labels: LabelLookups): Crumb[] {
+     },
+ 
+     { re: /^\/audit$/, build: () => [home, { label: 'Audit' }] },
++
++    { re: /^\/missing$/, build: () => [home, { label: 'Missing submissions' }] },
++    { re: /^\/explore$/, build: () => [home, { label: 'Explore' }] },
++    { re: /^\/tools$/, build: () => [home, { label: 'Tools' }] },
++    { re: /^\/settings$/, build: () => [home, { label: 'Settings' }] },
+   ]
+ 
+   for (const r of rules) {
+diff --git a/web/admin/src/pages/ExplorePage.tsx b/web/admin/src/pages/ExplorePage.tsx
+new file mode 100644
+index 0000000..051de5c
+--- /dev/null
++++ b/web/admin/src/pages/ExplorePage.tsx
+@@ -0,0 +1,792 @@
++import { useMemo, useRef, useState } from 'react'
++import { useSearchParams } from 'react-router-dom'
++import {
++  Card, CardHeader, Dropdown, MessageBar, MessageBarBody, Option, Switch,
++  Tab, TabList, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow,
++  Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger,
++  Text, Title2, Tooltip as FluentTooltip, makeStyles, tokens,
++} from '@fluentui/react-components'
++import {
++  ArrowClockwise20Regular, ArrowDownload20Regular, Image20Regular, Info16Regular, MoreHorizontal20Regular,
++} from '@fluentui/react-icons'
++import {
++  Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
++} from 'recharts'
++import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
++import { PeriodFilter } from '../components/PeriodFilter'
++import { formatApiError } from '../api/client'
++import { useAccounts, useExploreSeries, useSchemas } from '../api/hooks'
++import type {
++  Account, ExploreAggregation, ExploreServicePoint, ExploreValueSeries, Schema, SchemaValue,
++} from '../api/types'
++import { addCadence, cadenceLabel } from '../utils/cadence'
++import { formatPeriodLabel } from '../utils/periodFormat'
++import { intervalRange, type Interval } from '../utils/period'
++import type { PeriodFilterState } from '../utils/usePeriodFilter'
++import { buildCsv } from '../utils/csv'
++import { downloadText } from '../utils/download'
++import { exportChartPng } from '../utils/chartExport'
++
++type ViewKind = 'trend' | 'compare' | 'snapshot'
++
++// How many future periods the optional projection extends the trend chart by.
++const PROJECTION_PERIODS = 2
++
++const AGGREGATIONS: ExploreAggregation[] = ['Average', 'Sum', 'Min', 'Max', 'Count']
++const AGG_LABELS: Record<ExploreAggregation, string> = {
++  Average: 'Average', Sum: 'Sum', Min: 'Minimum', Max: 'Maximum', Count: 'Sample count',
++}
++
++// A small categorical palette that reads acceptably in both light and dark themes. Cycled when
++// there are more services than colours.
++const SERIES_COLORS = [
++  '#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed',
++  '#0891b2', '#db2777', '#65a30d', '#475569', '#c026d3',
++]
++
++const useStyles = makeStyles({
++  root: { display: 'flex', flexDirection: 'column', gap: '16px' },
++  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' },
++  filters: { display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' },
++  // Mirror the small, muted filter labels used by the other PeriodFilter pages (e.g. AuditPage)
++  // so the bundled "Period" label lines up with the rest of the row.
++  field: { display: 'flex', flexDirection: 'column', gap: '4px' },
++  fieldLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, display: 'flex', alignItems: 'center', gap: '4px' },
++  infoIcon: { color: tokens.colorNeutralForeground3, cursor: 'help' },
++  dropdown: { minWidth: '180px' },
++  statRow: { display: 'flex', gap: '12px', flexWrap: 'wrap' },
++  stat: { padding: '12px 16px', minWidth: '120px' },
++  statLabel: { color: tokens.colorNeutralForeground3, fontSize: '12px' },
++  statValue: { fontSize: '24px', fontWeight: 700 },
++  card: { padding: '16px' },
++  cardHeader: { marginBottom: '8px' },
++  cardHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' },
++  cardSub: { color: tokens.colorNeutralForeground3, fontSize: '12px' },
++  empty: { color: tokens.colorNeutralForeground3, padding: '32px 0', textAlign: 'center' },
++  chartWrap: { width: '100%' },
++  tableScroll: { overflowX: 'auto' },
++  numCell: { textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
++})
++
++export function ExplorePage() {
++  const s = useStyles()
++  const [sp, setSp] = useSearchParams()
++
++  // URL is the single source of truth so a filtered view is shareable by copying the address bar.
++  const update = (patch: Record<string, string | null>) => {
++    setSp(prev => {
++      const next = new URLSearchParams(prev)
++      for (const [k, v] of Object.entries(patch)) {
++        if (v === null || v === '') next.delete(k)
++        else next.set(k, v)
++      }
++      return next
++    }, { replace: true })
++  }
++
++  const schemas = useSchemas()
++  const schemaList = useMemo(
++    () => [...(schemas.data?.items ?? [])].sort((a, b) => label(a).localeCompare(label(b))),
++    [schemas.data],
++  )
++
++  // Resolve the active schema: the URL value when valid, otherwise the first one available.
++  const schemaParam = sp.get('schema') ?? ''
++  const schema: Schema | undefined =
++    schemaList.find(x => x.name === schemaParam) ?? schemaList[0]
++  const schemaName = schema?.name ?? ''
++
++  const numericValues: SchemaValue[] = useMemo(
++    () => (schema?.values ?? []).filter(v => v.type === 'Number' || v.type === 'Integer'),
++    [schema],
++  )
++  const valueParam = sp.get('value') ?? ''
++  const activeValueName =
++    numericValues.find(v => v.name === valueParam)?.name ?? numericValues[0]?.name ?? ''
++
++  const agg = (sp.get('agg') as ExploreAggregation) || 'Average'
++  const view = (sp.get('view') as ViewKind) || 'trend'
++  const combined = sp.get('combined') === '1'
++  const asTable = sp.get('table') === '1'
++  const projecting = sp.get('proj') === '1'
++
++  // Period filter backed by the URL so it round-trips with everything else.
++  const interval = (sp.get('period') as Interval) || 'all'
++  const customFrom = sp.get('cfrom') ?? ''
++  const customTo = sp.get('cto') ?? ''
++  const { from, to } = intervalRange(interval, customFrom, customTo)
++  const periodState: PeriodFilterState = {
++    interval,
++    setInterval: v => update({ period: v === 'all' ? null : v }),
++    customFrom, setCustomFrom: v => update({ cfrom: v }),
++    customTo, setCustomTo: v => update({ cto: v }),
++    from, to,
++  }
++
++  // Service multiselect options come from the account registry (independent of the data), so the
++  // filter is usable even before any series loads.
++  const accounts = useAccounts({ role: 'Service', pageSize: 500 })
++  const serviceAccounts: Account[] = useMemo(
++    () => [...(accounts.data?.items ?? [])].sort((a, b) => label(a).localeCompare(label(b))),
++    [accounts.data],
++  )
++  const selectedServiceIds = useMemo(
++    () => (sp.get('services') ?? '').split(',').filter(Boolean),
++    [sp],
++  )
++  const toggleService = (id: string) => {
++    const set = new Set(selectedServiceIds)
++    if (set.has(id)) set.delete(id)
++    else set.add(id)
++    update({ services: [...set].join(',') })
++  }
++
++  const series = useExploreSeries(
++    {
++      schema: schemaName,
++      serviceIds: selectedServiceIds.length ? selectedServiceIds : undefined,
++      from, to, agg,
++    },
++    !!schemaName,
++  )
++
++  const activeSeries: ExploreValueSeries | undefined =
++    series.data?.values.find(v => v.valueName === activeValueName)
++  const seriesServices = series.data?.services ?? []
++
++  const chartRef = useRef<HTMLDivElement>(null)
++  const [exportError, setExportError] = useState<string | null>(null)
++
++  const exportCsv = () => {
++    try {
++      if (!series.data) return
++      const { headers, rows, name } = buildExportRows(view, series.data.values, activeSeries, seriesServices, agg)
++      if (rows.length === 0) { setExportError('Nothing to export for this view yet.'); return }
++      downloadText(`explore-${schemaName}-${name}.csv`, buildCsv(headers, rows), 'text/csv;charset=utf-8')
++    } catch (e) {
++      setExportError(formatApiError(e))
++    }
++  }
++
++  const exportPng = async () => {
++    try {
++      await exportChartPng(chartRef.current, `explore-${schemaName}-${view}.png`)
++    } catch (e) {
++      setExportError(formatApiError(e))
++    }
++  }
++
++  const noNumeric = !!schema && numericValues.length === 0
++
++  return (
++    <div className={s.root}>
++      <div className={s.header}>
++        <Title2>Explore</Title2>
++        <Menu>
++          <MenuTrigger disableButtonEnhancement>
++            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
++          </MenuTrigger>
++          <MenuPopover>
++            <MenuList>
++              <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => series.refetch()}>Refresh</MenuItem>
++              <MenuDivider />
++              <MenuItem icon={<ArrowDownload20Regular />} disabled={!series.data} onClick={exportCsv}>Export CSV (this view)</MenuItem>
++              {view !== 'snapshot' && (
++                <MenuItem icon={<Image20Regular />} disabled={!series.data} onClick={exportPng}>Export chart (PNG)</MenuItem>
++              )}
++            </MenuList>
++          </MenuPopover>
++        </Menu>
++      </div>
++
++      {(schemas.error || series.error) && (
++        <AutoScrollMessageBar intent="error">
++          <MessageBarBody>{formatApiError(schemas.error || series.error)}</MessageBarBody>
++        </AutoScrollMessageBar>
++      )}
++      {exportError && (
++        <AutoScrollMessageBar intent="error"><MessageBarBody>{exportError}</MessageBarBody></AutoScrollMessageBar>
++      )}
++
++      <div className={s.filters}>
++        <div className={s.field}>
++          <span className={s.fieldLabel}>Schema</span>
++          <Dropdown
++            className={s.dropdown}
++            size="small"
++            selectedOptions={schemaName ? [schemaName] : []}
++            value={schema ? label(schema) : ''}
++            placeholder="Select a schema"
++            onOptionSelect={(_, d) => update({ schema: d.optionValue ?? null, value: null })}
++          >
++            {schemaList.map(x => <Option key={x.name} value={x.name}>{label(x)}</Option>)}
++          </Dropdown>
++        </div>
++
++        {view !== 'snapshot' && (
++          <div className={s.field}>
++            <span className={s.fieldLabel}>Value</span>
++            <Dropdown
++              className={s.dropdown}
++              size="small"
++              selectedOptions={activeValueName ? [activeValueName] : []}
++              value={numericValues.find(v => v.name === activeValueName)?.label || activeValueName}
++              placeholder="Select a value"
++              disabled={numericValues.length === 0}
++              onOptionSelect={(_, d) => update({ value: d.optionValue ?? null })}
++            >
++              {numericValues.map(v => <Option key={v.name} value={v.name}>{v.label || v.name}</Option>)}
++            </Dropdown>
++          </div>
++        )}
++
++        <div className={s.field}>
++          <span className={s.fieldLabel}>Services</span>
++          <Dropdown
++            className={s.dropdown}
++            size="small"
++            multiselect
++            selectedOptions={selectedServiceIds}
++            value={selectedServiceIds.length === 0 ? 'All services' : `${selectedServiceIds.length} selected`}
++            placeholder="All services"
++            onOptionSelect={(_, d) => d.optionValue && toggleService(d.optionValue)}
++          >
++            {serviceAccounts.map(a => <Option key={a.id} value={a.id}>{label(a)}</Option>)}
++          </Dropdown>
++        </div>
++
++        <div className={s.field}>
++          <span className={s.fieldLabel}>
++            Aggregation
++            <FluentTooltip
++              relationship="description"
++              content="How the samples that fall in each period are reduced to one number — and how several services are combined into the overall figure. Average is count-weighted; Sample count just tallies how many were submitted."
++            >
++              <Info16Regular className={s.infoIcon} tabIndex={0} aria-label="What does Aggregation do?" />
++            </FluentTooltip>
++          </span>
++          <Dropdown
++            className={s.dropdown}
++            size="small"
++            selectedOptions={[agg]}
++            value={AGG_LABELS[agg]}
++            onOptionSelect={(_, d) => update({ agg: (d.optionValue as ExploreAggregation) ?? null })}
++          >
++            {AGGREGATIONS.map(a => <Option key={a} value={a}>{AGG_LABELS[a]}</Option>)}
++          </Dropdown>
++        </div>
++
++        <PeriodFilter state={periodState} />
++      </div>
++
++      <TabList selectedValue={view} onTabSelect={(_, d) => update({ view: d.value as string })}>
++        <Tab value="trend">Trend</Tab>
++        <Tab value="compare">Compare</Tab>
++        <Tab value="snapshot">Snapshot</Tab>
++      </TabList>
++
++      {!schemaName ? (
++        <Card className={s.card}><div className={s.empty}>Pick a schema to start exploring.</div></Card>
++      ) : noNumeric ? (
++        <MessageBar intent="info">
++          <MessageBarBody>
++            This schema has no numeric values, so there's nothing to chart. Add a Number or Integer value to explore it.
++          </MessageBarBody>
++        </MessageBar>
++      ) : series.isLoading ? (
++        <Card className={s.card}><div className={s.empty}>Loading…</div></Card>
++      ) : view === 'snapshot' ? (
++        <SnapshotView styles={s} values={series.data?.values ?? []} services={seriesServices} agg={agg} />
++      ) : (
++        <>
++          <StatRow styles={s} series={activeSeries} agg={agg} serviceCount={seriesServices.length} />
++          <Card className={s.card}>
++            <div className={s.cardHeaderRow}>
++              <CardHeader
++                className={s.cardHeader}
++                header={<Text weight="semibold">{view === 'trend' ? 'Trend over time' : 'Compare services'}</Text>}
++                description={
++                  <span className={s.cardSub}>
++                    {AGG_LABELS[agg]} of {valueTitle(activeSeries, activeValueName)}
++                    {activeSeries?.cadence ? ` · per ${cadenceLabel(activeSeries.cadence).toLowerCase()} period` : ''}
++                  </span>
++                }
++              />
++              <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
++                {view === 'trend' && (
++                  <Switch
++                    label="Combine services"
++                    checked={combined}
++                    onChange={(_, d) => update({ combined: d.checked ? '1' : null })}
++                  />
++                )}
++                {view === 'trend' && !asTable && (
++                  <Switch
++                    label="Projection"
++                    checked={projecting}
++                    onChange={(_, d) => update({ proj: d.checked ? '1' : null })}
++                  />
++                )}
++                <Switch label="View as table" checked={asTable} onChange={(_, d) => update({ table: d.checked ? '1' : null })} />
++              </div>
++            </div>
++
++            {!activeSeries || activeSeries.buckets.length === 0 ? (
++              <div className={s.empty}>No samples for this selection.</div>
++            ) : view === 'trend' ? (
++              asTable
++                ? <TrendTable styles={s} series={activeSeries} services={seriesServices} combined={combined} />
++                : <div className={s.chartWrap} ref={chartRef}><TrendChart series={activeSeries} services={seriesServices} combined={combined} projectPeriods={projecting ? PROJECTION_PERIODS : 0} /></div>
++            ) : (
++              asTable
++                ? <CompareTable styles={s} series={activeSeries} services={seriesServices} agg={agg} />
++                : <div className={s.chartWrap} ref={chartRef}><CompareChart series={activeSeries} services={seriesServices} agg={agg} /></div>
++            )}
++          </Card>
++        </>
++      )}
++    </div>
++  )
++}
++
++// --- Stat cards ---------------------------------------------------------------------------
++
++function StatRow({ styles, series, agg, serviceCount }: {
++  styles: ReturnType<typeof useStyles>
++  series: ExploreValueSeries | undefined
++  agg: ExploreAggregation
++  serviceCount: number
++}) {
++  if (!series || series.buckets.length === 0) return null
++  const totalSamples = series.buckets.reduce((acc, b) => acc + b.count, 0)
++  const latest = series.buckets[series.buckets.length - 1]
++  const overall = rollup(agg, series.buckets.map(b => ({ value: b.value, count: b.count })))
++  const unit = series.unit ? ` ${series.unit}` : ''
++  return (
++    <div className={styles.statRow}>
++      <Card className={styles.stat}>
++        <span className={styles.statLabel}>Overall {AGG_LABELS[agg].toLowerCase()}</span>
++        <span className={styles.statValue}>{fmt(overall)}{unit}</span>
++      </Card>
++      <Card className={styles.stat}>
++        <span className={styles.statLabel}>Latest period</span>
++        <span className={styles.statValue}>{fmt(latest.value)}{unit}</span>
++      </Card>
++      <Card className={styles.stat}>
++        <span className={styles.statLabel}>Samples</span>
++        <span className={styles.statValue}>{totalSamples}</span>
++      </Card>
++      <Card className={styles.stat}>
++        <span className={styles.statLabel}>Periods / services</span>
++        <span className={styles.statValue}>{series.buckets.length} / {serviceCount}</span>
++      </Card>
++    </div>
++  )
++}
++
++// --- Trend --------------------------------------------------------------------------------
++
++type TrendRow = { period: string } & Record<string, number | string>
++
++function trendRows(series: ExploreValueSeries, combined: boolean): TrendRow[] {
++  return series.buckets.map(b => {
++    const row: TrendRow = { period: formatPeriodLabel(b.periodStart, series.cadence) }
++    if (combined) {
++      row.overall = round(b.value)
++    } else {
++      for (const sp of b.services) row[sp.serviceId] = round(sp.value)
++    }
++    return row
++  })
++}
++
++type SeriesDef = { key: string; name: string; color: string }
++
++// Ordinary least-squares fit of y = slope*x + intercept. Returns null when there aren't enough
++// distinct points to define a line.
++function linregress(points: { x: number; y: number }[]): { slope: number; intercept: number } | null {
++  const n = points.length
++  if (n < 2) return null
++  let sx = 0, sy = 0, sxx = 0, sxy = 0
++  for (const p of points) { sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y }
++  const denom = n * sxx - sx * sx
++  if (denom === 0) return null
++  const slope = (n * sxy - sx * sy) / denom
++  const intercept = (sy - slope * sx) / n
++  return { slope, intercept }
++}
++
++/**
++ * Build the chart rows plus optional projection. When `projectPeriods > 0` (and there are at least
++ * two periods to fit), the result appends that many future periods and, for each drawn line, a
++ * dashed `<key>__proj` series that continues from the last real point using a linear fit. In
++ * per-service mode it also adds a single straight `__trend` line for the aggregate direction.
++ */
++function buildTrend(
++  series: ExploreValueSeries,
++  services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[],
++  combined: boolean,
++  projectPeriods: number,
++): { rows: TrendRow[]; defs: SeriesDef[]; projected: boolean; overallTrend: boolean } {
++  const buckets = series.buckets
++  const n = buckets.length
++  const defs: SeriesDef[] = combined
++    ? [{ key: 'overall', name: 'All services', color: SERIES_COLORS[0] }]
++    : services.map((svc, i) => ({
++        key: svc.serviceId,
++        name: svc.serviceLabel || svc.serviceName,
++        color: SERIES_COLORS[i % SERIES_COLORS.length],
++      }))
++
++  const valueAt = (b: typeof buckets[number], key: string): number | undefined =>
++    key === 'overall' ? b.value : b.services.find(p => p.serviceId === key)?.value
++
++  const rows: TrendRow[] = buckets.map(b => {
++    const row: TrendRow = { period: formatPeriodLabel(b.periodStart, series.cadence) }
++    for (const def of defs) {
++      const v = valueAt(b, def.key)
++      if (v !== undefined) row[def.key] = round(v)
++    }
++    return row
++  })
++
++  if (projectPeriods <= 0 || n < 2) return { rows, defs, projected: false, overallTrend: false }
++
++  let cursor: string | Date = buckets[n - 1].periodStart
++  for (let j = 0; j < projectPeriods; j++) {
++    cursor = addCadence(cursor, series.cadence)
++    rows.push({ period: formatPeriodLabel(cursor.toISOString(), series.cadence) })
++  }
++
++  for (const def of defs) {
++    const pts: { x: number; y: number }[] = []
++    buckets.forEach((b, i) => { const v = valueAt(b, def.key); if (v !== undefined) pts.push({ x: i, y: v }) })
++    const reg = linregress(pts)
++    if (!reg) continue
++    // Anchor the dashed line at the last real value so it visually continues the solid line.
++    const lastVal = valueAt(buckets[n - 1], def.key)
++    if (lastVal !== undefined) rows[n - 1][`${def.key}__proj`] = round(lastVal)
++    for (let j = 0; j < projectPeriods; j++) {
++      const idx = n + j
++      rows[idx][`${def.key}__proj`] = round(reg.intercept + reg.slope * idx)
++    }
++  }
++
++  // A single straight aggregate trendline. Skipped in combined mode where the one projected line
++  // already conveys the overall direction.
++  let overallTrend = false
++  if (!combined) {
++    const reg = linregress(buckets.map((b, i) => ({ x: i, y: b.value })))
++    if (reg) {
++      overallTrend = true
++      for (let k = 0; k < rows.length; k++) rows[k].__trend = round(reg.intercept + reg.slope * k)
++    }
++  }
++
++  return { rows, defs, projected: true, overallTrend }
++}
++
++function TrendChart({ series, services, combined, projectPeriods }: {
++  series: ExploreValueSeries
++  services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[]
++  combined: boolean
++  projectPeriods: number
++}) {
++  const { rows, defs, projected, overallTrend } = useMemo(
++    () => buildTrend(series, services, combined, projectPeriods),
++    [series, services, combined, projectPeriods],
++  )
++  const showLegend = (!combined && defs.length > 1) || (projected && overallTrend)
++  return (
++    <ResponsiveContainer width="100%" height={340}>
++      <LineChart data={rows} margin={{ top: 8, right: 24, bottom: 8, left: 8 }}>
++        <CartesianGrid strokeDasharray="3 3" stroke={tokens.colorNeutralStroke2} />
++        <XAxis dataKey="period" tick={{ fontSize: 11 }} interval="preserveStartEnd" angle={-30} textAnchor="end" height={56} />
++        <YAxis tick={{ fontSize: 11 }} />
++        <Tooltip />
++        {showLegend && <Legend wrapperStyle={{ fontSize: 12 }} />}
++        {defs.map(def => (
++          <Line
++            key={def.key}
++            type="monotone"
++            dataKey={def.key}
++            name={def.name}
++            stroke={def.color}
++            strokeWidth={2}
++            dot={{ r: 2 }}
++            connectNulls
++          />
++        ))}
++        {projected && defs.map(def => (
++          <Line
++            key={`${def.key}__proj`}
++            type="linear"
++            dataKey={`${def.key}__proj`}
++            name={`${def.name} (projection)`}
++            stroke={def.color}
++            strokeWidth={2}
++            strokeDasharray="5 5"
++            dot={false}
++            connectNulls
++            legendType="none"
++          />
++        ))}
++        {projected && overallTrend && (
++          <Line
++            type="linear"
++            dataKey="__trend"
++            name="Overall trend"
++            stroke={tokens.colorNeutralForeground2}
++            strokeWidth={2}
++            strokeDasharray="6 4"
++            dot={false}
++            connectNulls
++          />
++        )}
++      </LineChart>
++    </ResponsiveContainer>
++  )
++}
++
++function TrendTable({ styles, series, services, combined }: {
++  styles: ReturnType<typeof useStyles>
++  series: ExploreValueSeries
++  services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[]
++  combined: boolean
++}) {
++  const rows = trendRows(series, combined)
++  const cols = combined ? [{ key: 'overall', name: 'All services' }] : services.map(s => ({ key: s.serviceId, name: s.serviceLabel || s.serviceName }))
++  return (
++    <div className={styles.tableScroll}>
++      <Table size="small">
++        <TableHeader>
++          <TableRow>
++            <TableHeaderCell>Period</TableHeaderCell>
++            {cols.map(c => <TableHeaderCell key={c.key}>{c.name}</TableHeaderCell>)}
++          </TableRow>
++        </TableHeader>
++        <TableBody>
++          {rows.map(r => (
++            <TableRow key={r.period}>
++              <TableCell>{r.period}</TableCell>
++              {cols.map(c => <TableCell key={c.key} className={styles.numCell}>{cell(r[c.key])}</TableCell>)}
++            </TableRow>
++          ))}
++        </TableBody>
++      </Table>
++    </div>
++  )
++}
++
++// --- Compare ------------------------------------------------------------------------------
++
++type CompareRow = { name: string; value: number }
++
++function compareRows(
++  series: ExploreValueSeries,
++  services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[],
++  agg: ExploreAggregation,
++): CompareRow[] {
++  return services
++    .map(svc => {
++      const points: ExploreServicePoint[] = series.buckets
++        .map(b => b.services.find(p => p.serviceId === svc.serviceId))
++        .filter((p): p is ExploreServicePoint => !!p)
++      return { name: svc.serviceLabel || svc.serviceName, value: round(rollup(agg, points)) }
++    })
++    .sort((a, b) => b.value - a.value)
++}
++
++function CompareChart({ series, services, agg }: {
++  series: ExploreValueSeries
++  services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[]
++  agg: ExploreAggregation
++}) {
++  const rows = useMemo(() => compareRows(series, services, agg), [series, services, agg])
++  return (
++    <ResponsiveContainer width="100%" height={Math.max(220, rows.length * 34 + 48)}>
++      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 32, bottom: 8, left: 8 }}>
++        <CartesianGrid strokeDasharray="3 3" stroke={tokens.colorNeutralStroke2} horizontal={false} />
++        <XAxis type="number" tick={{ fontSize: 11 }} />
++        <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 11 }} />
++        <Tooltip cursor={{ fill: tokens.colorNeutralBackground1Hover }} />
++        <Bar dataKey="value" name={AGG_LABELS[agg]} fill={SERIES_COLORS[0]} radius={[0, 3, 3, 0]} />
++      </BarChart>
++    </ResponsiveContainer>
++  )
++}
++
++function CompareTable({ styles, series, services, agg }: {
++  styles: ReturnType<typeof useStyles>
++  series: ExploreValueSeries
++  services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[]
++  agg: ExploreAggregation
++}) {
++  const rows = compareRows(series, services, agg)
++  return (
++    <div className={styles.tableScroll}>
++      <Table size="small">
++        <TableHeader>
++          <TableRow>
++            <TableHeaderCell>Service</TableHeaderCell>
++            <TableHeaderCell>{AGG_LABELS[agg]}</TableHeaderCell>
++          </TableRow>
++        </TableHeader>
++        <TableBody>
++          {rows.map(r => (
++            <TableRow key={r.name}>
++              <TableCell>{r.name}</TableCell>
++              <TableCell className={styles.numCell}>{fmt(r.value)}</TableCell>
++            </TableRow>
++          ))}
++        </TableBody>
++      </Table>
++    </div>
++  )
++}
++
++// --- Snapshot -----------------------------------------------------------------------------
++
++function SnapshotView({ styles, values, services, agg }: {
++  styles: ReturnType<typeof useStyles>
++  values: ExploreValueSeries[]
++  services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[]
++  agg: ExploreAggregation
++}) {
++  if (values.length === 0 || services.length === 0) {
++    return <Card className={styles.card}><div className={styles.empty}>No samples for this selection.</div></Card>
++  }
++  // Latest bucket per value, indexed by service for O(1) cell lookup.
++  const latestByValue = values.map(v => {
++    const latest = v.buckets[v.buckets.length - 1]
++    const byService = new Map<string, number>()
++    if (latest) for (const p of latest.services) byService.set(p.serviceId, p.value)
++    return { value: v, period: latest ? formatPeriodLabel(latest.periodStart, v.cadence) : '—', byService }
++  })
++
++  return (
++    <Card className={styles.card}>
++      <CardHeader
++        className={styles.cardHeader}
++        header={<Text weight="semibold">Latest value per service</Text>}
++        description={
++          <span className={styles.cardSub}>
++            Most recent period per value · cells show the {AGG_LABELS[agg].toLowerCase()} for that period
++          </span>
++        }
++      />
++      <div className={styles.tableScroll}>
++        <Table size="small">
++          <TableHeader>
++            <TableRow>
++              <TableHeaderCell>Service</TableHeaderCell>
++              {latestByValue.map(c => (
++                <TableHeaderCell key={c.value.valueName}>
++                  <div style={{ display: 'flex', flexDirection: 'column' }}>
++                    <span>{c.value.label || c.value.valueName}{c.value.unit ? ` (${c.value.unit})` : ''}</span>
++                    <span className={styles.cardSub}>{c.period}</span>
++                  </div>
++                </TableHeaderCell>
++              ))}
++            </TableRow>
++          </TableHeader>
++          <TableBody>
++            {services.map(svc => (
++              <TableRow key={svc.serviceId}>
++                <TableCell>{svc.serviceLabel || svc.serviceName}</TableCell>
++                {latestByValue.map(c => {
++                  const v = c.byService.get(svc.serviceId)
++                  return <TableCell key={c.value.valueName} className={styles.numCell}>{v === undefined ? '—' : fmt(v)}</TableCell>
++                })}
++              </TableRow>
++            ))}
++          </TableBody>
++        </Table>
++      </div>
++    </Card>
++  )
++}
++
++// --- Shared helpers -----------------------------------------------------------------------
++
++/** Reduce a set of per-bucket points to one figure for the whole range, matching the aggregation. */
++function rollup(agg: ExploreAggregation, points: { value: number; count: number }[]): number {
++  if (points.length === 0) return 0
++  switch (agg) {
++    case 'Sum':
++    case 'Count':
++      return points.reduce((acc, p) => acc + p.value, 0)
++    case 'Min':
++      return Math.min(...points.map(p => p.value))
++    case 'Max':
++      return Math.max(...points.map(p => p.value))
++    default: {
++      // Exact overall mean: each bucket value is the mean of `count` samples, so weight by count.
++      const totalCount = points.reduce((acc, p) => acc + p.count, 0)
++      if (totalCount === 0) return points.reduce((acc, p) => acc + p.value, 0) / points.length
++      return points.reduce((acc, p) => acc + p.value * p.count, 0) / totalCount
++    }
++  }
++}
++
++function buildExportRows(
++  view: ViewKind,
++  values: ExploreValueSeries[],
++  activeSeries: ExploreValueSeries | undefined,
++  services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[],
++  agg: ExploreAggregation,
++): { headers: string[]; rows: (string | number)[][]; name: string } {
++  if (view === 'snapshot') {
++    const headers = ['Service', ...values.map(v => `${v.label || v.valueName}${v.unit ? ` (${v.unit})` : ''}`)]
++    const latest = values.map(v => {
++      const b = v.buckets[v.buckets.length - 1]
++      const m = new Map<string, number>()
++      if (b) for (const p of b.services) m.set(p.serviceId, p.value)
++      return m
++    })
++    const rows = services.map(svc => [
++      svc.serviceLabel || svc.serviceName,
++      ...latest.map(m => { const x = m.get(svc.serviceId); return x === undefined ? '' : round(x) }),
++    ])
++    return { headers, rows, name: 'snapshot' }
++  }
++  if (!activeSeries) return { headers: [], rows: [], name: view }
++  if (view === 'compare') {
++    const headers = ['Service', AGG_LABELS[agg]]
++    const rows = compareRows(activeSeries, services, agg).map(r => [r.name, r.value])
++    return { headers, rows, name: `compare-${activeSeries.valueName}` }
++  }
++  // trend
++  const headers = ['Period', ...services.map(s => s.serviceLabel || s.serviceName)]
++  const rows = activeSeries.buckets.map(b => {
++    const byService = new Map(b.services.map(p => [p.serviceId, p.value]))
++    return [
++      formatPeriodLabel(b.periodStart, activeSeries.cadence),
++      ...services.map(s => { const x = byService.get(s.serviceId); return x === undefined ? '' : round(x) }),
++    ]
++  })
++  return { headers, rows, name: `trend-${activeSeries.valueName}` }
++}
++
++function valueTitle(series: ExploreValueSeries | undefined, fallback: string): string {
++  if (!series) return fallback
++  return (series.label || series.valueName) + (series.unit ? ` (${series.unit})` : '')
++}
++
++function label(x: { label?: string | null; name: string }): string {
++  return x.label || x.name
++}
++
++function round(n: number): number {
++  return Math.round(n * 1000) / 1000
++}
++
++function fmt(n: number): string {
++  if (!Number.isFinite(n)) return '—'
++  return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100)
++}
++
++function cell(v: number | string | undefined): string {
++  if (v === undefined || v === '') return '—'
++  return typeof v === 'number' ? fmt(v) : v
++}
+diff --git a/web/admin/src/pages/SchemaHistoryPage.tsx b/web/admin/src/pages/SchemaHistoryPage.tsx
+index 95b7622..0bcf0aa 100644
+--- a/web/admin/src/pages/SchemaHistoryPage.tsx
++++ b/web/admin/src/pages/SchemaHistoryPage.tsx
+@@ -12,8 +12,9 @@ import {
+   Tooltip, XAxis, YAxis,
+ } from 'recharts'
+ import { useSchemaHistory } from '../api/hooks'
+-import type { Cadence, HistoryBucket, SchemaValueHistory } from '../api/types'
++import type { SchemaValueHistory } from '../api/types'
+ import { cadenceLabel } from '../utils/cadence'
++import { formatPeriodLabel } from '../utils/periodFormat'
+ 
+ const useStyles = makeStyles({
+   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
+@@ -130,7 +131,7 @@ function ValueChartCard({ value }: { value: SchemaValueHistory }) {
+ 
+ function toChartRows(v: SchemaValueHistory): ChartRow[] {
+   return v.buckets.map(b => ({
+-    period: formatPeriod(b, v.cadence),
++    period: formatPeriodLabel(b.periodStart, v.cadence),
+     periodIso: b.periodStart,
+     min: b.min,
+     max: b.max,
+@@ -139,50 +140,3 @@ function toChartRows(v: SchemaValueHistory): ChartRow[] {
+     errorRange: [b.average - b.min, b.max - b.average],
+   }))
+ }
+-
+-function formatPeriod(b: HistoryBucket, cadence: Cadence): string {
+-  const start = new Date(b.periodStart)
+-  if (Number.isNaN(start.getTime())) return b.periodStart
+-  const y = start.getUTCFullYear()
+-  const m = start.getUTCMonth() + 1
+-  const d = start.getUTCDate()
+-  switch (cadence) {
+-    case 'Daily':
+-      return `${y}-${pad(m)}-${pad(d)}`
+-    case 'Weekly':
+-    case 'Fortnightly': {
+-      // Fortnightly buckets are 14 days starting on a Monday, so the ISO week of the start
+-      // date is enough to identify them on the X axis — the cadence tag in the chart title
+-      // tells the reader whether each label spans one or two weeks.
+-      const wk = isoWeek(start)
+-      return `${y}-W${pad(wk)}`
+-    }
+-    case 'Monthly':
+-      return `${y}-${pad(m)}`
+-    case 'Quarterly': {
+-      // Q1: Jan/Feb/Mar (months 1..3) → quarter index 1, etc.
+-      const q = Math.floor((m - 1) / 3) + 1
+-      return `${y}-Q${q}`
+-    }
+-    case 'SemiAnnually':
+-      return `${y}-${m <= 6 ? 'H1' : 'H2'}`
+-    case 'Yearly':
+-      return `${y}`
+-    default:
+-      return start.toISOString()
+-  }
+-}
+-
+-// ISO 8601 week-of-year (Mon-based). Used to label weekly buckets in the X axis.
+-function isoWeek(d: Date): number {
+-  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+-  const dayNr = (target.getUTCDay() + 6) % 7
+-  target.setUTCDate(target.getUTCDate() - dayNr + 3)
+-  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4))
+-  const diff = (target.getTime() - firstThursday.getTime()) / 86400000
+-  return 1 + Math.round((diff - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7)
+-}
+-
+-function pad(n: number): string {
+-  return n < 10 ? `0${n}` : String(n)
+-}
+diff --git a/web/admin/src/pages/Shell.tsx b/web/admin/src/pages/Shell.tsx
+index d9e327c..e7277c0 100644
+--- a/web/admin/src/pages/Shell.tsx
++++ b/web/admin/src/pages/Shell.tsx
+@@ -1,6 +1,6 @@
+ import { Link, NavLink, Outlet } from 'react-router-dom'
+ import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+-import { Board24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Toolbox24Regular, Warning24Regular } from '@fluentui/react-icons'
++import { Board24Regular, ChartMultiple24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Toolbox24Regular, Warning24Regular } from '@fluentui/react-icons'
+ import { useMe } from '../api/hooks'
+ import { TopBar } from '../components/TopBar'
+ import type { ReactNode } from 'react'
+@@ -112,6 +112,9 @@ export function Shell() {
+     { to: '/submissions', label: 'Submissions', icon: <DocumentBulletList24Regular />, show: true },
+     // Cross-service "what's overdue" analytics; relies on admin endpoints so it's hidden for services.
+     { to: '/missing',     label: 'Missing',     icon: <Warning24Regular />,            show: !isService },
++    // Lightweight in-app analytics (trends/compare/snapshot). Operator + admin only; the backing
++    // endpoint is operator-gated so service-role users would just 403.
++    { to: '/explore',     label: 'Explore',     icon: <ChartMultiple24Regular />,      show: !isService },
+     // Reports are an operator/admin tool; service-role users would get a 403 for the catalogue
+     // and have no reason to use them anyway.
+     { to: '/reports',     label: 'Reports',     icon: <DocumentText24Regular />,       show: !isService },
+diff --git a/web/admin/src/utils/chartExport.ts b/web/admin/src/utils/chartExport.ts
+new file mode 100644
+index 0000000..2ce39ca
+--- /dev/null
++++ b/web/admin/src/utils/chartExport.ts
+@@ -0,0 +1,63 @@
++/**
++ * Best-effort "save this chart as a PNG" for the recharts SVG surfaces on the Explore page.
++ * Rasterises the live <svg> onto a canvas and triggers a download. Kept dependency-free; it
++ * inlines a white background and a sans-serif font so the exported image is legible on its own
++ * (the on-screen theme colours are carried by the SVG's own attributes).
++ */
++
++/** Find the recharts surface inside a container and export it as a PNG download. */
++export async function exportChartPng(container: HTMLElement | null, filename: string, scale = 2): Promise<void> {
++  const svg = container?.querySelector('svg')
++  if (!svg) throw new Error('No chart to export yet.')
++  await exportSvgAsPng(svg, filename, scale)
++}
++
++async function exportSvgAsPng(svg: SVGSVGElement, filename: string, scale: number): Promise<void> {
++  const rect = svg.getBoundingClientRect()
++  const width = Math.max(1, Math.round(rect.width))
++  const height = Math.max(1, Math.round(rect.height))
++
++  const clone = svg.cloneNode(true) as SVGSVGElement
++  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
++  clone.setAttribute('width', String(width))
++  clone.setAttribute('height', String(height))
++  // A neutral font + white backdrop so the standalone file doesn't depend on the page's CSS.
++  clone.style.fontFamily = 'Segoe UI, system-ui, sans-serif'
++  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
++  bg.setAttribute('width', String(width))
++  bg.setAttribute('height', String(height))
++  bg.setAttribute('fill', '#ffffff')
++  clone.insertBefore(bg, clone.firstChild)
++
++  const svgText = new XMLSerializer().serializeToString(clone)
++  const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText)}`
++
++  const img = new Image()
++  img.width = width
++  img.height = height
++  await new Promise<void>((resolve, reject) => {
++    img.onload = () => resolve()
++    img.onerror = () => reject(new Error('Could not render the chart image.'))
++    img.src = svgUrl
++  })
++
++  const canvas = document.createElement('canvas')
++  canvas.width = width * scale
++  canvas.height = height * scale
++  const ctx = canvas.getContext('2d')
++  if (!ctx) throw new Error('Canvas is not supported in this browser.')
++  ctx.scale(scale, scale)
++  ctx.drawImage(img, 0, 0, width, height)
++
++  const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
++  if (!blob) throw new Error('Could not encode the chart image.')
++
++  const url = URL.createObjectURL(blob)
++  const a = document.createElement('a')
++  a.href = url
++  a.download = filename
++  document.body.appendChild(a)
++  a.click()
++  document.body.removeChild(a)
++  setTimeout(() => URL.revokeObjectURL(url), 0)
++}
+diff --git a/web/admin/src/utils/periodFormat.ts b/web/admin/src/utils/periodFormat.ts
+new file mode 100644
+index 0000000..286530f
+--- /dev/null
++++ b/web/admin/src/utils/periodFormat.ts
+@@ -0,0 +1,53 @@
++/**
++ * Compact, cadence-aware labels for a bucket's `periodStart`, used on chart X axes and in the
++ * "view as table" period column. Extracted from the schema history chart so the Explore page and
++ * any future time-series view share one implementation. All math is in UTC because bucket
++ * boundaries are computed UTC server-side.
++ */
++import type { Cadence } from '../api/types'
++
++/** Zero-pad a 1- or 2-digit number to two characters (e.g. 3 → "03"). */
++export function pad(n: number): string {
++  return n < 10 ? `0${n}` : String(n)
++}
++
++/** ISO 8601 week-of-year (Monday-based). Used to label weekly/fortnightly buckets. */
++export function isoWeek(d: Date): number {
++  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
++  const dayNr = (target.getUTCDay() + 6) % 7
++  target.setUTCDate(target.getUTCDate() - dayNr + 3)
++  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4))
++  const diff = (target.getTime() - firstThursday.getTime()) / 86400000
++  return 1 + Math.round((diff - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7)
++}
++
++/**
++ * Format a bucket start (ISO string) into a short label appropriate for its cadence:
++ * `2026-03-14` (daily), `2026-W11` (weekly/fortnightly), `2026-03` (monthly), `2026-Q1`
++ * (quarterly), `2026-H1` (semi-annually), `2026` (yearly). Falls back to the raw string when the
++ * date can't be parsed.
++ */
++export function formatPeriodLabel(periodStart: string, cadence: Cadence): string {
++  const start = new Date(periodStart)
++  if (Number.isNaN(start.getTime())) return periodStart
++  const y = start.getUTCFullYear()
++  const m = start.getUTCMonth() + 1
++  const d = start.getUTCDate()
++  switch (cadence) {
++    case 'Daily':
++      return `${y}-${pad(m)}-${pad(d)}`
++    case 'Weekly':
++    case 'Fortnightly':
++      return `${y}-W${pad(isoWeek(start))}`
++    case 'Monthly':
++      return `${y}-${pad(m)}`
++    case 'Quarterly':
++      return `${y}-Q${Math.floor((m - 1) / 3) + 1}`
++    case 'SemiAnnually':
++      return `${y}-${m <= 6 ? 'H1' : 'H2'}`
++    case 'Yearly':
++      return `${y}`
++    default:
++      return start.toISOString()
++  }
++}
+-- 
+2.53.0.windows.1
+

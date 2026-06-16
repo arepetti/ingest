@@ -28,7 +28,14 @@ import type {
 } from '../api/types'
 
 const CHANGE_TYPES: AuditChangeType[] = ['Create', 'Edit', 'Delete']
-const TARGET_TYPES: AuditTargetType[] = ['User', 'Account', 'Schema', 'ApiKey', 'Submission', 'Report']
+const TARGET_TYPES: AuditTargetType[] = ['User', 'Account', 'Schema', 'ApiKey', 'Submission', 'Report', 'SchemaHistory']
+
+/** Friendly labels for target types whose raw enum name doesn't read well in the UI. */
+const TARGET_TYPE_LABELS: Partial<Record<AuditTargetType, string>> = {
+  ApiKey: 'API key',
+  SchemaHistory: 'Schema history',
+}
+const targetTypeLabel = (t: AuditTargetType): string => TARGET_TYPE_LABELS[t] ?? t
 const EMAIL_STATUSES: EmailStatus[] = ['Pending', 'Sending', 'Sent', 'Failed']
 const WEBHOOK_STATUSES: WebhookDeliveryStatus[] = ['Pending', 'Sending', 'Sent', 'Failed']
 
@@ -285,14 +292,14 @@ function ChangesTab({
             className={s.filterDropdown}
             size="small"
             selectedOptions={[targetType ?? ALL]}
-            value={targetType ?? 'All'}
+            value={targetType ? targetTypeLabel(targetType) : 'All'}
             onOptionSelect={(_, d) => {
               setTargetType(d.optionValue === ALL ? undefined : (d.optionValue as AuditTargetType))
               setPage(1)
             }}
           >
             <Option value={ALL}>All</Option>
-            {TARGET_TYPES.map(t => <Option key={t} value={t}>{t}</Option>)}
+            {TARGET_TYPES.map(t => <Option key={t} value={t}>{targetTypeLabel(t)}</Option>)}
           </Dropdown>
         </div>
         <PeriodFilter state={period} onChange={() => setPage(1)} />
@@ -330,7 +337,7 @@ function ChangesTab({
               <TableCell className={s.colChange}>
                 <ChangeBadge change={entry.change} />
               </TableCell>
-              <TableCell className={s.colTarget}>{entry.targetType}</TableCell>
+              <TableCell className={s.colTarget}>{targetTypeLabel(entry.targetType)}</TableCell>
               <TableCell className={s.cellId}><IdentityCell name={entry.targetName} id={entry.targetId} /></TableCell>
               <TableCell className={s.cellId}><IdentityCell name={entry.actorName} id={entry.actorId} /></TableCell>
             </TableRow>
