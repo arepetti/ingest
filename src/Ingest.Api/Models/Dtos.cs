@@ -855,6 +855,90 @@ public sealed record SchemaHistoryDto(
     string? Label,
     List<SchemaValueHistoryDto> Values);
 
+/// <summary>One service's reduced value inside an Explore bucket.</summary>
+/// <param name="ServiceId">Service account id (join key back to <see cref="ExploreSeriesResponse.Services"/>).</param>
+/// <param name="Value">The bucket reduced by the requested aggregation, for this service only.</param>
+/// <param name="Count">Number of samples this service contributed to the bucket.</param>
+public sealed record ExploreServicePointDto(Guid ServiceId, double Value, int Count)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreServicePointDto From(ExploreServicePoint p) => new(p.ServiceId, p.Value, p.Count);
+}
+
+/// <summary>One cadence bucket of an Explore value series, with the overall and per-service reductions.</summary>
+/// <param name="PeriodStart">Inclusive bucket start.</param>
+/// <param name="PeriodEnd">Exclusive bucket end.</param>
+/// <param name="Value">The bucket reduced across every in-scope service.</param>
+/// <param name="Count">Total samples folded into the bucket.</param>
+/// <param name="Services">Per-service reductions.</param>
+public sealed record ExploreBucketDto(
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    double Value,
+    int Count,
+    List<ExploreServicePointDto> Services)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreBucketDto From(ExploreBucket b) => new(
+        b.PeriodStart, b.PeriodEnd, b.Value, b.Count,
+        b.Services.Select(ExploreServicePointDto.From).ToList());
+}
+
+/// <summary>A single value's bucketed Explore timeline.</summary>
+/// <param name="ValueName">Machine-style value name.</param>
+/// <param name="Label">Friendly label.</param>
+/// <param name="Type">Value type (always numeric).</param>
+/// <param name="Cadence">Cadence the buckets follow.</param>
+/// <param name="Unit">Unit of measure.</param>
+/// <param name="Buckets">Buckets ordered chronologically.</param>
+public sealed record ExploreValueSeriesDto(
+    string ValueName,
+    string? Label,
+    SchemaValueType Type,
+    Cadence Cadence,
+    string? Unit,
+    List<ExploreBucketDto> Buckets)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreValueSeriesDto From(ExploreValueSeries v) => new(
+        v.ValueName, v.Label, v.Type, v.Cadence, v.Unit,
+        v.Buckets.Select(ExploreBucketDto.From).ToList());
+}
+
+/// <summary>A service appearing in an Explore result, with its label resolved.</summary>
+/// <param name="ServiceId">Service account id.</param>
+/// <param name="ServiceName">Machine-style service name.</param>
+/// <param name="ServiceLabel">Friendly label, or <c>null</c>.</param>
+public sealed record ExploreServiceRefDto(Guid ServiceId, string ServiceName, string? ServiceLabel)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreServiceRefDto From(ExploreServiceRef s) => new(s.ServiceId, s.ServiceName, s.ServiceLabel);
+}
+
+/// <summary>Wire shape of <c>GET /api/admin/explore/series</c>: a per-value, per-cadence, per-service breakdown.</summary>
+/// <param name="SchemaName">Schema that was explored.</param>
+/// <param name="SchemaLabel">Friendly schema label.</param>
+/// <param name="Aggregation">The aggregation applied to every bucket.</param>
+/// <param name="From">Resolved lower bound echoed back from the request.</param>
+/// <param name="To">Resolved upper bound echoed back from the request.</param>
+/// <param name="Services">Every service appearing in the result.</param>
+/// <param name="Values">One timeline per in-scope numeric value.</param>
+public sealed record ExploreSeriesResponse(
+    string SchemaName,
+    string? SchemaLabel,
+    ExploreAggregation Aggregation,
+    DateTime? From,
+    DateTime? To,
+    List<ExploreServiceRefDto> Services,
+    List<ExploreValueSeriesDto> Values)
+{
+    /// <summary>Project the domain result onto the wire shape. (Named <c>FromResult</c> rather than the usual <c>From</c> because the record already carries a <c>From</c> date property.)</summary>
+    public static ExploreSeriesResponse FromResult(ExploreSeriesResult r) => new(
+        r.SchemaName, r.SchemaLabel, r.Aggregation, r.From, r.To,
+        r.Services.Select(ExploreServiceRefDto.From).ToList(),
+        r.Values.Select(ExploreValueSeriesDto.From).ToList());
+}
+
 /// <summary>Wire representation of a stored Liquid report.</summary>
 /// <param name="Id">Stable identifier.</param>
 /// <param name="Name">Machine-style unique name (URL segment).</param>

@@ -652,6 +652,9 @@ public class SchemaServiceTests
         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
 
+        public Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(string schemaName, IReadOnlyList<string> valueNames, IReadOnlyList<Guid>? serviceIds, DateTime? from, DateTime? to, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<SampleProjection>>(Array.Empty<SampleProjection>());
+
         public Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default) =>
             Task.CompletedTask;
 

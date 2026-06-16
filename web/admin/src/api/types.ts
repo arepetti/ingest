@@ -557,6 +557,60 @@ export interface SchemaVersionSnapshot extends SchemaVersionHistoryEntry {
   schema: Schema
 }
 
+// --- Explore (in-app analytics) ------------------------------------------------------------
+
+/** How an Explore bucket reduces its samples. Wire values mirror the C# enum member names. */
+export type ExploreAggregation = 'Average' | 'Sum' | 'Min' | 'Max' | 'Count'
+
+/** One service's reduced value inside an Explore bucket. */
+export interface ExploreServicePoint {
+  serviceId: string
+  /** The bucket reduced by the requested aggregation, for this service only. */
+  value: number
+  /** Number of samples this service contributed to the bucket. */
+  count: number
+}
+
+/** One cadence bucket of an Explore value series, with the overall and per-service reductions. */
+export interface ExploreBucket {
+  periodStart: string
+  periodEnd: string
+  /** The bucket reduced across every in-scope service. */
+  value: number
+  /** Total samples folded into the bucket. */
+  count: number
+  services: ExploreServicePoint[]
+}
+
+/** A single value's bucketed Explore timeline. */
+export interface ExploreValueSeries {
+  valueName: string
+  label?: string | null
+  /** Always numeric (Number or Integer) — non-numeric values never produce a series. */
+  type: SchemaValueType
+  cadence: Cadence
+  unit?: string | null
+  buckets: ExploreBucket[]
+}
+
+/** A service appearing in an Explore result, with its label resolved. */
+export interface ExploreServiceRef {
+  serviceId: string
+  serviceName: string
+  serviceLabel?: string | null
+}
+
+/** Response shape of `GET /api/admin/explore/series`. */
+export interface ExploreSeries {
+  schemaName: string
+  schemaLabel?: string | null
+  aggregation: ExploreAggregation
+  from?: string | null
+  to?: string | null
+  services: ExploreServiceRef[]
+  values: ExploreValueSeries[]
+}
+
 /**
  * Data envelope shape a Liquid report expects. `Single` renders one specific submission,
  * `Aggregate` renders the per-value bucketed history of a schema over a date range.

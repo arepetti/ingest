@@ -157,6 +157,11 @@ function buildBreadcrumbs(pathname: string, labels: LabelLookups): Crumb[] {
     },
 
     { re: /^\/audit$/, build: () => [home, { label: 'Audit' }] },
+
+    { re: /^\/missing$/, build: () => [home, { label: 'Missing submissions' }] },
+    { re: /^\/explore$/, build: () => [home, { label: 'Explore' }] },
+    { re: /^\/tools$/, build: () => [home, { label: 'Tools' }] },
+    { re: /^\/settings$/, build: () => [home, { label: 'Settings' }] },
   ]
 
   for (const r of rules) {

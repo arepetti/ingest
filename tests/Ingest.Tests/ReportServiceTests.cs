@@ -285,6 +285,8 @@ public class ReportServiceTests
             Task.FromResult(_store.Any(s => s.ServiceAccountId == serviceId && s.SchemaName == schemaName && s.ValueName == valueName && s.Timestamp >= start && s.Timestamp < end));
         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<SampleProjection>>(_store.Where(s => string.Equals(s.SchemaName, schemaName, StringComparison.OrdinalIgnoreCase)).ToList());
+        public Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(string schemaName, IReadOnlyList<string> valueNames, IReadOnlyList<Guid>? serviceIds, DateTime? from, DateTime? to, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<SampleProjection>>(_store.Where(s => string.Equals(s.SchemaName, schemaName, StringComparison.OrdinalIgnoreCase) && valueNames.Contains(s.ValueName)).ToList());
         public Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default) => Task.CompletedTask;
         public Task SoftDeleteForSubmissionAsync(Guid submissionId, CancellationToken ct = default) => Task.CompletedTask;
         public Task<bool> IsSchemaInUseAsync(string schemaName, CancellationToken ct = default) =>

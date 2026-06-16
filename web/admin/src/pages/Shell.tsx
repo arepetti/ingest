@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { Board24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Toolbox24Regular, Warning24Regular } from '@fluentui/react-icons'
+import { Board24Regular, ChartMultiple24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Toolbox24Regular, Warning24Regular } from '@fluentui/react-icons'
 import { useMe } from '../api/hooks'
 import { TopBar } from '../components/TopBar'
 import type { ReactNode } from 'react'
@@ -112,6 +112,9 @@ export function Shell() {
     { to: '/submissions', label: 'Submissions', icon: <DocumentBulletList24Regular />, show: true },
     // Cross-service "what's overdue" analytics; relies on admin endpoints so it's hidden for services.
     { to: '/missing',     label: 'Missing',     icon: <Warning24Regular />,            show: !isService },
+    // Lightweight in-app analytics (trends/compare/snapshot). Operator + admin only; the backing
+    // endpoint is operator-gated so service-role users would just 403.
+    { to: '/explore',     label: 'Explore',     icon: <ChartMultiple24Regular />,      show: !isService },
     // Reports are an operator/admin tool; service-role users would get a 403 for the catalogue
     // and have no reason to use them anyway.
     { to: '/reports',     label: 'Reports',     icon: <DocumentText24Regular />,       show: !isService },

@@ -346,6 +346,7 @@ public class GdprServiceTests
         public Task<SampleProjection?> GetLatestAsync(Guid serviceId, string schemaName, string valueName, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> ExistsInWindowAsync(Guid serviceId, string schemaName, string valueName, DateTime start, DateTime end, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(string schemaName, IReadOnlyList<string> valueNames, IReadOnlyList<Guid>? serviceIds, DateTime? from, DateTime? to, CancellationToken ct = default) => throw new NotSupportedException();
         public Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SoftDeleteForSubmissionAsync(Guid submissionId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> IsSchemaInUseAsync(string schemaName, CancellationToken ct = default) => throw new NotSupportedException();

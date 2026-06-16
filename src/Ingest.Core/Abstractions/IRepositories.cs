@@ -374,6 +374,26 @@ public interface ISampleRepository
     /// <returns>Every live projection for the schema.</returns>
     Task<IReadOnlyList<SampleProjection>> GetAllForSchemaAsync(string schemaName, CancellationToken ct = default);
 
+    /// <summary>
+    /// Return the live projections for a schema, narrowed to the given value names and optionally to
+    /// a set of services and a timestamp window. Backs the "Explore" analytics aggregation, which
+    /// groups these rows by cadence bucket and service in memory. Ordered by period start.
+    /// </summary>
+    /// <param name="schemaName">Machine-style schema name.</param>
+    /// <param name="valueNames">Value names to include; an empty list returns nothing.</param>
+    /// <param name="serviceIds">Restrict to these services when non-null and non-empty; otherwise every service.</param>
+    /// <param name="from">Inclusive lower bound on the sample timestamp when set.</param>
+    /// <param name="to">Exclusive upper bound on the sample timestamp when set.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching live projections.</returns>
+    Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(
+        string schemaName,
+        IReadOnlyList<string> valueNames,
+        IReadOnlyList<Guid>? serviceIds,
+        DateTime? from,
+        DateTime? to,
+        CancellationToken ct = default);
+
     /// <summary>Atomically replace every projection belonging to a submission. Used on create/update.</summary>
     /// <param name="submissionId">Submission whose projections should be rebuilt.</param>
     /// <param name="projections">The new projection rows.</param>

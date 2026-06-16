@@ -106,6 +106,38 @@ public sealed class SampleRepository : RepositoryBase<SampleProjection>, ISample
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<SampleProjection>> GetForExploreAsync(
+        string schemaName,
+        IReadOnlyList<string> valueNames,
+        IReadOnlyList<Guid>? serviceIds,
+        DateTime? from,
+        DateTime? to,
+        CancellationToken ct = default)
+    {
+        if (valueNames.Count == 0) return Array.Empty<SampleProjection>();
+
+        var filter = Builders<SampleProjection>.Filter.And(
+            NotDeleted,
+            Builders<SampleProjection>.Filter.Eq(s => s.SchemaName, schemaName),
+            Builders<SampleProjection>.Filter.In(s => s.ValueName, valueNames));
+
+        if (serviceIds is { Count: > 0 })
+            filter = Builders<SampleProjection>.Filter.And(filter, Builders<SampleProjection>.Filter.In(s => s.ServiceAccountId, serviceIds));
+        if (from is { } f)
+            filter = Builders<SampleProjection>.Filter.And(filter, Builders<SampleProjection>.Filter.Gte(s => s.Timestamp, f));
+        if (to is { } t)
+            filter = Builders<SampleProjection>.Filter.And(filter, Builders<SampleProjection>.Filter.Lt(s => s.Timestamp, t));
+
+        // Hard cap so a pathological query can't pull an unbounded result into memory. Well above
+        // the documented reference volume (a couple of years of samples for one schema), so a
+        // normal Explore query is never truncated.
+        return await Collection.Find(filter)
+            .Sort(Builders<SampleProjection>.Sort.Ascending(s => s.PeriodStart))
+            .Limit(200_000)
+            .ToListAsync(ct);
+    }
+
+    /// <inheritdoc />
     public async Task ReplaceForSubmissionAsync(Guid submissionId, IEnumerable<SampleProjection> projections, CancellationToken ct = default)
     {
         await Collection.DeleteManyAsync(s => s.SubmissionId == submissionId, ct);

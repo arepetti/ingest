@@ -12,8 +12,9 @@ import {
   Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { useSchemaHistory } from '../api/hooks'
-import type { Cadence, HistoryBucket, SchemaValueHistory } from '../api/types'
+import type { SchemaValueHistory } from '../api/types'
 import { cadenceLabel } from '../utils/cadence'
+import { formatPeriodLabel } from '../utils/periodFormat'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -130,7 +131,7 @@ function ValueChartCard({ value }: { value: SchemaValueHistory }) {
 
 function toChartRows(v: SchemaValueHistory): ChartRow[] {
   return v.buckets.map(b => ({
-    period: formatPeriod(b, v.cadence),
+    period: formatPeriodLabel(b.periodStart, v.cadence),
     periodIso: b.periodStart,
     min: b.min,
     max: b.max,
@@ -138,51 +139,4 @@ function toChartRows(v: SchemaValueHistory): ChartRow[] {
     count: b.count,
     errorRange: [b.average - b.min, b.max - b.average],
   }))
-}
-
-function formatPeriod(b: HistoryBucket, cadence: Cadence): string {
-  const start = new Date(b.periodStart)
-  if (Number.isNaN(start.getTime())) return b.periodStart
-  const y = start.getUTCFullYear()
-  const m = start.getUTCMonth() + 1
-  const d = start.getUTCDate()
-  switch (cadence) {
-    case 'Daily':
-      return `${y}-${pad(m)}-${pad(d)}`
-    case 'Weekly':
-    case 'Fortnightly': {
-      // Fortnightly buckets are 14 days starting on a Monday, so the ISO week of the start
-      // date is enough to identify them on the X axis — the cadence tag in the chart title
-      // tells the reader whether each label spans one or two weeks.
-      const wk = isoWeek(start)
-      return `${y}-W${pad(wk)}`
-    }
-    case 'Monthly':
-      return `${y}-${pad(m)}`
-    case 'Quarterly': {
-      // Q1: Jan/Feb/Mar (months 1..3) → quarter index 1, etc.
-      const q = Math.floor((m - 1) / 3) + 1
-      return `${y}-Q${q}`
-    }
-    case 'SemiAnnually':
-      return `${y}-${m <= 6 ? 'H1' : 'H2'}`
-    case 'Yearly':
-      return `${y}`
-    default:
-      return start.toISOString()
-  }
-}
-
-// ISO 8601 week-of-year (Mon-based). Used to label weekly buckets in the X axis.
-function isoWeek(d: Date): number {
-  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-  const dayNr = (target.getUTCDay() + 6) % 7
-  target.setUTCDate(target.getUTCDate() - dayNr + 3)
-  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4))
-  const diff = (target.getTime() - firstThursday.getTime()) / 86400000
-  return 1 + Math.round((diff - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7)
-}
-
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n)
 }

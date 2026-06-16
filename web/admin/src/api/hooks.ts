@@ -5,6 +5,7 @@ import type {
   ErasureMode, ErasureResult,
   ApiKey, GeneratedApiKey,
   Cadence,
+  ExploreAggregation, ExploreSeries,
   Schema, SchemaHistory, SchemaVersionHistoryEntry, SchemaVersionSnapshot, UpsertSchemaRequest,
   Submission, AdminSubmissionInput, SampleInput, ServiceStatus, Me, Paged,
   SubmissionWriteResponse, BulkImportRequest, BulkImportResult, BackupImportResult,
@@ -300,6 +301,38 @@ export const useDeleteSchemaVersionHistory = () => {
     mutationFn: (name: string) =>
       api.delete<void>(`/api/admin/schemas/${encodeURIComponent(name)}/version-history`),
     onSuccess: (_d, name) => qc.invalidateQueries({ queryKey: ['schema-version-history', name] }),
+  })
+}
+
+// --- Explore (in-app analytics) -----------------------------------------------------------
+
+/** Options for the Explore series query. Empty `valueNames`/`serviceIds` mean "all". */
+export interface ExploreSeriesParams {
+  schema: string
+  valueNames?: string[]
+  serviceIds?: string[]
+  from?: string
+  to?: string
+  agg: ExploreAggregation
+}
+
+/**
+ * Per-value, per-cadence, per-service breakdown for one schema, powering the Explore page's
+ * Trend/Compare/Snapshot views. Only numeric values come back; the server aggregates so the
+ * browser never sees raw rows. Disabled until a schema is chosen.
+ */
+export const useExploreSeries = (params: ExploreSeriesParams, enabled: boolean = true) => {
+  const search = new URLSearchParams()
+  search.set('schema', params.schema)
+  search.set('agg', params.agg)
+  for (const v of params.valueNames ?? []) search.append('value', v)
+  for (const sid of params.serviceIds ?? []) search.append('serviceIds', sid)
+  if (params.from) search.set('from', params.from)
+  if (params.to)   search.set('to', params.to)
+  return useQuery({
+    queryKey: ['explore-series', params],
+    queryFn: () => api.get<ExploreSeries>(`/api/admin/explore/series?${search}`),
+    enabled: enabled && !!params.schema,
   })
 }
 

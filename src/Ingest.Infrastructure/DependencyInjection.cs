@@ -89,6 +89,7 @@ public static class DependencyInjection
         services.AddScoped<IBackupService, BackupService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddScoped<IExploreService, ExploreService>();
 
         // GDPR data-rights services (erasure, retention purge, DSAR export).
         services.AddScoped<IErasureService, ErasureService>();

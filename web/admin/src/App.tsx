@@ -10,6 +10,7 @@ import { ServicesPage } from './pages/ServicesPage'
 import { ServiceStatusPage } from './pages/ServiceStatusPage'
 import { SubmissionsPage } from './pages/SubmissionsPage'
 import { MissingSubmissionsPage } from './pages/MissingSubmissionsPage'
+import { ExplorePage } from './pages/ExplorePage'
 import { SubmissionDetailPage } from './pages/SubmissionDetailPage'
 import { SubmissionEditPage } from './pages/SubmissionEditPage'
 import { ReportsPage } from './pages/ReportsPage'
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/services/:name/status" element={<ServiceStatusPage />} />
         <Route path="/submissions" element={<SubmissionsPage />} />
         <Route path="/missing" element={<MissingSubmissionsPage />} />
+        <Route path="/explore" element={<ExplorePage />} />
         <Route path="/submissions/new" element={<SubmissionEditPage />} />
         <Route path="/submissions/:id/edit" element={<SubmissionEditPage />} />
         <Route path="/submissions/:id/view" element={<SubmissionEditPage readOnly />} />
