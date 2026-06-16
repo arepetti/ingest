@@ -8,15 +8,16 @@ import {
   Option, Radio, RadioGroup, Spinner, Tab, TabList, Textarea, Title2, Toolbar, ToolbarButton, Tooltip,
   makeStyles, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowLeft20Regular, Delete20Regular, Dismiss16Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowLeft20Regular, Delete20Regular, Dismiss16Regular, Eye20Regular } from '@fluentui/react-icons'
 import type {
   Account, ApprovalMode, ApprovalPolicy, ApprovalSourceScope, ApproverRequirement,
-  Cadence, SchemaLayoutNode, SchemaValue, SchemaValueType, UpsertSchemaRequest,
+  Cadence, Schema, SchemaLayoutNode, SchemaValue, SchemaValueType, UpsertSchemaRequest,
 } from '../api/types'
 import { useAccounts, useCreateSchema, useMe, useSchemas, useSchemaVersionSnapshot, useSubmissions, useUpdateSchema } from '../api/hooks'
 import { accountHasCapability } from '../api/capabilities'
 import { formatApiError } from '../api/client'
 import { LayoutTreeEditor } from '../components/LayoutTreeEditor'
+import { SchemaPreviewDialog } from '../components/SchemaPreviewDialog'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { cadenceLabel } from '../utils/cadence'
 import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY, SERVICE_OWNER_LABEL } from '../utils/approvers'
@@ -111,6 +112,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
   const update = useUpdateSchema()
 
   const [req, setReq] = useState<UpsertSchemaRequest | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   // Which editor section is showing. The form is split into three tabs that mirror the old
   // top-to-bottom sections (General settings, Values, Layout).
   const [tab, setTab] = useState<SchemaTab>('general')
@@ -279,6 +281,30 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
 
   const title = isSnapshot ? 'View schema version' : isEdit ? 'Edit schema' : 'New schema'
 
+  // Synthesise a full `Schema` from the in-progress request so the layout editor and the preview
+  // dialog can share one definition. Just enough of a Schema for their needs — pulling the actual
+  // entity in would force a round-trip for IDs we don't need at edit time.
+  const previewSchema = useMemo<Schema | null>(() => {
+    if (!req) return null
+    return {
+      id: schemaId ?? '',
+      name: req.name,
+      label: req.label,
+      description: req.description,
+      notes: req.notes,
+      modifiable: req.modifiable,
+      enabled: req.enabled,
+      submissionValidations: req.submissionValidations,
+      isGlobal: req.isGlobal,
+      serviceIds: req.serviceIds,
+      values: req.values,
+      layout: req.layout ?? [],
+      version: req.version ?? 1,
+      versionModifiedAt: null,
+      createdAt: '', modifiedAt: '',
+    }
+  }, [req, schemaId])
+
   return (
     <div className={s.root}>
       <div className={s.toolbar}>
@@ -286,10 +312,15 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
           <Button appearance="subtle" icon={<ArrowLeft20Regular />} onClick={() => nav(isSnapshot ? `/schemas/${encodeURIComponent(name!)}/versions` : '/schemas')}>Back</Button>
           <Title2>{title}</Title2>
         </div>
-        {req && !readOnly && (
+        {req && (
           <Toolbar>
-            <ToolbarButton appearance="primary" disabled={isBusy} onClick={onSave}>
-              {isEdit ? 'Save changes' : 'Create schema'}
+            {!readOnly && (
+              <ToolbarButton appearance="primary" disabled={isBusy} onClick={onSave}>
+                {isEdit ? 'Save changes' : 'Create schema'}
+              </ToolbarButton>
+            )}
+            <ToolbarButton icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>
+              Preview
             </ToolbarButton>
           </Toolbar>
         )}
@@ -497,26 +528,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
               {/* `inert` makes the whole subtree non-interactive in the read-only snapshot view. */}
               <div className={readOnly ? s.readOnlyLayout : undefined} {...(readOnly ? { inert: true } : {})}>
                 <LayoutTreeEditor
-                  schema={{
-                    // Synthesise just enough of a Schema for the editor's needs. Pulling the
-                    // actual entity in would force us to round-trip through the server for IDs
-                    // we don't need at edit time.
-                    id: schemaId ?? '',
-                    name: req.name,
-                    label: req.label,
-                    description: req.description,
-                    notes: req.notes,
-                    modifiable: req.modifiable,
-                    enabled: req.enabled,
-                    submissionValidations: req.submissionValidations,
-                    isGlobal: req.isGlobal,
-                    serviceIds: req.serviceIds,
-                    values: req.values,
-                    layout: req.layout ?? [],
-                    version: req.version ?? 1,
-                    versionModifiedAt: null,
-                    createdAt: '', modifiedAt: '',
-                  }}
+                  schema={previewSchema!}
                   onChange={patchLayout}
                 />
               </div>
@@ -535,6 +547,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
                 <Divider />
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <Button onClick={() => nav('/schemas')}>Cancel</Button>
+                  <Button appearance="secondary" icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>Preview</Button>
                   <Button appearance="primary" disabled={isBusy} onClick={onSave}>
                     {isEdit ? 'Save changes' : 'Create schema'}
                   </Button>
@@ -575,6 +588,10 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
           </DialogBody>
         </DialogSurface>
       </Dialog>
+
+      {previewSchema && (
+        <SchemaPreviewDialog schema={previewSchema} open={previewOpen} onClose={() => setPreviewOpen(false)} />
+      )}
     </div>
   )
 }

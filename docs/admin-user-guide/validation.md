@@ -11,6 +11,9 @@ You write rules in a tiny expression language explained below. It looks like a c
 
 Long rules can be broken across multiple lines for readability — the system normalises whitespace before evaluation, so indent and line-break however helps you read them.
 
+> [!TIP]
+> You don't have to save and submit to try a rule out. The schema editor's **Preview** button (see [Previewing a schema](schemas.md#previewing-a-schema)) renders the live form from your unsaved schema and evaluates these rules in the browser as you type. It's a best-effort approximation — the server stays authoritative, and a few helpers (`sampleTimestamp()`, `serviceName()`) and the regex dialect differ client-side — so verify anything important with a real submission too.
+
 ## Why bother
 
 The built-in `min`, `max`, `regex` and friends are enough for the obvious shape checks. Validation rules buy you the rest:

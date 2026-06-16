@@ -111,6 +111,20 @@ In the schema editor, scroll to **Layout (UI grouping)** below the values list:
 - Empty sections **never appear** in the submission form or view drawer — if every descendant is hidden by `Visible if` (or simply missing from a submission), the section vanishes with them.
 - Values left in the tray still render in the submission form, but they appear first under no heading.
 
+## Previewing a schema
+
+Before you save, the **Preview** button (in the editor toolbar and at the bottom of the form) opens a full-screen window that renders the submission form for the schema **exactly as you have it right now** — unsaved. Type values into it to see how the schema behaves:
+
+- **Conditional display.** Values whose `Visible if` evaluates false disappear; values whose `Enabled if` evaluates false render greyed-out with a "disabled" badge. Sections whose every value is hidden fold away, just like the real form.
+- **Warnings.** A value's `Warning` rule shows its message inline under the value as soon as it fires.
+- **Validation results.** A side panel lists, grouped by kind: missing **required** values, basic **shape** problems (min/max, lengths, regex, type), failed per-value **Value validation** rules, and failed **schema-level** rules — recomputed as you type.
+- A **Sample timestamp** picker seeds the samples and any date-based rules that read a `Date` value, and **Reset values** clears the form. Nothing here is saved.
+
+Values with a blank or duplicate name can't be referenced by rules, so the preview skips them and tells you which — give every value a unique name to preview it. Preview also works in the read-only schema view and version snapshots, so you can poke at a published or historical schema without touching it.
+
+> [!IMPORTANT]
+> **The preview is a best-effort, client-side approximation — the server is always authoritative.** Rules are translated and evaluated in your browser, so some behaviour can differ: regular expressions use the browser's engine (not .NET's), and submission helpers such as `sampleTimestamp()`, `sampleNote()`, and `serviceName()` aren't available client-side (they evaluate to empty). Treat a green preview as encouraging, not a guarantee — confirm any rule you rely on with a real submission or an API call before publishing.
+
 ## Schema versioning
 
 Every schema carries an integer **Version**. New schemas start at `1`. When you introduce a new value to an existing schema:

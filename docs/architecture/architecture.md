@@ -186,6 +186,8 @@ The target language is selected through standard HTTP content negotiation. The S
 
 Translations are deterministic functions of the source string, so the client caches them by source for the lifetime of the page; each unique rule is translated exactly once. Server-side validation remains authoritative — if translation fails or a rule references something the runtime can't resolve, the editor stays permissive (show + no warning) and the real verdict comes back with the submission response.
 
+The submission form and its rule machinery are factored into shared pieces — `SchemaSampleFields` (the controlled form renderer) and `utils/sampleRules.ts` (the row model, the variable context the server mirrors, gating, and the `useSampleRules` prefetch hook) — so the same translate runtime also powers the **schema editor's Preview** (`SchemaPreviewDialog`). The preview renders the live form from the in-progress, unsaved schema and additionally evaluates value-level and schema-level validations client-side (via `interpretRuleResult`, mirroring the server's accept/reject contract). It's explicitly best-effort: the dialog carries a disclaimer that the server is authoritative, since the regex dialect and submission-only helpers (`sampleTimestamp()`, `serviceName()`) differ in the browser.
+
 ## Cadence semantics
 
 `CadenceCalculator.BucketFor(cadence, timestamp)` returns the half-open `[start, end)` window that contains `timestamp` for the given cadence:
