@@ -1,0 +1,21 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+	annotation PBI_QueryOrder = ["BaseUrl", "ApiKey", "Samples"]
+
+	annotation __PBI_TimeIntelligenceEnabled = 0
+
+relationship d3f1a000-0000-0000-0000-000000000001
+	fromColumn: Samples.Date
+	toColumn: Calendar.Date
+
+ref table Samples
+ref table Calendar
+
+ref cultureInfo en-US

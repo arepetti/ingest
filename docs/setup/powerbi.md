@@ -4,6 +4,8 @@
 
 Ingest exposes its sample data as an **OData feed** at `/odata/samples`. Any OData v4 client can consume it; this guide walks through the most common case — Microsoft Power BI Desktop.
 
+> **In a hurry?** [`examples/powerbi/`](../../examples/powerbi/README.md) has two ready-made starters that apply everything below: a full text-format project ([`ingest-samples`](../../examples/powerbi/ingest-samples/)) and a copy-paste `.m`/`.dax` quickstart ([`waste-quickstart`](../../examples/powerbi/waste-quickstart/)).
+
 ## What you get
 
 The feed serves rows from the `SampleProjection` collection: one row **per sample** (not per submission). Each row is fully denormalised, so PowerBI gets readable, self-contained data without any joins to perform.

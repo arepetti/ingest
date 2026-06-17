@@ -1,0 +1,71 @@
+{
+  "$schema": "http://powerbi.com/product/schema#report",
+  "config": "{\"version\":\"5.43\",\"activeSectionIndex\":0,\"defaultDrillFilterOtherVisuals\":true,\"settings\":{\"useStylableVisualContainerHeader\":true}}",
+  "layoutOptimization": 0,
+  "publicCustomVisuals": [],
+  "resourcePackages": [],
+  "filters": "[]",
+  "pods": [],
+  "sections": [
+    {
+      "name": "page_waste",
+      "displayName": "Waste",
+      "ordinal": 0,
+      "width": 1280,
+      "height": 720,
+      "displayOption": 1,
+      "config": "{}",
+      "filters": "[]",
+      "visualContainers": [
+        {
+          "x": 24,
+          "y": 24,
+          "z": 0,
+          "width": 900,
+          "height": 150,
+          "config": "{\"name\":\"tb_waste\",\"layouts\":[{\"id\":0,\"position\":{\"x\":24,\"y\":24,\"z\":0,\"width\":900,\"height\":150,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"textbox\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"paragraphs\":[{\"textRuns\":[{\"value\":\"Waste — garbage_collection\",\"textStyle\":{\"fontSize\":\"22px\",\"fontWeight\":\"bold\"}}]},{\"textRuns\":[{\"value\":\"Add: a line chart of [Total tonnes collected] and [Recycling tonnes] by Calendar[Month], a gauge of [Avg contamination %], cards for [Routes missed], and a SchemaName/ServiceName slicer. See the README for the field list.\",\"textStyle\":{\"fontSize\":\"11px\"}}]}]}}]}}}"
+        }
+      ]
+    },
+    {
+      "name": "page_workforce",
+      "displayName": "Workforce",
+      "ordinal": 1,
+      "width": 1280,
+      "height": 720,
+      "displayOption": 1,
+      "config": "{}",
+      "filters": "[]",
+      "visualContainers": [
+        {
+          "x": 24,
+          "y": 24,
+          "z": 0,
+          "width": 900,
+          "height": 150,
+          "config": "{\"name\":\"tb_workforce\",\"layouts\":[{\"id\":0,\"position\":{\"x\":24,\"y\":24,\"z\":0,\"width\":900,\"height\":150,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"textbox\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"paragraphs\":[{\"textRuns\":[{\"value\":\"Workforce — weekly_workforce\",\"textStyle\":{\"fontSize\":\"22px\",\"fontWeight\":\"bold\"}}]},{\"textRuns\":[{\"value\":\"Add: a column/line chart of NumericValue by Calendar[Month] for employees_active / sick_leave / contractors (ValueName on the legend), and a card for [Avg active employees]. See the README.\",\"textStyle\":{\"fontSize\":\"11px\"}}]}]}}]}}}"
+        }
+      ]
+    },
+    {
+      "name": "page_finance",
+      "displayName": "Finance",
+      "ordinal": 2,
+      "width": 1280,
+      "height": 720,
+      "displayOption": 1,
+      "config": "{}",
+      "filters": "[]",
+      "visualContainers": [
+        {
+          "x": 24,
+          "y": 24,
+          "z": 0,
+          "width": 900,
+          "height": 150,
+          "config": "{\"name\":\"tb_finance\",\"layouts\":[{\"id\":0,\"position\":{\"x\":24,\"y\":24,\"z\":0,\"width\":900,\"height\":150,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"textbox\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"paragraphs\":[{\"textRuns\":[{\"value\":\"Finance — finance_monthly_close\",\"textStyle\":{\"fontSize\":\"22px\",\"fontWeight\":\"bold\"}}]},{\"textRuns\":[{\"value\":\"Add: clustered columns of [Budget actual (GBP)] vs budget_planned, [Revenue collected (GBP)] vs revenue_target by Calendar[Month], and a KPI for invoices_paid_on_time_pct. See the README.\",\"textStyle\":{\"fontSize\":\"11px\"}}]}]}}]}}}"
+        }
+      ]
+    }
+  ]
+}

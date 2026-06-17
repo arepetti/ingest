@@ -31,6 +31,15 @@ Scripts that collect data from a source system and submit it to Ingest — the "
 | [hr-workforce-csv-powershell](integrations/hr-workforce-csv-powershell/) | HR / workforce | CSV export | PowerShell |
 | [hr-workforce-vendor-api-python](integrations/hr-workforce-vendor-api-python/) | HR / workforce | Vendor REST API | Python |
 
+### Power BI
+
+Ready-made starting points for exploring the data in Power BI over the `/odata/samples` feed — the [recommended way to explore Ingest data](../docs/setup/powerbi.md). See [powerbi/](powerbi/README.md).
+
+| Example | What it is |
+|---------|-----------|
+| [ingest-samples](powerbi/ingest-samples/) | A full PBIP (text-format project) you open in Power BI Desktop; three pages across all example schemas. |
+| [waste-quickstart](powerbi/waste-quickstart/) | A docs-only, copy-paste `.m`/`.dax` mini-example for the `garbage_collection` schema. |
+
 ## See also
 
 - [docs/client/](../docs/client/) — service-client documentation (auth, full API reference)

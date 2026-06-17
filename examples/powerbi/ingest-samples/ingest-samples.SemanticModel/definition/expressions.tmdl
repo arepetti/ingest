@@ -1,0 +1,13 @@
+/// Base URL of your Ingest deployment, e.g. https://ingest.example.org (no trailing slash).
+/// Set this in Power BI Desktop: Home > Transform data > Manage parameters.
+expression BaseUrl = "https://ingest.example.org" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: a1b2c3d4-0000-0000-0000-000000000001
+
+	annotation PBI_ResultType = Text
+
+/// An Operator (or Admin) API key in the form keyId.secret. Sent as the X-Api-Key header.
+/// Do NOT commit a real key — leave the placeholder and set it locally / at workspace level.
+expression ApiKey = "REPLACE-WITH-OPERATOR-KEY" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: a1b2c3d4-0000-0000-0000-000000000002
+
+	annotation PBI_ResultType = Text

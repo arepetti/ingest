@@ -1,0 +1,8 @@
+# Power BI Desktop local state — never commit these.
+.pbi/
+*.pbi/localSettings.json
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
+
+# A built binary report, if you ever export one alongside the project.
+*.pbix

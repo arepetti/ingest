@@ -1,0 +1,175 @@
+table Samples
+	lineageTag: b0000000-0000-0000-0000-0000000000a0
+
+	measure 'Total tonnes collected' = CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "tonnes_collected" )
+		formatString: #,0.0
+		lineageTag: c0000000-0000-0000-0000-000000000001
+
+	measure 'Recycling tonnes' = CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "recycling_tonnes_collected" )
+		formatString: #,0.0
+		lineageTag: c0000000-0000-0000-0000-000000000002
+
+	measure 'Recycling rate %' = DIVIDE ( [Recycling tonnes], [Total tonnes collected] )
+		formatString: 0.0%
+		lineageTag: c0000000-0000-0000-0000-000000000003
+
+	measure 'Avg contamination %' = CALCULATE ( AVERAGE ( Samples[NumberValue] ), Samples[ValueName] = "contamination_pct" ) / 100
+		formatString: 0.0%
+		lineageTag: c0000000-0000-0000-0000-000000000004
+
+	measure 'Routes missed' = CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "routes_missed" )
+		formatString: #,0
+		lineageTag: c0000000-0000-0000-0000-000000000005
+
+	measure 'Avg active employees' = CALCULATE ( AVERAGE ( Samples[IntegerValue] ), Samples[ValueName] = "employees_active" )
+		formatString: #,0
+		lineageTag: c0000000-0000-0000-0000-000000000006
+
+	measure 'Budget actual (GBP)' = CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "budget_actual" )
+		formatString: #,0
+		lineageTag: c0000000-0000-0000-0000-000000000007
+
+	measure 'Revenue collected (GBP)' = CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "revenue_collected" )
+		formatString: #,0
+		lineageTag: c0000000-0000-0000-0000-000000000008
+
+	column Id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Id
+		lineageTag: d0000000-0000-0000-0000-000000000001
+
+	column SubmissionId
+		dataType: string
+		summarizeBy: none
+		sourceColumn: SubmissionId
+		lineageTag: d0000000-0000-0000-0000-000000000002
+
+	column ServiceAccountId
+		dataType: string
+		summarizeBy: none
+		sourceColumn: ServiceAccountId
+		lineageTag: d0000000-0000-0000-0000-000000000003
+
+	column ServiceName
+		dataType: string
+		summarizeBy: none
+		sourceColumn: ServiceName
+		lineageTag: d0000000-0000-0000-0000-000000000004
+
+	column SchemaName
+		dataType: string
+		summarizeBy: none
+		sourceColumn: SchemaName
+		lineageTag: d0000000-0000-0000-0000-000000000005
+
+	column ValueName
+		dataType: string
+		summarizeBy: none
+		sourceColumn: ValueName
+		lineageTag: d0000000-0000-0000-0000-000000000006
+
+	column ValueType
+		dataType: string
+		summarizeBy: none
+		sourceColumn: ValueType
+		lineageTag: d0000000-0000-0000-0000-000000000007
+
+	column StringValue
+		dataType: string
+		summarizeBy: none
+		sourceColumn: StringValue
+		lineageTag: d0000000-0000-0000-0000-000000000008
+
+	column IntegerValue
+		dataType: int64
+		formatString: 0
+		summarizeBy: sum
+		sourceColumn: IntegerValue
+		lineageTag: d0000000-0000-0000-0000-000000000009
+
+	column NumberValue
+		dataType: double
+		summarizeBy: sum
+		sourceColumn: NumberValue
+		lineageTag: d0000000-0000-0000-0000-00000000000a
+
+	column DateValue
+		dataType: dateTime
+		formatString: General Date
+		summarizeBy: none
+		sourceColumn: DateValue
+		lineageTag: d0000000-0000-0000-0000-00000000000b
+
+	column BooleanValue
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: BooleanValue
+		lineageTag: d0000000-0000-0000-0000-00000000000c
+
+	column Timestamp
+		dataType: dateTime
+		formatString: General Date
+		summarizeBy: none
+		sourceColumn: Timestamp
+		lineageTag: d0000000-0000-0000-0000-00000000000d
+
+	column Note
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Note
+		lineageTag: d0000000-0000-0000-0000-00000000000e
+
+	column Cadence
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Cadence
+		lineageTag: d0000000-0000-0000-0000-00000000000f
+
+	column PeriodStart
+		dataType: dateTime
+		formatString: General Date
+		summarizeBy: none
+		sourceColumn: PeriodStart
+		lineageTag: d0000000-0000-0000-0000-000000000010
+
+	column PeriodEnd
+		dataType: dateTime
+		formatString: General Date
+		summarizeBy: none
+		sourceColumn: PeriodEnd
+		lineageTag: d0000000-0000-0000-0000-000000000011
+
+	column NumericValue = COALESCE ( Samples[NumberValue], Samples[IntegerValue] )
+		dataType: double
+		summarizeBy: sum
+		lineageTag: d0000000-0000-0000-0000-000000000012
+
+	column Date = DATE ( YEAR ( Samples[Timestamp] ), MONTH ( Samples[Timestamp] ), DAY ( Samples[Timestamp] ) )
+		dataType: dateTime
+		formatString: General Date
+		summarizeBy: none
+		lineageTag: d0000000-0000-0000-0000-000000000013
+
+	partition Samples = m
+		mode: import
+		source =
+				let
+					Source = OData.Feed(
+						BaseUrl & "/odata/samples",
+						null,
+						[
+							Implementation = "2.0",
+							Headers = [ #"X-Api-Key" = ApiKey ]
+						]
+					),
+					#"Added Value" = Table.AddColumn(Source, "Value", each
+						if [ValueType] = "Number"  then Number.From([NumberValue])  else
+						if [ValueType] = "Integer" then Number.From([IntegerValue]) else
+						if [ValueType] = "Date"    then DateTime.From([DateValue])  else
+						if [ValueType] = "Boolean" then Logical.From([BooleanValue]) else
+						[StringValue])
+				in
+					#"Added Value"
+
+	annotation PBI_ResultType = Table

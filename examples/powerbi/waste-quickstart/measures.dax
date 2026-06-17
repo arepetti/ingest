@@ -1,0 +1,31 @@
+// Starter measures for the garbage_collection schema.
+// Create each one with Modeling > New measure on the Samples table.
+// They filter Samples[ValueName] and aggregate the typed columns, so leave
+// NumberValue / IntegerValue in the table (don't remove them after flattening).
+
+Total tonnes collected =
+CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "tonnes_collected" )
+
+Recycling tonnes =
+CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "recycling_tonnes_collected" )
+
+Recycling rate % =
+DIVIDE ( [Recycling tonnes], [Total tonnes collected] )
+
+Avg contamination % =
+CALCULATE ( AVERAGE ( Samples[NumberValue] ), Samples[ValueName] = "contamination_pct" ) / 100
+
+Routes completed =
+CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "routes_completed" )
+
+Routes missed =
+CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "routes_missed" )
+
+Miss rate % =
+DIVIDE ( [Routes missed], [Routes completed] + [Routes missed] )
+
+Vehicle breakdowns =
+CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "vehicle_breakdowns" )
+
+Customer complaints =
+CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "customer_complaints" )
