@@ -1,0 +1,24 @@
+{
+  "depotId": "EASTFIELD",
+  "operationalDate": "2026-06-15",
+  "summary": {
+    "totalTonnage": 114.5,
+    "recyclingTonnage": 29.1,
+    "recyclingContaminationPercent": 9.98,
+    "roundsScheduled": 8,
+    "roundsCompleted": 6,
+    "roundsMissed": 2
+  },
+  "missedRounds": [
+    { "round": "Riverside recycling", "reason": "Road closure on Mill Lane (burst water main)" },
+    { "round": "Marsh End recycling", "reason": "Crew shortage - two sickness absences" }
+  ],
+  "fleetIncidents": [
+    {
+      "vehicle": "WX22 QRS",
+      "round": "Hilltop domestic",
+      "type": "breakdown",
+      "description": "Hydraulic lifter fault at 11:20 - swapped to spare vehicle"
+    }
+  ]
+}

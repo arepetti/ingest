@@ -94,6 +94,16 @@ Long-form docs live under `[docs/](docs/README.md)` and are split by audience:
 - **[architecture/](docs/architecture/README.md)** — system design and the auth model in depth.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev environment, tests, and where the source lives.
 
+## Examples
+
+Ingest is designed to be extended **without changing the product code**. The three extension points each ship ready-to-use, copy-pasteable examples for contributors and council developers who want to add a useful data page or pipeline of their own:
+
+- **Schemas** — [`examples/schemas/*.json`](examples/schemas/) — example KPI packages (garbage collection, weekly workforce, finance month-end close). Upload one through the admin console (**Schemas → New schema → Upload JSON…**) as-is, or adapt it. See [docs/admin-user-guide/schemas.md](docs/admin-user-guide/schemas.md).
+- **Reports** — [`examples/reports/html/*.html`](examples/reports/html/) — HTML + Liquid templates (single-submission summaries and period roll-ups) you upload to add a small, server-rendered data page. No editor, no redeploy. See [docs/admin-user-guide/reports.md](docs/admin-user-guide/reports.md).
+- **Integrations** — [`examples/integrations/`](examples/integrations/README.md) — minimal scripts (Python, PowerShell, C#, Java) showing how a council's existing waste-collection or HR software (a CSV export, or a vendor REST API) can push KPIs to the API on a schedule.
+
+Schemas and reports are uploaded through the admin console; integrations run wherever your scripts run. None of them require touching or rebuilding the application.
+
 ## Feature highlights
 
 Everything Ingest does, in one place:

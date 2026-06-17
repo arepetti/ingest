@@ -59,6 +59,21 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 
 `GET /api/me/status` returns, per value and cadence bucket, whether you've already submitted in the current period. Useful as the final step of a scheduled job to assert "yes, this period is closed out". See [api.md § `GET /api/me/status`](api.md#get-apimestatus).
 
+### Worked examples to copy from
+
+If you'd rather start from working code than the raw reference, the repository ships minimal, runnable integration scripts under [`examples/`](../../examples/README.md). They show the full pattern — read from a source, map to a schema, `POST /api/submissions`, handle warnings/errors — across **Python, PowerShell, C# and Java**, for both a **CSV export** and a **vendor REST API** source, against a council waste-collection and an HR schema:
+
+| Example | Source style | Language |
+|---------|--------------|----------|
+| [waste-rounds-csv-python](../../examples/integrations/waste-rounds-csv-python/) | CSV export | Python |
+| [waste-rounds-csv-csharp](../../examples/integrations/waste-rounds-csv-csharp/) | CSV export | C# (.NET 10) |
+| [waste-rounds-csv-java](../../examples/integrations/waste-rounds-csv-java/) | CSV export | Java (11+) |
+| [waste-rounds-vendor-api-powershell](../../examples/integrations/waste-rounds-vendor-api-powershell/) | Vendor REST API | PowerShell |
+| [hr-workforce-csv-powershell](../../examples/integrations/hr-workforce-csv-powershell/) | CSV export | PowerShell |
+| [hr-workforce-vendor-api-python](../../examples/integrations/hr-workforce-vendor-api-python/) | Vendor REST API | Python |
+
+Each has a dry-run switch that prints the exact payload without calling the API, and the integrations index shows how to **schedule one on Windows**.
+
 ## What you can do via the admin UI
 
 If your account is **User**-kind, you can also sign in to the admin SPA at the deployment URL and:
@@ -94,6 +109,7 @@ Status codes per endpoint are documented in detail in [api.md § Common status c
 
 ## Where to go next
 
+- [examples/](../../examples/README.md) — runnable Python/PowerShell integration scripts you can adapt to your own source system.
 - [api.md](api.md) — the reference. Endpoint by endpoint.
 - [../admin-user-guide/validation.md](../admin-user-guide/validation.md) — if you author your own schemas (some service teams do): how the validation expressions work and what errors look like to your callers.
 - [../architecture/authentication.md](../architecture/authentication.md) — the wire-level contract for keys; useful background when you're integrating with a secrets manager or CI pipeline.

@@ -173,6 +173,18 @@ The schema list and the schema view drawer expose three quick affordances:
 | Schema view drawer → split button on **Download** → **Example submission (JSON)** | Download a starter submission body (`{name}.example.json`). | One sample per value with type-appropriate defaults (empty string, `0`/`Min` for numerics, today/`MinDate` for dates, `false` for booleans). Validation rules are ignored — it's a template, not a guaranteed-valid payload. |
 | Schemas page row menu → **Clone** | Server-side clone with a fresh unique name. | The new schema keeps every field (values, layout, version, audience, rules) but gets a unique name (`{source}_copy`, then `{source}_copy_2`, …) and its audit/`versionModifiedAt` reset to now. |
 
+### Example schemas to start from
+
+The repository ships a few ready-made schema definitions under [`examples/schemas/`](../../examples/schemas/) that you can feed straight into **Upload JSON…** and tweak:
+
+| File | Schema | What it covers |
+|------|--------|----------------|
+| [`examples/schemas/garbage-collection.json`](../../examples/schemas/garbage-collection.json) | `garbage_collection` | Daily kerbside-collection operations (tonnage, routes, fleet, recycling) with mixed cadences and conditional fields. |
+| [`examples/schemas/generic.json`](../../examples/schemas/generic.json) | `weekly_workforce` | A lightweight weekly headcount/availability snapshot any department can use as a starter. |
+| [`examples/schemas/finance-monthly-close.json`](../../examples/schemas/finance-monthly-close.json) | `finance_monthly_close` | A monthly finance close with budget/variance, revenue, and reconciliation checks. |
+
+They're also the schemas the [example integrations](../../examples/integrations/README.md) and [example reports](../../examples/reports/README.md) are built against, so uploading them lets you try the whole flow end to end.
+
 ## Editing a schema
 
 Row menu → **Edit**. You can add/remove values freely; existing submissions retain their original shape thanks to the denormalised sample projection.

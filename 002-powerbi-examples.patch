@@ -1,0 +1,706 @@
+diff --git a/docs/setup/powerbi.md b/docs/setup/powerbi.md
+index 11ab084..da1d568 100644
+--- a/docs/setup/powerbi.md
++++ b/docs/setup/powerbi.md
+@@ -4,6 +4,8 @@
+ 
+ Ingest exposes its sample data as an **OData feed** at `/odata/samples`. Any OData v4 client can consume it; this guide walks through the most common case — Microsoft Power BI Desktop.
+ 
++> **In a hurry?** [`examples/powerbi/`](../../examples/powerbi/README.md) has two ready-made starters that apply everything below: a full text-format project ([`ingest-samples`](../../examples/powerbi/ingest-samples/)) and a copy-paste `.m`/`.dax` quickstart ([`waste-quickstart`](../../examples/powerbi/waste-quickstart/)).
++
+ ## What you get
+ 
+ The feed serves rows from the `SampleProjection` collection: one row **per sample** (not per submission). Each row is fully denormalised, so PowerBI gets readable, self-contained data without any joins to perform.
+diff --git a/examples/README.md b/examples/README.md
+index f621bde..5062863 100644
+--- a/examples/README.md
++++ b/examples/README.md
+@@ -31,6 +31,15 @@ Scripts that collect data from a source system and submit it to Ingest — the "
+ | [hr-workforce-csv-powershell](integrations/hr-workforce-csv-powershell/) | HR / workforce | CSV export | PowerShell |
+ | [hr-workforce-vendor-api-python](integrations/hr-workforce-vendor-api-python/) | HR / workforce | Vendor REST API | Python |
+ 
++### Power BI
++
++Ready-made starting points for exploring the data in Power BI over the `/odata/samples` feed — the [recommended way to explore Ingest data](../docs/setup/powerbi.md). See [powerbi/](powerbi/README.md).
++
++| Example | What it is |
++|---------|-----------|
++| [ingest-samples](powerbi/ingest-samples/) | A full PBIP (text-format project) you open in Power BI Desktop; three pages across all example schemas. |
++| [waste-quickstart](powerbi/waste-quickstart/) | A docs-only, copy-paste `.m`/`.dax` mini-example for the `garbage_collection` schema. |
++
+ ## See also
+ 
+ - [docs/client/](../docs/client/) — service-client documentation (auth, full API reference)
+diff --git a/examples/powerbi/README.md b/examples/powerbi/README.md
+new file mode 100644
+index 0000000..c905c52
+--- /dev/null
++++ b/examples/powerbi/README.md
+@@ -0,0 +1,29 @@
++# Power BI examples
++
++Ready-made starting points for exploring Ingest data in **Power BI**, pointed at the OData feed at `/odata/samples`. This is the [recommended, primary way to explore Ingest data](../../docs/setup/powerbi.md) — the admin SPA dashboard and built-in reports are deliberately basic; real slicing, trends and charting belong in a BI tool.
++
++Both artifacts here use the exact connection recipe from [docs/setup/powerbi.md](../../docs/setup/powerbi.md): an OData feed with **Anonymous** auth plus an `X-Api-Key` custom header, with the key held in a Power Query **parameter** rather than baked into the file.
++
++## The two artifacts
++
++| Folder | What it is | Reach for it when… |
++|--------|-----------|--------------------|
++| [ingest-samples/](ingest-samples/) | A full **PBIP** (text-format Power BI project) you open in Power BI Desktop. Three report pages, one per [example schema](../schemas/README.md), with a flattened value column and a calendar table for time-intelligence. | You want a working report to open, point at your deployment, and build on. |
++| [waste-quickstart/](waste-quickstart/) | A **docs-only** mini-example: a README plus copy-paste `.m` and `.dax` snippets for the `garbage_collection` schema only. No project files. | You'd rather paste a couple of queries into a blank report and assemble it yourself in five minutes — or the full PBIP won't open and you want the raw pieces. |
++
++The full example covers all three schemas; the quickstart is intentionally just waste, as the smallest end-to-end illustration.
++
++## Required role (both)
++
++The feed is gated by the **Operator** policy: any account with role `Operator` or `Admin` can read it — a `Service`-role key cannot. Issue a dedicated Operator-kind credential for the report so revoking it later doesn't affect anybody else. See the [admin guide](../../docs/admin-user-guide/accounts.md) for how to create one.
++
++## Before you start
++
++1. An admin uploads the [example schemas](../schemas/README.md) and there are some submissions to look at (run an [integration example](../integrations/README.md) to generate data, or use the dashboard).
++2. You have an **Operator** API key and your deployment's base URL (e.g. `https://ingest.example.org`).
++
++## See also
++
++- [docs/setup/powerbi.md](../../docs/setup/powerbi.md) — the full connection guide: column reference, header recipe, pre-filtering, data-model tips, scheduled refresh.
++- [docs/setup/excel.md](../../docs/setup/excel.md) — the same feed in Excel, the cheapest analyst on-ramp.
++- [examples index](../README.md)
+diff --git a/examples/powerbi/ingest-samples/.gitignore b/examples/powerbi/ingest-samples/.gitignore
+new file mode 100644
+index 0000000..b6e354c
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/.gitignore
+@@ -0,0 +1,8 @@
++# Power BI Desktop local state — never commit these.
++.pbi/
++*.pbi/localSettings.json
++**/.pbi/localSettings.json
++**/.pbi/cache.abf
++
++# A built binary report, if you ever export one alongside the project.
++*.pbix
+diff --git a/examples/powerbi/ingest-samples/README.md b/examples/powerbi/ingest-samples/README.md
+new file mode 100644
+index 0000000..1262456
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/README.md
+@@ -0,0 +1,70 @@
++# Ingest samples — full Power BI project (PBIP)
++
++A ready-to-open **Power BI project** wired to the Ingest OData feed at `/odata/samples`, with a data model that covers all three [example schemas](../../schemas/README.md): `garbage_collection`, `weekly_workforce`, and `finance_monthly_close`.
++
++It's stored in the **PBIP** (Power BI Project) format — plain text (TMDL + JSON) instead of a binary `.pbix` — so it lives in git as readable, diffable files. You open `ingest-samples.pbip` in Power BI Desktop.
++
++## What's in the box
++
++```
++ingest-samples/
++├─ ingest-samples.pbip                  ← open this in Power BI Desktop
++├─ ingest-samples.SemanticModel/        ← the data model (tables, parameters, measures)
++│  └─ definition/
++│     ├─ expressions.tmdl               ← BaseUrl + ApiKey parameters
++│     └─ tables/Samples.tmdl, Calendar.tmdl
++└─ ingest-samples.Report/               ← three pages: Waste, Workforce, Finance
++```
++
++The model:
++
++- **`Samples`** — the OData feed, with the doc's [flatten step](../../../docs/setup/powerbi.md#suggested-data-model) adding a single `Value` column, plus a `NumericValue` calculated column (`COALESCE(NumberValue, IntegerValue)`) so Number and Integer KPIs aggregate together, and a `Date` column for the relationship. A handful of starter **measures** are defined (total tonnes, recycling rate, avg contamination, routes missed, avg active employees, budget actual, revenue collected).
++- **`Calendar`** — a DAX calendar (`CALENDAR(2024-01-01, 2027-12-31)`) related to `Samples[Date]`, for time-intelligence and clean month/quarter axes.
++
++## First-time setup (required)
++
++Because the key must not live in the file, the connection is driven by two **parameters** you set after opening:
++
++1. Open `ingest-samples.pbip` in **Power BI Desktop** (a recent version — PBIP is GA but the option may need enabling under *File > Options > Preview features > Power BI Project (.pbip) save format* on older builds).
++2. Go to **Home > Transform data > Edit parameters** (or **Manage parameters**) and set:
++   - **`BaseUrl`** — your deployment, e.g. `https://ingest.example.org` (no trailing slash).
++   - **`ApiKey`** — an **Operator** (or Admin) API key in the form `keyId.secret`. A `Service`-role key will get a 401.
++3. When prompted for credentials on the OData source, choose **Anonymous** — the key travels as the `X-Api-Key` header set by the query, not through the credential dialog. (See [why anonymous + header](../../../docs/setup/powerbi.md#why-anonymous--custom-header).)
++4. **Close & Apply.** The model refreshes against your data.
++
++> Don't commit your key. Leave `ApiKey` as the placeholder in `expressions.tmdl`; set the real value locally, and at workspace level when publishing to the Power BI service.
++
++## Building the visuals
++
++The three pages (**Waste**, **Workforce**, **Finance**) open with a title and a hint textbox but **no charts yet** — this project is hand-authored text, so the visuals are left for you to drop in (it takes a minute and avoids shipping a brittle hand-written visual layout). Suggested starters, all sliced by a `SchemaName` + `ServiceName` slicer and a `Calendar[Date]` range slicer:
++
++**Waste**
++- Line chart — Axis `Calendar[Month]`, Values `[Total tonnes collected]` and `[Recycling tonnes]`.
++- Gauge — Value `[Avg contamination %]`.
++- Cards — `[Routes missed]`, `[Recycling rate %]`.
++
++**Workforce**
++- Line/column chart — Axis `Calendar[Month]`, Values `NumericValue` (Sum), Legend `ValueName`, filtered to `employees_active`, `sick_leave`, `contractors`.
++- Card — `[Avg active employees]`.
++
++**Finance**
++- Clustered column — Axis `Calendar[Month]`, Values `[Budget actual (GBP)]` and `budget_planned` (Sum of `NumericValue` filtered to that value).
++- Clustered column — `[Revenue collected (GBP)]` vs `revenue_target`.
++- KPI — `invoices_paid_on_time_pct`.
++
++## Refresh & publish
++
++After publishing to the Power BI service, set **Data source credentials > Anonymous** and configure a **Refresh schedule** (Daily is plenty). Behind a private network, add an on-premises data gateway. Full detail: [docs/setup/powerbi.md § Refresh schedule](../../../docs/setup/powerbi.md#refresh-schedule).
++
++## If the project won't open
++
++This PBIP is authored by hand and **hasn't been round-tripped through Power BI Desktop** in this repo, so Desktop may want to repair or re-serialise a file on first open. If it refuses to load:
++
++- Use the [waste-quickstart](../waste-quickstart/) snippets (or the `Samples` query and measures here) to rebuild the model in a blank report in a few minutes — the M, the flatten step, and the DAX are the parts worth copying.
++- Then **Save as** PBIP to regenerate a Desktop-blessed version.
++
++## See also
++
++- [docs/setup/powerbi.md](../../../docs/setup/powerbi.md) — the authoritative connection guide (column reference, pre-filtering, data model, refresh).
++- [waste-quickstart](../waste-quickstart/) — the no-project, copy-paste version (waste only).
++- [Power BI examples index](../README.md)
+diff --git a/examples/powerbi/ingest-samples/ingest-samples.Report/definition.pbir b/examples/powerbi/ingest-samples/ingest-samples.Report/definition.pbir
+new file mode 100644
+index 0000000..69dea33
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/ingest-samples.Report/definition.pbir
+@@ -0,0 +1,8 @@
++{
++  "version": "1.0",
++  "datasetReference": {
++    "byPath": {
++      "path": "../ingest-samples.SemanticModel"
++    }
++  }
++}
+diff --git a/examples/powerbi/ingest-samples/ingest-samples.Report/report.json b/examples/powerbi/ingest-samples/ingest-samples.Report/report.json
+new file mode 100644
+index 0000000..da6a959
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/ingest-samples.Report/report.json
+@@ -0,0 +1,71 @@
++{
++  "$schema": "http://powerbi.com/product/schema#report",
++  "config": "{\"version\":\"5.43\",\"activeSectionIndex\":0,\"defaultDrillFilterOtherVisuals\":true,\"settings\":{\"useStylableVisualContainerHeader\":true}}",
++  "layoutOptimization": 0,
++  "publicCustomVisuals": [],
++  "resourcePackages": [],
++  "filters": "[]",
++  "pods": [],
++  "sections": [
++    {
++      "name": "page_waste",
++      "displayName": "Waste",
++      "ordinal": 0,
++      "width": 1280,
++      "height": 720,
++      "displayOption": 1,
++      "config": "{}",
++      "filters": "[]",
++      "visualContainers": [
++        {
++          "x": 24,
++          "y": 24,
++          "z": 0,
++          "width": 900,
++          "height": 150,
++          "config": "{\"name\":\"tb_waste\",\"layouts\":[{\"id\":0,\"position\":{\"x\":24,\"y\":24,\"z\":0,\"width\":900,\"height\":150,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"textbox\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"paragraphs\":[{\"textRuns\":[{\"value\":\"Waste — garbage_collection\",\"textStyle\":{\"fontSize\":\"22px\",\"fontWeight\":\"bold\"}}]},{\"textRuns\":[{\"value\":\"Add: a line chart of [Total tonnes collected] and [Recycling tonnes] by Calendar[Month], a gauge of [Avg contamination %], cards for [Routes missed], and a SchemaName/ServiceName slicer. See the README for the field list.\",\"textStyle\":{\"fontSize\":\"11px\"}}]}]}}]}}}"
++        }
++      ]
++    },
++    {
++      "name": "page_workforce",
++      "displayName": "Workforce",
++      "ordinal": 1,
++      "width": 1280,
++      "height": 720,
++      "displayOption": 1,
++      "config": "{}",
++      "filters": "[]",
++      "visualContainers": [
++        {
++          "x": 24,
++          "y": 24,
++          "z": 0,
++          "width": 900,
++          "height": 150,
++          "config": "{\"name\":\"tb_workforce\",\"layouts\":[{\"id\":0,\"position\":{\"x\":24,\"y\":24,\"z\":0,\"width\":900,\"height\":150,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"textbox\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"paragraphs\":[{\"textRuns\":[{\"value\":\"Workforce — weekly_workforce\",\"textStyle\":{\"fontSize\":\"22px\",\"fontWeight\":\"bold\"}}]},{\"textRuns\":[{\"value\":\"Add: a column/line chart of NumericValue by Calendar[Month] for employees_active / sick_leave / contractors (ValueName on the legend), and a card for [Avg active employees]. See the README.\",\"textStyle\":{\"fontSize\":\"11px\"}}]}]}}]}}}"
++        }
++      ]
++    },
++    {
++      "name": "page_finance",
++      "displayName": "Finance",
++      "ordinal": 2,
++      "width": 1280,
++      "height": 720,
++      "displayOption": 1,
++      "config": "{}",
++      "filters": "[]",
++      "visualContainers": [
++        {
++          "x": 24,
++          "y": 24,
++          "z": 0,
++          "width": 900,
++          "height": 150,
++          "config": "{\"name\":\"tb_finance\",\"layouts\":[{\"id\":0,\"position\":{\"x\":24,\"y\":24,\"z\":0,\"width\":900,\"height\":150,\"tabOrder\":0}}],\"singleVisual\":{\"visualType\":\"textbox\",\"drillFilterOtherVisuals\":true,\"objects\":{\"general\":[{\"properties\":{\"paragraphs\":[{\"textRuns\":[{\"value\":\"Finance — finance_monthly_close\",\"textStyle\":{\"fontSize\":\"22px\",\"fontWeight\":\"bold\"}}]},{\"textRuns\":[{\"value\":\"Add: clustered columns of [Budget actual (GBP)] vs budget_planned, [Revenue collected (GBP)] vs revenue_target by Calendar[Month], and a KPI for invoices_paid_on_time_pct. See the README.\",\"textStyle\":{\"fontSize\":\"11px\"}}]}]}}]}}}"
++        }
++      ]
++    }
++  ]
++}
+diff --git a/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition.pbism b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition.pbism
+new file mode 100644
+index 0000000..07e21e6
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition.pbism
+@@ -0,0 +1,4 @@
++{
++  "version": "4.2",
++  "settings": {}
++}
+diff --git a/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/database.tmdl b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/database.tmdl
+new file mode 100644
+index 0000000..3da6479
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/database.tmdl
+@@ -0,0 +1,2 @@
++database
++	compatibilityLevel: 1567
+diff --git a/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/expressions.tmdl b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/expressions.tmdl
+new file mode 100644
+index 0000000..bd09e76
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/expressions.tmdl
+@@ -0,0 +1,13 @@
++/// Base URL of your Ingest deployment, e.g. https://ingest.example.org (no trailing slash).
++/// Set this in Power BI Desktop: Home > Transform data > Manage parameters.
++expression BaseUrl = "https://ingest.example.org" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
++	lineageTag: a1b2c3d4-0000-0000-0000-000000000001
++
++	annotation PBI_ResultType = Text
++
++/// An Operator (or Admin) API key in the form keyId.secret. Sent as the X-Api-Key header.
++/// Do NOT commit a real key — leave the placeholder and set it locally / at workspace level.
++expression ApiKey = "REPLACE-WITH-OPERATOR-KEY" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
++	lineageTag: a1b2c3d4-0000-0000-0000-000000000002
++
++	annotation PBI_ResultType = Text
+diff --git a/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/model.tmdl b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/model.tmdl
+new file mode 100644
+index 0000000..0a61b28
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/model.tmdl
+@@ -0,0 +1,21 @@
++model Model
++	culture: en-US
++	defaultPowerBIDataSourceVersion: powerBI_V3
++	discourageImplicitMeasures
++	sourceQueryCulture: en-US
++	dataAccessOptions
++		legacyRedirects
++		returnErrorValuesAsNull
++
++	annotation PBI_QueryOrder = ["BaseUrl", "ApiKey", "Samples"]
++
++	annotation __PBI_TimeIntelligenceEnabled = 0
++
++relationship d3f1a000-0000-0000-0000-000000000001
++	fromColumn: Samples.Date
++	toColumn: Calendar.Date
++
++ref table Samples
++ref table Calendar
++
++ref cultureInfo en-US
+diff --git a/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/tables/Calendar.tmdl b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/tables/Calendar.tmdl
+new file mode 100644
+index 0000000..e068329
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/tables/Calendar.tmdl
+@@ -0,0 +1,46 @@
++table Calendar
++	lineageTag: b0000000-0000-0000-0000-0000000000b0
++	dataCategory: Time
++
++	column Date
++		isKey
++		dataType: dateTime
++		formatString: Long Date
++		summarizeBy: none
++		sourceColumn: [Date]
++		lineageTag: e0000000-0000-0000-0000-000000000001
++
++	column Year = YEAR ( 'Calendar'[Date] )
++		dataType: int64
++		formatString: 0
++		summarizeBy: none
++		lineageTag: e0000000-0000-0000-0000-000000000002
++
++	column MonthNumber = MONTH ( 'Calendar'[Date] )
++		dataType: int64
++		formatString: 0
++		summarizeBy: none
++		lineageTag: e0000000-0000-0000-0000-000000000003
++
++	column Month = FORMAT ( 'Calendar'[Date], "mmm yyyy" )
++		dataType: string
++		summarizeBy: none
++		sortByColumn: MonthKey
++		lineageTag: e0000000-0000-0000-0000-000000000004
++
++	column MonthKey = ( YEAR ( 'Calendar'[Date] ) * 100 ) + MONTH ( 'Calendar'[Date] )
++		dataType: int64
++		formatString: 0
++		summarizeBy: none
++		lineageTag: e0000000-0000-0000-0000-000000000005
++
++	column Quarter = "Q" & FORMAT ( 'Calendar'[Date], "q yyyy" )
++		dataType: string
++		summarizeBy: none
++		lineageTag: e0000000-0000-0000-0000-000000000006
++
++	partition Calendar = calculated
++		mode: import
++		source = CALENDAR ( DATE ( 2024, 1, 1 ), DATE ( 2027, 12, 31 ) )
++
++	annotation PBI_Id = Calendar
+diff --git a/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/tables/Samples.tmdl b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/tables/Samples.tmdl
+new file mode 100644
+index 0000000..512ff4e
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/ingest-samples.SemanticModel/definition/tables/Samples.tmdl
+@@ -0,0 +1,175 @@
++table Samples
++	lineageTag: b0000000-0000-0000-0000-0000000000a0
++
++	measure 'Total tonnes collected' = CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "tonnes_collected" )
++		formatString: #,0.0
++		lineageTag: c0000000-0000-0000-0000-000000000001
++
++	measure 'Recycling tonnes' = CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "recycling_tonnes_collected" )
++		formatString: #,0.0
++		lineageTag: c0000000-0000-0000-0000-000000000002
++
++	measure 'Recycling rate %' = DIVIDE ( [Recycling tonnes], [Total tonnes collected] )
++		formatString: 0.0%
++		lineageTag: c0000000-0000-0000-0000-000000000003
++
++	measure 'Avg contamination %' = CALCULATE ( AVERAGE ( Samples[NumberValue] ), Samples[ValueName] = "contamination_pct" ) / 100
++		formatString: 0.0%
++		lineageTag: c0000000-0000-0000-0000-000000000004
++
++	measure 'Routes missed' = CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "routes_missed" )
++		formatString: #,0
++		lineageTag: c0000000-0000-0000-0000-000000000005
++
++	measure 'Avg active employees' = CALCULATE ( AVERAGE ( Samples[IntegerValue] ), Samples[ValueName] = "employees_active" )
++		formatString: #,0
++		lineageTag: c0000000-0000-0000-0000-000000000006
++
++	measure 'Budget actual (GBP)' = CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "budget_actual" )
++		formatString: #,0
++		lineageTag: c0000000-0000-0000-0000-000000000007
++
++	measure 'Revenue collected (GBP)' = CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "revenue_collected" )
++		formatString: #,0
++		lineageTag: c0000000-0000-0000-0000-000000000008
++
++	column Id
++		dataType: string
++		summarizeBy: none
++		sourceColumn: Id
++		lineageTag: d0000000-0000-0000-0000-000000000001
++
++	column SubmissionId
++		dataType: string
++		summarizeBy: none
++		sourceColumn: SubmissionId
++		lineageTag: d0000000-0000-0000-0000-000000000002
++
++	column ServiceAccountId
++		dataType: string
++		summarizeBy: none
++		sourceColumn: ServiceAccountId
++		lineageTag: d0000000-0000-0000-0000-000000000003
++
++	column ServiceName
++		dataType: string
++		summarizeBy: none
++		sourceColumn: ServiceName
++		lineageTag: d0000000-0000-0000-0000-000000000004
++
++	column SchemaName
++		dataType: string
++		summarizeBy: none
++		sourceColumn: SchemaName
++		lineageTag: d0000000-0000-0000-0000-000000000005
++
++	column ValueName
++		dataType: string
++		summarizeBy: none
++		sourceColumn: ValueName
++		lineageTag: d0000000-0000-0000-0000-000000000006
++
++	column ValueType
++		dataType: string
++		summarizeBy: none
++		sourceColumn: ValueType
++		lineageTag: d0000000-0000-0000-0000-000000000007
++
++	column StringValue
++		dataType: string
++		summarizeBy: none
++		sourceColumn: StringValue
++		lineageTag: d0000000-0000-0000-0000-000000000008
++
++	column IntegerValue
++		dataType: int64
++		formatString: 0
++		summarizeBy: sum
++		sourceColumn: IntegerValue
++		lineageTag: d0000000-0000-0000-0000-000000000009
++
++	column NumberValue
++		dataType: double
++		summarizeBy: sum
++		sourceColumn: NumberValue
++		lineageTag: d0000000-0000-0000-0000-00000000000a
++
++	column DateValue
++		dataType: dateTime
++		formatString: General Date
++		summarizeBy: none
++		sourceColumn: DateValue
++		lineageTag: d0000000-0000-0000-0000-00000000000b
++
++	column BooleanValue
++		dataType: boolean
++		summarizeBy: none
++		sourceColumn: BooleanValue
++		lineageTag: d0000000-0000-0000-0000-00000000000c
++
++	column Timestamp
++		dataType: dateTime
++		formatString: General Date
++		summarizeBy: none
++		sourceColumn: Timestamp
++		lineageTag: d0000000-0000-0000-0000-00000000000d
++
++	column Note
++		dataType: string
++		summarizeBy: none
++		sourceColumn: Note
++		lineageTag: d0000000-0000-0000-0000-00000000000e
++
++	column Cadence
++		dataType: string
++		summarizeBy: none
++		sourceColumn: Cadence
++		lineageTag: d0000000-0000-0000-0000-00000000000f
++
++	column PeriodStart
++		dataType: dateTime
++		formatString: General Date
++		summarizeBy: none
++		sourceColumn: PeriodStart
++		lineageTag: d0000000-0000-0000-0000-000000000010
++
++	column PeriodEnd
++		dataType: dateTime
++		formatString: General Date
++		summarizeBy: none
++		sourceColumn: PeriodEnd
++		lineageTag: d0000000-0000-0000-0000-000000000011
++
++	column NumericValue = COALESCE ( Samples[NumberValue], Samples[IntegerValue] )
++		dataType: double
++		summarizeBy: sum
++		lineageTag: d0000000-0000-0000-0000-000000000012
++
++	column Date = DATE ( YEAR ( Samples[Timestamp] ), MONTH ( Samples[Timestamp] ), DAY ( Samples[Timestamp] ) )
++		dataType: dateTime
++		formatString: General Date
++		summarizeBy: none
++		lineageTag: d0000000-0000-0000-0000-000000000013
++
++	partition Samples = m
++		mode: import
++		source =
++				let
++					Source = OData.Feed(
++						BaseUrl & "/odata/samples",
++						null,
++						[
++							Implementation = "2.0",
++							Headers = [ #"X-Api-Key" = ApiKey ]
++						]
++					),
++					#"Added Value" = Table.AddColumn(Source, "Value", each
++						if [ValueType] = "Number"  then Number.From([NumberValue])  else
++						if [ValueType] = "Integer" then Number.From([IntegerValue]) else
++						if [ValueType] = "Date"    then DateTime.From([DateValue])  else
++						if [ValueType] = "Boolean" then Logical.From([BooleanValue]) else
++						[StringValue])
++				in
++					#"Added Value"
++
++	annotation PBI_ResultType = Table
+diff --git a/examples/powerbi/ingest-samples/ingest-samples.pbip b/examples/powerbi/ingest-samples/ingest-samples.pbip
+new file mode 100644
+index 0000000..e0a57e0
+--- /dev/null
++++ b/examples/powerbi/ingest-samples/ingest-samples.pbip
+@@ -0,0 +1,14 @@
++{
++  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/pbip/definitionProperties/1.0.0/schema.json",
++  "version": "1.0",
++  "artifacts": [
++    {
++      "report": {
++        "path": "ingest-samples.Report"
++      }
++    }
++  ],
++  "settings": {
++    "enableAutoRecovery": true
++  }
++}
+diff --git a/examples/powerbi/waste-quickstart/README.md b/examples/powerbi/waste-quickstart/README.md
+new file mode 100644
+index 0000000..487ebe6
+--- /dev/null
++++ b/examples/powerbi/waste-quickstart/README.md
+@@ -0,0 +1,51 @@
++# Waste quickstart — build it yourself in five minutes
++
++A no-project, copy-paste path to a Power BI report over the `garbage_collection` schema. No `.pbix` or `.pbip` to download or repair — just three snippet files you paste into a blank report:
++
++| File | Where it goes |
++|------|---------------|
++| [samples.m](samples.m) | The query source (Advanced Editor) — pulls the feed, pre-filtered to waste. |
++| [value.m](value.m) | A custom column that flattens the typed columns into one `Value`. |
++| [measures.dax](measures.dax) | Starter measures (tonnes, recycling rate, contamination, missed routes…). |
++
++Prefer a ready-made model across all three schemas? Use the full [ingest-samples](../ingest-samples/) project instead.
++
++## Prerequisites
++
++- Power BI Desktop (or Excel — the M and the connection work there too; see [docs/setup/excel.md](../../../docs/setup/excel.md)).
++- An **Operator** (or Admin) API key and your deployment's base URL. A `Service`-role key cannot read the feed.
++- The `garbage_collection` schema uploaded and some submissions in it (run the [waste integration example](../../integrations/README.md) to generate data).
++
++## Steps
++
++1. **New parameters.** In Power BI Desktop: **Home > Transform data** to open Power Query, then **Manage Parameters > New Parameter**. Add two, both **Type = Text**:
++   - `BaseUrl` — e.g. `https://ingest.example.org` (no trailing slash).
++   - `ApiKey` — your key, form `keyId.secret`.
++2. **New source query.** **Home > New Source > Blank Query**, open the **Advanced Editor**, and paste [samples.m](samples.m). Rename the query to `Samples`. Click **Done**.
++3. **Anonymous auth.** If prompted for credentials, pick **Anonymous** — the key rides along as the `X-Api-Key` header from the query, not the dialog. ([Why?](../../../docs/setup/powerbi.md#why-anonymous--custom-header))
++4. **Flatten the value.** With `Samples` selected: **Add Column > Custom Column**, name it `Value`, and paste the body of [value.m](value.m). Leave the original `*Value` columns in place — the measures use them.
++5. **Close & Apply.**
++6. **Add the measures.** For each block in [measures.dax](measures.dax): **Modeling > New measure** and paste it.
++7. **Chart it.** A good first page:
++   - Line chart — Axis `PeriodStart` (or `Timestamp`), Values `[Total tonnes collected]` and `[Recycling tonnes]`.
++   - Gauge — `[Avg contamination %]`.
++   - Cards — `[Routes missed]`, `[Recycling rate %]`.
++   - Slicer — `ServiceName`.
++
++> For proper time-intelligence (YTD, same-period-last-year), add a calendar table and relate it to `Timestamp` — see [docs/setup/powerbi.md § Suggested data model](../../../docs/setup/powerbi.md#suggested-data-model). The full [ingest-samples](../ingest-samples/) project already includes one.
++
++## Pre-filtering more
++
++[samples.m](samples.m) already filters to `SchemaName eq 'garbage_collection'`. Narrow further by editing the URL in the source step, e.g. one service and the last 12 months:
++
++```m
++BaseUrl & "/odata/samples?$filter=SchemaName eq 'garbage_collection' and ServiceName eq 'roads-team' and Timestamp ge 2025-06-01T00:00:00Z"
++```
++
++See [docs/setup/powerbi.md § Pre-filtering at the source](../../../docs/setup/powerbi.md#pre-filtering-at-the-source) for the full set of options.
++
++## See also
++
++- [docs/setup/powerbi.md](../../../docs/setup/powerbi.md) — the authoritative guide (column reference, data model, refresh).
++- [ingest-samples](../ingest-samples/) — the full PBIP across all three schemas.
++- [Power BI examples index](../README.md)
+diff --git a/examples/powerbi/waste-quickstart/measures.dax b/examples/powerbi/waste-quickstart/measures.dax
+new file mode 100644
+index 0000000..0263460
+--- /dev/null
++++ b/examples/powerbi/waste-quickstart/measures.dax
+@@ -0,0 +1,31 @@
++// Starter measures for the garbage_collection schema.
++// Create each one with Modeling > New measure on the Samples table.
++// They filter Samples[ValueName] and aggregate the typed columns, so leave
++// NumberValue / IntegerValue in the table (don't remove them after flattening).
++
++Total tonnes collected =
++CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "tonnes_collected" )
++
++Recycling tonnes =
++CALCULATE ( SUM ( Samples[NumberValue] ), Samples[ValueName] = "recycling_tonnes_collected" )
++
++Recycling rate % =
++DIVIDE ( [Recycling tonnes], [Total tonnes collected] )
++
++Avg contamination % =
++CALCULATE ( AVERAGE ( Samples[NumberValue] ), Samples[ValueName] = "contamination_pct" ) / 100
++
++Routes completed =
++CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "routes_completed" )
++
++Routes missed =
++CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "routes_missed" )
++
++Miss rate % =
++DIVIDE ( [Routes missed], [Routes completed] + [Routes missed] )
++
++Vehicle breakdowns =
++CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "vehicle_breakdowns" )
++
++Customer complaints =
++CALCULATE ( SUM ( Samples[IntegerValue] ), Samples[ValueName] = "customer_complaints" )
+diff --git a/examples/powerbi/waste-quickstart/samples.m b/examples/powerbi/waste-quickstart/samples.m
+new file mode 100644
+index 0000000..11d9594
+--- /dev/null
++++ b/examples/powerbi/waste-quickstart/samples.m
+@@ -0,0 +1,23 @@
++// Power Query (M) source for the Samples table — waste only.
++//
++// Paste this into the Advanced Editor of a new query, OR use it as the source step.
++// It pre-filters to the garbage_collection schema at the server so the payload is small.
++//
++// Requires two Power Query parameters (Home > Manage Parameters > New Parameter, type Text):
++//   BaseUrl  e.g. https://ingest.example.org   (no trailing slash)
++//   ApiKey   an Operator/Admin key, form keyId.secret
++//
++// Auth: choose "Anonymous" on the credential dialog — the key is sent as the
++// X-Api-Key header set below, not through the dialog.
++
++let
++    Source = OData.Feed(
++        BaseUrl & "/odata/samples?$filter=SchemaName eq 'garbage_collection'",
++        null,
++        [
++            Implementation = "2.0",
++            Headers = [ #"X-Api-Key" = ApiKey ]
++        ]
++    )
++in
++    Source
+diff --git a/examples/powerbi/waste-quickstart/value.m b/examples/powerbi/waste-quickstart/value.m
+new file mode 100644
+index 0000000..b2d4f7b
+--- /dev/null
++++ b/examples/powerbi/waste-quickstart/value.m
+@@ -0,0 +1,11 @@
++// Add Column > Custom Column. Name it "Value".
++//
++// Collapses the per-type columns (only one is populated per row) into a single value
++// for slicers and tables. Keep the original *Value columns too — the numeric measures
++// in measures.dax aggregate NumberValue / IntegerValue directly.
++
++if [ValueType] = "Number"  then Number.From([NumberValue])  else
++if [ValueType] = "Integer" then Number.From([IntegerValue]) else
++if [ValueType] = "Date"    then DateTime.From([DateValue])  else
++if [ValueType] = "Boolean" then Logical.From([BooleanValue]) else
++[StringValue]

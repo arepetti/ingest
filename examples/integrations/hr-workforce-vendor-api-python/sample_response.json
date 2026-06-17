@@ -1,0 +1,10 @@
+{
+  "team": "Waste Services",
+  "weekEnding": "2026-06-15",
+  "headcount": {
+    "permanentActive": 8,
+    "contractorsActive": 2,
+    "onSickLeave": 2
+  },
+  "overtimeHours": 29.0
+}

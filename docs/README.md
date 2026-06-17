@@ -28,6 +28,14 @@ Go to [**setup/powerbi.md**](setup/powerbi.md). It covers the OData feed, sample
 
 Start with [**../CONTRIBUTING.md**](../CONTRIBUTING.md) for the dev environment (prerequisites, running locally with Aspire, tests, building the image). Then [**architecture/**](architecture/README.md) is the source of truth for system design, code layout, and trade-offs. After that the source itself (with the XML docs generated into Swagger) is the next step.
 
+### "I want a ready-made schema, report, or integration script"
+
+Ingest is meant to be extended **without changing the product code**, and ships examples for each extension point at the repository root:
+
+- **Schemas** — [`examples/schemas/*.json`](../examples/schemas/) — example KPI packages to upload via **Schemas → New schema → Upload JSON…** (see [admin-user-guide/schemas.md](admin-user-guide/schemas.md)).
+- **Reports** — [`examples/reports/html/*.html`](../examples/reports/html/) — HTML + Liquid templates to upload (see [admin-user-guide/reports.md](admin-user-guide/reports.md)).
+- **Integrations** — [`examples/integrations/`](../examples/integrations/README.md) — minimal scripts (Python, PowerShell, C#, Java) that push KPIs from a council's waste-collection or HR system (CSV export or vendor REST API) to the [service API](client/api.md).
+
 ### "I'm responsible for data protection / GDPR"
 
 Read [**gdpr.md**](gdpr.md). It describes the EU GDPR features the product provides (UK GDPR / DPA 2018 apply the same article numbers) — erasure (anonymise or delete), retention purge, and per-subject data export (DSAR) — where each one lives, and what stays the controller's responsibility.

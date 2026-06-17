@@ -136,7 +136,7 @@ The server-side render is stateless — every click re-runs the template against
 
 ## Sample reports
 
-Four examples live under `/samples/reports/`:
+Four examples live under [`examples/reports/html/`](../../examples/reports/html/):
 
 | File | Type | Targets | What it does |
 |------|------|---------|--------------|

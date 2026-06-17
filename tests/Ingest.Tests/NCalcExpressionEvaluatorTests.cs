@@ -76,7 +76,7 @@ public class NCalcExpressionEvaluatorTests
     {
         var ev = new NCalcExpressionEvaluator();
 
-        // Mirrors the schema-level rule in samples/generic.json (weekly_workforce):
+        // Mirrors the schema-level rule in examples/schemas/generic.json (weekly_workforce):
         // `if(sick_leave > employees_active, 'Sick-leave count (…) cannot exceed …', null)`
         var ok = ev.EvaluateValidation(
             "if(sick_leave > employees_active, 'too many sick leaves', null)",

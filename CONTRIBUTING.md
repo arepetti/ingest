@@ -22,8 +22,14 @@ src/
 web/admin/                React + Vite + Fluent UI admin SPA.
 tests/Ingest.Tests/       Test suite.
 docs/                     Long-form documentation. Index: docs/README.md.
+examples/                 Extension examples to upload or run. Index: examples/README.md.
+  schemas/                Example schema definitions (*.json) to upload.
+  reports/html/           Example HTML+Liquid report templates to upload.
+  integrations/           Runnable client integration scripts (Python/PowerShell/C#/Java).
 Dockerfile                Multi-stage build: SPA + API into a single image.
 ```
+
+The `examples/` tree is the supported way to extend a deployment **without changing the product code** — schemas and reports are uploaded through the admin console, and integration scripts run wherever you schedule them. When you add a new example, give it a README and link it from the relevant index.
 
 The split is deliberately Clean-Architecture-ish: `Core` knows nothing about Mongo or HTTP, `Infrastructure` depends on `Core` and never the other way around, `Api` depends on both. Full discussion in [docs/architecture/architecture.md § Solution layout](docs/architecture/architecture.md#solution-layout).
 

@@ -83,6 +83,7 @@ This is meant for services that don't (yet) have an automated submitter and pref
 
 ## Where to go next
 
+- Ready-made [example schemas](../../examples/schemas/) and [report templates](../../examples/reports/html/) you can upload as-is or adapt — see [schemas.md § Example schemas](schemas.md#example-schemas-to-start-from) and [reports.md § Sample reports](reports.md#sample-reports).
 - The deep-dive on each task lives in the focused pages linked at the top of this page.
 - For the API surface a Service account hits programmatically, see [client/api.md](../client/api.md).
 - For the auth model and how API keys are issued/verified, see [architecture/authentication.md](../architecture/authentication.md).

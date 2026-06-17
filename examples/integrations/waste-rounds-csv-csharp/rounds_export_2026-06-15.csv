@@ -1,0 +1,9 @@
+round_id,round_name,depot,collection_date,status,miss_reason,general_waste_tonnes,recycling_tonnes,recycling_contamination_pct,vehicle_reg,vehicle_breakdown,breakdown_notes
+R01,Northgate domestic,Eastfield Depot,2026-06-15,completed,,18.40,5.10,9.5,WX21 ABC,N,
+R02,Northgate recycling,Eastfield Depot,2026-06-15,completed,,0.00,7.80,11.2,WX21 ABD,N,
+R03,Riverside domestic,Eastfield Depot,2026-06-15,completed,,21.05,6.40,8.0,WX19 LMN,N,
+R04,Riverside recycling,Eastfield Depot,2026-06-15,missed,Road closure on Mill Lane (burst water main),0.00,0.00,0.0,WX19 LMN,N,
+R05,Hilltop domestic,Eastfield Depot,2026-06-15,completed,,16.70,4.25,14.8,WX22 QRS,Y,Hydraulic lifter fault at 11:20 - swapped to spare vehicle
+R06,Hilltop garden,Eastfield Depot,2026-06-15,completed,,9.30,0.00,0.0,WX18 TUV,N,
+R07,Marsh End domestic,Westpoint Depot,2026-06-15,completed,,19.95,5.55,7.3,WX20 GHJ,N,
+R08,Marsh End recycling,Westpoint Depot,2026-06-15,missed,Crew shortage - two sickness absences,0.00,0.00,0.0,WX20 GHJ,N,
