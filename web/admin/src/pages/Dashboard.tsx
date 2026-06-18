@@ -1,8 +1,14 @@
-import { Badge, Card, CardHeader, makeStyles, Subtitle2, Text, Title2, Tooltip, tokens } from '@fluentui/react-components'
 import {
-  useAccounts, useCapabilities, useMissingSubmissions, useMySubmissions, usePendingApprovalCount, useSchemas, useSubmissions,
+  Badge, Card, CardHeader, Dropdown, Field, makeStyles, Option, Spinner, Subtitle2, Text, Title2, Tooltip, tokens,
+} from '@fluentui/react-components'
+import {
+  CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis,
+} from 'recharts'
+import { useMemo, useState } from 'react'
+import {
+  useAccounts, useCapabilities, useMissingHistory, useMissingSubmissions, useMySubmissions, usePendingApprovalCount, useSchemas, useSubmissions,
 } from '../api/hooks'
-import type { MissingByCadence, MissingSubmissionEntry } from '../api/types'
+import type { Cadence, MissingByCadence, MissingSubmissionEntry } from '../api/types'
 import { cadenceLabel } from '../utils/cadence'
 import { Link } from 'react-router-dom'
 
@@ -61,6 +67,18 @@ const useStyles = makeStyles({
     textAlign: 'center',
     color: tokens.colorNeutralForeground4,
     fontSize: '11px',
+  },
+  chartCard: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' },
+  chartToolbar: { display: 'flex', alignItems: 'flex-end', gap: '16px', flexWrap: 'wrap' },
+  chartFilter: { minWidth: '180px' },
+  chartBody: { width: '100%', height: '320px' },
+  chartEmpty: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '320px',
+    color: tokens.colorNeutralForeground3,
+    fontSize: '13px',
   },
 })
 
@@ -172,6 +190,8 @@ export function Dashboard() {
         styles={s}
       />}
 
+      {canReadStatus && <MissingTrendsChart styles={s} canReadAccounts={canReadAccounts} />}
+
       <div className={s.footer}>Ingest{me?.version ? ` v${me.version}` : ''}</div>
     </div>
   )
@@ -228,6 +248,127 @@ function MissingSubmissionsSection({
       )}
     </div>
   )
+}
+
+// Cadences offered in the trend's cadence picker, in the same order as the server enum. Monthly
+// is the default because it's the most common reporting rhythm for council KPIs.
+const TREND_CADENCES: Cadence[] = ['Daily', 'Weekly', 'Fortnightly', 'Monthly', 'Quarterly', 'SemiAnnually', 'Yearly']
+
+// Sentinel option value for the "all services" (global) view in the service picker.
+const ALL_SERVICES = '__all__'
+
+/**
+ * "Missing submissions over time" trend. Plots the total count of missing required values per
+ * cadence window (oldest → current) as a line chart, either across every service (the global
+ * view) or scoped to a single service. Both filters drive the same `/missing/history` endpoint.
+ */
+function MissingTrendsChart({
+  styles,
+  canReadAccounts,
+}: {
+  styles: ReturnType<typeof useStyles>
+  canReadAccounts: boolean
+}) {
+  const [cadence, setCadence] = useState<Cadence>('Monthly')
+  const [serviceId, setServiceId] = useState<string>(ALL_SERVICES)
+
+  // Only operators with accounts:read can resolve the service list; everyone else keeps the
+  // global view (the chart still works, it just can't offer the per-service breakdown).
+  const services = useAccounts({ role: 'Service' }, canReadAccounts)
+  const scoped = serviceId !== ALL_SERVICES ? serviceId : undefined
+  const history = useMissingHistory(cadence, 12, scoped)
+
+  const rows = useMemo(
+    () => (history.data?.points ?? []).map(p => ({
+      label: trendPointLabel(p.periodStart, cadence),
+      missing: p.totalMissing,
+    })),
+    [history.data, cadence],
+  )
+
+  const hasData = rows.length > 0
+  const serviceName = serviceId === ALL_SERVICES
+    ? 'All services'
+    : services.data?.items.find(a => a.id === serviceId)?.label
+      || services.data?.items.find(a => a.id === serviceId)?.name
+      || 'Service'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <Subtitle2>Missing submissions over time</Subtitle2>
+      <Card className={styles.chartCard}>
+        <div className={styles.chartToolbar}>
+          <Field label="Cadence" className={styles.chartFilter}>
+            <Dropdown
+              selectedOptions={[cadence]}
+              value={cadenceLabel(cadence)}
+              onOptionSelect={(_, d) => d.optionValue && setCadence(d.optionValue as Cadence)}
+            >
+              {TREND_CADENCES.map(c => <Option key={c} value={c}>{cadenceLabel(c)}</Option>)}
+            </Dropdown>
+          </Field>
+          {canReadAccounts && (
+            <Field label="Service" className={styles.chartFilter}>
+              <Dropdown
+                selectedOptions={[serviceId]}
+                value={serviceName}
+                onOptionSelect={(_, d) => d.optionValue && setServiceId(d.optionValue)}
+              >
+                <Option value={ALL_SERVICES}>All services</Option>
+                {(services.data?.items ?? []).map(a => (
+                  <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
+                ))}
+              </Dropdown>
+            </Field>
+          )}
+        </div>
+
+        {history.isLoading ? (
+          <div className={styles.chartEmpty}><Spinner size="tiny" label="Loading trend…" /></div>
+        ) : !hasData ? (
+          <div className={styles.chartEmpty}>No trend data available.</div>
+        ) : (
+          <div className={styles.chartBody}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={rows} margin={{ top: 8, right: 24, bottom: 8, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={tokens.colorNeutralStroke2} />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" angle={-30} textAnchor="end" height={56} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <RechartsTooltip />
+                <Line
+                  type="monotone"
+                  dataKey="missing"
+                  name={`Missing — ${serviceName}`}
+                  stroke={tokens.colorBrandForeground1}
+                  strokeWidth={2}
+                  dot={{ r: 2 }}
+                  connectNulls
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}
+
+/**
+ * Compact axis label for one trend point. Sub-monthly cadences read best as "MMM d" (the window
+ * changes within a month); monthly-and-longer windows collapse to "MMM yyyy" so a 12-point yearly
+ * trend doesn't repeat the same month label.
+ */
+function trendPointLabel(periodStart: string, cadence: Cadence): string {
+  try {
+    const d = new Date(periodStart)
+    const subMonthly = cadence === 'Daily' || cadence === 'Weekly' || cadence === 'Fortnightly'
+    const fmt = subMonthly
+      ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+      : new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' })
+    return fmt.format(d)
+  } catch {
+    return ''
+  }
 }
 
 type MissingTone = 'current' | 'previous'

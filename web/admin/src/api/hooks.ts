@@ -920,13 +920,18 @@ export const useMissingPeriod = (cadence: Cadence, offset: number, enabled: bool
 
 /**
  * "Missing submissions over time" trend for a single cadence: total missing required values for
- * each of the last `periods` windows, oldest first. Powers the analytics page's trend chart.
+ * each of the last `periods` windows, oldest first. Powers the analytics page's trend chart and
+ * the dashboard trend chart. Pass `serviceId` to scope the trend to a single service; omit it for
+ * the registry-wide (global) view.
  */
-export const useMissingHistory = (cadence: Cadence, periods: number = 12, enabled: boolean = true) =>
+export const useMissingHistory = (cadence: Cadence, periods: number = 12, serviceId?: string, enabled: boolean = true) =>
   useQuery({
-    queryKey: ['missing-history', cadence, periods],
-    queryFn: () =>
-      api.get<MissingHistory>(`/api/admin/status/missing/history?cadence=${cadence}&periods=${periods}`),
+    queryKey: ['missing-history', cadence, periods, serviceId ?? null],
+    queryFn: () => {
+      const search = new URLSearchParams({ cadence, periods: String(periods) })
+      if (serviceId) search.set('serviceId', serviceId)
+      return api.get<MissingHistory>(`/api/admin/status/missing/history?${search}`)
+    },
     enabled,
   })
 

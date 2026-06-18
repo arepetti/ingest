@@ -225,12 +225,12 @@ public sealed class StatusService : IStatusService
     public async Task<MissingPeriodReport> GetMissingForPeriodAsync(Cadence cadence, int offset, CancellationToken ct = default)
     {
         var (start, end) = CadenceCalculator.BucketAtOffset(cadence, _audit.UtcNow, offset);
-        var entries = await ComputeMissingForWindowAsync(cadence, start, end, ct);
+        var entries = await ComputeMissingForWindowAsync(cadence, start, end, null, ct);
         return new MissingPeriodReport(cadence, offset, start, end, SortEntries(entries));
     }
 
     /// <inheritdoc />
-    public async Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, CancellationToken ct = default)
+    public async Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, Guid? serviceId = null, CancellationToken ct = default)
     {
         periods = Math.Clamp(periods, 1, 52);
         var now = _audit.UtcNow;
@@ -240,7 +240,7 @@ public sealed class StatusService : IStatusService
         {
             var offset = -i;
             var (start, end) = CadenceCalculator.BucketAtOffset(cadence, now, offset);
-            var entries = await ComputeMissingForWindowAsync(cadence, start, end, ct);
+            var entries = await ComputeMissingForWindowAsync(cadence, start, end, serviceId, ct);
             points.Add(new MissingHistoryPoint(offset, start, end, entries.Sum(e => e.MissingRequiredCount)));
         }
         return new MissingHistory(cadence, points);
@@ -250,12 +250,24 @@ public sealed class StatusService : IStatusService
     /// Evaluate every enabled Service-role account against a single cadence and a single window,
     /// returning one entry per (service, schema) tuple short at least one required value. A
     /// schema/service is only considered if it existed before the window closed. Used by the
-    /// per-period detail and the trend builder.
+    /// per-period detail and the trend builder. When <paramref name="serviceId"/> is supplied the
+    /// walk is scoped to that single service instead of paging through every one.
     /// </summary>
     private async Task<List<MissingSubmissionEntry>> ComputeMissingForWindowAsync(
-        Cadence cadence, DateTime start, DateTime end, CancellationToken ct)
+        Cadence cadence, DateTime start, DateTime end, Guid? serviceId, CancellationToken ct)
     {
         var entries = new List<MissingSubmissionEntry>();
+
+        // Scoped to a single service: resolve it directly and skip the registry-wide paging. A
+        // missing, deleted, non-service, or not-yet-existing account simply yields no entries.
+        if (serviceId.HasValue)
+        {
+            var only = await _accounts.GetByIdAsync(serviceId.Value, ct: ct);
+            if (only is { Role: AccountRole.Service })
+                await EvaluateAccountAsync(only, cadence, start, end, entries, ct);
+            return entries;
+        }
+
         int page = 1;
         const int pageSize = 200;
         while (true)
@@ -267,36 +279,45 @@ public sealed class StatusService : IStatusService
             if (accounts.Items.Count == 0) break;
 
             foreach (var account in accounts.Items)
-            {
-                if (!account.Enabled || account.CreatedAt >= end) continue;
-
-                var schemas = await _schemas.ListVisibleToAsync(account.Id, ct);
-                foreach (var schema in schemas)
-                {
-                    if (!schema.Enabled || schema.CreatedAt >= end) continue;
-
-                    int missing = 0, total = 0;
-                    foreach (var v in schema.Values)
-                    {
-                        if (!v.Enabled || !v.Required || v.Cadence != cadence) continue;
-                        total++;
-                        var satisfied = await _samples.ExistsInWindowAsync(account.Id, schema.Name, v.Name, start, end, ct);
-                        if (!satisfied) missing++;
-                    }
-
-                    if (missing > 0)
-                        entries.Add(new MissingSubmissionEntry(
-                            account.Id, account.Name, account.Label,
-                            schema.Name, schema.Label,
-                            missing, total));
-                }
-            }
+                await EvaluateAccountAsync(account, cadence, start, end, entries, ct);
 
             if (accounts.Items.Count < pageSize) break;
             page++;
         }
 
         return entries;
+    }
+
+    /// <summary>
+    /// Evaluate one account against a cadence window, appending a missing-entry per schema that is
+    /// short at least one required value. Shared by the global and per-service trend walks.
+    /// </summary>
+    private async Task EvaluateAccountAsync(
+        Account account, Cadence cadence, DateTime start, DateTime end,
+        List<MissingSubmissionEntry> entries, CancellationToken ct)
+    {
+        if (!account.Enabled || account.CreatedAt >= end) return;
+
+        var schemas = await _schemas.ListVisibleToAsync(account.Id, ct);
+        foreach (var schema in schemas)
+        {
+            if (!schema.Enabled || schema.CreatedAt >= end) continue;
+
+            int missing = 0, total = 0;
+            foreach (var v in schema.Values)
+            {
+                if (!v.Enabled || !v.Required || v.Cadence != cadence) continue;
+                total++;
+                var satisfied = await _samples.ExistsInWindowAsync(account.Id, schema.Name, v.Name, start, end, ct);
+                if (!satisfied) missing++;
+            }
+
+            if (missing > 0)
+                entries.Add(new MissingSubmissionEntry(
+                    account.Id, account.Name, account.Label,
+                    schema.Name, schema.Label,
+                    missing, total));
+        }
     }
 
     private static List<MissingSubmissionEntry> SortEntries(IEnumerable<MissingSubmissionEntry> entries) =>

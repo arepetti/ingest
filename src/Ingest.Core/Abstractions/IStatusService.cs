@@ -203,7 +203,8 @@ public interface IStatusService
     /// </summary>
     /// <param name="cadence">Cadence to evaluate.</param>
     /// <param name="periods">Number of windows to include (clamped to a sane range).</param>
+    /// <param name="serviceId">Optional service to scope the trend to. When null the trend covers every service (the global view).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>One point per window, ordered oldest → current.</returns>
-    Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, CancellationToken ct = default);
+    Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, Guid? serviceId = null, CancellationToken ct = default);
 }

@@ -59,17 +59,19 @@ public sealed class AdminStatusController(IStatusService statuses) : ControllerB
     /// <summary>
     /// "Missing submissions over time" trend for a single cadence: the total count of missing
     /// required values for each of the last <paramref name="periods"/> windows, oldest first and
-    /// ending with the current window.
+    /// ending with the current window. Pass <paramref name="serviceId"/> to scope the trend to a
+    /// single service; omit it for the registry-wide (global) view.
     /// </summary>
     /// <param name="cadence">Cadence to evaluate (e.g. <c>Monthly</c>).</param>
     /// <param name="periods">Number of windows to include (clamped server-side; defaults to 12).</param>
+    /// <param name="serviceId">Optional service to scope the trend to. Omit for the global view.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">The trend. <see cref="MissingHistoryDto"/>.</response>
     [HttpGet("missing/history")]
     [ProducesResponseType(typeof(MissingHistoryDto), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMissingHistory([FromQuery] Cadence cadence, [FromQuery] int periods, CancellationToken ct)
+    public async Task<IActionResult> GetMissingHistory([FromQuery] Cadence cadence, [FromQuery] int periods, [FromQuery] Guid? serviceId, CancellationToken ct)
     {
-        var history = await statuses.GetMissingHistoryAsync(cadence, periods <= 0 ? 12 : periods, ct);
+        var history = await statuses.GetMissingHistoryAsync(cadence, periods <= 0 ? 12 : periods, serviceId, ct);
         return Ok(StatusMapper.ToDto(history));
     }
 }
