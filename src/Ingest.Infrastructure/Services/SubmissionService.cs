@@ -27,6 +27,7 @@ public sealed class SubmissionService : ISubmissionService
     private readonly IAuditLogService _audit;
     private readonly IWebhookPublisher _webhooks;
     private readonly IApprovalSettingsService _approvalSettings;
+    private readonly IApprovalRulesService _approvalRules;
     private readonly IApprovalNotificationService _approvalNotifier;
     private readonly bool _webhooksEnabled;
     private readonly bool _approvalEnabled;
@@ -43,6 +44,7 @@ public sealed class SubmissionService : ISubmissionService
     /// <param name="webhooks">Publisher used to push submission events to subscribed webhook endpoints.</param>
     /// <param name="webhookOptions">Bound webhook options (only the master switch is read, to skip work when off).</param>
     /// <param name="approvalSettings">Global default approval policy provider.</param>
+    /// <param name="approvalRules">Cross-cutting per-service/per-schema approval rules, applied additively to the schema/global policy.</param>
     /// <param name="approvalOptions">Bound approval options (the master switch gating the whole workflow).</param>
     /// <param name="approvalNotifier">Sends the approval-lifecycle emails (pending/approved/rejected); self-gates on the email switch.</param>
     /// <param name="logger">Logger; webhook publishing failures are logged but never fail an accepted write.</param>
@@ -57,6 +59,7 @@ public sealed class SubmissionService : ISubmissionService
         IWebhookPublisher webhooks,
         IOptions<WebhookOptions> webhookOptions,
         IApprovalSettingsService approvalSettings,
+        IApprovalRulesService approvalRules,
         IOptions<ApprovalOptions> approvalOptions,
         IApprovalNotificationService approvalNotifier,
         ILogger<SubmissionService> logger)
@@ -70,6 +73,7 @@ public sealed class SubmissionService : ISubmissionService
         _audit = audit;
         _webhooks = webhooks;
         _approvalSettings = approvalSettings;
+        _approvalRules = approvalRules;
         _approvalNotifier = approvalNotifier;
         _webhooksEnabled = webhookOptions.Value.Enabled;
         _approvalEnabled = approvalOptions.Value.Enabled;
@@ -323,20 +327,21 @@ public sealed class SubmissionService : ISubmissionService
         }
 
         var globalDefault = await _approvalSettings.GetDefaultAsync(ct);
+        var rules = await _approvalRules.ListAsync(ct);
         var schemaNames = submission.Samples
             .Select(s => s.SchemaName)
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
         // Merge approver snapshots across every schema the submission touches (normally just one).
-        // Required beats Optional when the same account appears in more than one schema's policy.
+        // Required beats Optional when the same account appears in more than one policy.
         var merged = new Dictionary<Guid, ApproverSpec>();
         var required = false;
-        foreach (var name in schemaNames)
+
+        // Local merge so the schema policy and every matching cross-cutting rule funnel into the
+        // same snapshot. Returns true when the resolved policy actually gates this submission.
+        bool MergeResolved(ResolvedApproval resolved)
         {
-            visible.TryGetValue(name, out var schema);
-            var resolved = ApprovalPolicyResolver.Resolve(true, schema?.Approval, globalDefault, submission.Source);
-            if (!resolved.Required) continue;
-            required = true;
+            if (!resolved.Required) return false;
             foreach (var spec in resolved.Approvers)
             {
                 // Bind the dynamic "service owner" approver to the account that actually sent this
@@ -352,6 +357,25 @@ public sealed class SubmissionService : ISubmissionService
                 {
                     merged[accountId] = new ApproverSpec { AccountId = accountId, Kind = spec.Kind, Requirement = spec.Requirement };
                 }
+            }
+            return true;
+        }
+
+        foreach (var name in schemaNames)
+        {
+            visible.TryGetValue(name, out var schema);
+
+            // 1) The schema's own policy (deferring to the global default when set to UseGlobalDefault).
+            if (MergeResolved(ApprovalPolicyResolver.Resolve(true, schema?.Approval, globalDefault, submission.Source)))
+                required = true;
+
+            // 2) Cross-cutting rules that target this (service, schema). Additive — they can gate a
+            //    submission even when the schema/global policy doesn't, and merge their approvers in.
+            foreach (var rule in rules)
+            {
+                if (!ApprovalRuleMatcher.Matches(rule, submission.ServiceAccountId, schema?.Id)) continue;
+                if (MergeResolved(ApprovalPolicyResolver.Resolve(true, rule.Policy, globalDefault, submission.Source)))
+                    required = true;
             }
         }
 

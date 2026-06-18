@@ -2,13 +2,21 @@
 
 **Settings** is the configuration hub. It appears for any account that holds at least one settings-related capability (e.g. `settings:read`, `notifications:read`, `webhooks:read`) — in practice admins, plus any non-admin you've specifically granted one of those. Each section is independently gated by its own capability, so a user only sees (and can only change) the parts they're permitted to. It uses a master-detail layout — a vertical list of **sections** on the left, the selected section's content on the right (much like VS Code's settings). The sections shown depend on which features are enabled **and** your capabilities:
 
-- When the **approval workflow is enabled** (`Approval:Enabled`, on by default) you get an **Approval** section for the global default policy — documented in [approval-process.md](approval-process.md).
+- When the **approval workflow is enabled** (`Approval:Enabled`, on by default) you get an **Approval** section for the global default policy and a **Rules** section for per-service/per-schema approval rules — both documented in [approval-process.md](approval-process.md).
 - When the **email feature is enabled** (`Email:Enabled`, on by default — see [setup/configuration.md → Email & notifications](../setup/configuration.md#email--notifications)) you get **Email**, **Email templates** and **Notifications**.
 - When **webhooks are enabled** (`Webhooks:Enabled`, **off** by default) you get a **Webhooks** section — documented separately in [webhooks.md](webhooks.md).
 
 > When `Email:Enabled` is `false`, the three email/notification sections disappear, along with the **Audit → Sent emails** tab and the per-account **Send email** action. If neither email nor webhooks is enabled, the Settings page shows a short "nothing to configure" notice.
 
 > **Backup & restore moved.** It isn't really a setting, so it now lives on the **Tools** page (in the sidebar, directly above Settings) — see [tools.md](tools.md).
+
+## Rules
+
+The **Rules** section (shown when the approval workflow is enabled, gated by the same `settings:read` / `settings:manage` capabilities as **Approval**) is a generic home for cross-cutting rules. Today the only kind is an **approval rule**: it requires approval for a chosen set of **services** and **schemas**, on top of — and independently of — each schema's own policy.
+
+- Click **Add rule** to open the side drawer, or click a row (or its **⋮ → Edit**) to change an existing one. Each rule has an optional label, an **Enabled** switch, a **Services** selector (or **All services**), a **Schemas** selector (or **All schemas**), and an approval policy (the same editor used on schemas — **Required** with its own approvers and source scope, or **Use the global default**).
+- Multiple services and schemas can be selected in one rule, and either side can be left as "All".
+- The full behaviour, including how rules combine with schema and global policies and how to use an API-only rule to force manual intervention for partially automated feeds, is in [approval-process.md → Rules](approval-process.md#rules-per-service--schema).
 
 ## Email (SMTP)
 

@@ -51,6 +51,29 @@ export interface ApprovalPolicy {
   approvers: ApproverSpec[]
 }
 
+/** A cross-cutting approval rule: require approval for a set of services and schemas (empty = all). */
+export interface ApprovalRule {
+  id: string
+  label?: string | null
+  enabled: boolean
+  serviceIds: string[]
+  schemaIds: string[]
+  policy: ApprovalPolicy
+  createdAt: string
+  createdBy?: string | null
+  modifiedAt: string
+  modifiedBy?: string | null
+}
+
+/** Body for creating/updating an approval rule. */
+export interface UpsertApprovalRuleRequest {
+  label?: string | null
+  enabled: boolean
+  serviceIds: string[]
+  schemaIds: string[]
+  policy: ApprovalPolicy
+}
+
 /** One recorded approval/rejection decision on a submission. */
 export interface SubmissionApproval {
   approverAccountId: string
@@ -577,7 +600,7 @@ export type AuditChangeType = 'Create' | 'Edit' | 'Delete' | 'Approve' | 'Reject
  * The type of object an audit entry targets. 'User' and 'Account' are both accounts, told apart
  * by the account's kind at the time of the change.
  */
-export type AuditTargetType = 'User' | 'Account' | 'Schema' | 'ApiKey' | 'Submission' | 'Report' | 'SchemaHistory'
+export type AuditTargetType = 'User' | 'Account' | 'Schema' | 'ApiKey' | 'Submission' | 'Report' | 'SchemaHistory' | 'ApprovalRule'
 
 /** A single audit-log entry: who changed what, when, and how. */
 export interface AuditLog {

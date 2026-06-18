@@ -49,6 +49,20 @@ Open **Schemas → (edit a schema) → Approval**. Pick a **mode**:
 
 Open **Settings → Approval** (needs `settings:read` to view, `settings:manage` to change — both in the Admin default bundle). The global default is the policy schemas fall back to when they're set to **Use the global default**. It can be "no approval" or "approval required" with its own source scope and approver list. Changing it affects only **new** submissions — in-flight ones keep the approvers they were created with (the policy is snapshotted onto each submission when it first becomes `Pending`).
 
+### Rules (per service + schema)
+
+Open **Settings → Rules** (same `settings:read` / `settings:manage` capabilities as the global default). A **rule** requires approval for a chosen set of **services** and **schemas**, regardless of what those schemas' own policies say. It's the answer to "service A submitting schema B needs sign-off" without having to gate schema B for everyone.
+
+- **Either side can be "All".** Tick **All services** to mean "every service", and/or **All schemas** to mean "every schema". A rule with both set to "All" requires approval for everything (even if that duplicates a schema- or global-level policy — rules are additive, never subtractive).
+- **Multiple selections.** Pick several services and several schemas in one rule; it applies to every combination of the two.
+- **Each rule carries its own policy.** Choose **Required** (with its own source scope and approver list, including the service owner) or **Use the global default**. Mark at least one approver as Required, exactly like the other editors.
+- **Additive resolution.** A submission needs approval if its schema/global policy requires it **or** any enabled matching rule does. When more than one applies, their approvers are merged (a Required approver always wins over the same account listed as Optional).
+- Rules are listed in a table with the usual row menu (**Edit** / **Delete**); click a row to edit it in the side drawer. Disabled rules are kept but ignored.
+
+> **Forcing manual intervention for automated feeds.** Set a rule's **source scope** to *API submissions only* to hold an automated integration's data as `Pending` while a person reviews it. This is useful for **partially automated** feeds — where a script can post most of a schema but some values need a human to check or fill them in — because the held submission can be edited (via on-behalf-of) and approved before it goes live. Direct API feeds you fully trust are unaffected; only the services/schemas the rule names are gated.
+
+Like the global default, changing a rule affects only **new** submissions; in-flight ones keep the approvers they were snapshotted with.
+
 ## Reviewing submissions
 
 - **Dashboard.** Accounts with `submissions:approve` get a **Pending approvals** card showing the count, with a **Review** button that jumps to the Submissions page filtered to `Pending`.
@@ -79,6 +93,7 @@ The approval workflow is transparent to API callers — they submit exactly as b
 
 - Submissions are tagged with a **source** so source-aware policies can apply. Direct API calls default to `Api`; the admin console tags its writes as `Manual` (via the `X-Ingest-Source` header).
 - A submission that needs approval is accepted and stored as normal, but stays out of the OData feed until approved. The create/replace response is unchanged.
+- An [approval **rule**](#rules-per-service--schema) scoped to API submissions can deliberately hold an automated feed for review — letting a person complete or sign off on a partially automated submission before it goes live — without the integration code changing at all.
 - Approve/reject are admin/approver actions (`POST /api/admin/submissions/{id}/approve` and `.../reject`, optional `{ "note": "…" }` body).
 
 ## See also

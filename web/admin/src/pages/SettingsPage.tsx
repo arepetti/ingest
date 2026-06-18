@@ -1,19 +1,21 @@
 import { useState } from 'react'
 import {
-  Avatar, Badge, Body1, Button, Card, Checkbox, Dropdown, Drawer, DrawerBody, Field, Input, Option, Radio, RadioGroup, Spinner,
+  Badge, Body1, Button, Card, Checkbox, Dropdown, Drawer, DrawerBody, Field, Input, Option, Radio, RadioGroup, Spinner,
   Switch,
-  Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
+  Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow,
   Textarea, Title3,
   MessageBarBody, makeStyles, tokens,
 } from '@fluentui/react-components'
 import {
-  Alert24Regular, CheckmarkCircle24Regular, DocumentText24Regular, Mail20Regular, Mail24Regular, PlugConnected24Regular,
+  Alert24Regular, CheckmarkCircle24Regular, ClipboardTaskListLtr24Regular, DocumentText24Regular,
+  Mail24Regular, PlugConnected24Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { SectionedLayout } from '../components/SectionedLayout'
 import type { LayoutSection } from '../components/SectionedLayout'
 import { WebhooksSection } from '../components/WebhooksSection'
+import { ApprovalRulesSection } from '../components/ApprovalRulesSection'
 import { clickableRowProps } from '../utils/a11y'
 import {
   useCapabilities, useAccounts,
@@ -224,6 +226,7 @@ export function SettingsPage() {
   const sections: LayoutSection[] = [
     ...(approvalEnabled && canConfigureSettings ? [
       { id: 'approval', label: 'Approval', icon: <CheckmarkCircle24Regular />, render: () => <ApprovalSettingsSection /> },
+      { id: 'rules', label: 'Rules', icon: <ClipboardTaskListLtr24Regular />, render: () => <ApprovalRulesSection /> },
     ] as LayoutSection[] : []),
     ...(emailEnabled && canConfigureNotifications ? [
       { id: 'email', label: 'Email', icon: <Mail24Regular />, render: () => <EmailSettingsSection /> },
@@ -394,11 +397,7 @@ function EmailTemplatesSection() {
                   {...clickableRowProps(() => { setEditingKey(t.key); setExpanded(false) }, `Edit template ${t.name}`)}
                 >
                   <TableCell className={s.nameCell}>
-                    <TableCellLayout
-                      media={<Avatar name={t.name} icon={<Mail20Regular />} color="brand" size={32} />}
-                    >
-                      <strong className={s.truncate}>{t.name}</strong>
-                    </TableCellLayout>
+                    <strong className={s.truncate}>{t.name}</strong>
                   </TableCell>
                   <TableCell className={s.colSubject}>
                     <span className={s.truncate}>{t.subject}</span>

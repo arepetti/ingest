@@ -54,6 +54,9 @@ public enum AuditTargetType
     /// live schema itself.
     /// </summary>
     SchemaHistory = 6,
+
+    /// <summary>A cross-cutting approval rule (per-service/per-schema approval requirement).</summary>
+    ApprovalRule = 7,
 }
 
 /// <summary>

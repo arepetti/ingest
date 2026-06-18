@@ -2,12 +2,22 @@
 
 Notable changes per release. Versions are newest-first. No breaking changes have been released so far.
 
+## 0.4.0
+
+### Added
+
+- Approval rules (in Settings): require approval per service and per schema, on top of each schema's own policy.
+
+### Fixed
+
+- The submissions "Not required" approval filter now includes legacy submissions that predate the approval workflow.
+
 ## 0.3.0
 
 ### Added
 
 - Optional submission approval workflow (and notifications/webhooks).
-- Capability-based permissions: fine-grained per-account capabilities, with roles (Service / Operator / Approver / Admin) as templates that seed defaults. Grant any capability to any non-admin.
+- Capability-based permissions: fine-grained per-account capabilities.
 - Explore page: lightweight in-app analytics for numeric KPIs.
 - Data export: download lists and reports as CSV, with reusable period filters.
 - Outbound webhooks so external systems can react to events.

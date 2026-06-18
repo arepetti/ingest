@@ -38,7 +38,7 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
         if (serviceId is { } sid)
             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Eq(s => s.ServiceAccountId, sid));
         if (approvalStatus is { } status)
-            filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Eq(s => s.ApprovalStatus, status));
+            filter = Builders<Submission>.Filter.And(filter, ApprovalStatusFilter(status));
         if (from is { } f)
             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Gte(s => s.SubmittedAt, DateTime.SpecifyKind(f, DateTimeKind.Utc)));
         if (to is { } t)
@@ -76,9 +76,22 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
     {
         var filter = Builders<Submission>.Filter.And(
             ApplySoftDelete(Builders<Submission>.Filter.Empty, includeDeleted: false),
-            Builders<Submission>.Filter.Eq(s => s.ApprovalStatus, status));
+            ApprovalStatusFilter(status));
         return Collection.CountDocumentsAsync(filter, cancellationToken: ct);
     }
+
+    /// <summary>
+    /// Filter for a given approval status. Legacy submissions that predate the approval workflow have
+    /// no <c>approvalStatus</c> field at all; an equality match on <see cref="ApprovalStatus.NotRequired"/>
+    /// (which serialises to <c>0</c>) wouldn't match them, so we additionally accept documents where the
+    /// field is absent — they are effectively "not required" (they were live the moment they landed).
+    /// </summary>
+    private static FilterDefinition<Submission> ApprovalStatusFilter(ApprovalStatus status) =>
+        status == ApprovalStatus.NotRequired
+            ? Builders<Submission>.Filter.Or(
+                Builders<Submission>.Filter.Eq(s => s.ApprovalStatus, status),
+                Builders<Submission>.Filter.Exists(s => s.ApprovalStatus, false))
+            : Builders<Submission>.Filter.Eq(s => s.ApprovalStatus, status);
 
     /// <inheritdoc />
     public Task AddAsync(Submission submission, CancellationToken ct = default)

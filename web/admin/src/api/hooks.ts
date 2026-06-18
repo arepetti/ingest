@@ -20,7 +20,7 @@ import type {
   WebhookEndpoint, CreateWebhookEndpointRequest, UpdateWebhookEndpointRequest,
   WebhookEndpointCreatedResponse, WebhookSecretResponse,
   WebhookDelivery, WebhookDeliveryStatus, WebhookDrainResult,
-  ApprovalStatus, ApprovalPolicy,
+  ApprovalStatus, ApprovalPolicy, ApprovalRule, UpsertApprovalRuleRequest,
 } from './types'
 import type { Capability } from './capabilities'
 
@@ -435,6 +435,39 @@ export const useUpdateApprovalSettings = () => {
   return useMutation({
     mutationFn: (req: ApprovalPolicy) => api.put<ApprovalPolicy>('/api/admin/approval/settings', req),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['approval-settings'] }),
+  })
+}
+
+/** Cross-cutting per-service/per-schema approval rules. 404s when the workflow is disabled. */
+export const useApprovalRules = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['approval-rules'],
+    queryFn: () => api.get<ApprovalRule[]>('/api/admin/approval/rules'),
+    enabled,
+  })
+
+export const useCreateApprovalRule = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: UpsertApprovalRuleRequest) => api.post<ApprovalRule>('/api/admin/approval/rules', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['approval-rules'] }),
+  })
+}
+
+export const useUpdateApprovalRule = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, req }: { id: string; req: UpsertApprovalRuleRequest }) =>
+      api.put<ApprovalRule>(`/api/admin/approval/rules/${id}`, req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['approval-rules'] }),
+  })
+}
+
+export const useDeleteApprovalRule = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/api/admin/approval/rules/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['approval-rules'] }),
   })
 }
 

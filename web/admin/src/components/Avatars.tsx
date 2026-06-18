@@ -93,6 +93,7 @@ const TARGET_TYPE_INITIALS: Record<AuditTargetType, string> = {
   Submission:    'Sb',
   Report:        'Rp',
   SchemaHistory: 'Sh',
+  ApprovalRule:  'Ar',
 }
 
 export function AuditChangeAvatar({ change, targetType, size = 32 }: { change: AuditChangeType; targetType: AuditTargetType; size?: AvatarSize }) {

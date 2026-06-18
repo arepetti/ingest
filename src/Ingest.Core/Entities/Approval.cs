@@ -164,3 +164,30 @@ public sealed class ApprovalSettings : AuditedEntity
     /// <summary>The global default policy. <see cref="ApprovalMode.UseGlobalDefault"/> is not meaningful here.</summary>
     public ApprovalPolicy Default { get; set; } = new();
 }
+
+/// <summary>
+/// A cross-cutting approval rule that requires approval for a chosen set of services and schemas,
+/// independently of (and additively to) the per-schema and global-default policies. Lets you say,
+/// for example, "service A submitting schema B needs approval" without touching schema B's own
+/// policy. Either axis may be left empty to mean "all": an empty <see cref="ServiceIds"/> matches
+/// every service, an empty <see cref="SchemaIds"/> matches every schema. A submission needs
+/// approval if its schema/global policy requires it <em>or</em> any enabled matching rule does;
+/// approvers from all sources are merged.
+/// </summary>
+public sealed class ApprovalRule : AuditedEntity
+{
+    /// <summary>Optional friendly label for the rule, shown in the admin console.</summary>
+    public string? Label { get; set; }
+
+    /// <summary>Whether the rule is active. Disabled rules are ignored during resolution.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Services this rule applies to. Empty means "all services".</summary>
+    public List<Guid> ServiceIds { get; set; } = new();
+
+    /// <summary>Schemas this rule applies to. Empty means "all schemas".</summary>
+    public List<Guid> SchemaIds { get; set; } = new();
+
+    /// <summary>The approval policy this rule imposes when it matches. <see cref="ApprovalMode.UseGlobalDefault"/> is allowed (defers to the global default).</summary>
+    public ApprovalPolicy Policy { get; set; } = new();
+}

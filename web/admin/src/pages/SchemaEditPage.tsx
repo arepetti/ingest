@@ -10,7 +10,7 @@ import {
 } from '@fluentui/react-components'
 import { Add20Regular, ArrowLeft20Regular, Delete20Regular, Dismiss16Regular, Eye20Regular } from '@fluentui/react-icons'
 import type {
-  Account, ApprovalMode, ApprovalPolicy, ApprovalSourceScope, ApproverRequirement,
+  Account, ApprovalPolicy,
   Cadence, Schema, SchemaLayoutNode, SchemaValue, SchemaValueType, UpsertSchemaRequest,
 } from '../api/types'
 import { useAccounts, useCreateSchema, useMe, useSchemas, useSchemaVersionSnapshot, useSubmissions, useUpdateSchema } from '../api/hooks'
@@ -20,7 +20,7 @@ import { LayoutTreeEditor } from '../components/LayoutTreeEditor'
 import { SchemaPreviewDialog } from '../components/SchemaPreviewDialog'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { cadenceLabel } from '../utils/cadence'
-import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY, SERVICE_OWNER_LABEL } from '../utils/approvers'
+import { ApprovalPolicyEditor } from '../components/ApprovalPolicyEditor'
 import { confirmDelete } from '../utils/confirm'
 import { formatDateTime } from '../utils/format'
 import { validateExpression, type ExpressionSyntaxResult } from '../utils/expression'
@@ -472,10 +472,9 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
               <ApprovalPolicyEditor
                 policy={req.approval ?? null}
                 accounts={approverAccounts}
-                modifiable={req.modifiable}
+                modifiableWarning={req.modifiable}
                 disabled={readOnly}
                 onChange={patchApproval}
-                styles={s}
               />
             </div>
             )}
@@ -593,161 +592,6 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
         <SchemaPreviewDialog schema={previewSchema} open={previewOpen} onClose={() => setPreviewOpen(false)} />
       )}
     </div>
-  )
-}
-
-const approvalModeLabels: Record<ApprovalMode, string> = {
-  None: 'No approval required',
-  UseGlobalDefault: 'Use the global default',
-  Required: 'Approval required',
-}
-
-const approvalSourceLabels: Record<ApprovalSourceScope, string> = {
-  Both: 'Both manual and API submissions',
-  ManualOnly: 'Manual (web console) submissions only',
-  ApiOnly: 'API submissions only',
-}
-
-/**
- * Per-schema approval policy editor. A policy has a mode (none / defer to global / required), the
- * source scope it applies to, and — when `Required` — a set of designated approvers each marked
- * Required or Optional. At least one Required approver is needed; the server enforces this and we
- * surface a hint when the rule isn't met yet.
- */
-function ApprovalPolicyEditor({
-  policy, accounts, modifiable, disabled, onChange, styles,
-}: {
-  policy: ApprovalPolicy | null
-  accounts: Account[]
-  modifiable: boolean
-  disabled?: boolean
-  onChange: (patch: Partial<ApprovalPolicy>) => void
-  styles: ReturnType<typeof useStyles>
-}) {
-  const mode: ApprovalMode = policy?.mode ?? 'None'
-  const appliesToSources: ApprovalSourceScope = policy?.appliesToSources ?? 'Both'
-  const approvers = policy?.approvers ?? []
-  const accountsById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts])
-  const hasRequiredApprover = approvers.some(a => a.requirement === 'Required')
-  // Show the data-loss caution whenever this schema is both editable and may gate submissions:
-  // a re-submission for the same window replaces the row and resets it to Pending, so a value
-  // that was previously approved (and live) drops out of reporting until it's approved again.
-  const showModifiableWarning = modifiable && mode !== 'None'
-
-  function setApprovers(next: ApprovalPolicy['approvers']) {
-    onChange({ approvers: next })
-  }
-  function toggleApprover(key: string, selected: boolean) {
-    if (selected) {
-      if (approvers.some(a => approverKey(a) === key)) return
-      setApprovers([...approvers, approverFromKey(key)])
-    } else {
-      setApprovers(approvers.filter(a => approverKey(a) !== key))
-    }
-  }
-  function setRequirement(key: string, requirement: ApproverRequirement) {
-    setApprovers(approvers.map(a => approverKey(a) === key ? { ...a, requirement } : a))
-  }
-
-  return (
-    <>
-      <div className={styles.sectionLabel}>Approval</div>
-      <Field
-        label="Approval mode"
-        hint="Submissions in scope are held as Pending until approved, and excluded from the OData feed and Explore until then. Defaults to no approval for backwards compatibility."
-      >
-        <Dropdown
-          disabled={disabled}
-          value={approvalModeLabels[mode]}
-          selectedOptions={[mode]}
-          onOptionSelect={(_, d) => onChange({ mode: d.optionValue as ApprovalMode })}
-        >
-          {(Object.keys(approvalModeLabels) as ApprovalMode[]).map(m => (
-            <Option key={m} value={m}>{approvalModeLabels[m]}</Option>
-          ))}
-        </Dropdown>
-      </Field>
-
-      {mode !== 'None' && (
-        <Field label="Applies to" hint="You can require approval for only manual entries, only API submissions, or both.">
-          <Dropdown
-            disabled={disabled}
-            value={approvalSourceLabels[appliesToSources]}
-            selectedOptions={[appliesToSources]}
-            onOptionSelect={(_, d) => onChange({ appliesToSources: d.optionValue as ApprovalSourceScope })}
-          >
-            {(Object.keys(approvalSourceLabels) as ApprovalSourceScope[]).map(sc => (
-              <Option key={sc} value={sc}>{approvalSourceLabels[sc]}</Option>
-            ))}
-          </Dropdown>
-        </Field>
-      )}
-
-      {mode === 'UseGlobalDefault' && (
-        <MessageBar intent="info">
-          <MessageBarBody>
-            This schema follows the global default approval policy, configured in Settings → Approval.
-          </MessageBarBody>
-        </MessageBar>
-      )}
-
-      {mode === 'Required' && (
-        <Field
-          label="Approvers"
-          hint="Pick who may review: the Approver/Admin accounts below, and/or the service owner (the account that sent the submission, so a service can sign off on its own data). Mark at least one as Required; the submission goes live once every Required approver has approved."
-          validationState={hasRequiredApprover ? 'none' : 'warning'}
-          validationMessage={hasRequiredApprover ? undefined : 'Add at least one Required approver.'}
-        >
-          <Dropdown
-            multiselect
-            disabled={disabled}
-            placeholder="Select approvers"
-            selectedOptions={approvers.map(approverKey)}
-            value={approvers.map(a => approverLabel(a, accountsById)).join(', ')}
-            onOptionSelect={(_, d) => toggleApprover(d.optionValue!, d.selectedOptions.includes(d.optionValue!))}
-          >
-            <Option value={SERVICE_OWNER_KEY}>{SERVICE_OWNER_LABEL}</Option>
-            {accounts.map(a => (
-              <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
-            ))}
-          </Dropdown>
-        </Field>
-      )}
-
-      {mode === 'Required' && approvers.length > 0 && (
-        <div className={styles.approverList}>
-          {approvers.map(a => {
-            const key = approverKey(a)
-            return (
-              <div key={key} className={styles.approverRow}>
-                <span className={styles.approverName}>{approverLabel(a, accountsById)}</span>
-                <RadioGroup
-                  layout="horizontal"
-                  disabled={disabled}
-                  value={a.requirement}
-                  onChange={(_, d) => setRequirement(key, d.value as ApproverRequirement)}
-                >
-                  <Radio value="Required" label="Required" />
-                  <Radio value="Optional" label="Optional" />
-                </RadioGroup>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {showModifiableWarning && (
-        <MessageBar intent="warning">
-          <MessageBarBody>
-            <MessageBarTitle>Heads up: this schema is modifiable</MessageBarTitle>
-            Re-submitting data for a window that already has a submission replaces it and resets its
-            approval status to Pending — even if it was previously approved. While it waits for
-            re-approval it drops out of the OData feed and Explore. If you don’t want re-submissions to
-            disturb approved data, mark the schema as not modifiable.
-          </MessageBarBody>
-        </MessageBar>
-      )}
-    </>
   )
 }
 

@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import {
   Badge, Body1, Button, Card, Checkbox, Dialog, DialogActions, DialogBody, DialogContent,
-  DialogSurface, DialogTitle, Dropdown, Drawer, DrawerBody, Field, Input, MessageBarBody,
+  DialogSurface, DialogTitle, Dropdown, Drawer, DrawerBody, Field, Input,
+  Menu, MenuButton, MenuItem, MenuList, MenuPopover, MenuTrigger, MessageBarBody,
   Option, Switch, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow,
   Textarea, Title3, Tooltip, makeStyles, tokens,
 } from '@fluentui/react-components'
 import {
-  Add20Regular, Copy20Regular, Send20Regular, KeyReset20Regular, Delete20Regular,
+  Add20Regular, ArrowClockwise20Regular, Copy20Regular, Send20Regular, KeyReset20Regular,
+  Delete20Regular, MoreHorizontal20Regular,
 } from '@fluentui/react-icons'
 import { Link as RouterLink } from 'react-router-dom'
 import { AutoScrollMessageBar } from './AutoScrollMessageBar'
@@ -41,7 +43,8 @@ const useStyles = makeStyles({
   card: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' },
   sectionTitle: { display: 'block', marginBottom: '2px' },
   help: { color: tokens.colorNeutralForeground3 },
-  headerRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' },
+  titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' },
+  headerActions: { display: 'flex', gap: '8px', alignItems: 'center' },
   actions: { display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' },
   table: { tableLayout: 'fixed', width: '100%' },
   row: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
@@ -76,7 +79,7 @@ const useStyles = makeStyles({
  */
 export function WebhooksSection() {
   const s = useStyles()
-  const { data: endpoints, isLoading } = useWebhookEndpoints()
+  const { data: endpoints, isLoading, refetch } = useWebhookEndpoints()
   const [editing, setEditing] = useState<WebhookEndpoint | 'new' | null>(null)
   // Plaintext secret to reveal once after create/rotate (cleared when the dialog closes).
   const [revealed, setRevealed] = useState<{ name: string; secret: string } | null>(null)
@@ -117,18 +120,28 @@ export function WebhooksSection() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <Card className={s.card}>
-        <div className={s.headerRow}>
-          <div>
-            <Title3 className={s.sectionTitle}>Webhook endpoints</Title3>
-            <Body1 className={s.help}>
-              Send a signed HTTP POST to an external URL (Teams, Power Automate, your own service)
-              when a subscribed event happens — no polling required.
-            </Body1>
+        <div className={s.titleRow}>
+          <Title3 className={s.sectionTitle}>Webhook endpoints</Title3>
+          <div className={s.headerActions}>
+            <Button appearance="primary" icon={<Add20Regular />} onClick={() => setEditing('new')}>
+              Add endpoint
+            </Button>
+            <Menu>
+              <MenuTrigger disableButtonEnhancement>
+                <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+              </MenuTrigger>
+              <MenuPopover>
+                <MenuList>
+                  <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                </MenuList>
+              </MenuPopover>
+            </Menu>
           </div>
-          <Button appearance="primary" icon={<Add20Regular />} onClick={() => setEditing('new')}>
-            Add endpoint
-          </Button>
         </div>
+        <Body1 className={s.help}>
+          Send a signed HTTP POST to an external URL (Teams, Power Automate, your own service)
+          when a subscribed event happens — no polling required.
+        </Body1>
 
         {banner && (
           <AutoScrollMessageBar intent={banner.intent}>

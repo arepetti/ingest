@@ -51,9 +51,13 @@ function rejectionNote(sub: Submission): string | null {
   return last?.note?.trim() || null
 }
 
-/** Small inline approval-state badge. Renders nothing for the legacy `NotRequired` state. */
-function ApprovalBadge({ status }: { status: ApprovalStatus }) {
-  if (status === 'NotRequired') return <>—</>
+/**
+ * Small inline approval-state badge. Renders a dash for the `NotRequired` state — including legacy
+ * submissions that predate the approval workflow and so carry no status at all (treated as not
+ * required, since they were live the moment they landed).
+ */
+function ApprovalBadge({ status }: { status?: ApprovalStatus | null }) {
+  if (!status || status === 'NotRequired') return <>—</>
   return <Badge appearance="tint" color={approvalBadgeColor(status)}>{status}</Badge>
 }
 

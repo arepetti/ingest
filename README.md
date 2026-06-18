@@ -141,6 +141,7 @@ Everything Ingest does, in one place:
 **Security, governance & operations**
 
 - **API-key auth** with zero-downtime rotation and individual revocation; **capability-based authorisation** with roles (Service / Operator / Approver / Admin) as templates that seed per-account capabilities.
+- **Optional approval workflow** — hold submissions for review before they go live, configured per schema, as a global default, or via cross-cutting **rules** that require sign-off for chosen services and schemas (either side can be "All"). An API-only rule can force manual intervention so a person reviews or completes a partially automated feed before it's published.
 - **Optional SSO** (Microsoft / Google) layered on top of API keys.
 - **Full audit log** and **soft-delete** by default — nothing important is destroyed silently.
 - **GDPR built in** — right-to-erasure (anonymise or delete), per-subject data export, and configurable time-based retention.

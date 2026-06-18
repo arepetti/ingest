@@ -40,6 +40,9 @@ public sealed class MongoContext
     /// <summary><c>approvalSettings</c> collection — singleton global default approval policy.</summary>
     public IMongoCollection<ApprovalSettings> ApprovalSettings => Database.GetCollection<ApprovalSettings>("approvalSettings");
 
+    /// <summary><c>approvalRules</c> collection — cross-cutting per-service/per-schema approval rules.</summary>
+    public IMongoCollection<ApprovalRule> ApprovalRules => Database.GetCollection<ApprovalRule>("approvalRules");
+
     /// <summary><c>emailSettings</c> collection — singleton SMTP configuration.</summary>
     public IMongoCollection<EmailSettings> EmailSettings => Database.GetCollection<EmailSettings>("emailSettings");
 

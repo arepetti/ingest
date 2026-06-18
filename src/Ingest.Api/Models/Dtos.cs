@@ -485,6 +485,60 @@ public sealed record ApprovalPolicyDto(
     };
 }
 
+/// <summary>Wire shape of a cross-cutting approval rule (per-service/per-schema approval requirement).</summary>
+/// <param name="Id">Stable identifier.</param>
+/// <param name="Label">Optional friendly label.</param>
+/// <param name="Enabled">Whether the rule is active.</param>
+/// <param name="ServiceIds">Services the rule applies to; empty means all services.</param>
+/// <param name="SchemaIds">Schemas the rule applies to; empty means all schemas.</param>
+/// <param name="Policy">The approval policy imposed when the rule matches.</param>
+/// <param name="CreatedAt">Creation timestamp (UTC).</param>
+/// <param name="CreatedBy">Name of the creator.</param>
+/// <param name="ModifiedAt">Last update timestamp (UTC).</param>
+/// <param name="ModifiedBy">Name of the last modifier.</param>
+public sealed record ApprovalRuleDto(
+    Guid Id,
+    string? Label,
+    bool Enabled,
+    List<Guid> ServiceIds,
+    List<Guid> SchemaIds,
+    ApprovalPolicyDto Policy,
+    DateTime CreatedAt,
+    string? CreatedBy,
+    DateTime ModifiedAt,
+    string? ModifiedBy)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ApprovalRuleDto From(ApprovalRule r) => new(
+        r.Id, r.Label, r.Enabled, r.ServiceIds, r.SchemaIds,
+        ApprovalPolicyDto.From(r.Policy),
+        r.CreatedAt, r.CreatedBy, r.ModifiedAt, r.ModifiedBy);
+}
+
+/// <summary>Body for <c>POST</c> and <c>PUT</c> on the admin approval-rules endpoint. Null list fields are normalised to "all".</summary>
+/// <param name="Label">Optional friendly label.</param>
+/// <param name="Enabled">Whether the rule is active.</param>
+/// <param name="ServiceIds">Services the rule applies to; null/empty means all services.</param>
+/// <param name="SchemaIds">Schemas the rule applies to; null/empty means all schemas.</param>
+/// <param name="Policy">The approval policy imposed when the rule matches.</param>
+public sealed record UpsertApprovalRuleRequest(
+    string? Label,
+    bool Enabled,
+    List<Guid>? ServiceIds,
+    List<Guid>? SchemaIds,
+    ApprovalPolicyDto Policy)
+{
+    /// <summary>Convert the wire DTO into a domain entity.</summary>
+    public ApprovalRule ToEntity() => new()
+    {
+        Label = string.IsNullOrWhiteSpace(Label) ? null : Label.Trim(),
+        Enabled = Enabled,
+        ServiceIds = ServiceIds ?? new(),
+        SchemaIds = SchemaIds ?? new(),
+        Policy = Policy.ToEntity(),
+    };
+}
+
 /// <summary>Wire shape of one recorded approval/rejection decision on a submission.</summary>
 /// <param name="ApproverAccountId">Account that recorded the decision.</param>
 /// <param name="ApproverName">Machine-name snapshot of the approver.</param>
