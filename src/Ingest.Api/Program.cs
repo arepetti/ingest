@@ -196,6 +196,21 @@ builder.Services.AddHttpClient(Ingest.Infrastructure.Webhooks.WebhookDispatchSer
 if (webhookOptions.Enabled && webhookOptions.Worker.Enabled)
     builder.Services.AddHostedService<WebhookOutboxWorker>();
 
+// Integrations (Microsoft Teams). Gated by the Integrations:Enabled master switch (enabled by
+// default; mirrors the webhook pattern): when off, the admin + inbound endpoints 404 and neither
+// worker runs. The scheduled-pass worker enqueues prompts; the outbox worker sends them. Each is
+// independently toggleable so the schedule/delivery can be driven by an external scheduler hitting
+// POST /api/admin/integrations/run and POST /api/admin/integrations/drain instead. The typed
+// HttpClient picks up the Aspire standard resilience handler from ServiceDefaults.
+var integrationOptions = builder.Configuration.GetSection("Integrations").Get<Ingest.Infrastructure.Integrations.IntegrationOptions>() ?? new Ingest.Infrastructure.Integrations.IntegrationOptions();
+builder.Services.AddHttpClient(Ingest.Infrastructure.Integrations.TeamsClient.HttpClientName);
+builder.Services.AddSingleton<Ingest.Api.Auth.TeamsBotAuthenticator>();
+if (integrationOptions.Enabled)
+{
+    if (integrationOptions.Scheduler.Enabled) builder.Services.AddHostedService<IntegrationSchedulerWorker>();
+    if (integrationOptions.Worker.Enabled) builder.Services.AddHostedService<IntegrationOutboxWorker>();
+}
+
 // Retention purge (GDPR storage limitation). Off by default; the in-process worker only runs when
 // Retention:Enabled is on. The manual POST /api/admin/retention/run trigger works regardless, so
 // the schedule can be driven externally instead.

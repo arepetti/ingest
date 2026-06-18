@@ -474,6 +474,8 @@ export interface Me {
   emailEnabled?: boolean
   /** Whether outbound webhooks are enabled server-side. Drives whether the Webhooks settings section shows. */
   webhooksEnabled?: boolean
+  /** Whether integrations (e.g. Microsoft Teams) are enabled server-side. Drives whether the Integrations settings section shows. */
+  integrationsEnabled?: boolean
   /** Whether the submission approval workflow is enabled server-side. Drives all approval-related UI. */
   approvalEnabled?: boolean
   /** Whether the global default approval policy currently requires approval (so schemas deferring to it are gated). */
@@ -600,7 +602,7 @@ export type AuditChangeType = 'Create' | 'Edit' | 'Delete' | 'Approve' | 'Reject
  * The type of object an audit entry targets. 'User' and 'Account' are both accounts, told apart
  * by the account's kind at the time of the change.
  */
-export type AuditTargetType = 'User' | 'Account' | 'Schema' | 'ApiKey' | 'Submission' | 'Report' | 'SchemaHistory' | 'ApprovalRule'
+export type AuditTargetType = 'User' | 'Account' | 'Schema' | 'ApiKey' | 'Submission' | 'Report' | 'SchemaHistory' | 'ApprovalRule' | 'Settings' | 'Backup'
 
 /** A single audit-log entry: who changed what, when, and how. */
 export interface AuditLog {
@@ -843,6 +845,117 @@ export interface WebhookDelivery {
 export interface WebhookDrainResult {
   sent: number
   failed: number
+}
+
+// --- Integrations (Microsoft Teams) --------------------------------------------------------
+
+/** Provider an integration targets. Only Microsoft Teams ships today. */
+export type IntegrationKind = 'MicrosoftTeams'
+
+/** Whether a Teams integration targets a single user or a channel. */
+export type TeamsTargetKind = 'User' | 'Channel'
+
+/** A weekday name, matching the .NET `DayOfWeek` enum serialised as a string. */
+export type Weekday = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday'
+
+/** How often an integration's scheduled pass runs (mirrors the schema cadences, minus Fortnightly). */
+export type IntegrationFrequency = 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'SemiAnnually' | 'Yearly'
+
+/** When an integration's scheduled pass runs. */
+export interface IntegrationSchedule {
+  /** How often the pass runs. */
+  frequency: IntegrationFrequency
+  /** Weekdays the pass runs on (Weekly only); empty = every day. */
+  days: Weekday[]
+  /** Day of the month (1-31) for the Monthly-and-longer frequencies; clamped to month length. */
+  dayOfMonth: number
+  /** When true, run on the last day of the month instead of `dayOfMonth`. */
+  lastDayOfMonth: boolean
+  /** Anchor month (1-12) for Quarterly / SemiAnnually / Yearly. */
+  anchorMonth: number
+  /** Hour of day (UTC, 0-23). */
+  hourUtc: number
+  /** Minute of the hour (UTC, 0-59). */
+  minuteUtc: number
+}
+
+/** Teams target. The captured conversation reference is never exposed. */
+export interface TeamsTarget {
+  kind: TeamsTargetKind
+  /** Stable id of the user (Entra object id / UPN / email) or channel. */
+  targetId: string
+  displayName?: string | null
+  /** True once the bot has been contacted and a conversation reference is stored. */
+  hasConversation: boolean
+}
+
+/** A configured integration. */
+export interface Integration {
+  id: string
+  label?: string | null
+  enabled: boolean
+  kind: IntegrationKind
+  /** Scoped services; empty = all. */
+  serviceIds: string[]
+  /** Scoped schemas; empty = all. */
+  schemaIds: string[]
+  schedule: IntegrationSchedule
+  teams: TeamsTarget
+  createdAt: string
+  modifiedAt: string
+  modifiedBy?: string | null
+}
+
+/** Target fields a client may set when creating/updating an integration. */
+export interface TeamsTargetInput {
+  kind: TeamsTargetKind
+  targetId: string
+  displayName?: string | null
+}
+
+/** Body for creating/updating an integration. */
+export interface IntegrationRequest {
+  label?: string | null
+  enabled: boolean
+  kind: IntegrationKind
+  serviceIds: string[]
+  schemaIds: string[]
+  schedule: IntegrationSchedule
+  teams: TeamsTargetInput
+}
+
+/** Microsoft Teams bot connection settings. The bot secret is write-only and never returned. */
+export interface TeamsConnection {
+  appId?: string | null
+  tenantId?: string | null
+  singleTenant: boolean
+  /** True when a bot secret is stored. */
+  hasPassword: boolean
+  /** True when both an app id and a secret are present. */
+  isConfigured: boolean
+  modifiedAt: string
+  modifiedBy?: string | null
+}
+
+/** Body for updating the Teams connection. The secret is write-once. */
+export interface UpdateTeamsConnectionRequest {
+  appId?: string | null
+  tenantId?: string | null
+  singleTenant: boolean
+  updatePassword: boolean
+  password?: string | null
+}
+
+/** Outcome of verifying the Teams bot credentials. */
+export interface TeamsConnectionTestResult {
+  ok: boolean
+  error?: string | null
+}
+
+/** Outcome of an integration run pass. */
+export interface IntegrationRunResult {
+  prompted: number
+  skipped: number
 }
 
 /** Response shape returned by the render endpoint. */

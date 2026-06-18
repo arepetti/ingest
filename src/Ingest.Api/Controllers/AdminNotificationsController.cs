@@ -1,6 +1,8 @@
 using Ingest.Api.Auth;
+using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Entities;
 using Ingest.Core.Security;
 using Ingest.Infrastructure.Email;
 using Microsoft.AspNetCore.Authorization;
@@ -21,16 +23,19 @@ public sealed class AdminNotificationsController : ControllerBase
 {
     private readonly INotificationSettingsService _settings;
     private readonly INotificationService _notifications;
+    private readonly IAuditLogService _audit;
     private readonly bool _enabled;
 
     /// <summary>Create a new <see cref="AdminNotificationsController"/>.</summary>
     public AdminNotificationsController(
         INotificationSettingsService settings,
         INotificationService notifications,
+        IAuditLogService audit,
         IOptions<EmailOptions> options)
     {
         _settings = settings;
         _notifications = notifications;
+        _audit = audit;
         _enabled = options.Value.Enabled;
     }
 
@@ -60,6 +65,7 @@ public sealed class AdminNotificationsController : ControllerBase
             req.Upcoming.ToUpdate(), req.Missed.ToUpdate(), req.Warnings.ToUpdate(),
             req.PendingApproval.ToUpdate(), req.Approved.ToUpdate(), req.Rejected.ToUpdate(),
             req.UpcomingLeadHours, req.AdminRecipientAccountIds ?? new()), ct);
+        await _audit.RecordAsync(AuditTargetType.Settings, AuditChangeType.Edit, AuditTargets.NotificationSettings, "Notification settings", ct);
         return Ok(NotificationSettingsDto.From(updated));
     }
 

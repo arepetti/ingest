@@ -1263,3 +1263,159 @@ public sealed record WebhookDeliveryDto(
         d.EventId, d.Status, d.Attempts, d.LastError, d.LastStatusCode,
         d.CreatedAt, d.DeliveredAt, d.NextAttemptAt, d.RelatedAccountId);
 }
+
+// ── Integrations (Microsoft Teams) ──────────────────────────────────────────────────────────
+
+/// <summary>Wire shape of an integration schedule.</summary>
+/// <param name="Frequency">How often the pass runs (Daily / Weekly / Monthly / Quarterly / SemiAnnually / Yearly).</param>
+/// <param name="Days">Weekdays the pass runs on (Weekly only); empty = every day.</param>
+/// <param name="DayOfMonth">Day of the month (1-31) for the Monthly-and-longer frequencies; clamped to month length.</param>
+/// <param name="LastDayOfMonth">When true, run on the last day of the month instead of <paramref name="DayOfMonth"/>.</param>
+/// <param name="AnchorMonth">Anchor month (1-12) for Quarterly / SemiAnnually / Yearly.</param>
+/// <param name="HourUtc">Hour of day (UTC, 0-23).</param>
+/// <param name="MinuteUtc">Minute of the hour (UTC, 0-59).</param>
+public sealed record IntegrationScheduleDto(
+    IntegrationFrequency Frequency,
+    List<DayOfWeek> Days,
+    int DayOfMonth,
+    bool LastDayOfMonth,
+    int AnchorMonth,
+    int HourUtc,
+    int MinuteUtc)
+{
+    /// <summary>Project the domain object onto the wire shape.</summary>
+    public static IntegrationScheduleDto From(IntegrationSchedule s) =>
+        new(s.Frequency, s.Days, s.DayOfMonth, s.LastDayOfMonth, s.AnchorMonth, s.HourUtc, s.MinuteUtc);
+
+    /// <summary>Build the domain object from the wire shape.</summary>
+    public IntegrationSchedule ToEntity() => new()
+    {
+        Frequency = Frequency,
+        Days = Days ?? new(),
+        DayOfMonth = DayOfMonth,
+        LastDayOfMonth = LastDayOfMonth,
+        AnchorMonth = AnchorMonth,
+        HourUtc = HourUtc,
+        MinuteUtc = MinuteUtc,
+    };
+}
+
+/// <summary>Wire shape of a Teams target. The captured conversation reference is never exposed.</summary>
+/// <param name="Kind">User or channel.</param>
+/// <param name="TargetId">Stable id of the user (Entra object id / UPN / email) or channel.</param>
+/// <param name="DisplayName">Optional friendly label for the target.</param>
+/// <param name="HasConversation">True once the bot has been contacted and a conversation reference is stored.</param>
+public sealed record TeamsTargetDto(TeamsTargetKind Kind, string TargetId, string? DisplayName, bool HasConversation)
+{
+    /// <summary>Project the domain object onto the wire shape, omitting the conversation reference.</summary>
+    public static TeamsTargetDto From(TeamsTarget t) => new(
+        t.Kind, t.TargetId, t.DisplayName, !string.IsNullOrEmpty(t.ConversationReferenceJson));
+}
+
+/// <summary>Target fields a client may set when creating/updating an integration.</summary>
+/// <param name="Kind">User or channel.</param>
+/// <param name="TargetId">Stable id of the user or channel.</param>
+/// <param name="DisplayName">Optional friendly label.</param>
+public sealed record TeamsTargetInput(TeamsTargetKind Kind, string TargetId, string? DisplayName = null)
+{
+    /// <summary>Build the domain object (conversation reference is preserved by the service layer).</summary>
+    public TeamsTarget ToEntity() => new() { Kind = Kind, TargetId = TargetId?.Trim() ?? "", DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? null : DisplayName!.Trim() };
+}
+
+/// <summary>Wire shape of an integration.</summary>
+/// <param name="Id">Stable identifier.</param>
+/// <param name="Label">Optional friendly label.</param>
+/// <param name="Enabled">Whether the integration is active.</param>
+/// <param name="Kind">The provider (Microsoft Teams today).</param>
+/// <param name="ServiceIds">Scoped services; empty = all.</param>
+/// <param name="SchemaIds">Scoped schemas; empty = all.</param>
+/// <param name="Schedule">When the scheduled pass runs.</param>
+/// <param name="Teams">Teams target.</param>
+/// <param name="CreatedAt">Creation timestamp (UTC).</param>
+/// <param name="ModifiedAt">Last update timestamp (UTC).</param>
+/// <param name="ModifiedBy">Name of the last modifier.</param>
+public sealed record IntegrationDto(
+    Guid Id,
+    string? Label,
+    bool Enabled,
+    IntegrationKind Kind,
+    List<Guid> ServiceIds,
+    List<Guid> SchemaIds,
+    IntegrationScheduleDto Schedule,
+    TeamsTargetDto Teams,
+    DateTime CreatedAt,
+    DateTime ModifiedAt,
+    string? ModifiedBy)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static IntegrationDto From(Integration i) => new(
+        i.Id, i.Label, i.Enabled, i.Kind, i.ServiceIds, i.SchemaIds,
+        IntegrationScheduleDto.From(i.Schedule), TeamsTargetDto.From(i.Teams),
+        i.CreatedAt, i.ModifiedAt, i.ModifiedBy);
+}
+
+/// <summary>Body for <c>POST /api/admin/integrations</c> and <c>PUT /api/admin/integrations/{id}</c>.</summary>
+/// <param name="Label">Optional friendly label.</param>
+/// <param name="Enabled">Whether the integration is active; defaults to true.</param>
+/// <param name="Kind">The provider; defaults to Microsoft Teams.</param>
+/// <param name="ServiceIds">Scoped services; empty/null = all.</param>
+/// <param name="SchemaIds">Scoped schemas; empty/null = all.</param>
+/// <param name="Schedule">When the scheduled pass runs; defaults to 08:00 UTC daily.</param>
+/// <param name="Teams">Teams target (required for the Teams provider).</param>
+public sealed record IntegrationRequest(
+    string? Label = null,
+    bool Enabled = true,
+    IntegrationKind Kind = IntegrationKind.MicrosoftTeams,
+    List<Guid>? ServiceIds = null,
+    List<Guid>? SchemaIds = null,
+    IntegrationScheduleDto? Schedule = null,
+    TeamsTargetInput? Teams = null)
+{
+    /// <summary>Build the domain entity from the request (conversation reference handled by the service).</summary>
+    public Integration ToEntity() => new()
+    {
+        Label = string.IsNullOrWhiteSpace(Label) ? null : Label!.Trim(),
+        Enabled = Enabled,
+        Kind = Kind,
+        ServiceIds = ServiceIds ?? new(),
+        SchemaIds = SchemaIds ?? new(),
+        Schedule = Schedule?.ToEntity() ?? new IntegrationSchedule(),
+        Teams = Teams?.ToEntity() ?? new TeamsTarget(),
+    };
+}
+
+/// <summary>Wire shape of the Teams connection settings. The bot secret is write-once and never returned.</summary>
+/// <param name="AppId">Microsoft App (client) id.</param>
+/// <param name="TenantId">Entra tenant id (null/empty for multi-tenant).</param>
+/// <param name="SingleTenant">Whether the bot app registration is single-tenant.</param>
+/// <param name="HasPassword">True when a bot secret is stored.</param>
+/// <param name="IsConfigured">True when both an app id and a secret are present.</param>
+/// <param name="ModifiedAt">Last update timestamp (UTC).</param>
+/// <param name="ModifiedBy">Name of the last modifier.</param>
+public sealed record TeamsConnectionDto(
+    string? AppId,
+    string? TenantId,
+    bool SingleTenant,
+    bool HasPassword,
+    bool IsConfigured,
+    DateTime ModifiedAt,
+    string? ModifiedBy)
+{
+    /// <summary>Project the domain entity onto the wire shape, omitting the secret.</summary>
+    public static TeamsConnectionDto From(TeamsConnectionSettings s) => new(
+        s.AppId, s.TenantId, s.SingleTenant,
+        !string.IsNullOrEmpty(s.AppPasswordCipher), s.IsConfigured, s.ModifiedAt, s.ModifiedBy);
+}
+
+/// <summary>Body for <c>PUT /api/admin/integrations/connection</c>.</summary>
+/// <param name="AppId">Microsoft App (client) id.</param>
+/// <param name="TenantId">Entra tenant id (null/empty for multi-tenant).</param>
+/// <param name="SingleTenant">Whether the bot app registration is single-tenant.</param>
+/// <param name="UpdatePassword">When true, <paramref name="Password"/> replaces the stored secret (blank clears it).</param>
+/// <param name="Password">New bot client secret; only consulted when <paramref name="UpdatePassword"/> is true.</param>
+public sealed record UpdateTeamsConnectionRequest(
+    string? AppId,
+    string? TenantId,
+    bool SingleTenant = false,
+    bool UpdatePassword = false,
+    string? Password = null);

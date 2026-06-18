@@ -136,6 +136,7 @@ Everything Ingest does, in one place:
 - **Full REST API** — every console action is a documented HTTP endpoint, so a cron job, Azure Function, or integration platform can submit automatically.
 - **OData v4 feed** at `/odata/samples` — Power BI talks to it out of the box; also reachable as paged JSON.
 - **Outbound webhooks** — signed (HMAC-SHA256), durably queued, auto-retrying HTTP pushes on `submission.accepted` / `submission.warnings` / `window.upcoming` / `window.missed`, to wire into Teams, Power Automate, or your own service without polling.
+- **Microsoft Teams integration** — a bot that prompts a user or channel for the KPI values still outstanding, as an interactive Adaptive Card filled in and submitted straight from Teams. Daily or on demand, scoped to chosen services and schemas, hidden/disabled fields omitted and warnings surfaced. See [docs/setup/ms-teams.md](docs/setup/ms-teams.md).
 - **Email notifications** — upcoming-reminder, missed-alert, and submission-warning emails with editable Liquid templates and configurable recipients.
 
 **Security, governance & operations**

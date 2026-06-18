@@ -14,6 +14,7 @@ The guide is split into focused pages — pick whichever matches the task at han
 | [explore.md](explore.md)                      | Lightweight in-app analytics: charting numeric KPIs by period and service (Trend / Compare / Snapshot). A convenience for deployments without a BI tool — PowerBI is still the primary analytics surface. |
 | [settings.md](settings.md)                    | Settings hub (gated per-section by `settings:*`/`notifications:*`/`webhooks:*` capabilities): email (SMTP) settings, editable notification templates, notification triggers & recipients, ad-hoc email send, and retention policy. |
 | [webhooks.md](webhooks.md)                    | Outbound webhooks: registering signed endpoints, subscribing to submission/window events, signature verification, retries and the delivery log. |
+| [integrations.md](integrations.md)            | Microsoft Teams integration: configuring the bot connection, creating integrations scoped to services/schemas, schedules, targets (user/channel), running on demand and test sends. |
 | [tools.md](tools.md)                          | Operational utilities gated by the `backup:*` capabilities — currently backup & restore (a convenience tool, *not* the primary backup). |
 | [validation.md](validation.md)                | Writing custom validation rules — operators, conditionals, helpers, recipes. The companion to schemas.md when you start using the rule fields. |
 | [troubleshooting.md](troubleshooting.md)      | Common error messages and what they mean.                                      |

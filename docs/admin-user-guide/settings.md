@@ -5,8 +5,9 @@
 - When the **approval workflow is enabled** (`Approval:Enabled`, on by default) you get an **Approval** section for the global default policy and a **Rules** section for per-service/per-schema approval rules — both documented in [approval-process.md](approval-process.md).
 - When the **email feature is enabled** (`Email:Enabled`, on by default — see [setup/configuration.md → Email & notifications](../setup/configuration.md#email--notifications)) you get **Email**, **Email templates** and **Notifications**.
 - When **webhooks are enabled** (`Webhooks:Enabled`, **off** by default) you get a **Webhooks** section — documented separately in [webhooks.md](webhooks.md).
+- When **integrations are enabled** (`Integrations:Enabled`, **on** by default) you get an **Integrations** section and a **Teams connection** section (gated by `integrations:read` / `integrations:manage`) — the Microsoft Teams integration, documented separately in [integrations.md](integrations.md).
 
-> When `Email:Enabled` is `false`, the three email/notification sections disappear, along with the **Audit → Sent emails** tab and the per-account **Send email** action. If neither email nor webhooks is enabled, the Settings page shows a short "nothing to configure" notice.
+> When `Email:Enabled` is `false`, the three email/notification sections disappear, along with the **Audit → Sent emails** tab and the per-account **Send email** action. If none of email, webhooks, or integrations is enabled, the Settings page shows a short "nothing to configure" notice.
 
 > **Backup & restore moved.** It isn't really a setting, so it now lives on the **Tools** page (in the sidebar, directly above Settings) — see [tools.md](tools.md).
 

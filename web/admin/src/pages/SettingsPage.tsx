@@ -8,7 +8,7 @@ import {
 } from '@fluentui/react-components'
 import {
   Alert24Regular, CheckmarkCircle24Regular, ClipboardTaskListLtr24Regular, DocumentText24Regular,
-  Mail24Regular, PlugConnected24Regular,
+  Key24Regular, Mail24Regular, PeopleTeam24Regular, PlugConnected24Regular, Settings24Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
@@ -16,6 +16,7 @@ import { SectionedLayout } from '../components/SectionedLayout'
 import type { LayoutSection } from '../components/SectionedLayout'
 import { WebhooksSection } from '../components/WebhooksSection'
 import { ApprovalRulesSection } from '../components/ApprovalRulesSection'
+import { IntegrationsSection, TeamsConnectionSection } from '../components/IntegrationsSection'
 import { clickableRowProps } from '../utils/a11y'
 import {
   useCapabilities, useAccounts,
@@ -34,7 +35,7 @@ import type {
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  card: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', maxWidth: '760px' },
+  card: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' },
   cardWide: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' },
   sectionTitle: { display: 'block', marginBottom: '2px' },
   help: { color: tokens.colorNeutralForeground3 },
@@ -210,8 +211,9 @@ export function SettingsPage() {
   const canConfigureSettings = hasAny('settings:read', 'settings:manage')
   const canConfigureNotifications = hasAny('notifications:read', 'notifications:manage')
   const canConfigureWebhooks = hasAny('webhooks:read', 'webhooks:manage')
+  const canConfigureIntegrations = hasAny('integrations:read', 'integrations:manage')
 
-  if (!canConfigureSettings && !canConfigureNotifications && !canConfigureWebhooks) {
+  if (!canConfigureSettings && !canConfigureNotifications && !canConfigureWebhooks && !canConfigureIntegrations) {
     return (
       <AutoScrollMessageBar intent="error">
         <MessageBarBody>You don't have permission to manage any settings.</MessageBarBody>
@@ -222,19 +224,25 @@ export function SettingsPage() {
   const emailEnabled = me?.emailEnabled === true
   const webhooksEnabled = me?.webhooksEnabled === true
   const approvalEnabled = me?.approvalEnabled === true
+  const integrationsEnabled = me?.integrationsEnabled === true
 
   const sections: LayoutSection[] = [
+    { id: 'general', label: 'General', group: 'General', icon: <Settings24Regular />, render: () => <GeneralSettingsSection /> },
     ...(approvalEnabled && canConfigureSettings ? [
-      { id: 'approval', label: 'Approval', icon: <CheckmarkCircle24Regular />, render: () => <ApprovalSettingsSection /> },
-      { id: 'rules', label: 'Rules', icon: <ClipboardTaskListLtr24Regular />, render: () => <ApprovalRulesSection /> },
+      { id: 'approval', label: 'Approval', group: 'Approvals', icon: <CheckmarkCircle24Regular />, render: () => <ApprovalSettingsSection /> },
+      { id: 'rules', label: 'Rules', group: 'Approvals', icon: <ClipboardTaskListLtr24Regular />, render: () => <ApprovalRulesSection /> },
     ] as LayoutSection[] : []),
     ...(emailEnabled && canConfigureNotifications ? [
-      { id: 'email', label: 'Email', icon: <Mail24Regular />, render: () => <EmailSettingsSection /> },
-      { id: 'templates', label: 'Email templates', icon: <DocumentText24Regular />, render: () => <EmailTemplatesSection /> },
-      { id: 'notifications', label: 'Notifications', icon: <Alert24Regular />, render: () => <NotificationsSection /> },
+      { id: 'email', label: 'Email', group: 'Notifications', icon: <Mail24Regular />, render: () => <EmailSettingsSection /> },
+      { id: 'templates', label: 'Email templates', group: 'Notifications', icon: <DocumentText24Regular />, render: () => <EmailTemplatesSection /> },
+      { id: 'notifications', label: 'Notifications', group: 'Notifications', icon: <Alert24Regular />, render: () => <NotificationsSection /> },
     ] as LayoutSection[] : []),
     ...(webhooksEnabled && canConfigureWebhooks ? [
-      { id: 'webhooks', label: 'Webhooks', icon: <PlugConnected24Regular />, render: () => <WebhooksSection /> },
+      { id: 'webhooks', label: 'Webhooks', group: 'Integrations', icon: <PlugConnected24Regular />, render: () => <WebhooksSection /> },
+    ] as LayoutSection[] : []),
+    ...(integrationsEnabled && canConfigureIntegrations ? [
+      { id: 'integrations', label: 'Teams notifications', group: 'Integrations', icon: <PeopleTeam24Regular />, render: () => <IntegrationsSection /> },
+      { id: 'teams-connection', label: 'Teams connection', group: 'Integrations', icon: <Key24Regular />, render: () => <TeamsConnectionSection /> },
     ] as LayoutSection[] : []),
   ]
 
@@ -242,14 +250,58 @@ export function SettingsPage() {
     return (
       <AutoScrollMessageBar intent="info">
         <MessageBarBody>
-          No configurable settings are enabled. Turn on email, webhooks, or the approval workflow in
-          the server configuration to manage them here.
+          No configurable settings are enabled. Turn on email, webhooks, integrations, or the
+          approval workflow in the server configuration to manage them here.
         </MessageBarBody>
       </AutoScrollMessageBar>
     )
   }
 
   return <SectionedLayout title="Settings" sections={sections} />
+}
+
+// --- General (console preferences) --------------------------------------------------------
+
+/**
+ * Console-wide preferences. These are intentionally UI-only placeholders for now — the app ships
+ * a single language and a single theme, so the controls exist to establish the section and aren't
+ * wired to anything. Extra options (and persistence) will follow as more are actually supported.
+ */
+function GeneralSettingsSection() {
+  const s = useStyles()
+  const [language, setLanguage] = useState('en-US')
+  const [theme, setTheme] = useState('light')
+
+  return (
+    <Card className={s.card}>
+      <div>
+        <Title3 className={s.sectionTitle}>General</Title3>
+        <Body1 className={s.help}>
+          Preferences for the admin console.
+        </Body1>
+      </div>
+
+      <Field label="Language">
+        <Dropdown
+          value="English (US)"
+          selectedOptions={[language]}
+          onOptionSelect={(_, d) => setLanguage(d.optionValue as string)}
+        >
+          <Option value="en-US">English (US)</Option>
+        </Dropdown>
+      </Field>
+
+      <Field label="Theme">
+        <Dropdown
+          value="Light"
+          selectedOptions={[theme]}
+          onOptionSelect={(_, d) => setTheme(d.optionValue as string)}
+        >
+          <Option value="light">Light</Option>
+        </Dropdown>
+      </Field>
+    </Card>
+  )
 }
 
 // --- Email (SMTP) settings ----------------------------------------------------------------

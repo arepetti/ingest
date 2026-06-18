@@ -71,7 +71,7 @@ See [hosting.md § Automatic backups](hosting.md#automatic-backups-on-cosmos-db-
 - **Automatic, continuous PITR backups** of the Cosmos cluster, 35-day retention, no setup required.
 - Backup snapshots stored across **three availability zones** where supported.
 - A restore **creates a new cluster** — it is not an in-place rollback. HA and networking are **not** carried over and must be re-applied.
-- The **in-app Backup & restore** tool (admin SPA) is **not** part of this plan for production — it's an in-memory, non-transactional, whole-database export meant for small datasets and copying between environments. Do not depend on it for DR.
+- The **in-app Tools → Backup & restore** tools (admin SPA) are **not** part of this plan for production — they are in-memory, non-transactional exports meant for small datasets and copying between environments. Do not depend on them for DR. There are two: a **data backup** (the whole registry) and a separate **configuration backup** (the Settings-page configuration: approvals, email/notifications, webhooks, integrations and the Teams connection — see [admin-user-guide/tools.md](../admin-user-guide/tools.md)). The configuration backup can be a convenient way to re-seed settings onto a freshly restored cluster, but its encrypted secrets only decrypt on a deployment using the **same** `api-key-pepper` — the same constraint that makes the pepper the one irreplaceable secret above.
 
 ## Scenarios and runbooks
 

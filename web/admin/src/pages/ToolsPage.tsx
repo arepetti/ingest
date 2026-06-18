@@ -2,17 +2,21 @@ import { useState } from 'react'
 import {
   Body1, Button, Card, MessageBarBody, Spinner, Text, Title3, makeStyles, tokens,
 } from '@fluentui/react-components'
-import { ArrowDownload20Regular, ArrowUpload20Regular, DatabaseArrowDownRegular } from '@fluentui/react-icons'
+import {
+  ArrowDownload20Regular, ArrowUpload20Regular, DatabaseArrowDownRegular, SettingsRegular,
+} from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { SectionedLayout } from '../components/SectionedLayout'
 import type { LayoutSection } from '../components/SectionedLayout'
-import { backupExportUrl, useCapabilities, useImportBackup } from '../api/hooks'
+import {
+  backupExportUrl, configBackupExportUrl, useCapabilities, useImportBackup, useImportConfigBackup,
+} from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { downloadFromUrl, pickTextFile } from '../utils/download'
 import type { BackupImportResult } from '../api/types'
 
 const useStyles = makeStyles({
-  card: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', maxWidth: '760px' },
+  card: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' },
   sectionTitle: { display: 'block', marginBottom: '2px' },
   help: { color: tokens.colorNeutralForeground3 },
   actions: { display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' },
@@ -45,7 +49,8 @@ export function ToolsPage() {
   }
 
   const sections: LayoutSection[] = [
-    { id: 'backup', label: 'Backup & restore', icon: <DatabaseArrowDownRegular fontSize={24} />, render: () => <BackupRestoreSection canRestore={has('backup:manage')} /> },
+    { id: 'backup', label: 'Data backup', group: 'Backup & restore', icon: <DatabaseArrowDownRegular fontSize={24} />, render: () => <BackupRestoreSection canRestore={has('backup:manage')} /> },
+    { id: 'config-backup', label: 'Configuration backup', group: 'Backup & restore', icon: <SettingsRegular fontSize={24} />, render: () => <ConfigBackupRestoreSection canRestore={has('backup:manage')} /> },
   ]
 
   return <SectionedLayout title="Tools" sections={sections} />
@@ -103,9 +108,10 @@ function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Backup &amp; restore</Title3>
+        <Title3 className={s.sectionTitle}>Data backup</Title3>
         <Body1 className={s.help}>
-          Export the entire registry to a single JSON file, or restore it from one.
+          Export the entire registry (accounts, keys, schemas, submissions, reports, audit log) to a
+          single JSON file, or restore it from one.
         </Body1>
       </div>
 
@@ -143,6 +149,118 @@ function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
           onClick={onExport}
         >
           {busy ? 'Preparing…' : 'Download backup'}
+        </Button>
+        {canRestore && (
+          <Button
+            icon={importer.isPending ? <Spinner size="tiny" /> : <ArrowUpload20Regular />}
+            disabled={busy || importer.isPending}
+            onClick={onImport}
+          >
+            {importer.isPending ? 'Restoring…' : 'Restore from file…'}
+          </Button>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+function ConfigBackupRestoreSection({ canRestore }: { canRestore: boolean }) {
+  const s = useStyles()
+  const importer = useImportConfigBackup()
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<BackupImportResult | null>(null)
+
+  async function onExport() {
+    setError(null)
+    setBusy(true)
+    try {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+      await downloadFromUrl(configBackupExportUrl(), `ingest-config-${stamp}.json`)
+    } catch (e) {
+      setError(formatApiError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onImport() {
+    setError(null)
+    setResult(null)
+    let parsed: unknown
+    try {
+      const { content } = await pickTextFile('.json,application/json')
+      parsed = JSON.parse(content)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (!/no file selected/i.test(msg)) setError(`Could not read the configuration file: ${msg}`)
+      return
+    }
+
+    const ok = window.confirm(
+      'Restore from this configuration backup?\n\n' +
+      'This REPLACES all current configuration (approval policy & rules, email & notification ' +
+      'settings and templates, webhooks, integrations and the Teams connection) with the contents ' +
+      'of the file. It cannot be undone.\n\n' +
+      'Encrypted secrets (SMTP password, webhook secrets, Teams bot secret) only work if this ' +
+      'server uses the same ApiKey:Pepper as the one that produced the file; otherwise re-enter them ' +
+      'afterwards. A stored secret is kept when the file omits it.',
+    )
+    if (!ok) return
+
+    try {
+      const res = await importer.mutateAsync(parsed)
+      setResult(res)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  return (
+    <Card className={s.card}>
+      <div>
+        <Title3 className={s.sectionTitle}>Configuration backup</Title3>
+        <Body1 className={s.help}>
+          Export all configuration (approval policy &amp; rules, email &amp; notification settings and
+          templates, webhooks, integrations and the Teams connection) to a single JSON file, or
+          restore it from one — to copy configuration between environments or recover after a disaster.
+        </Body1>
+      </div>
+
+      <div className={s.warn}>
+        Restoring <strong>replaces all current configuration</strong> and is not transactional.
+        Encrypted secrets are included as ciphertext and only decrypt on a server using the same{' '}
+        <code>ApiKey:Pepper</code>; on a different deployment, re-enter them after the restore. A
+        stored secret is preserved when the file omits it.
+      </div>
+
+      {error && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      {result && (
+        <AutoScrollMessageBar intent="success">
+          <MessageBarBody>
+            Restore complete.
+            <ul className={s.counts}>
+              {Object.entries(result.restored).map(([name, n]) => (
+                <li key={name}><Text weight="semibold">{name}</Text>: {n}</li>
+              ))}
+            </ul>
+          </MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      <div className={s.actions}>
+        <Button
+          appearance="primary"
+          icon={busy ? <Spinner size="tiny" /> : <ArrowDownload20Regular />}
+          disabled={busy || importer.isPending}
+          onClick={onExport}
+        >
+          {busy ? 'Preparing…' : 'Download configuration'}
         </Button>
         {canRestore && (
           <Button

@@ -4,6 +4,7 @@ using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
 using Ingest.Infrastructure.Approvals;
 using Ingest.Infrastructure.Email;
+using Ingest.Infrastructure.Integrations;
 using Ingest.Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,18 +33,21 @@ public sealed class MeController : ControllerBase
 
     private readonly EmailOptions _email;
     private readonly WebhookOptions _webhooks;
+    private readonly IntegrationOptions _integrations;
     private readonly ApprovalOptions _approval;
     private readonly IApprovalSettingsService _approvalSettings;
 
     /// <summary>Create a new <see cref="MeController"/>.</summary>
     /// <param name="email">Bound email options (only the master switch is read, to expose it to the SPA).</param>
     /// <param name="webhooks">Bound webhook options (only the master switch is read, to expose it to the SPA).</param>
+    /// <param name="integrations">Bound integration options (only the master switch is read, to expose it to the SPA).</param>
     /// <param name="approval">Bound approval options (only the master switch is read, to expose it to the SPA).</param>
     /// <param name="approvalSettings">Global default approval policy provider; used to expose whether the default gates submissions.</param>
-    public MeController(IOptions<EmailOptions> email, IOptions<WebhookOptions> webhooks, IOptions<ApprovalOptions> approval, IApprovalSettingsService approvalSettings)
+    public MeController(IOptions<EmailOptions> email, IOptions<WebhookOptions> webhooks, IOptions<IntegrationOptions> integrations, IOptions<ApprovalOptions> approval, IApprovalSettingsService approvalSettings)
     {
         _email = email.Value;
         _webhooks = webhooks.Value;
+        _integrations = integrations.Value;
         _approval = approval.Value;
         _approvalSettings = approvalSettings;
     }
@@ -87,6 +91,7 @@ public sealed class MeController : ControllerBase
             capabilities,
             emailEnabled = _email.Enabled,
             webhooksEnabled = _webhooks.Enabled,
+            integrationsEnabled = _integrations.Enabled,
             approvalEnabled = _approval.Enabled,
             approvalDefaultRequired,
             version = AppVersion,

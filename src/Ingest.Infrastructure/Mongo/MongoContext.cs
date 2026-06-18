@@ -64,6 +64,15 @@ public sealed class MongoContext
     /// <summary><c>webhookDeliveries</c> collection — the durable queue of webhook POSTs to send / already sent.</summary>
     public IMongoCollection<WebhookDelivery> WebhookDeliveries => Database.GetCollection<WebhookDelivery>("webhookDeliveries");
 
+    /// <summary><c>integrations</c> collection — admin-configured external integrations (e.g. Microsoft Teams prompts).</summary>
+    public IMongoCollection<Integration> Integrations => Database.GetCollection<Integration>("integrations");
+
+    /// <summary><c>integrationDeliveries</c> collection — the durable queue of Teams prompt cards to send / already sent.</summary>
+    public IMongoCollection<IntegrationDelivery> IntegrationDeliveries => Database.GetCollection<IntegrationDelivery>("integrationDeliveries");
+
+    /// <summary><c>teamsConnectionSettings</c> collection — singleton Microsoft Teams bot credentials.</summary>
+    public IMongoCollection<TeamsConnectionSettings> TeamsConnectionSettings => Database.GetCollection<TeamsConnectionSettings>("teamsConnectionSettings");
+
     /// <summary>Create a new <see cref="MongoContext"/>.</summary>
     /// <param name="client">Mongo client supplied by the container.</param>
     /// <param name="databaseName">Name of the database to use.</param>

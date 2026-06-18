@@ -1,8 +1,10 @@
 # Tools
 
-**Tools** is a page of operational utilities — things you *do* occasionally rather than *configure* — gated by the `backup:read` capability (running a restore needs `backup:manage`). Both are in the Admin default bundle. It sits in the sidebar directly above **Settings** and uses the same master-detail layout (a list of tools on the left, the selected one on the right). Today it hosts a single tool, **Backup & restore**; more maintenance utilities will slot in as additional sections over time.
+**Tools** is a page of operational utilities — things you *do* occasionally rather than *configure* — gated by the `backup:read` capability (running a restore needs `backup:manage`). Both are in the Admin default bundle. It sits in the sidebar directly above **Settings** and uses the same master-detail layout (a list of tools on the left, the selected one on the right), with the tools grouped under **Backup & restore**. It hosts two tools: **Data backup** (the registry) and **Configuration backup** (the Settings-page configuration). More maintenance utilities will slot in as additional sections over time.
 
-## Backup & restore
+> **The `backup:read` / `backup:manage` capabilities govern both tools.** Anyone who can export or restore the data backup can also export or restore the configuration backup (which includes encrypted secrets). There is no separate permission for configuration.
+
+## Data backup
 
 A convenience tool to export the whole registry to one JSON file, or restore it from one.
 
@@ -25,7 +27,35 @@ Click **Restore from file…**, pick a backup JSON, and confirm the warning.
 
 On success the tool reports how many documents were written into each collection.
 
+## Configuration backup
+
+A separate tool that exports just the **configuration** you manage on the **Settings** page — distinct from the data backup above. Use it to copy configuration between environments, or to recover settings after a disaster without touching the registry data.
+
+It covers eight collections:
+
+- **Approvals** — the default approval policy (`approvalSettings`) and the per-service/per-schema approval rules (`approvalRules`).
+- **Notifications** — the SMTP settings (`emailSettings`), the editable email templates (`emailTemplates`), and the notification rules (`notificationSettings`).
+- **Integrations** — the webhook endpoints (`webhookEndpoints`), the integrations (`integrations`), and the Microsoft Teams connection (`teamsConnectionSettings`).
+
+> Retention and other settings that live only in the server's configuration file are **not** included — they aren't stored in the database. Reapply them through configuration.
+
+### Export
+
+Click **Download configuration**. Your browser downloads `ingest-config-<timestamp>.json`.
+
+> **Secrets are included as ciphertext.** The SMTP password, webhook signing secrets, and the Teams bot secret are exported exactly as stored — encrypted. They are encrypted with a key derived from `ApiKey:Pepper`, so they only decrypt (and therefore only work) on a deployment configured with the **same** `ApiKey:Pepper`. Restoring onto a server with a different pepper restores everything else correctly, but you'll need to re-enter those secrets afterwards. See [setup/configuration.md](../setup/configuration.md) for the pepper.
+
+### Restore
+
+Click **Restore from file…**, pick a configuration JSON, and confirm the warning.
+
+- **Restore replaces all current configuration.** Every configuration collection in the file is emptied and repopulated. As with the data backup, it is not transactional and the file is validated first.
+- **Secrets are preserved when omitted.** If an incoming document doesn't carry its secret (for example a file you hand-edited to drop the ciphertext), the existing stored secret is kept rather than wiped — so a config-only file never silently clears a working SMTP password or bot secret.
+
+On success the tool reports how many documents were written into each collection.
+
 ## Where to go next
 
 - [setup/hosting.md → Backups](../setup/hosting.md#backups) — the database-level backups that are the real safety net.
-- [settings.md](settings.md) — the admin configuration hub (email, notifications, webhooks).
+- [setup/disaster-recovery.md](../setup/disaster-recovery.md) — recovering an instance, including configuration.
+- [settings.md](settings.md) — the admin configuration hub (approvals, email, notifications, webhooks, integrations).

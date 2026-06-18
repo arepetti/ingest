@@ -28,6 +28,7 @@ public sealed class AdminEmailController : ControllerBase
     private readonly IEmailQueue _queue;
     private readonly IEmailDispatchService _dispatch;
     private readonly IAccountService _accounts;
+    private readonly IAuditLogService _audit;
     private readonly bool _enabled;
 
     /// <summary>Create a new <see cref="AdminEmailController"/>.</summary>
@@ -37,6 +38,7 @@ public sealed class AdminEmailController : ControllerBase
         IEmailQueue queue,
         IEmailDispatchService dispatch,
         IAccountService accounts,
+        IAuditLogService audit,
         IOptions<EmailOptions> options)
     {
         _settings = settings;
@@ -44,6 +46,7 @@ public sealed class AdminEmailController : ControllerBase
         _queue = queue;
         _dispatch = dispatch;
         _accounts = accounts;
+        _audit = audit;
         _enabled = options.Value.Enabled;
     }
 
@@ -73,6 +76,7 @@ public sealed class AdminEmailController : ControllerBase
         if (!_enabled) return NotFound();
         var updated = await _settings.UpdateAsync(
             new EmailSettingsUpdate(req.Host, req.Port, req.UseStartTls, req.Username, req.FromAddress, req.FromName, req.UpdatePassword, req.Password), ct);
+        await _audit.RecordAsync(AuditTargetType.Settings, AuditChangeType.Edit, AuditTargets.EmailSettings, "Email server (SMTP)", ct);
         return Ok(EmailSettingsDto.From(updated));
     }
 
@@ -115,6 +119,7 @@ public sealed class AdminEmailController : ControllerBase
         if (!_enabled) return NotFound();
         var updated = await _templates.UpdateAsync(key,
             new EmailTemplateUpdate(req.Name, req.Description, req.Subject, req.HtmlBody, req.TextBody), ct);
+        await _audit.RecordAsync(AuditTargetType.Settings, AuditChangeType.Edit, updated.Id, $"Email template: {updated.Name}", ct);
         return Ok(EmailTemplateDto.From(updated));
     }
 

@@ -160,6 +160,19 @@ public static class MongoSetup
                 new CreateIndexOptions { Name = "by_created" }),
         }, cancellationToken: ct);
 
+        await ctx.IntegrationDeliveries.Indexes.CreateManyAsync(new[]
+        {
+            // At-most-once enqueue: one delivery per (event, integration). The run service relies on
+            // the duplicate-key error to dedupe, exactly like the notification log and webhook outbox.
+            new CreateIndexModel<IntegrationDelivery>(
+                Builders<IntegrationDelivery>.IndexKeys.Ascending(d => d.EventId).Ascending(d => d.IntegrationId),
+                new CreateIndexOptions { Unique = true, Name = "uniq_event_integration" }),
+            // The dispatcher drains pending deliveries oldest-first.
+            new CreateIndexModel<IntegrationDelivery>(
+                Builders<IntegrationDelivery>.IndexKeys.Ascending(d => d.Status).Ascending(d => d.CreatedAt),
+                new CreateIndexOptions { Name = "by_status_created" }),
+        }, cancellationToken: ct);
+
         await ctx.Samples.Indexes.CreateManyAsync(new[]
         {
             new CreateIndexModel<SampleProjection>(

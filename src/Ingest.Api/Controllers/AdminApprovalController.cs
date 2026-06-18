@@ -1,6 +1,8 @@
 using Ingest.Api.Auth;
+using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Entities;
 using Ingest.Core.Security;
 using Ingest.Infrastructure.Approvals;
 using Microsoft.AspNetCore.Authorization;
@@ -17,7 +19,7 @@ namespace Ingest.Api.Controllers;
 [ApiController]
 [Route("api/admin/approval/settings")]
 [Authorize(Policy = Capabilities.SettingsRead)]
-public sealed class AdminApprovalController(IApprovalSettingsService settings, IOptions<ApprovalOptions> options) : ControllerBase
+public sealed class AdminApprovalController(IApprovalSettingsService settings, IAuditLogService audit, IOptions<ApprovalOptions> options) : ControllerBase
 {
     private bool Enabled => options.Value.Enabled;
 
@@ -50,6 +52,7 @@ public sealed class AdminApprovalController(IApprovalSettingsService settings, I
     {
         if (!Enabled) return NotFound();
         var updated = await settings.UpdateDefaultAsync(body.ToEntity(), ct);
+        await audit.RecordAsync(AuditTargetType.Settings, AuditChangeType.Edit, AuditTargets.ApprovalPolicy, "Default approval policy", ct);
         return Ok(ApprovalPolicyDto.From(updated));
     }
 }

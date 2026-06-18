@@ -59,6 +59,10 @@ public static class Capabilities
     public const string NotificationsRead = "notifications:read";
     /// <summary>Edit notification/email configuration and templates; send test mail; run/drain queues.</summary>
     public const string NotificationsManage = "notifications:manage";
+    /// <summary>View integrations (e.g. Microsoft Teams) and their connection settings.</summary>
+    public const string IntegrationsRead = "integrations:read";
+    /// <summary>Create/edit/delete integrations, edit the connection, run/test and drain deliveries.</summary>
+    public const string IntegrationsManage = "integrations:manage";
     /// <summary>Export a subject's personal data (DSAR view/export).</summary>
     public const string PrivacyRead = "privacy:read";
     /// <summary>Erase personal data and run retention.</summary>
@@ -84,6 +88,7 @@ public static class Capabilities
         AuditRead,
         WebhooksRead, WebhooksManage,
         NotificationsRead, NotificationsManage,
+        IntegrationsRead, IntegrationsManage,
         PrivacyRead, PrivacyManage,
         BackupRead, BackupManage,
         SettingsRead, SettingsManage,

@@ -27,6 +27,8 @@ export const CAPABILITIES = {
   webhooksManage: 'webhooks:manage',
   notificationsRead: 'notifications:read',
   notificationsManage: 'notifications:manage',
+  integrationsRead: 'integrations:read',
+  integrationsManage: 'integrations:manage',
   privacyRead: 'privacy:read',
   privacyManage: 'privacy:manage',
   backupRead: 'backup:read',
@@ -117,6 +119,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       { id: CAPABILITIES.notificationsManage, label: 'Manage notifications', description: 'Edit email/notification config and templates; send mail.' },
       { id: CAPABILITIES.webhooksRead, label: 'View webhooks', description: 'See webhook endpoints and deliveries.' },
       { id: CAPABILITIES.webhooksManage, label: 'Manage webhooks', description: 'Create/edit webhooks, rotate secrets, redeliver and drain.' },
+      { id: CAPABILITIES.integrationsRead, label: 'View integrations', description: 'See integrations (e.g. Microsoft Teams) and their connection.' },
+      { id: CAPABILITIES.integrationsManage, label: 'Manage integrations', description: 'Create/edit integrations, edit the connection, run/test and drain.' },
     ],
   },
   {

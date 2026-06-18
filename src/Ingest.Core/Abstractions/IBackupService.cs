@@ -24,4 +24,26 @@ public interface IBackupService
     /// <returns>Per-collection counts of restored documents.</returns>
     /// <exception cref="Ingest.Core.Common.ValidationException">The file is empty, not valid JSON, not an Ingest backup, or an unsupported version.</exception>
     Task<BackupImportResult> ImportAsync(string json, CancellationToken ct = default);
+
+    /// <summary>
+    /// Serialise the configuration collections (Settings-page data: approval policy + rules, email +
+    /// notification settings and templates, webhooks, integrations and the Teams connection) into one
+    /// JSON document, for copying configuration between environments or recovering it after a disaster.
+    /// Encrypted secrets are exported as stored and only decrypt on a deployment using the same
+    /// <c>ApiKey:Pepper</c>.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The configuration backup as a JSON string (extended JSON, faithful to the stored BSON).</returns>
+    Task<string> ExportConfigAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Replace the current configuration with the contents of a backup produced by
+    /// <see cref="ExportConfigAsync"/>. For the secret-bearing collections, a stored secret is
+    /// preserved when the incoming document omits it (so a config-only file never clears a working secret).
+    /// </summary>
+    /// <param name="json">The configuration backup JSON.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Per-collection counts of restored documents.</returns>
+    /// <exception cref="Ingest.Core.Common.ValidationException">The file is empty, not valid JSON, not an Ingest configuration backup, or an unsupported version.</exception>
+    Task<BackupImportResult> ImportConfigAsync(string json, CancellationToken ct = default);
 }

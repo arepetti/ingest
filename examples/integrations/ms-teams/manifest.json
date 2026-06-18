@@ -1,0 +1,36 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "a7f3c2e1-9b4d-4f8a-b6e2-1d0c9a8f7e3b",
+  "packageName": "org.ingest.teams",
+  "developer": {
+    "name": "Ingest",
+    "websiteUrl": "https://github.com/arepetti/ingest",
+    "privacyUrl": "https://github.com/arepetti/ingest",
+    "termsOfUseUrl": "https://github.com/arepetti/ingest"
+  },
+  "name": {
+    "short": "Ingest",
+    "full": "Ingest KPI Assistant"
+  },
+  "description": {
+    "short": "Collect outstanding KPI values via Teams.",
+    "full": "The Ingest KPI Assistant bot sends interactive Adaptive Cards prompting users for required KPI values. Submissions are sent back to your self-hosted Ingest deployment."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#2A6FB0",
+  "bots": [
+    {
+      "botId": "{{BOT_APP_ID}}",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["{{INGEST_HOST}}"]
+}

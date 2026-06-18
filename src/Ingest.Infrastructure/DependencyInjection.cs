@@ -1,6 +1,7 @@
 using Ingest.Core.Abstractions;
 using Ingest.Infrastructure.Approvals;
 using Ingest.Infrastructure.Email;
+using Ingest.Infrastructure.Integrations;
 using Ingest.Infrastructure.Mongo;
 using Ingest.Infrastructure.Reports;
 using Ingest.Infrastructure.Security;
@@ -39,6 +40,7 @@ public static class DependencyInjection
         services.Configure<EmailOptions>(configuration.GetSection("Email"));
         services.Configure<NotificationOptions>(configuration.GetSection("Notifications"));
         services.Configure<WebhookOptions>(configuration.GetSection("Webhooks"));
+        services.Configure<IntegrationOptions>(configuration.GetSection("Integrations"));
         services.Configure<Retention.RetentionOptions>(configuration.GetSection("Retention"));
         services.Configure<ApprovalOptions>(configuration.GetSection("Approval"));
 
@@ -124,6 +126,17 @@ public static class DependencyInjection
         services.AddScoped<IWebhookEndpointService, WebhookEndpointService>();
         services.AddScoped<IWebhookDeliveryRepository, WebhookDeliveryRepository>();
         services.AddScoped<IWebhookDispatchService, WebhookDispatchService>();
+
+        // Integrations (Microsoft Teams). Always registered (cheap); behaviour is gated by
+        // Integrations:Enabled (controllers 404, the workers only register when enabled) and by the
+        // TeamsConnectionSettings DB singleton (the feature stays inert until the bot is configured).
+        // The Teams client and the (stateless) card builder are singletons; the typed HttpClient the
+        // client uses is registered by the host (Program.cs) so Aspire resilience applies.
+        services.AddSingleton<ITeamsClient, TeamsClient>();
+        services.AddSingleton<TeamsCardBuilder>();
+        services.AddScoped<IIntegrationsService, IntegrationsService>();
+        services.AddScoped<IIntegrationRunService, IntegrationRunService>();
+        services.AddScoped<IIntegrationDispatchService, IntegrationDispatchService>();
 
         return services;
     }

@@ -57,6 +57,16 @@ public enum AuditTargetType
 
     /// <summary>A cross-cutting approval rule (per-service/per-schema approval requirement).</summary>
     ApprovalRule = 7,
+
+    /// <summary>
+    /// A configuration area saved from the Settings page (e.g. the default approval policy, email
+    /// or notification settings, an email template, the Teams connection). Recorded generically so
+    /// "who changed settings, and when" is answerable without a target type per area.
+    /// </summary>
+    Settings = 8,
+
+    /// <summary>A backup restore (either the data backup or the configuration backup).</summary>
+    Backup = 9,
 }
 
 /// <summary>

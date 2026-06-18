@@ -6,11 +6,17 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 
 ### Added
 
+- Microsoft Teams integration: a bot prompts a user or channel for outstanding required values, on a flexible schedule (daily, weekly, monthly, quarterly, semi-annually, or yearly) or on demand.
 - Approval rules (in Settings): require approval per service and per schema, on top of each schema's own policy.
+- Configuration backup (in Tools): export and restore all Settings-page configuration (approvals, email/notifications, webhooks, integrations and the Teams connection) as a JSON file, separate from the data backup, for copying configuration between environments or recovering it after a disaster. Encrypted secrets are included and require the same `ApiKey:Pepper` to decrypt; the `backup:read`/`backup:manage` capabilities govern both backups.
 
 ### Fixed
 
 - The submissions "Not required" approval filter now includes legacy submissions that predate the approval workflow.
+
+### Documentation
+
+- More integration examples for MHR iTrust.
 
 ## 0.3.0
 

@@ -21,6 +21,8 @@ import type {
   WebhookEndpointCreatedResponse, WebhookSecretResponse,
   WebhookDelivery, WebhookDeliveryStatus, WebhookDrainResult,
   ApprovalStatus, ApprovalPolicy, ApprovalRule, UpsertApprovalRuleRequest,
+  Integration, IntegrationRequest, IntegrationRunResult,
+  TeamsConnection, UpdateTeamsConnectionRequest, TeamsConnectionTestResult,
 } from './types'
 import type { Capability } from './capabilities'
 
@@ -539,6 +541,23 @@ export const useImportBackup = () => {
   })
 }
 
+/** Relative URL for the configuration backup download (authenticated via downloadFromUrl). */
+export const configBackupExportUrl = () => '/api/admin/backup/config/export'
+
+/**
+ * Restore all configuration (settings, rules, integrations, webhooks, …) from a configuration
+ * backup file. The parsed JSON is posted as-is; the server validates the format/version, preserves
+ * existing secrets when omitted, and then replaces every configuration collection. Invalidates
+ * everything on success because configuration has just changed wholesale.
+ */
+export const useImportConfigBackup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (backup: unknown) => api.post<BackupImportResult>('/api/admin/backup/config/import', backup),
+    onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
 // --- Email + notifications (admin) --------------------------------------------------------
 
 export const useEmailSettings = (enabled: boolean = true) =>
@@ -719,6 +738,76 @@ export const useRedeliverWebhook = () => {
 }
 
 /** Trigger a manual outbox drain (sends pending deliveries now). */
+// --- Integrations (Microsoft Teams) -------------------------------------------------------
+
+/** Configured integrations. 404s when the feature is disabled. */
+export const useIntegrations = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['integrations'],
+    queryFn: () => api.get<Integration[]>('/api/admin/integrations'),
+    enabled,
+  })
+
+export const useCreateIntegration = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: IntegrationRequest) => api.post<Integration>('/api/admin/integrations', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['integrations'] }),
+  })
+}
+
+export const useUpdateIntegration = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, req }: { id: string; req: IntegrationRequest }) =>
+      api.put<Integration>(`/api/admin/integrations/${id}`, req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['integrations'] }),
+  })
+}
+
+export const useDeleteIntegration = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/api/admin/integrations/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['integrations'] }),
+  })
+}
+
+/** Run a single integration now (on-demand). */
+export const useRunIntegration = () =>
+  useMutation({
+    mutationFn: (id: string) => api.post<IntegrationRunResult>(`/api/admin/integrations/${id}/run`, {}),
+  })
+
+/** Enqueue a diagnostic test prompt to an integration's target. */
+export const useSendIntegrationTest = () =>
+  useMutation({
+    mutationFn: (id: string) => api.post<void>(`/api/admin/integrations/${id}/test`, {}),
+  })
+
+/** The Microsoft Teams bot connection settings (without the secret). */
+export const useTeamsConnection = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['teams-connection'],
+    queryFn: () => api.get<TeamsConnection>('/api/admin/integrations/connection'),
+    enabled,
+  })
+
+export const useUpdateTeamsConnection = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: UpdateTeamsConnectionRequest) =>
+      api.put<TeamsConnection>('/api/admin/integrations/connection', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teams-connection'] }),
+  })
+}
+
+/** Verify the saved bot credentials against Microsoft Entra. */
+export const useTestTeamsConnection = () =>
+  useMutation({
+    mutationFn: () => api.post<TeamsConnectionTestResult>('/api/admin/integrations/connection/test', {}),
+  })
+
 export const useDrainWebhooks = () => {
   const qc = useQueryClient()
   return useMutation({
