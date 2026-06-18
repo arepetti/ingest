@@ -85,8 +85,9 @@ public sealed class Schema : AuditedEntity
 
     /// <summary>
     /// Validation rules evaluated against the assembled submission. Each rule runs once per
-    /// schema present in the payload and can compare values to each other. See the admin guide
-    /// for rule syntax.
+    /// schema present in the payload and can compare values to each other, and can compare the
+    /// current submission against the service's last live values via <c>latest()</c> /
+    /// <c>previous()</c>. See the admin guide for rule syntax.
     /// </summary>
     public List<string> SubmissionValidations { get; set; } = new();
 
@@ -191,8 +192,10 @@ public sealed class SchemaValue
     public string? RegexPattern { get; set; }
 
     /// <summary>
-    /// Optional value-level validation rule. Runs against every submitted sample with <c>value</c>,
-    /// <c>minimum</c> and <c>maximum</c> in scope. See <c>docs/admin-user-guide/validation.md</c> for the syntax.
+    /// Optional value-level validation rule. Runs against every submitted sample, with every value
+    /// in the schema exposed by name (and <c>[name.minimum]</c> / <c>[name.maximum]</c> bounds for
+    /// numerics). Can also compare against the service's last live values via <c>latest()</c> /
+    /// <c>previous()</c>. See <c>docs/admin-user-guide/validation.md</c> for the syntax.
     /// </summary>
     public string? ValueValidation { get; set; }
 

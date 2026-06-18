@@ -92,6 +92,22 @@ public sealed class SubmissionValidator : ISubmissionValidator
             list.Add((sample, def));
         }
 
+        // History lookup (latest()/previous()) is resolved lazily per schema and cached: the
+        // queries are skipped entirely for schemas whose rules never reference the functions, and
+        // run at most once per schema otherwise. NCalc custom functions are synchronous, so the
+        // values have to be fetched up-front and handed to the evaluator as a ready map.
+        var historyCache = new Dictionary<string, SchemaHistory>(StringComparer.OrdinalIgnoreCase);
+        async Task<SchemaHistory> HistoryFor(Schema schema)
+        {
+            if (historyCache.TryGetValue(schema.Name, out var cached)) return cached;
+            var history = SchemaUsesHistory(schema)
+                ? await BuildSchemaHistoryAsync(
+                    service.Id, schema, samplesBySchema.GetValueOrDefault(schema.Name) ?? new(), existing, ct)
+                : SchemaHistory.Empty;
+            historyCache[schema.Name] = history;
+            return history;
+        }
+
         // Pass 1: gating (visibility + EnabledIf/VisibleIf). Populates `discarded` and emits the
         // associated warnings before any other rule looks at the samples.
         foreach (var sample in submission.Samples)
@@ -125,12 +141,14 @@ public sealed class SubmissionValidator : ISubmissionValidator
             // against the FULL submitted context (before pruning) so rules like
             // "VisibleIf: type == 'A'" see the sibling value 'type' regardless of order.
             var context = BuildRuleContext(schema, samplesBySchema.GetValueOrDefault(schema.Name) ?? new());
-            if (IsGatingFalse(value.EnabledIf, "EnabledIf", schema, value, context, warnings, errors))
+            var gatingHistory = await HistoryFor(schema);
+            var gatingFns = BuildHistoryFunctions(gatingHistory.Latest, gatingHistory.Previous, value.Name);
+            if (IsGatingFalse(value.EnabledIf, "EnabledIf", schema, value, context, gatingFns, warnings, errors))
             {
                 discarded.Add(new SampleRef(schema.Name, value.Name));
                 continue;
             }
-            if (IsGatingFalse(value.VisibleIf, "VisibleIf", schema, value, context, warnings, errors))
+            if (IsGatingFalse(value.VisibleIf, "VisibleIf", schema, value, context, gatingFns, warnings, errors))
             {
                 discarded.Add(new SampleRef(schema.Name, value.Name));
                 continue;
@@ -154,9 +172,10 @@ public sealed class SubmissionValidator : ISubmissionValidator
                 schemaContext = BuildRuleContext(schema, samplesBySchema.GetValueOrDefault(schema.Name) ?? new());
                 contextCache[schema.Name] = schemaContext;
             }
+            var history = await HistoryFor(schema);
 
             ValidateValueShape(schema, value, sample, errors);
-            EvaluateValueValidator(service, schema, value, sample, schemaContext, errors);
+            EvaluateValueValidator(service, schema, value, sample, schemaContext, history, errors);
             await CheckCadenceAsync(service.Id, schema, value, sample, isReplacement, existing, errors, ct);
 
             var modifiable = schema.Modifiable && value.Modifiable;
@@ -172,7 +191,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
             // Per-value Warning expression. Runs only on surviving samples that already passed
             // shape/value validation up to this point — there's no point reporting a "warning"
             // alongside an outright rejection.
-            EvaluateValueWarning(service, schema, value, sample, schemaContext, warnings);
+            EvaluateValueWarning(service, schema, value, sample, schemaContext, history, warnings);
         }
 
         // Pass 3: schema-level submission validators. Evaluated against the surviving context so
@@ -189,6 +208,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
             // Same unified shape every other rule sees: each value by name, plus the
             // `[name.minimum]` / `[name.maximum]` bound keys for numeric values.
             var parameters = BuildRuleContext(schema, survivors);
+            var history = await HistoryFor(schema);
 
             var customFns = new Dictionary<string, Func<object?[], object?>>(StringComparer.OrdinalIgnoreCase)
             {
@@ -197,6 +217,10 @@ public sealed class SubmissionValidator : ISubmissionValidator
                 ["sampleTimestamp"] = args => LookupSampleField(survivors, args, s => (object?)s.Timestamp),
                 ["sampleNote"] = args => LookupSampleField(survivors, args, s => (object?)s.Note),
             };
+            // Schema-level rules have no single "current value", so latest()/previous() require an
+            // explicit value name (no-arg falls back to the supplied default / null).
+            foreach (var (k, v) in BuildHistoryFunctions(history.Latest, history.Previous, currentValueName: null))
+                customFns[k] = v;
 
             foreach (var expr in schema.SubmissionValidations)
             {
@@ -243,13 +267,15 @@ public sealed class SubmissionValidator : ISubmissionValidator
                     .Where(t => t.def is not null && !discarded.Contains(new SampleRef(schema.Name, t.def!.Name)))
                     .ToList();
                 var context = BuildRuleContext(schema, survivors);
+                var history = await HistoryFor(schema);
 
                 foreach (var v in schema.Values)
                 {
                     if (!v.Enabled || !v.Required) continue;
                     if (presented.Contains((schema.Name, v.Name))) continue;
-                    if (IsConditionFalseSilent(v.EnabledIf, context)) continue;
-                    if (IsConditionFalseSilent(v.VisibleIf, context)) continue;
+                    var fns = BuildHistoryFunctions(history.Latest, history.Previous, v.Name);
+                    if (IsConditionFalseSilent(v.EnabledIf, context, fns)) continue;
+                    if (IsConditionFalseSilent(v.VisibleIf, context, fns)) continue;
                     errors.Add($"Required value '{Display(schema, v)}' missing.");
                 }
             }
@@ -300,13 +326,14 @@ public sealed class SubmissionValidator : ISubmissionValidator
         Schema schema,
         SchemaValue value,
         IReadOnlyDictionary<string, object?> context,
+        IReadOnlyDictionary<string, Func<object?[], object?>> customFns,
         List<string> warnings,
         List<string> errors)
     {
         if (string.IsNullOrWhiteSpace(expression)) return false;
 
         ExpressionValidation outcome;
-        try { outcome = _evaluator.EvaluateValidation(expression, context); }
+        try { outcome = _evaluator.EvaluateValidation(expression, context, customFns); }
         catch (Exception ex)
         {
             // A broken gating rule shouldn't silently swallow data: surface as an error.
@@ -327,7 +354,10 @@ public sealed class SubmissionValidator : ISubmissionValidator
         return false;
     }
 
-    private bool IsConditionFalseSilent(string? expression, IReadOnlyDictionary<string, object?> context)
+    private bool IsConditionFalseSilent(
+        string? expression,
+        IReadOnlyDictionary<string, object?> context,
+        IReadOnlyDictionary<string, Func<object?[], object?>> customFns)
     {
         if (string.IsNullOrWhiteSpace(expression)) return false;
 
@@ -335,7 +365,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         {
             // The unified context already carries every value (null when not submitted). No
             // current-value alias is injected here — rules reference values by name.
-            var outcome = _evaluator.EvaluateValidation(expression, context);
+            var outcome = _evaluator.EvaluateValidation(expression, context, customFns);
             return !outcome.IsValid;
         }
         catch
@@ -411,12 +441,13 @@ public sealed class SubmissionValidator : ISubmissionValidator
         SchemaValue def,
         Sample sample,
         IReadOnlyDictionary<string, object?> schemaContext,
+        SchemaHistory history,
         List<string> errors)
     {
         if (string.IsNullOrWhiteSpace(def.ValueValidation)) return;
         var key = Display(schema, def);
 
-        var customFns = BuildValueLevelFunctions(service, schema, def, sample);
+        var customFns = BuildValueLevelFunctions(service, schema, def, sample, history);
 
         ExpressionValidation outcome;
         try { outcome = _evaluator.EvaluateValidation(def.ValueValidation, schemaContext, customFns); }
@@ -436,12 +467,13 @@ public sealed class SubmissionValidator : ISubmissionValidator
         SchemaValue def,
         Sample sample,
         IReadOnlyDictionary<string, object?> schemaContext,
+        SchemaHistory history,
         List<string> warnings)
     {
         if (string.IsNullOrWhiteSpace(def.Warning)) return;
         var key = Display(schema, def);
 
-        var customFns = BuildValueLevelFunctions(service, schema, def, sample);
+        var customFns = BuildValueLevelFunctions(service, schema, def, sample, history);
 
         // The Warning rule fires on truthy / non-empty results — the inverse of validation
         // semantics — so we read the raw value rather than going through ExpressionValidation
@@ -466,8 +498,9 @@ public sealed class SubmissionValidator : ISubmissionValidator
     }
 
     private static Dictionary<string, Func<object?[], object?>> BuildValueLevelFunctions(
-        Account service, Schema schema, SchemaValue def, Sample sample) =>
-        new(StringComparer.OrdinalIgnoreCase)
+        Account service, Schema schema, SchemaValue def, Sample sample, SchemaHistory history)
+    {
+        var fns = new Dictionary<string, Func<object?[], object?>>(StringComparer.OrdinalIgnoreCase)
         {
             ["serviceName"] = _ => service.Name,
             ["schemaName"] = _ => schema.Name,
@@ -475,6 +508,150 @@ public sealed class SubmissionValidator : ISubmissionValidator
             ["sampleTimestamp"] = _ => sample.Timestamp,
             ["sampleNote"] = _ => sample.Note,
         };
+        // latest()/previous() with no argument default to the current value being validated.
+        foreach (var (k, v) in BuildHistoryFunctions(history.Latest, history.Previous, def.Name))
+            fns[k] = v;
+        return fns;
+    }
+
+    /// <summary>
+    /// Build the <c>latest(name [, fallback])</c> / <c>previous(name [, fallback])</c> functions
+    /// over a pair of pre-fetched value-name to last-live-value maps. <paramref name="currentValueName"/>
+    /// is the value a no-argument call resolves to (the value-level rule's own value; <c>null</c>
+    /// for schema-level rules, where a name argument is required).
+    /// </summary>
+    internal static Dictionary<string, Func<object?[], object?>> BuildHistoryFunctions(
+        IReadOnlyDictionary<string, object?> latest,
+        IReadOnlyDictionary<string, object?> previous,
+        string? currentValueName) =>
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["latest"] = args => LookupHistory(latest, args, currentValueName),
+            ["previous"] = args => LookupHistory(previous, args, currentValueName),
+        };
+
+    /// <summary>
+    /// Resolve a history lookup. The first string argument is the value name; a non-string first
+    /// argument (or no argument) falls back to <paramref name="currentValueName"/> and treats that
+    /// first argument as the fallback default. Returns the stored value when present and non-null,
+    /// otherwise the supplied fallback (default <c>null</c>).
+    /// </summary>
+    private static object? LookupHistory(
+        IReadOnlyDictionary<string, object?> map, object?[] args, string? currentValueName)
+    {
+        string? name;
+        object? fallback;
+        if (args.Length > 0 && args[0] is string s)
+        {
+            name = s;
+            fallback = args.Length > 1 ? args[1] : null;
+        }
+        else
+        {
+            name = currentValueName;
+            fallback = args.Length > 0 ? args[0] : null;
+        }
+
+        if (name is not null && map.TryGetValue(name, out var value) && value is not null)
+            return value;
+        return fallback;
+    }
+
+    /// <summary>
+    /// True when any rule on the schema references <c>latest(</c> or <c>previous(</c>. Used to skip
+    /// the history queries entirely for the (common) case where no rule needs them.
+    /// </summary>
+    private static bool SchemaUsesHistory(Schema schema)
+    {
+        static bool Uses(string? rule) =>
+            !string.IsNullOrEmpty(rule) &&
+            (rule.Contains("latest(", StringComparison.OrdinalIgnoreCase) ||
+             rule.Contains("previous(", StringComparison.OrdinalIgnoreCase));
+
+        foreach (var v in schema.Values)
+            if (Uses(v.ValueValidation) || Uses(v.Warning) || Uses(v.EnabledIf) || Uses(v.VisibleIf))
+                return true;
+        return schema.SubmissionValidations.Any(Uses);
+    }
+
+    /// <summary>
+    /// Pre-fetch the last live (approved / not-required, i.e. projected) value of every schema value
+    /// for this service: <c>latest</c> is the most recent across all periods, <c>previous</c> the
+    /// value in the cadence bucket immediately before the one this submission targets. On a
+    /// replacement the submission being edited is excluded so the rule compares against genuinely
+    /// prior data rather than the value it is about to overwrite.
+    /// </summary>
+    private async Task<SchemaHistory> BuildSchemaHistoryAsync(
+        Guid serviceId,
+        Schema schema,
+        IReadOnlyList<(Sample sample, SchemaValue? def)> schemaSamples,
+        Submission? existing,
+        CancellationToken ct)
+    {
+        var latest = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var previous = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        // For values not present in this submission, fall back to the newest submitted timestamp
+        // (or now) to anchor the "previous bucket" maths.
+        var fallbackTs = schemaSamples.Count > 0
+            ? schemaSamples.Max(t => t.sample.Timestamp)
+            : DateTime.UtcNow;
+
+        foreach (var v in schema.Values)
+        {
+            var baseFilter = Builders<SampleProjection>.Filter.And(
+                Builders<SampleProjection>.Filter.Eq(s => s.IsDeleted, false),
+                Builders<SampleProjection>.Filter.Eq(s => s.ServiceAccountId, serviceId),
+                Builders<SampleProjection>.Filter.Eq(s => s.SchemaName, schema.Name),
+                Builders<SampleProjection>.Filter.Eq(s => s.ValueName, v.Name));
+            if (existing is not null)
+                baseFilter = Builders<SampleProjection>.Filter.And(baseFilter,
+                    Builders<SampleProjection>.Filter.Ne(s => s.SubmissionId, existing.Id));
+
+            var sort = Builders<SampleProjection>.Sort.Descending(s => s.Timestamp);
+
+            var latestRow = await _ctx.Samples.Find(baseFilter).Sort(sort).FirstOrDefaultAsync(ct);
+            if (latestRow is not null) latest[v.Name] = ProjectionValue(latestRow);
+
+            var refTs = schemaSamples
+                .FirstOrDefault(t => t.def is not null &&
+                    string.Equals(t.def.Name, v.Name, StringComparison.OrdinalIgnoreCase))
+                .sample?.Timestamp ?? fallbackTs;
+            var (pStart, pEnd) = CadenceCalculator.PreviousBucketFor(v.Cadence, refTs);
+            var prevFilter = Builders<SampleProjection>.Filter.And(baseFilter,
+                Builders<SampleProjection>.Filter.Gte(s => s.Timestamp, pStart),
+                Builders<SampleProjection>.Filter.Lt(s => s.Timestamp, pEnd));
+            var prevRow = await _ctx.Samples.Find(prevFilter).Sort(sort).FirstOrDefaultAsync(ct);
+            if (prevRow is not null) previous[v.Name] = ProjectionValue(prevRow);
+        }
+
+        return new SchemaHistory(latest, previous);
+    }
+
+    /// <summary>Unbox the single populated typed column of a projection back to its CLR value.</summary>
+    private static object? ProjectionValue(SampleProjection p) => p.ValueType switch
+    {
+        SchemaValueType.String => p.StringValue,
+        SchemaValueType.Integer => p.IntegerValue,
+        SchemaValueType.Number => p.NumberValue,
+        SchemaValueType.Date => p.DateValue,
+        SchemaValueType.Boolean => p.BooleanValue,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Pre-fetched last-live values for one schema, keyed by value name. <c>Latest</c> is the most
+    /// recent value across all periods; <c>Previous</c> the value in the immediately preceding
+    /// cadence bucket. Missing entries mean "no live history".
+    /// </summary>
+    internal sealed record SchemaHistory(
+        IReadOnlyDictionary<string, object?> Latest,
+        IReadOnlyDictionary<string, object?> Previous)
+    {
+        public static readonly SchemaHistory Empty = new(
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase));
+    }
 
     private async Task CheckCadenceAsync(
         Guid serviceId,

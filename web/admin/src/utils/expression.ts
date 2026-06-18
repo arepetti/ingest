@@ -274,6 +274,15 @@ function callBuiltin(name: string, args: unknown[]): unknown {
     case 'hour':   { const d = toDate(args[0]); return d ? d.getUTCHours() : null }
     case 'minute': { const d = toDate(args[0]); return d ? d.getUTCMinutes() : null }
     case 'second': { const d = toDate(args[0]); return d ? d.getUTCSeconds() : null }
+    case 'latest':
+    case 'previous': {
+      // Historical values aren't available in the browser preview — the server resolves them
+      // from the last live submission at validation time. Honour the optional fallback default
+      // (2nd argument when a value name is given, 1st when called for the current value), else
+      // return null so the preview stays permissive (never rejects on data it can't see).
+      if (args.length > 0 && typeof args[0] === 'string') return args.length > 1 ? args[1] : null
+      return args.length > 0 ? args[0] : null
+    }
     default:
       // Unknown function — return null so the rule evaluates falsy (no warning, no hide).
       // The server is the source of truth and will catch real issues.

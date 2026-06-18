@@ -6,6 +6,7 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 
 ### Added
 
+- Validation rules can now compare a submission against the service's own history: `latest("value")` returns the most recent live value and `previous("value")` returns the value from the immediately preceding cadence period.
 - Microsoft Teams integration: a bot prompts a user or channel for outstanding required values, on a flexible schedule (daily, weekly, monthly, quarterly, semi-annually, or yearly) or on demand.
 - Approval rules (in Settings): require approval per service and per schema, on top of each schema's own policy.
 - Configuration backup (in Tools): export and restore all Settings-page configuration for copying configuration between environments or recovering it after a disaster.

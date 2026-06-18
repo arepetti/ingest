@@ -62,7 +62,7 @@ Every rule — value-level validation, schema-level validations, conditional dis
 | `[<value_name>.minimum]`  | The `Min` bound configured for that value.                                                          | Only for numeric (`Integer` / `Number`) values that have `Min` set.      |
 | `[<value_name>.maximum]`  | The `Max` bound configured for that value.                                                          | Only for numeric (`Integer` / `Number`) values that have `Max` set.      |
 
-Plus every [built-in function](#built-in-functions) below.
+Plus every [built-in function](#built-in-functions) below — including the [`latest()` / `previous()` history functions](#history-last-submitted-values), the one way a rule can look beyond the current submission.
 
 A few things to notice:
 
@@ -463,6 +463,25 @@ All of these accept a value of `Date` type, or a string that looks like a date.
 
 > The `sampleTimestamp('x')` / `sampleNote('x')` forms are particularly useful in schema-level rules where you want to reason about *when* a particular value was reported, not just what it was. Pair them with `isNull(...)` to guard against the value being absent.
 
+### History (last submitted values)
+
+These two functions let a rule compare the value being submitted now against what the **same service** reported before. They only ever see *live* data — submissions that are approved, or that never needed approval. Anything still awaiting approval, or rejected, is invisible to them.
+
+| Function                  | Returns | Available |
+|---------------------------|---------|-----------|
+| `latest('x')`             | the most recent live value for `'x'`, regardless of how long ago | both levels |
+| `latest('x', fallback)`   | same, but returns `fallback` instead of `null` when there's no history | both levels |
+| `previous('x')`           | the live value for `'x'` in the cadence period **immediately before** the one this submission targets (`null` if that period had no submission) | both levels |
+| `previous('x', fallback)` | same, but returns `fallback` instead of `null` | both levels |
+
+A few details worth knowing:
+
+- **Value level shorthand.** In a value-level rule you can drop the name: `latest()` / `previous()` mean "this value". To supply a fallback for the current value, pass it as the only argument: `latest(0)`.
+- **Which period `previous()` looks at** is driven by the named value's own cadence (daily, weekly, monthly, …) and the timestamp of this submission. For a weekly value submitted this week, `previous('x')` is last week's value.
+- **Missing history is `null`.** A brand-new service, or a gap in reporting, makes both functions return `null` (or your fallback). As everywhere else, comparisons against `null` are neither true nor false — guard with `isNull(...)` or supply a fallback.
+- **Editing an existing submission** doesn't count as its own history: when you replace a submission, `latest()` / `previous()` look past it to the genuinely prior value.
+- **Preview is approximate.** The in-browser preview can't reach the database, so `latest()` / `previous()` there return your fallback (or `null`). Verify history-based rules with a real submission.
+
 ## Common recipes
 
 ### Range with a friendly message that includes the offending number
@@ -540,16 +559,35 @@ if(serviceName() == 'pilot-roads' and tonnes > 50,
    null)
 ```
 
+### Compare against the last reported value
+
+Flag a suspicious jump from the previous live value (rule on the `tonnes` value):
+
+```text
+if(not isNull(latest()) and tonnes > latest() * 1.1,
+   'more than 10% above the last reported figure — please double-check',
+   null)
+```
+
+### Enforce a non-decreasing counter
+
+For a meter reading that should never go backwards, treat a missing history as zero:
+
+```text
+if(reading < previous('reading', 0),
+   'reading is lower than last period — meters do not run backwards',
+   null)
+```
+
 ## What isn't (yet) possible
 
 To keep the editor self-contained and side-effect-free, validation rules **don't** have access to:
 
-- The history of previous submissions. A rule can see this submission and the schema definition; it cannot ask *"what did the same service submit last month?"*. If you need that kind of check, do it in your reporting/dashboard layer.
 - Other services' data. Rules only ever see the current submitter's own data.
 - The database directly. There's no `query(...)` function — by design.
 - HTTP or anything external.
 
-In other words: validation rules are **pure** functions of the submission plus the current time. That keeps them cheap (a couple of milliseconds) and predictable (the same input always gives the same answer).
+There is **one** controlled exception to "this submission only": the [`latest()` / `previous()` history functions](#history-last-submitted-values) can read the submitting service's own last *live* (approved / not-required) values. Beyond that, validation rules are **pure** functions of the submission, its own history, and the current time — which keeps them cheap (a few milliseconds) and predictable.
 
 ## Troubleshooting
 
