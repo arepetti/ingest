@@ -1,0 +1,13 @@
+{
+  "@odata.context": "https://itrent.example.org/odata/v1/$metadata#WeeklyWorkforceSummary",
+  "value": [
+    {
+      "organisationUnit": "Waste Services",
+      "weekEnding": "2026-06-15",
+      "activeEmployees": 8,
+      "absenceSickness": 2,
+      "contingentWorkers": 2,
+      "overtimeHours": 29.0
+    }
+  ]
+}

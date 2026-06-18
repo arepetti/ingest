@@ -1,0 +1,16 @@
+{
+  "weekEnding": "2026-06-14",
+  "organisationUnit": "Waste Services",
+  "employees": [
+    { "personRef": "EMP00123", "employmentStatus": "active", "engagement": "permanent", "sicknessThisWeek": false, "overtimeHours": 0 },
+    { "personRef": "EMP00124", "employmentStatus": "active", "engagement": "permanent", "sicknessThisWeek": true, "overtimeHours": 3.5 },
+    { "personRef": "EMP00125", "employmentStatus": "active", "engagement": "permanent", "sicknessThisWeek": false, "overtimeHours": 6 },
+    { "personRef": "EMP00126", "employmentStatus": "active", "engagement": "permanent", "sicknessThisWeek": true, "overtimeHours": 0 },
+    { "personRef": "EMP00127", "employmentStatus": "active", "engagement": "permanent", "sicknessThisWeek": false, "overtimeHours": 0 },
+    { "personRef": "EMP00128", "employmentStatus": "active", "engagement": "permanent", "sicknessThisWeek": false, "overtimeHours": 2 },
+    { "personRef": "EMP00129", "employmentStatus": "active", "engagement": "permanent", "sicknessThisWeek": false, "overtimeHours": 0 },
+    { "personRef": "EMP00130", "employmentStatus": "leaver", "engagement": "permanent", "sicknessThisWeek": false, "overtimeHours": 0 },
+    { "personRef": "CON0457", "employmentStatus": "active", "engagement": "contractor", "sicknessThisWeek": false, "overtimeHours": 4 },
+    { "personRef": "CON0461", "employmentStatus": "active", "engagement": "contractor", "sicknessThisWeek": false, "overtimeHours": 0 }
+  ]
+}

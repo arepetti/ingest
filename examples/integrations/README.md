@@ -14,6 +14,8 @@ These are **educated-guess illustrations** of how a council's existing software 
 | [waste-rounds-vendor-api-powershell](waste-rounds-vendor-api-powershell/) | Garbage collection | Vendor REST API | PowerShell | `garbage_collection` |
 | [hr-workforce-csv-powershell](hr-workforce-csv-powershell/) | HR / workforce | CSV export | PowerShell | `weekly_workforce` |
 | [hr-workforce-vendor-api-python](hr-workforce-vendor-api-python/) | HR / workforce | Vendor REST API | Python | `weekly_workforce` |
+| [hr-workforce-itrent](hr-workforce-itrent/) | HR / workforce | MHR iTrent OData API | C# (.NET 10), PowerShell, Python | `weekly_workforce` |
+| [hr-workforce-itrent-api-csharp](hr-workforce-itrent-api-csharp/) | HR / workforce | MHR iTrent REST API (OAuth2) | C# (.NET 10) | `weekly_workforce` |
 
 The spread is intentional: two domains, two source styles (a scheduled **CSV/Excel export** vs a **REST API**), and several languages (Python, PowerShell, C#, Java). Whatever your real system looks like, one of these is close enough to adapt — the four waste **CSV** examples are the same logic in four languages, so pick whichever your team is comfortable maintaining.
 

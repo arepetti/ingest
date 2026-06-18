@@ -30,6 +30,7 @@ Scripts that collect data from a source system and submit it to Ingest — the "
 | [waste-rounds-vendor-api-powershell](integrations/waste-rounds-vendor-api-powershell/) | Garbage collection | Vendor REST API | PowerShell |
 | [hr-workforce-csv-powershell](integrations/hr-workforce-csv-powershell/) | HR / workforce | CSV export | PowerShell |
 | [hr-workforce-vendor-api-python](integrations/hr-workforce-vendor-api-python/) | HR / workforce | Vendor REST API | Python |
+| [hr-workforce-itrent-api-csharp](integrations/hr-workforce-itrent-api-csharp/) | HR / workforce | MHR iTrent REST API (OAuth2) | C# (.NET 10) |
 
 ### Power BI
 
