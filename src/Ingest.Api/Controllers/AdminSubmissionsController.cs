@@ -125,7 +125,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create([FromBody] AdminSubmissionInput input, CancellationToken ct)
     {
-        var written = await service.AdminCreateAsync(input, Request.ResolveSource(), ct);
+        var written = await service.AdminCreateAsync(input, Request.ResolveSource(), ct: ct);
         return Created($"/api/admin/submissions/{written.Submission.Id}",
             new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }

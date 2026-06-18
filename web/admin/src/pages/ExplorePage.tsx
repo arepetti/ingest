@@ -21,7 +21,8 @@ import type {
 } from '../api/types'
 import { addCadence, cadenceLabel } from '../utils/cadence'
 import { formatPeriodLabel } from '../utils/periodFormat'
-import { intervalRange, type Interval } from '../utils/period'
+import { intervalRange, shiftIso, SHIFT_LABELS, type Interval, type ShiftKey } from '../utils/period'
+import { ExplorePresets } from '../components/ExplorePresets'
 import type { PeriodFilterState } from '../utils/usePeriodFilter'
 import { buildCsv } from '../utils/csv'
 import { downloadText } from '../utils/download'
@@ -31,6 +32,8 @@ type ViewKind = 'trend' | 'compare' | 'snapshot'
 
 // How many future periods the optional projection extends the trend chart by.
 const PROJECTION_PERIODS = 2
+
+const SHIFTS: ShiftKey[] = ['1m', '6m', '1y']
 
 const AGGREGATIONS: ExploreAggregation[] = ['Average', 'Sum', 'Min', 'Max', 'Count']
 const AGG_LABELS: Record<ExploreAggregation, string> = {
@@ -109,12 +112,20 @@ export function ExplorePage() {
   const combined = sp.get('combined') === '1'
   const asTable = sp.get('table') === '1'
   const projecting = sp.get('proj') === '1'
+  // A single "Compare with previous" dropdown: empty/absent means off, otherwise it's the shift.
+  const shift = (sp.get('shift') ?? '') as ShiftKey | ''
+  const comparing = shift !== ''
 
   // Period filter backed by the URL so it round-trips with everything else.
   const interval = (sp.get('period') as Interval) || 'all'
   const customFrom = sp.get('cfrom') ?? ''
   const customTo = sp.get('cto') ?? ''
   const { from, to } = intervalRange(interval, customFrom, customTo)
+
+  // "Compare with previous" only makes sense for a bounded window, so it needs both ends resolved.
+  const canCompare = !!from && !!to
+  const from2 = comparing && canCompare ? shiftIso(from!, shift as ShiftKey) : undefined
+  const to2 = comparing && canCompare ? shiftIso(to!, shift as ShiftKey) : undefined
   const periodState: PeriodFilterState = {
     interval,
     setInterval: v => update({ period: v === 'all' ? null : v }),
@@ -150,8 +161,22 @@ export function ExplorePage() {
     !!schemaName,
   )
 
+  // Previous-period overlay: the same query shifted back by `shift`. Only fetched for the Trend
+  // view, when the toggle is on and the window is bounded.
+  const compareEnabled = comparing && canCompare && view === 'trend'
+  const prevSeries = useExploreSeries(
+    {
+      schema: schemaName,
+      serviceIds: selectedServiceIds.length ? selectedServiceIds : undefined,
+      from: from2, to: to2, agg,
+    },
+    !!schemaName && compareEnabled,
+  )
+
   const activeSeries: ExploreValueSeries | undefined =
     series.data?.values.find(v => v.valueName === activeValueName)
+  const prevActiveSeries: ExploreValueSeries | undefined =
+    compareEnabled ? prevSeries.data?.values.find(v => v.valueName === activeValueName) : undefined
   const seriesServices = series.data?.services ?? []
 
   const chartRef = useRef<HTMLDivElement>(null)
@@ -182,21 +207,27 @@ export function ExplorePage() {
     <div className={s.root}>
       <div className={s.header}>
         <Title2>Explore</Title2>
-        <Menu>
-          <MenuTrigger disableButtonEnhancement>
-            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
-          </MenuTrigger>
-          <MenuPopover>
-            <MenuList>
-              <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => series.refetch()}>Refresh</MenuItem>
-              <MenuDivider />
-              <MenuItem icon={<ArrowDownload20Regular />} disabled={!series.data} onClick={exportCsv}>Export CSV (this view)</MenuItem>
-              {view !== 'snapshot' && (
-                <MenuItem icon={<Image20Regular />} disabled={!series.data} onClick={exportPng}>Export chart (PNG)</MenuItem>
-              )}
-            </MenuList>
-          </MenuPopover>
-        </Menu>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ExplorePresets
+            current={sp.toString()}
+            onLoad={q => setSp(new URLSearchParams(q), { replace: true })}
+          />
+          <Menu>
+            <MenuTrigger disableButtonEnhancement>
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => series.refetch()}>Refresh</MenuItem>
+                <MenuDivider />
+                <MenuItem icon={<ArrowDownload20Regular />} disabled={!series.data} onClick={exportCsv}>Export CSV (this view)</MenuItem>
+                {view !== 'snapshot' && (
+                  <MenuItem icon={<Image20Regular />} disabled={!series.data} onClick={exportPng}>Export chart (PNG)</MenuItem>
+                )}
+              </MenuList>
+            </MenuPopover>
+          </Menu>
+        </div>
       </div>
 
       {(schemas.error || series.error) && (
@@ -276,12 +307,40 @@ export function ExplorePage() {
           </Dropdown>
         </div>
 
+      </div>
+
+      <div className={s.filters}>
         <PeriodFilter state={periodState} />
+
+        {view === 'trend' && (
+          <div className={s.field}>
+            <span className={s.fieldLabel}>
+              Compare with previous
+              <FluentTooltip
+                relationship="description"
+                content="Overlay the same selection shifted back in time so you can read this period against an earlier one. Needs a Period range (not All time); the two windows may overlap."
+              >
+                <Info16Regular className={s.infoIcon} tabIndex={0} aria-label="What does Compare do?" />
+              </FluentTooltip>
+            </span>
+            <Dropdown
+              className={s.dropdown}
+              size="small"
+              disabled={!canCompare}
+              selectedOptions={[comparing ? shift : 'off']}
+              value={comparing ? SHIFT_LABELS[shift as ShiftKey] : 'No'}
+              onOptionSelect={(_, d) => update({ shift: d.optionValue && d.optionValue !== 'off' ? d.optionValue : null })}
+            >
+              <Option value="off">No</Option>
+              {SHIFTS.map(k => <Option key={k} value={k}>{SHIFT_LABELS[k]}</Option>)}
+            </Dropdown>
+          </div>
+        )}
       </div>
 
       <TabList selectedValue={view} onTabSelect={(_, d) => update({ view: d.value as string })}>
         <Tab value="trend">Trend</Tab>
-        <Tab value="compare">Compare</Tab>
+        <Tab value="compare">Compare services</Tab>
         <Tab value="snapshot">Snapshot</Tab>
       </TabList>
 
@@ -336,7 +395,7 @@ export function ExplorePage() {
             ) : view === 'trend' ? (
               asTable
                 ? <TrendTable styles={s} series={activeSeries} services={seriesServices} combined={combined} />
-                : <div className={s.chartWrap} ref={chartRef}><TrendChart series={activeSeries} services={seriesServices} combined={combined} projectPeriods={projecting ? PROJECTION_PERIODS : 0} /></div>
+                : <div className={s.chartWrap} ref={chartRef}><TrendChart series={activeSeries} services={seriesServices} combined={combined} projectPeriods={projecting ? PROJECTION_PERIODS : 0} previous={prevActiveSeries} previousLabel={comparing ? SHIFT_LABELS[shift as ShiftKey] : undefined} /></div>
             ) : (
               asTable
                 ? <CompareTable styles={s} series={activeSeries} services={seriesServices} agg={agg} />
@@ -427,7 +486,8 @@ function buildTrend(
   services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[],
   combined: boolean,
   projectPeriods: number,
-): { rows: TrendRow[]; defs: SeriesDef[]; projected: boolean; overallTrend: boolean } {
+  previous?: ExploreValueSeries,
+): { rows: TrendRow[]; defs: SeriesDef[]; projected: boolean; overallTrend: boolean; compared: boolean } {
   const buckets = series.buckets
   const n = buckets.length
   const defs: SeriesDef[] = combined
@@ -450,7 +510,20 @@ function buildTrend(
     return row
   })
 
-  if (projectPeriods <= 0 || n < 2) return { rows, defs, projected: false, overallTrend: false }
+  // Previous-period overlay: align the shifted buckets to the current ones by index, so the same
+  // ordinal period (week 1 vs week 1, …) lines up on the shared x-axis.
+  const prevBuckets = previous?.buckets ?? []
+  const compared = prevBuckets.length > 0
+  if (compared) {
+    for (let i = 0; i < rows.length && i < prevBuckets.length; i++) {
+      for (const def of defs) {
+        const v = valueAt(prevBuckets[i], def.key)
+        if (v !== undefined) rows[i][`${def.key}__prev`] = round(v)
+      }
+    }
+  }
+
+  if (projectPeriods <= 0 || n < 2) return { rows, defs, projected: false, overallTrend: false, compared }
 
   let cursor: string | Date = buckets[n - 1].periodStart
   for (let j = 0; j < projectPeriods; j++) {
@@ -483,20 +556,23 @@ function buildTrend(
     }
   }
 
-  return { rows, defs, projected: true, overallTrend }
+  return { rows, defs, projected: true, overallTrend, compared }
 }
 
-function TrendChart({ series, services, combined, projectPeriods }: {
+function TrendChart({ series, services, combined, projectPeriods, previous, previousLabel }: {
   series: ExploreValueSeries
   services: { serviceId: string; serviceName: string; serviceLabel?: string | null }[]
   combined: boolean
   projectPeriods: number
+  previous?: ExploreValueSeries
+  previousLabel?: string
 }) {
-  const { rows, defs, projected, overallTrend } = useMemo(
-    () => buildTrend(series, services, combined, projectPeriods),
-    [series, services, combined, projectPeriods],
+  const { rows, defs, projected, overallTrend, compared } = useMemo(
+    () => buildTrend(series, services, combined, projectPeriods, previous),
+    [series, services, combined, projectPeriods, previous],
   )
-  const showLegend = (!combined && defs.length > 1) || (projected && overallTrend)
+  const prevSuffix = previousLabel ? ` (${previousLabel} ago)` : ' (previous)'
+  const showLegend = (!combined && defs.length > 1) || (projected && overallTrend) || compared
   return (
     <ResponsiveContainer width="100%" height={340}>
       <LineChart data={rows} margin={{ top: 8, right: 24, bottom: 8, left: 8 }}>
@@ -514,6 +590,20 @@ function TrendChart({ series, services, combined, projectPeriods }: {
             stroke={def.color}
             strokeWidth={2}
             dot={{ r: 2 }}
+            connectNulls
+          />
+        ))}
+        {compared && defs.map(def => (
+          <Line
+            key={`${def.key}__prev`}
+            type="monotone"
+            dataKey={`${def.key}__prev`}
+            name={`${def.name}${prevSuffix}`}
+            stroke={def.color}
+            strokeOpacity={0.55}
+            strokeWidth={2}
+            strokeDasharray="4 4"
+            dot={false}
             connectNulls
           />
         ))}

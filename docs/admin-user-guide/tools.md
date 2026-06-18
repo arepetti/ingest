@@ -1,6 +1,6 @@
 # Tools
 
-**Tools** is a page of operational utilities — things you *do* occasionally rather than *configure* — gated by the `backup:read` capability (running a restore needs `backup:manage`). Both are in the Admin default bundle. It sits in the sidebar directly above **Settings** and uses the same master-detail layout (a list of tools on the left, the selected one on the right), with the tools grouped under **Backup & restore**. It hosts two tools: **Data backup** (the registry) and **Configuration backup** (the Settings-page configuration). More maintenance utilities will slot in as additional sections over time.
+**Tools** is a page of operational utilities — things you *do* occasionally rather than *configure* — gated by the `backup:read` capability (running a restore needs `backup:manage`). Both are in the Admin default bundle. It sits in the sidebar directly above **Settings** and uses the same master-detail layout (a list of tools on the left, the selected one on the right), with the tools grouped under **Backup & restore**. It hosts three tools: **Data backup** (the registry), **Configuration backup** (the Settings-page configuration), and **Accounts** (a portable, key-free export/import of just the accounts). More maintenance utilities will slot in as additional sections over time.
 
 > **The `backup:read` / `backup:manage` capabilities govern both tools.** Anyone who can export or restore the data backup can also export or restore the configuration backup (which includes encrypted secrets). There is no separate permission for configuration.
 
@@ -53,6 +53,27 @@ Click **Restore from file…**, pick a configuration JSON, and confirm the warni
 - **Secrets are preserved when omitted.** If an incoming document doesn't carry its secret (for example a file you hand-edited to drop the ciphertext), the existing stored secret is kept rather than wiped — so a config-only file never silently clears a working SMTP password or bot secret.
 
 On success the tool reports how many documents were written into each collection.
+
+## Accounts
+
+A focused export/import of just the **accounts** — names, labels, roles, permissions, SSO links and enabled state — as a single JSON file. Unlike the data backup it is **not** a full snapshot and **not** destructive: use it to clone the account registry into another environment, seed a fresh instance, or bulk-edit accounts in a text editor and re-import. The same two actions are also available from the **⋮** menu on the [Accounts](accounts.md) page. Export needs `accounts:read`; import needs `accounts:manage`.
+
+> **API keys are never exported.** Keys are stored only as irreversible hashes, so they can't be put in a portable file. Every account that this import *creates* therefore starts with **no key** — generate one for each afterwards on the Accounts page (**API keys → Generate new key**). Accounts that already existed keep their current keys untouched.
+
+### Export
+
+Click **Download accounts**. Your browser downloads `ingest-accounts-<timestamp>.json` with one entry per live account (no ids, no audit stamps, no keys).
+
+### Import
+
+Click **Import from file…**, pick an accounts JSON, and confirm.
+
+- **Matched by name.** Each entry is matched on the account name: an existing account is updated in place, an unknown name is created.
+- **Non-destructive.** Accounts that aren't in the file are left exactly as they are — nothing is deleted.
+- **Per-account isolation.** If an individual entry is invalid (e.g. an unknown capability, or an SSO link already claimed by another account) it's skipped and reported; the rest still import.
+- **The file is validated first.** A file that isn't an Ingest accounts export, is the wrong version, or isn't valid JSON is rejected before anything changes.
+
+On success the tool reports how many accounts were created and updated, and lists any that were skipped.
 
 ## Where to go next
 

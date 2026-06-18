@@ -159,13 +159,17 @@ public sealed class SubmissionService : ISubmissionService
         _submissions.GetByIdAsync(submissionId, includeDeleted, ct);
 
     /// <inheritdoc />
-    public async Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, CancellationToken ct = default)
+    public async Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, DateTime? submittedAt = null, CancellationToken ct = default)
     {
         var service = await _accounts.GetByIdAsync(input.ServiceAccountId, ct: ct)
             ?? throw new NotFoundException($"Service '{input.ServiceAccountId}'");
         var visible = await LoadVisibleAsync(service.Id, ct);
 
         var submission = MapInput(service, new SubmissionInput(input.Samples), visible, source);
+        // Back-fill case: date the record to the supplied instant (e.g. the sample timestamp on a
+        // bulk import) instead of letting the repository stamp "now".
+        if (submittedAt is { } at)
+            submission.SubmittedAt = DateTime.SpecifyKind(at, DateTimeKind.Utc);
         var validation = await ValidateOrThrow(service, submission, isReplacement: false, existing: null, ct);
 
         submission.Samples = FilterDiscarded(submission.Samples, validation.DiscardedSamples);

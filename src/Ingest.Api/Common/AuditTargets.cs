@@ -29,4 +29,7 @@ public static class AuditTargets
 
     /// <summary>A restore of the configuration backup (the Settings-page configuration).</summary>
     public static readonly Guid ConfigBackup = new("b0d17e00-0000-0000-0000-000000000002");
+
+    /// <summary>An import of the accounts backup (the registry accounts, without API keys).</summary>
+    public static readonly Guid AccountsBackup = new("b0d17e00-0000-0000-0000-000000000003");
 }

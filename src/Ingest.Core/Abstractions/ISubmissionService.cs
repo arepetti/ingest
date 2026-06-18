@@ -85,11 +85,17 @@ public interface ISubmissionService
 
     /// <summary>Create a submission on behalf of a service account; the audit trail records the calling admin.</summary>
     /// <param name="input">Submission payload including the target <c>ServiceId</c>.</param>
+    /// <param name="source">Where the submission originated (drives the source-aware approval policy).</param>
+    /// <param name="submittedAt">
+    /// Explicit <c>SubmittedAt</c> for the persisted submission, used when back-filling historical
+    /// data (e.g. bulk import) so the record is dated to when it was measured rather than to now.
+    /// <c>null</c> (the default) stamps the current time as usual.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The persisted submission together with any non-blocking warnings.</returns>
     /// <exception cref="NotFoundException">The referenced service or schema does not exist.</exception>
     /// <exception cref="ValidationException">Validators rejected the payload.</exception>
-    Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, CancellationToken ct = default);
+    Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, DateTime? submittedAt = null, CancellationToken ct = default);
 
     /// <summary>Replace any submission. No cadence-window restriction; the audit trail records the calling admin.</summary>
     /// <param name="submissionId">Id of the submission to replace.</param>

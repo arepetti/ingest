@@ -29,10 +29,19 @@ chart.
 | **Services**  | Restrict to one or more services. Empty means *all services*. |
 | **Aggregation** | How the samples in each period bucket are reduced: **Average**, **Sum**, **Minimum**, **Maximum**, or **Sample count**. |
 | **Period**    | A relative range (last day / week / month) or a custom from/to window. *All time* by default. |
+| **Compare with previous** | (Trend only) Overlay the same selection shifted back in time — pick **1 month**, **6 months**, or **1 year**, or **No** to turn it off (the default). Needs a Period range (it's unavailable for *All time*); the two windows are allowed to overlap. |
 
 Samples are grouped into buckets by each value's own **cadence** (Daily, Weekly, Monthly, …), the
 same boundaries the rest of the system uses. Submissions from different services in the same window
 collapse onto the same bucket automatically.
+
+### Presets
+
+The **Presets** dropdown (top right) saves the whole current selection — every filter and view
+toggle — under a name you type, so you can jump back to a view you use often. Pick a preset to reload
+it, or use the trash icon next to its name to delete it (no confirmation). You can keep up to **five**
+presets. Unlike the shareable URL, presets are stored in your browser's local storage, so they're
+per-browser and not shared when you paste the link to someone else.
 
 ## The three views
 
@@ -44,6 +53,12 @@ going up or down?".
 
 The **Average** aggregation across the whole range is an exact, count-weighted mean (each period is
 weighted by how many samples it held), not a naive average of the per-period averages.
+
+Turn on **Compare** to read this period against an earlier one: each line gains a faded, dashed
+counterpart drawn from the same selection shifted back by the chosen amount (1 month / 6 months / 1
+year). The two windows are aligned period-for-period — the first bucket of "now" sits above the first
+bucket of "then" — so you can eyeball this-vs-last even when the calendar dates differ. Overlapping
+ranges are allowed; it's up to you whether that's meaningful.
 
 Toggle **Projection** to extend the chart by the next two periods. Each line gains a dashed
 continuation fitted from its own history (a simple straight-line / least-squares trend), and in

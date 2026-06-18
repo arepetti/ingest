@@ -95,6 +95,18 @@ Both old and new keys authenticate during the overlap; the consumer never sees a
 
 > If you delete an account and later create a new one with the same name, the tombstone is replaced automatically — the create succeeds rather than failing with an "account already exists" conflict. The new account starts with a fresh id and a fresh key set; any soft-deleted samples the old account left behind are not touched and stay excluded from queries.
 
+## Bulk export & import
+
+The **⋮** (More actions) menu at the top of the grid offers three ways to get accounts in and out in bulk:
+
+- **Export this list (CSV)** — a human-readable spreadsheet of the *currently listed* accounts (name, label, kind, role, status, email, created). Good for sharing or reporting; not meant for re-import.
+- **Export accounts (JSON)** — downloads `ingest-accounts-<timestamp>.json`: a portable, re-importable file with every account's name, label, description, email, kind, role, permissions, SSO links and enabled state. Needs `accounts:read`.
+- **Import accounts (JSON)…** — pick an accounts JSON to create and update accounts in bulk. Needs `accounts:manage`.
+
+Import matches each entry on its **name**: an existing account is updated in place, an unknown name is created. It's **non-destructive** — accounts missing from the file are left alone — and entries are applied independently, so one invalid account (say, an unknown capability) is skipped and reported without blocking the rest.
+
+> **API keys are never part of the file.** Keys are stored only as irreversible hashes, so an account *created* by an import starts with **no key** — generate one for it afterwards (see "Issuing and rotating keys" above). Accounts that already existed keep their current keys. This same export/import also lives on the [Tools](tools.md#accounts) page.
+
 ## Data-subject rights (GDPR)
 
 Two actions on the row menu (and the detail-drawer toolbar) cover the GDPR rights that need a button in the product (EU GDPR; the UK GDPR / DPA 2018 are equivalent). **Export personal data** needs the `privacy:read` capability; **Erase (GDPR)** needs `privacy:manage`. Both are in the `Admin` default bundle, but either can be granted to a non-admin (e.g. a data-protection officer). See [docs/gdpr.md](../gdpr.md) for the full data-protection overview.

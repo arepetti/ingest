@@ -35,7 +35,7 @@ The bundled admin SPA (built with Microsoft Fluent UI) lets administrators:
 - Browse every submission, with filters by service and date range.
 - Submit or edit data **on behalf of** a service (handy for back-fills, fixes, or training).
 - See at a glance which services are up to date and which are behind, per KPI per period.
-- Plot historical numeric data with a single click.
+- Plot historical numeric data with a single click, with optional period-over-period comparison and saveable view presets.
 - Upload simple HTML+Liquid **reports** (single-submission summaries or period roll-ups) that operators can render and re-render with different filters.
 
 Service-side users can use a slimmed-down version of the same console to file submissions through the web while they're getting started.
@@ -129,7 +129,7 @@ Everything Ingest does, in one place:
 - Author schemas and their validation rules — no editor or redeploy.
 - Browse and filter submissions; create or edit data **on behalf of** a service; bulk-import history from JSON/CSV.
 - A status dashboard and **missing-submissions** analytics — who's up to date, who's behind, per KPI per period.
-- One-click historical plotting and HTML + Liquid **reports** (single-submission or period roll-ups).
+- One-click historical plotting — with optional period-over-period comparison (e.g. this year vs last) and saveable filter presets — plus HTML + Liquid **reports** (single-submission or period roll-ups).
 
 **Integration & reporting**
 

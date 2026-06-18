@@ -9,13 +9,13 @@ import {
   Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, SplitButton,
   Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, Delete20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, PersonAdd20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, ArrowUpload20Regular, Delete20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, PersonAdd20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { useNavigate } from 'react-router-dom'
-import { fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCapabilities, useCreateAccount, useDeleteAccount, useEraseAccount, useRevokeApiKey, useRotateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
+import { accountsBackupExportUrl, fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCapabilities, useCreateAccount, useDeleteAccount, useEraseAccount, useImportAccountsBackup, useRevokeApiKey, useRotateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
 import type { Account, AccountKind, AccountRole, AuthProvider, CreateAccountRequest, ErasureMode, ErasureResult, ExternalLogin, UpdateAccountRequest } from '../api/types'
 import { CAPABILITY_GROUPS, defaultCapabilitiesForRole, type Capability } from '../api/capabilities'
-import { downloadFromUrl } from '../utils/download'
+import { downloadFromUrl, pickTextFile } from '../utils/download'
 import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
 import { OnboardAccountWizard } from '../components/OnboardAccountWizard'
@@ -206,6 +206,46 @@ export function ServicesPage() {
     fetchAll: () => fetchAllAccounts(),
     onError: setActionError,
   })
+  const importAccounts = useImportAccountsBackup()
+  const [actionInfo, setActionInfo] = useState<string | null>(null)
+
+  async function exportAccountsJson() {
+    setActionError(null); setActionInfo(null)
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+    try {
+      await downloadFromUrl(accountsBackupExportUrl(), `ingest-accounts-${stamp}.json`)
+    } catch (e) {
+      setActionError(formatApiError(e))
+    }
+  }
+
+  async function importAccountsJson() {
+    setActionError(null); setActionInfo(null)
+    let parsed: unknown
+    try {
+      const { content } = await pickTextFile('.json,application/json')
+      parsed = JSON.parse(content)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (!/no file selected/i.test(msg)) setActionError(`Could not read the accounts file: ${msg}`)
+      return
+    }
+    const ok = window.confirm(
+      'Import accounts from this file?\n\n' +
+      'Accounts are matched by name: existing ones are updated and new names are created. ' +
+      'Accounts not in the file are left untouched.\n\n' +
+      'API keys are NOT included, so any account created by this import starts with no key — ' +
+      'generate one for each afterwards.',
+    )
+    if (!ok) return
+    try {
+      const res = await importAccounts.mutateAsync(parsed)
+      const tail = res.errors.length > 0 ? ` · ${res.errors.length} skipped: ${res.errors.join('; ')}` : ''
+      setActionInfo(`Import complete: ${res.created} created, ${res.updated} updated${tail}.`)
+    } catch (e) {
+      setActionError(formatApiError(e))
+    }
+  }
   // Per-drawer "expanded" state so the edit and view drawers can be enlarged independently
   // (e.g. expand the view to read a long description without losing the editor state).
   const [editorExpanded, setEditorExpanded] = useState(false)
@@ -319,8 +359,21 @@ export function ServicesPage() {
                   disabled={accountsExport.exporting}
                   onClick={accountsExport.exportList}
                 >
-                  {accountsExport.exporting ? 'Exporting…' : 'Export this list'}
+                  {accountsExport.exporting ? 'Exporting…' : 'Export this list (CSV)'}
                 </MenuItem>
+                <MenuDivider />
+                <MenuItem icon={<ArrowDownload20Regular />} onClick={exportAccountsJson}>
+                  Export accounts (JSON)
+                </MenuItem>
+                {canManageAccounts && (
+                  <MenuItem
+                    icon={<ArrowUpload20Regular />}
+                    disabled={importAccounts.isPending}
+                    onClick={importAccountsJson}
+                  >
+                    {importAccounts.isPending ? 'Importing…' : 'Import accounts (JSON)…'}
+                  </MenuItem>
+                )}
               </MenuList>
             </MenuPopover>
           </Menu>
@@ -342,6 +395,12 @@ export function ServicesPage() {
             <MessageBarTitle>Action failed</MessageBarTitle>
             {actionError}
           </MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      {actionInfo && (
+        <AutoScrollMessageBar intent="success">
+          <MessageBarBody>{actionInfo}</MessageBarBody>
         </AutoScrollMessageBar>
       )}
 

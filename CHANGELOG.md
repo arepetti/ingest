@@ -8,7 +8,15 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 
 - Microsoft Teams integration: a bot prompts a user or channel for outstanding required values, on a flexible schedule (daily, weekly, monthly, quarterly, semi-annually, or yearly) or on demand.
 - Approval rules (in Settings): require approval per service and per schema, on top of each schema's own policy.
-- Configuration backup (in Tools): export and restore all Settings-page configuration (approvals, email/notifications, webhooks, integrations and the Teams connection) as a JSON file, separate from the data backup, for copying configuration between environments or recovering it after a disaster. Encrypted secrets are included and require the same `ApiKey:Pepper` to decrypt; the `backup:read`/`backup:manage` capabilities govern both backups.
+- Configuration backup (in Tools): export and restore all Settings-page configuration for copying configuration between environments or recovering it after a disaster.
+- Explore "compare with previous": overlay the Trend chart with the same selection shifted back by 1 month, 6 months, or 1 year to read this period against an earlier one.
+- Explore view presets: save up to five named filter/view selections in the browser and reload them from a dropdown.
+- Accounts bulk export/import: a portable, key-free JSON of all accounts.
+
+### Changed
+
+- Bulk-imported submissions are now dated to their data: each submission's submitted-at is set to its first sample's timestamp (rather than the import time), so back-filled history sorts and filters by when it was measured.
+- Bulk submission import is now idempotent: submissions that already exist are skipped instead of failing, so re-running the same file is safe. The import report is also simpler — it shows how many succeeded and skipped, and lists only the failures.
 
 ### Fixed
 
@@ -17,6 +25,7 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 ### Documentation
 
 - More integration examples for MHR iTrust.
+- Example test data (`examples/test-data/submissions.json`): two years of weekly workforce snapshots for seeding a demo deployment.
 
 ## 0.3.0
 

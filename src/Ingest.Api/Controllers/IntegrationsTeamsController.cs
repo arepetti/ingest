@@ -136,7 +136,7 @@ public sealed class IntegrationsTeamsController : ControllerBase
         try
         {
             var result = await _submissions.AdminCreateAsync(
-                new AdminSubmissionInput(serviceId, samples), SubmissionSource.Manual, ct);
+                new AdminSubmissionInput(serviceId, samples), SubmissionSource.Manual, ct: ct);
             var messages = result.Warnings.Count > 0
                 ? result.Warnings
                 : new[] { "Your submission was recorded." };

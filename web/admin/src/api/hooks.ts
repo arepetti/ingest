@@ -8,7 +8,7 @@ import type {
   ExploreAggregation, ExploreSeries,
   Schema, SchemaHistory, SchemaVersionHistoryEntry, SchemaVersionSnapshot, UpsertSchemaRequest,
   Submission, AdminSubmissionInput, SampleInput, ServiceStatus, Me, Paged,
-  SubmissionWriteResponse, BulkImportRequest, BulkImportResult, BackupImportResult,
+  SubmissionWriteResponse, BulkImportRequest, BulkImportResult, BackupImportResult, AccountsImportResult,
   MissingByCadence, MissingPeriodReport, MissingHistory,
   Report, RenderReportRequest, ReportRenderResponse,
   AuthProvider,
@@ -555,6 +555,22 @@ export const useImportConfigBackup = () => {
   return useMutation({
     mutationFn: (backup: unknown) => api.post<BackupImportResult>('/api/admin/backup/config/import', backup),
     onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
+/** Relative URL for the accounts export download (authenticated via downloadFromUrl). */
+export const accountsBackupExportUrl = () => '/api/admin/accounts/backup/export'
+
+/**
+ * Import accounts from an accounts file. The parsed JSON is posted as-is; the server matches on the
+ * account name (creating new ones, updating existing ones) and never touches API keys. Invalidates
+ * the accounts list on success.
+ */
+export const useImportAccountsBackup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: unknown) => api.post<AccountsImportResult>('/api/admin/accounts/backup/import', file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['accounts'] }),
   })
 }
 

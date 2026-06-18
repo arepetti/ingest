@@ -27,6 +27,22 @@ public sealed class SubmissionValidator : ISubmissionValidator
     private readonly IAuditContext _audit;
     private readonly bool _approvalEnabled;
 
+    /// <summary>Marker embedded in the "already submitted for this period" cadence error.</summary>
+    internal const string DuplicatePeriodMarker = "already submitted for this";
+
+    /// <summary>Marker embedded in the "already has a submission awaiting approval" cadence error.</summary>
+    internal const string PendingDuplicateMarker = "already has a submission awaiting approval";
+
+    /// <summary>
+    /// True when <paramref name="error"/> is a cadence-duplicate rejection — i.e. a sample that
+    /// already has a live (or pending) submission in its reporting window. Callers that want
+    /// idempotent behaviour (bulk import) use this to treat such a submission as "already there"
+    /// rather than a genuine failure.
+    /// </summary>
+    internal static bool IsDuplicatePeriodError(string error) =>
+        error.Contains(DuplicatePeriodMarker, StringComparison.Ordinal) ||
+        error.Contains(PendingDuplicateMarker, StringComparison.Ordinal);
+
     /// <summary>Create a new <see cref="SubmissionValidator"/>.</summary>
     /// <param name="schemas">Schema repository used to fetch the caller's visible schemas.</param>
     /// <param name="ctx">Mongo context, used directly for the cadence lookup so it doesn't go through the generic repo.</param>
@@ -487,7 +503,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         var existsInPeriod = await _ctx.Samples.Find(filter).AnyAsync(ct);
         if (existsInPeriod)
         {
-            errors.Add($"Value '{Display(schema, def)}' already submitted for this {def.Cadence.ToString().ToLowerInvariant()} period.");
+            errors.Add($"Value '{Display(schema, def)}' {DuplicatePeriodMarker} {def.Cadence.ToString().ToLowerInvariant()} period.");
             return;
         }
 
@@ -512,7 +528,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
                     Builders<Submission>.Filter.Ne(s => s.Id, existing.Id));
 
             if (await _ctx.Submissions.Find(pendingFilter).AnyAsync(ct))
-                errors.Add($"Value '{Display(schema, def)}' already has a submission awaiting approval for this {def.Cadence.ToString().ToLowerInvariant()} period; replace that submission instead.");
+                errors.Add($"Value '{Display(schema, def)}' {PendingDuplicateMarker} for this {def.Cadence.ToString().ToLowerInvariant()} period; replace that submission instead.");
         }
     }
 

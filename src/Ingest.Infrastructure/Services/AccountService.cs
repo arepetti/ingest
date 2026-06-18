@@ -216,4 +216,77 @@ public sealed class AccountService : IAccountService
         await _accounts.SoftDeleteAsync(id, ct);
         await _audit.RecordAsync(TargetTypeFor(existing), AuditChangeType.Delete, existing.Id, existing.Name, ct);
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<AccountBackupEntry>> ExportAsync(CancellationToken ct = default)
+    {
+        // One large page is plenty for the registry sizes this convenience tool targets; the
+        // repository clamps PageSize to 500.
+        var page = await _accounts.ListAsync(new PageRequest(1, 500), null, null, ct);
+        return page.Items
+            .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(a => new AccountBackupEntry(
+                a.Name, a.Label, a.Description, a.Email, a.Kind, a.Role, a.Enabled,
+                a.Capabilities.ToList(),
+                a.ExternalLogins.Select(l => new AccountBackupLogin(l.Provider, l.Email)).ToList()))
+            .ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<AccountsImportResult> ImportAsync(IReadOnlyList<AccountBackupEntry> accounts, CancellationToken ct = default)
+    {
+        var created = 0;
+        var updated = 0;
+        var errors = new List<string>();
+
+        foreach (var entry in accounts)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Name))
+            {
+                errors.Add("Skipped an account with no name.");
+                continue;
+            }
+
+            try
+            {
+                var links = entry.ExternalLogins
+                    .Select(l => new ExternalLogin { Provider = l.Provider, Email = l.Email })
+                    .ToList();
+
+                // Match on the unique name. A live account is updated in place; anything else
+                // (missing, or only present as a soft-deleted row) is created — CreateAsync frees a
+                // soft-deleted name slot automatically.
+                var existing = await _accounts.GetByNameAsync(entry.Name, includeDeleted: false, ct);
+                if (existing is not null)
+                {
+                    await UpdateAsync(existing.Id, new AccountUpdate(
+                        entry.Label, entry.Description, entry.Email, entry.Role, entry.Enabled,
+                        links, entry.Capabilities.ToList()), ct);
+                    updated++;
+                }
+                else
+                {
+                    await CreateAsync(new Account
+                    {
+                        Name = entry.Name,
+                        Label = entry.Label,
+                        Description = entry.Description,
+                        Email = entry.Email,
+                        Kind = entry.Kind,
+                        Role = entry.Role,
+                        Enabled = entry.Enabled,
+                        Capabilities = entry.Capabilities.ToList(),
+                        ExternalLogins = links,
+                    }, ct);
+                    created++;
+                }
+            }
+            catch (Exception ex) when (ex is ValidationException or ConflictException)
+            {
+                errors.Add($"'{entry.Name}': {ex.Message}");
+            }
+        }
+
+        return new AccountsImportResult(created, updated, errors);
+    }
 }

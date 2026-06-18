@@ -42,16 +42,19 @@ When you have a lot of history to load for one service — months of past readin
 1. Click **Import**.
 2. Pick the target **service** (every submission in the file is attributed to it).
 3. Choose the **file**. The **format** is auto-detected from the extension (`.json` / `.csv`) — override it if your file uses a different extension.
-4. Click **Import**. The result panel reports, per submission, whether it was imported (with any warnings) or rejected (with the errors that caused it).
+4. Click **Import**. The result panel reports how many submissions were imported (and how many were skipped because they already existed), then lists only the ones that *failed*, with the errors that caused each rejection.
 
 Each imported submission goes through exactly the same validation as one created through the form, and the audit trail records you (the admin) as the creator.
+
+> **Imported submissions are dated to their data.** Because you're back-filling history, each submission's *submitted-at* is set to its **first sample's timestamp** (if a submission mixes samples with different timestamps, the first one in the file wins) rather than to the moment you ran the import. So imported history sorts and filters by when it was actually measured. (Submissions created through the form or API are stamped with the current time, as before.)
 
 > **Not a database restore.** This is for back-filling submission *data* for one service, not for backing up or migrating the whole registry. For that, see [hosting.md](../setup/hosting.md).
 
 ### How importing behaves
 
 - **Parsing is all-or-nothing.** If the file can't be parsed — invalid JSON, a missing CSV column, an unparseable timestamp — nothing is imported and the errors list exactly what's wrong. Fix the file and re-upload.
-- **Importing is not transactional.** Once the file parses, each submission is validated and saved on its own. A submission that fails validation is reported as failed and skipped; the rest still import. Because of this, re-uploading a file re-imports the submissions that already succeeded (creating duplicates) — so after a partial import, trim the file down to just the failed groups and upload that.
+- **Importing is not transactional.** Once the file parses, each submission is validated and saved on its own. A submission that fails validation is reported as failed; the rest still import.
+- **Importing is idempotent.** A submission that already exists — one whose samples already cover their reporting window for this service — is **skipped**, not re-created. Skipped submissions are counted in the summary but not listed individually. This means you can safely re-upload the same file (for example after fixing a few rejected groups): the submissions that already imported are skipped and only the new or corrected ones are added, with no duplicates.
 
 ### JSON format
 

@@ -347,6 +347,8 @@ export interface BulkImportItemResult {
   /** CSV group key when present; null for JSON groups. */
   group?: string | null
   success: boolean
+  /** True when the group was a no-op because the submission already existed. */
+  skipped: boolean
   submissionId?: string | null
   sampleCount: number
   errors: string[]
@@ -357,6 +359,8 @@ export interface BulkImportItemResult {
 export interface BulkImportResult {
   total: number
   succeeded: number
+  /** Groups skipped because the submission already existed (idempotent import). */
+  skipped: number
   failed: number
   items: BulkImportItemResult[]
 }
@@ -364,6 +368,13 @@ export interface BulkImportResult {
 /** Result of restoring a backup: per-collection counts of documents written. */
 export interface BackupImportResult {
   restored: Record<string, number>
+}
+
+/** Result of importing an accounts file: how many were created/updated, plus any skipped entries. */
+export interface AccountsImportResult {
+  created: number
+  updated: number
+  errors: string[]
 }
 
 export interface SampleInput {

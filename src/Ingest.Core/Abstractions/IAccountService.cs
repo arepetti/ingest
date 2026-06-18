@@ -58,4 +58,21 @@ public interface IAccountService
     /// <param name="id">Account id.</param>
     /// <param name="ct">Cancellation token.</param>
     Task DeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Project every live account onto the portable, secret-free <see cref="AccountBackupEntry"/> shape for export.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>One entry per live account, ordered by name.</returns>
+    Task<IReadOnlyList<AccountBackupEntry>> ExportAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Import a batch of accounts, matching on <see cref="AccountBackupEntry.Name"/>: existing
+    /// accounts are updated in place and unknown names are created. API keys are never part of this
+    /// data, so created accounts start without any and must have one generated afterwards. Each
+    /// entry is applied independently — a failing entry is reported and skipped without aborting the
+    /// rest.
+    /// </summary>
+    /// <param name="accounts">The accounts to upsert.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Counts of created/updated accounts plus any per-entry errors.</returns>
+    Task<AccountsImportResult> ImportAsync(IReadOnlyList<AccountBackupEntry> accounts, CancellationToken ct = default);
 }

@@ -97,7 +97,10 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
     public Task AddAsync(Submission submission, CancellationToken ct = default)
     {
         StampForCreate(submission);
-        submission.SubmittedAt = Audit.UtcNow;
+        // Default to "now", but honour an explicit SubmittedAt set by the caller (e.g. a bulk import
+        // back-filling history dates the record to the sample's own timestamp).
+        if (submission.SubmittedAt == default)
+            submission.SubmittedAt = Audit.UtcNow;
         return Collection.InsertOneAsync(submission, cancellationToken: ct);
     }
 

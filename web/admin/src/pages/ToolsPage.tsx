@@ -3,17 +3,18 @@ import {
   Body1, Button, Card, MessageBarBody, Spinner, Text, Title3, makeStyles, tokens,
 } from '@fluentui/react-components'
 import {
-  ArrowDownload20Regular, ArrowUpload20Regular, DatabaseArrowDownRegular, SettingsRegular,
+  ArrowDownload20Regular, ArrowUpload20Regular, DatabaseArrowDownRegular, PeopleRegular, SettingsRegular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { SectionedLayout } from '../components/SectionedLayout'
 import type { LayoutSection } from '../components/SectionedLayout'
 import {
-  backupExportUrl, configBackupExportUrl, useCapabilities, useImportBackup, useImportConfigBackup,
+  accountsBackupExportUrl, backupExportUrl, configBackupExportUrl, useCapabilities,
+  useImportAccountsBackup, useImportBackup, useImportConfigBackup,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { downloadFromUrl, pickTextFile } from '../utils/download'
-import type { BackupImportResult } from '../api/types'
+import type { AccountsImportResult, BackupImportResult } from '../api/types'
 
 const useStyles = makeStyles({
   card: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' },
@@ -51,6 +52,9 @@ export function ToolsPage() {
   const sections: LayoutSection[] = [
     { id: 'backup', label: 'Data backup', group: 'Backup & restore', icon: <DatabaseArrowDownRegular fontSize={24} />, render: () => <BackupRestoreSection canRestore={has('backup:manage')} /> },
     { id: 'config-backup', label: 'Configuration backup', group: 'Backup & restore', icon: <SettingsRegular fontSize={24} />, render: () => <ConfigBackupRestoreSection canRestore={has('backup:manage')} /> },
+    ...(has('accounts:read')
+      ? [{ id: 'accounts-backup', label: 'Accounts', group: 'Backup & restore', icon: <PeopleRegular fontSize={24} />, render: () => <AccountsBackupSection canImport={has('accounts:manage')} /> }]
+      : []),
   ]
 
   return <SectionedLayout title="Tools" sections={sections} />
@@ -269,6 +273,117 @@ function ConfigBackupRestoreSection({ canRestore }: { canRestore: boolean }) {
             onClick={onImport}
           >
             {importer.isPending ? 'Restoring…' : 'Restore from file…'}
+          </Button>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+function AccountsBackupSection({ canImport }: { canImport: boolean }) {
+  const s = useStyles()
+  const importer = useImportAccountsBackup()
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<AccountsImportResult | null>(null)
+
+  async function onExport() {
+    setError(null)
+    setBusy(true)
+    try {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+      await downloadFromUrl(accountsBackupExportUrl(), `ingest-accounts-${stamp}.json`)
+    } catch (e) {
+      setError(formatApiError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onImport() {
+    setError(null)
+    setResult(null)
+    let parsed: unknown
+    try {
+      const { content } = await pickTextFile('.json,application/json')
+      parsed = JSON.parse(content)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (!/no file selected/i.test(msg)) setError(`Could not read the accounts file: ${msg}`)
+      return
+    }
+
+    const ok = window.confirm(
+      'Import accounts from this file?\n\n' +
+      'Accounts are matched by name: existing ones are updated and new names are created. ' +
+      'Accounts not in the file are left untouched.\n\n' +
+      'API keys are NOT included in the file, so any account created by this import starts with no ' +
+      'key — generate one for each afterwards.',
+    )
+    if (!ok) return
+
+    try {
+      const res = await importer.mutateAsync(parsed)
+      setResult(res)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  return (
+    <Card className={s.card}>
+      <div>
+        <Title3 className={s.sectionTitle}>Accounts</Title3>
+        <Body1 className={s.help}>
+          Export every account (name, label, role, permissions, SSO links, enabled state) to a single
+          JSON file, or import one to create and update accounts — handy for cloning or seeding an
+          environment.
+        </Body1>
+      </div>
+
+      <div className={s.warn}>
+        <strong>API keys are never exported.</strong> They aren&apos;t stored in a recoverable form,
+        so an imported account starts with <strong>no key</strong> and must have one re-generated
+        before it can authenticate. Import is non-destructive — accounts missing from the file are
+        left as they are.
+      </div>
+
+      {error && (
+        <AutoScrollMessageBar intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      {result && (
+        <AutoScrollMessageBar intent={result.errors.length > 0 ? 'warning' : 'success'}>
+          <MessageBarBody>
+            Import complete: <Text weight="semibold">{result.created}</Text> created,{' '}
+            <Text weight="semibold">{result.updated}</Text> updated.
+            {result.errors.length > 0 && (
+              <ul className={s.counts}>
+                {result.errors.map((msg, i) => <li key={i}>{msg}</li>)}
+              </ul>
+            )}
+          </MessageBarBody>
+        </AutoScrollMessageBar>
+      )}
+
+      <div className={s.actions}>
+        <Button
+          appearance="primary"
+          icon={busy ? <Spinner size="tiny" /> : <ArrowDownload20Regular />}
+          disabled={busy || importer.isPending}
+          onClick={onExport}
+        >
+          {busy ? 'Preparing…' : 'Download accounts'}
+        </Button>
+        {canImport && (
+          <Button
+            icon={importer.isPending ? <Spinner size="tiny" /> : <ArrowUpload20Regular />}
+            disabled={busy || importer.isPending}
+            onClick={onImport}
+          >
+            {importer.isPending ? 'Importing…' : 'Import from file…'}
           </Button>
         )}
       </div>

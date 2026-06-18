@@ -102,6 +102,62 @@ public sealed record ApiKeyDto(
 /// <param name="ExpiresAt">Absolute expiry for the new key. <c>null</c> (or an omitted body) means the key never expires; when supplied it must be in the future and no more than two years out.</param>
 public sealed record GenerateApiKeyRequest(DateTime? ExpiresAt = null);
 
+/// <summary>One account inside an accounts export/import file. Secret-free: no id, audit stamps or API keys.</summary>
+/// <param name="Name">Unique machine-style name; the match key on import.</param>
+/// <param name="Label">Friendly label.</param>
+/// <param name="Description">Free-form description.</param>
+/// <param name="Email">Contact email (may be null).</param>
+/// <param name="Kind">UI-capable (User) vs API-only (Application).</param>
+/// <param name="Role">Authorisation tier.</param>
+/// <param name="Enabled">Whether the account is enabled.</param>
+/// <param name="Capabilities">Capability overrides (empty = follow the role default bundle).</param>
+/// <param name="ExternalLogins">SSO identity links (provider + email); only meaningful for User-kind accounts.</param>
+public sealed record AccountBackupEntryDto(
+    string Name,
+    string? Label,
+    string? Description,
+    string? Email,
+    AccountKind Kind,
+    AccountRole Role,
+    bool Enabled,
+    List<string> Capabilities,
+    List<ExternalLoginDto> ExternalLogins)
+{
+    /// <summary>Project a domain backup entry onto the wire shape.</summary>
+    public static AccountBackupEntryDto From(AccountBackupEntry e) => new(
+        e.Name, e.Label, e.Description, e.Email, e.Kind, e.Role, e.Enabled,
+        e.Capabilities.ToList(),
+        e.ExternalLogins.Select(l => new ExternalLoginDto(l.Provider, l.Email)).ToList());
+
+    /// <summary>Map back to the domain backup entry for import.</summary>
+    public AccountBackupEntry ToEntry() => new(
+        Name, Label, Description, Email, Kind, Role, Enabled,
+        Capabilities ?? new(),
+        (ExternalLogins ?? new()).Select(l => new AccountBackupLogin(l.Provider, l.Email)).ToList());
+}
+
+/// <summary>Wrapper for an accounts export file: a marker, version and the account list. API keys are never included.</summary>
+/// <param name="Format">Format marker; always <c>ingest-accounts</c>.</param>
+/// <param name="Version">Format version.</param>
+/// <param name="ExportedAt">When the file was produced (UTC).</param>
+/// <param name="Accounts">The exported accounts.</param>
+public sealed record AccountsBackupFileDto(
+    string Format,
+    int Version,
+    DateTime ExportedAt,
+    List<AccountBackupEntryDto> Accounts);
+
+/// <summary>Result of an accounts import.</summary>
+/// <param name="Created">Number of accounts created.</param>
+/// <param name="Updated">Number of existing accounts updated (matched by name).</param>
+/// <param name="Errors">Per-account errors for entries that were skipped.</param>
+public sealed record AccountsImportResultDto(int Created, int Updated, List<string> Errors)
+{
+    /// <summary>Project the domain result onto the wire shape.</summary>
+    public static AccountsImportResultDto From(AccountsImportResult r) =>
+        new(r.Created, r.Updated, r.Errors.ToList());
+}
+
 /// <summary>Body for <c>POST /api/admin/accounts/{id}/erase</c> — a GDPR right-to-erasure request.</summary>
 /// <param name="Mode">
 /// <c>Anonymise</c> keeps the statistical KPI values but strips identity (pseudonymises the

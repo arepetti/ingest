@@ -14,7 +14,6 @@ const useStyles = makeStyles({
   report: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' },
   itemList: { margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '6px' },
   errors: { margin: '2px 0 0', paddingLeft: '18px', color: tokens.colorPaletteRedForeground1 },
-  warnings: { margin: '2px 0 0', paddingLeft: '18px', color: tokens.colorPaletteDarkOrangeForeground1 },
   help: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
 })
 
@@ -92,7 +91,8 @@ export function BulkImportDialog({
               <Body1 className={s.help}>
                 Import historical submissions for a single service from a JSON or CSV file. Parsing
                 must succeed for the whole file; each submission is then validated and saved
-                independently, so a rejected one won&apos;t block the rest.
+                independently, so a rejected one won&apos;t block the rest. Submissions that already
+                exist are skipped, so re-running the same file is safe.
               </Body1>
 
               <Field label="Service" required>
@@ -136,37 +136,37 @@ export function BulkImportDialog({
                 </AutoScrollMessageBar>
               )}
 
-              {result && (
-                <div className={s.report}>
-                  <AutoScrollMessageBar intent={result.failed === 0 ? 'success' : 'warning'}>
-                    <MessageBarBody>
-                      Imported {result.succeeded} of {result.total} submission{result.total === 1 ? '' : 's'}
-                      {result.failed > 0 ? ` — ${result.failed} failed.` : '.'}
-                    </MessageBarBody>
-                  </AutoScrollMessageBar>
-                  <ul className={s.itemList}>
-                    {result.items.map(item => (
-                      <li key={item.index}>
-                        <Text weight="semibold">
-                          {item.group ? `Group "${item.group}"` : `Submission #${item.index + 1}`}
-                        </Text>
-                        {' '}({item.sampleCount} sample{item.sampleCount === 1 ? '' : 's'}) —{' '}
-                        {item.success ? 'imported' : 'failed'}
-                        {item.errors.length > 0 && (
-                          <ul className={s.errors}>
-                            {item.errors.map((e, i) => <li key={i}>{e}</li>)}
-                          </ul>
-                        )}
-                        {item.warnings.length > 0 && (
-                          <ul className={s.warnings}>
-                            {item.warnings.map((w, i) => <li key={i}>{w}</li>)}
-                          </ul>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {result && (() => {
+                const failures = result.items.filter(item => !item.success && !item.skipped)
+                return (
+                  <div className={s.report}>
+                    <AutoScrollMessageBar intent={result.failed === 0 ? 'success' : 'warning'}>
+                      <MessageBarBody>
+                        Imported {result.succeeded} of {result.total} submission{result.total === 1 ? '' : 's'}.
+                        {result.skipped > 0 ? ` ${result.skipped} already existed (skipped).` : ''}
+                        {result.failed > 0 ? ` ${result.failed} failed.` : ''}
+                      </MessageBarBody>
+                    </AutoScrollMessageBar>
+                    {failures.length > 0 && (
+                      <ul className={s.itemList}>
+                        {failures.map(item => (
+                          <li key={item.index}>
+                            <Text weight="semibold">
+                              {item.group ? `Group "${item.group}"` : `Submission #${item.index + 1}`}
+                            </Text>
+                            {' '}({item.sampleCount} sample{item.sampleCount === 1 ? '' : 's'}) — failed
+                            {item.errors.length > 0 && (
+                              <ul className={s.errors}>
+                                {item.errors.map((e, i) => <li key={i}>{e}</li>)}
+                              </ul>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           </DialogContent>
           <DialogActions>
