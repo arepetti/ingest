@@ -6,7 +6,7 @@ import {
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow, Text, Textarea,
   Title2, Tooltip, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Checkmark20Regular, Delete20Regular, Dismiss20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Checkmark20Regular, Copy20Regular, Delete20Regular, Dismiss20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { BulkImportDialog } from '../components/BulkImportDialog'
 import { formatApiError } from '../api/client'
@@ -562,6 +562,10 @@ export function SubmissionsPage() {
                       { key: 'view-form',    label: 'View',         icon: <Eye20Regular />,    onClick: () => nav(`/submissions/${sub.id}/view`) },
                       { key: 'view-details', label: 'View details', icon: <Open20Regular />,   onClick: () => nav(`/submissions/${sub.id}`) },
                       { key: 'edit',         label: 'Edit',         icon: <Edit20Regular />,   onClick: () => nav(`/submissions/${sub.id}/edit`) },
+                      // "Clone into new submission" opens a fresh /submissions/new form pre-filled from this
+                      // row (service, schema, per-value rows), with the timestamp reset to now. It only
+                      // populates the form — nothing is written until the user presses Submit.
+                      { key: 'clone',        label: 'Clone into new submission', icon: <Copy20Regular />, onClick: () => nav('/submissions/new', { state: { cloneFrom: sub } }) },
                       // Hard-delete needs the submissions:delete capability; for everyone else this would just 403 anyway.
                       ...(canDelete ? [{ key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => { if (confirmDelete('submission', submissionLabel(sub))) del.mutate(sub.id) } }] : []),
                     ]}

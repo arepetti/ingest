@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Button, Card, Dropdown, Field, Input,
   MessageBar, MessageBarBody, MessageBarTitle,
@@ -14,7 +14,7 @@ import {
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import type {
-  AdminSubmissionInput, SampleInput, Schema,
+  AdminSubmissionInput, SampleInput, Schema, Submission,
 } from '../api/types'
 import { AccountAvatar, SchemaAvatar } from '../components/Avatars'
 import { SchemaSampleFields, fromLocalInput, toLocalInput } from '../components/SchemaSampleFields'
@@ -48,10 +48,16 @@ export interface SubmissionEditPageProps {
 export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps = {}) {
   const s = useStyles()
   const nav = useNavigate()
+  const location = useLocation()
   const { id } = useParams<{ id?: string }>()
   // In view mode we always have an id and treat the page like an edit (so the same hydration
   // path runs); the read-only flag then suppresses every mutation surface.
   const isEdit = !!id
+  // "Clone into new submission" navigates here with a source submission in router state. We treat
+  // it as a brand-new submission (pickers stay enabled, timestamp resets to now) that just happens
+  // to start pre-filled. Reading it from router state means a page refresh cleanly drops the clone.
+  const cloneFrom = (location.state as { cloneFrom?: Submission } | null)?.cloneFrom
+  const isClone = !isEdit && !!cloneFrom
 
   const { me, has } = useCapabilities()
   // Self-service submitters (no cross-service read) use their own schemas + /api/submissions.
@@ -115,6 +121,10 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [schema])
 
+  // The submission we hydrate the form from: the loaded entity when editing, or the source row
+  // passed in router state when cloning. A plain "new" submission has neither.
+  const sourceSubmission: Submission | undefined = isEdit ? existing.data : cloneFrom
+
   // On edit, hydrate state from the existing submission once it has loaded.
   useEffect(() => {
     if (!isEdit || prefilled) return
@@ -133,11 +143,24 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [isEdit, prefilled, existing.data])
 
-  // Once we've prefilled and the schema is resolved, fill the row values from the existing samples.
+  // On clone, hydrate service + schema from the source row once. The timestamp is deliberately left
+  // at "now" (not copied) so the clone records a fresh reading rather than re-stamping the original.
   useEffect(() => {
-    if (!isEdit || !prefilled || !schema || !existing.data) return
+    if (!isClone || prefilled || !cloneFrom) return
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setServiceId(cloneFrom.serviceAccountId)
+    const firstSchema = cloneFrom.samples?.[0]?.schemaName
+    if (firstSchema) setSchemaName(firstSchema)
+    setPrefilled(true)
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [isClone, prefilled, cloneFrom])
+
+  // Once we've prefilled and the schema is resolved, fill the row values from the source samples.
+  // Shared by edit and clone — both copy the per-value value/note for the chosen schema.
+  useEffect(() => {
+    if (!prefilled || !schema || !sourceSubmission) return
     const samplesByValue = new Map(
-      existing.data.samples
+      (sourceSubmission.samples ?? [])
         .filter(s => s.schemaName === schema.name)
         .map(s => [s.valueName, s] as const),
     )
@@ -149,7 +172,7 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
     }))
   // We deliberately key on schema.name (not the object identity) so swapping schemas re-runs this.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, prefilled, schema?.name, existing.data])
+  }, [prefilled, schema?.name, sourceSubmission])
 
   function patchRow(name: string, patch: Partial<ValueRow>) {
     setRows(rs => rs.map(r => r.name === name ? { ...r, ...patch } : r))
@@ -237,8 +260,9 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
 
   const isBusy = adminCreate.isPending || adminUpdate.isPending || myCreate.isPending || myUpdate.isPending
   const selectedService = !isService ? services.data?.items.find(a => a.id === serviceId) : undefined
-  // Best-effort detection: the existing submission used more than one schema.
-  const multiSchema = isEdit && (existing.data?.samples ?? []).some(s => s.schemaName !== schemaName) && rows.length > 0
+  // Best-effort detection: the source submission (being edited or cloned) used more than one
+  // schema, so only the chosen schema's values will be carried over on save.
+  const multiSchema = !!sourceSubmission && (sourceSubmission.samples ?? []).some(s => s.schemaName !== schemaName) && rows.length > 0
 
   return (
     <div className={s.root}>
@@ -255,6 +279,16 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
           </Toolbar>
         )}
       </div>
+
+      {isClone && (
+        <MessageBar intent="info">
+          <MessageBarBody>
+            <MessageBarTitle>Cloned from an existing submission.</MessageBarTitle>
+            The service, schema and values were pre-filled and the timestamp reset to now. Review them,
+            adjust the service or schema if needed, then Submit to create a new submission.
+          </MessageBarBody>
+        </MessageBar>
+      )}
 
       {existing.isLoading && isEdit && <div>Loading...</div>}
       {existing.error && isEdit && (
@@ -325,9 +359,9 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
       {multiSchema && (
         <MessageBar intent="warning">
           <MessageBarBody>
-            <MessageBarTitle>This submission contained values from multiple schemas.</MessageBarTitle>
+            <MessageBarTitle>The source submission contained values from multiple schemas.</MessageBarTitle>
             Saving will keep only the values for <strong>{schema?.label || schema?.name}</strong>. Pick another
-            schema first if you need to edit those instead.
+            schema first if you need those values instead.
           </MessageBarBody>
         </MessageBar>
       )}

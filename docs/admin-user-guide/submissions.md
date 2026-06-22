@@ -100,6 +100,12 @@ Notes on CSV values:
 
 Row menu → **Edit**. Same form as create, pre-populated. Admin edits ignore the cadence-window restriction entirely — you can rewrite a submission from two years ago. The `ModifiedBy` audit field records your identity.
 
+## Cloning into a new submission
+
+Row menu → **Clone into new submission**. This opens the **New submission** form pre-filled from the chosen row — the same service, the same schema, and each value copied across — with the **timestamp reset to now**. Unlike Edit, the service and schema pickers stay **enabled**, so you can retarget the clone to a different service or schema before saving (changing the schema re-shapes the value rows, keeping any values whose names match).
+
+Nothing is written until you press **Submit**: cloning only seeds the form. The result is a brand-new submission (new id, fresh audit trail, current submitted-at), not a copy linked to the original. It's the quickest way to repeat a recurring report — clone last period's entry, tweak the numbers, submit.
+
 ## Deleting a submission
 
 Row menu → **Delete**. Soft-delete only — the database row is retained for audit, but downstream queries (OData, `/api/admin/query`) stop seeing it.
