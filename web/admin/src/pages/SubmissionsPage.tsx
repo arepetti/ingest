@@ -23,16 +23,24 @@ import { walkLayout, type RenderItem } from '../utils/layout'
 import { clickableRowProps } from '../utils/a11y'
 import type { Account, ApprovalStatus, Schema, Submission } from '../api/types'
 
-/** Approval-status filter values for the dropdown. 'all' clears the filter. */
-type ApprovalFilter = 'all' | ApprovalStatus
+/**
+ * Status-filter values for the dropdown. 'all' clears the filter, 'draft' selects work-in-progress
+ * drafts (independent of the approval workflow), and the remaining values are approval states
+ * (only offered to cross-service viewers when the approval workflow is on).
+ */
+type StatusFilter = 'all' | 'draft' | ApprovalStatus
 
-const approvalFilterLabels: Record<ApprovalFilter, string> = {
+const statusFilterLabels: Record<StatusFilter, string> = {
   all:         'All statuses',
+  draft:       'Draft',
   Pending:     'Pending',
   Approved:    'Approved',
   Rejected:    'Rejected',
   NotRequired: 'Not required',
 }
+
+/** The approval-state values offered in the status filter (drafts and 'all' are always available). */
+const approvalStatusFilters: ApprovalStatus[] = ['Pending', 'Approved', 'Rejected', 'NotRequired']
 
 /** Map an approval status onto a Fluent badge colour. */
 function approvalBadgeColor(status: ApprovalStatus): 'warning' | 'success' | 'danger' | 'informative' {
@@ -237,21 +245,34 @@ export function SubmissionsPage() {
   const [rejectNote, setRejectNote] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
 
-  // The approval-status filter is mirrored in the URL so the dashboard "Review" action can deep-link
-  // straight to the pending queue (?approvalStatus=Pending) and the filter survives a refresh.
+  // The status filter is mirrored in the URL so the dashboard "Review" action can deep-link straight
+  // to the pending queue (?approvalStatus=Pending) and the filter survives a refresh. Drafts use a
+  // separate ?draft=true param (the lifecycle is independent of approval), so the deep link keeps
+  // working unchanged.
+  const draftParam = searchParams.get('draft')
   const approvalParam = searchParams.get('approvalStatus')
-  const approvalFilter: ApprovalFilter =
-    approvalEnabled && approvalParam && approvalParam in approvalFilterLabels
-      ? (approvalParam as ApprovalFilter)
-      : 'all'
-  const setApprovalFilter = (next: ApprovalFilter) => {
+  const statusFilter: StatusFilter =
+    draftParam === 'true'
+      ? 'draft'
+      : approvalEnabled && !isService && approvalParam && approvalStatusFilters.includes(approvalParam as ApprovalStatus)
+        ? (approvalParam as ApprovalStatus)
+        : 'all'
+  const setStatusFilter = (next: StatusFilter) => {
     const sp = new URLSearchParams(searchParams)
-    if (next === 'all') sp.delete('approvalStatus')
-    else sp.set('approvalStatus', next)
+    sp.delete('approvalStatus')
+    sp.delete('draft')
+    if (next === 'draft') sp.set('draft', 'true')
+    else if (next !== 'all') sp.set('approvalStatus', next)
     setSearchParams(sp, { replace: true })
     setPage(1)
   }
-  const approvalStatus = approvalFilter === 'all' ? undefined : approvalFilter
+  // Approval-status filter feeds the existing query param; an approval-state filter also excludes
+  // drafts (which carry NotRequired but aren't live), while the dedicated Draft filter selects them.
+  const approvalStatus = statusFilter !== 'all' && statusFilter !== 'draft' ? statusFilter : undefined
+  const draftFilter = statusFilter === 'draft' ? true : approvalStatus ? false : undefined
+  // Status options: 'all' + 'draft' always; approval states only for cross-service viewers with the
+  // workflow enabled.
+  const statusOptions: StatusFilter[] = ['all', 'draft', ...(approvalEnabled && !isService ? approvalStatusFilters : [])]
 
   const approve = useApproveSubmission()
   const reject = useRejectSubmission()
@@ -263,8 +284,8 @@ export function SubmissionsPage() {
   )
 
   const services = useAccounts({ role: 'Service' }, !isService)
-  const adminSubs = useSubmissions({ page, pageSize, serviceId, schemaName, from, to, approvalStatus }, !isService)
-  const mySubs = useMySubmissions({ page, pageSize, schemaName, from, to }, isService)
+  const adminSubs = useSubmissions({ page, pageSize, serviceId, schemaName, from, to, approvalStatus, draft: draftFilter }, !isService)
+  const mySubs = useMySubmissions({ page, pageSize, schemaName, from, to, draft: draftFilter }, isService)
   // Schemas are needed by the read-only view drawer (value labels + units), not by the list itself.
   // Cached by react-query so the click latency stays close to zero on subsequent opens.
   const adminSchemas = useSchemas(undefined, !isService)
@@ -273,9 +294,9 @@ export function SubmissionsPage() {
 
   const submissions = isService ? mySubs : adminSubs
   const { data, isLoading, error } = submissions
-  // Column count for the loading / empty placeholder rows (Service column is admin-only; the
-  // approval Status column only appears when the workflow is enabled).
-  const colSpan = (isService ? 7 : 8) + (approvalEnabled ? 1 : 0)
+  // Column count for the loading / empty placeholder rows (Service column is admin-only; the Status
+  // column is always present now that it doubles as the draft indicator).
+  const colSpan = isService ? 8 : 9
 
   function doApprove(sub: Submission) {
     setActionError(null)
@@ -410,19 +431,17 @@ export function SubmissionsPage() {
             ))}
           </Dropdown>
         </Field>
-        {approvalEnabled && !isService && (
-          <Field label="Approval">
-            <Dropdown
-              selectedOptions={[approvalFilter]}
-              value={approvalFilterLabels[approvalFilter]}
-              onOptionSelect={(_, d) => setApprovalFilter((d.optionValue as ApprovalFilter) ?? 'all')}
-            >
-              {(Object.keys(approvalFilterLabels) as ApprovalFilter[]).map(k => (
-                <Option key={k} value={k}>{approvalFilterLabels[k]}</Option>
-              ))}
-            </Dropdown>
-          </Field>
-        )}
+        <Field label="Status">
+          <Dropdown
+            selectedOptions={[statusFilter]}
+            value={statusFilterLabels[statusFilter]}
+            onOptionSelect={(_, d) => setStatusFilter((d.optionValue as StatusFilter) ?? 'all')}
+          >
+            {statusOptions.map(k => (
+              <Option key={k} value={k}>{statusFilterLabels[k]}</Option>
+            ))}
+          </Dropdown>
+        </Field>
         <Field label="Interval">
           <Dropdown
             selectedOptions={[interval]}
@@ -478,7 +497,7 @@ export function SubmissionsPage() {
             <TableHeaderCell>Submitted at</TableHeaderCell>
             {!isService && <TableHeaderCell>Service</TableHeaderCell>}
             <TableHeaderCell>Schema</TableHeaderCell>
-            {approvalEnabled && <TableHeaderCell>Status</TableHeaderCell>}
+            <TableHeaderCell>Status</TableHeaderCell>
             <TableHeaderCell>Samples</TableHeaderCell>
             <TableHeaderCell>Warnings</TableHeaderCell>
             <TableHeaderCell>Created</TableHeaderCell>
@@ -499,20 +518,22 @@ export function SubmissionsPage() {
             >
               <TableCell>
                 <Tooltip content={formatDateTime(sub.submittedAt)} relationship="label">
-                  <TableCellLayout media={<SubmissionAvatar status={sub.approvalStatus} />}>
+                  <TableCellLayout media={<SubmissionAvatar status={sub.approvalStatus} isDraft={sub.isDraft} />}>
                     {formatDate(sub.submittedAt)}
                   </TableCellLayout>
                 </Tooltip>
               </TableCell>
               {!isService && <TableCell>{resolveServiceLabel(sub, isService, me, services.data?.items ?? [])}</TableCell>}
               <TableCell>{resolveSchemaLabel(sub, schemasByName)}</TableCell>
-              {approvalEnabled && (
-                <TableCell>
-                  {sub.approvalStatus === 'Rejected' && rejectionNote(sub)
-                    ? <Tooltip content={rejectionNote(sub)!} relationship="label"><span><ApprovalBadge status={sub.approvalStatus} /></span></Tooltip>
-                    : <ApprovalBadge status={sub.approvalStatus} />}
-                </TableCell>
-              )}
+              <TableCell>
+                {sub.isDraft
+                  ? <Badge appearance="tint" color="informative">Draft</Badge>
+                  : approvalEnabled
+                    ? (sub.approvalStatus === 'Rejected' && rejectionNote(sub)
+                        ? <Tooltip content={rejectionNote(sub)!} relationship="label"><span><ApprovalBadge status={sub.approvalStatus} /></span></Tooltip>
+                        : <ApprovalBadge status={sub.approvalStatus} />)
+                    : '—'}
+              </TableCell>
               <TableCell>{sub.samples.length}</TableCell>
               <TableCell>
                 {(sub.warnings?.length ?? 0) > 0
@@ -767,6 +788,16 @@ function SubmissionViewBody({
         <Field label="Schema"><Body1>{schemaDisplay}</Body1></Field>
         <Field label="Samples"><Body1>{submission.samples.length}</Body1></Field>
       </div>
+
+      {submission.isDraft && (
+        <div>
+          <Badge appearance="tint" color="informative">Draft</Badge>
+          <Body1 style={{ marginTop: 4, color: tokens.colorNeutralForeground3 }}>
+            This submission is a work-in-progress draft. It is excluded from reporting and approval
+            until it is published.
+          </Body1>
+        </div>
+      )}
 
       {showApproval && (
         <>

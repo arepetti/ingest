@@ -64,6 +64,7 @@ public sealed class AdminNotificationsController : ControllerBase
         var updated = await _settings.UpdateAsync(new NotificationSettingsUpdate(
             req.Upcoming.ToUpdate(), req.Missed.ToUpdate(), req.Warnings.ToUpdate(),
             req.PendingApproval.ToUpdate(), req.Approved.ToUpdate(), req.Rejected.ToUpdate(),
+            req.DraftSaved.ToUpdate(),
             req.UpcomingLeadHours, req.AdminRecipientAccountIds ?? new()), ct);
         await _audit.RecordAsync(AuditTargetType.Settings, AuditChangeType.Edit, AuditTargets.NotificationSettings, "Notification settings", ct);
         return Ok(NotificationSettingsDto.From(updated));

@@ -27,6 +27,9 @@ public static class DefaultEmailTemplates
     /// <summary>Template key for the "submission rejected" notice.</summary>
     public const string Rejected = "notification.rejected";
 
+    /// <summary>Template key for the "draft saved" nudge.</summary>
+    public const string DraftSaved = "notification.draftSaved";
+
     /// <summary>Every built-in template, in display order.</summary>
     public static IReadOnlyList<EmailTemplate> All { get; } = new[]
     {
@@ -142,6 +145,30 @@ public static class DefaultEmailTemplates
                 "<p>The submission from <strong>{{ service.label }}</strong> (id {{ submissionId }}, {{ submittedAt }}) was rejected{% if decidedBy %} by {{ decidedBy }}{% endif %} and will not go live.</p>" +
                 "{% if reason %}<p>Reason: {{ reason }}</p>{% endif %}" +
                 "<p>You can re-submit corrected data for the same period.</p><p>— Ingest</p>",
+        },
+        new EmailTemplate
+        {
+            Key = DraftSaved,
+            Name = "Draft saved nudge",
+            Description = "Sent every time a submission is saved as a draft, nudging collaborators to keep filling it in. " +
+                          "Model: service (name, label), submissionId, submittedAt, schemas[] (strings), sampleCount, editPath. " +
+                          "editPath is a relative path (e.g. /submissions/{id}/edit) shown as plain text — the server doesn't know its public URL, so paste it after your console's host.",
+            Subject = "Draft saved — {{ service.label }}",
+            TextBody =
+                "Hello,\n\n" +
+                "A draft submission for {{ service.label }} has been saved and is waiting to be completed.\n" +
+                "Schemas: {% for s in schemas %}{{ s }}{% unless forloop.last %}, {% endunless %}{% endfor %} ({{ sampleCount }} value(s) so far).\n\n" +
+                "Open it in the admin console at this path (add it after your console address):\n" +
+                "{{ editPath }}\n\n" +
+                "The draft stays out of reporting until it is published.\n\n" +
+                "— Ingest",
+            HtmlBody =
+                "<p>Hello,</p>" +
+                "<p>A draft submission for <strong>{{ service.label }}</strong> has been saved and is waiting to be completed.</p>" +
+                "<p>Schemas: {% for s in schemas %}{{ s }}{% unless forloop.last %}, {% endunless %}{% endfor %} ({{ sampleCount }} value(s) so far).</p>" +
+                "<p>Open it in the admin console at this path (add it after your console address):<br>" +
+                "<code>{{ editPath }}</code></p>" +
+                "<p>The draft stays out of reporting until it is published.</p><p>— Ingest</p>",
         },
     };
 }

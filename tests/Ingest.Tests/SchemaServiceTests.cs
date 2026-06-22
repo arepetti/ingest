@@ -866,7 +866,7 @@ public class SchemaServiceTests
 
         public Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) =>
             Task.FromResult<Submission?>(null);
-        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, ApprovalStatus? approvalStatus = null, CancellationToken ct = default) =>
+        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, ApprovalStatus? approvalStatus = null, bool? draft = null, CancellationToken ct = default) =>
             Task.FromResult(new PagedResult<Submission>(Array.Empty<Submission>(), 0, 1, 0));
         public Task<long> CountByApprovalStatusAsync(ApprovalStatus status, CancellationToken ct = default) => Task.FromResult(0L);
         public Task AddAsync(Submission submission, CancellationToken ct = default) => Task.CompletedTask;

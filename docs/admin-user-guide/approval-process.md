@@ -17,6 +17,8 @@ Every submission carries an **approval status**:
 
 A `Pending` or `Rejected` submission is held out of the live projection, so Power BI, the OData feed, Explore and reports never see it. It's still fully visible on the **Submissions** page so submitters and reviewers can see what's happening.
 
+> **Drafts never enter approval.** A submission [saved as a draft](submissions.md#saving-a-draft) sits outside this lifecycle entirely — it's `NotRequired` but flagged as a draft, so it has no required approvers and is held out of reporting like a `Pending` one. The approval policy is resolved only when the draft is **published**, at which point it lands in `Pending` (or goes live) exactly as a first-time submission would.
+
 ## Who can approve
 
 Approving or rejecting needs the **`submissions:approve`** capability (and `submissions:read` to see the queue). The **Approver** role is just the template that seeds exactly those two capabilities; an **Admin** holds every capability and can always approve. You can equally grant `submissions:approve` to any other non-admin account that should be able to review. See [accounts.md § Permissions (capabilities)](accounts.md#permissions-capabilities) and [architecture/authentication.md § Authorisation: capabilities](../architecture/authentication.md#authorisation-capabilities).

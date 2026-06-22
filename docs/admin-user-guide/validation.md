@@ -14,6 +14,9 @@ Long rules can be broken across multiple lines for readability — the system no
 > [!TIP]
 > You don't have to save and submit to try a rule out. The schema editor's **Preview** button (see [Previewing a schema](schemas.md#previewing-a-schema)) renders the live form from your unsaved schema and evaluates these rules in the browser as you type. It's a best-effort approximation — the server stays authoritative, and a few helpers (`sampleTimestamp()`, `serviceName()`) and the regex dialect differ client-side — so verify anything important with a real submission too.
 
+> [!NOTE]
+> **Rules don't run on drafts.** A submission [saved as a draft](submissions.md#saving-a-draft) is only checked for shape (type, min/max, length, regex) on the values that were filled in. The rules described here — value-level, schema-level, `Enabled if` / `Visible if`, and warnings — plus required-value and cadence checks are all skipped until the draft is published, at which point the full pipeline runs.
+
 ## Why bother
 
 The built-in `min`, `max`, `regex` and friends are enough for the obvious shape checks. Validation rules buy you the rest:

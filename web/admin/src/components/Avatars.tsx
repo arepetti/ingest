@@ -59,12 +59,15 @@ function colorForApproval(status?: ApprovalStatus): AvatarColor {
   }
 }
 
-export function SubmissionAvatar({ status, size = 32 }: { status?: ApprovalStatus; size?: AvatarSize }) {
-  const label = status && status !== 'NotRequired' ? `Submission · ${status}` : 'Submission'
+export function SubmissionAvatar({ status, isDraft = false, size = 32 }: { status?: ApprovalStatus; isDraft?: boolean; size?: AvatarSize }) {
+  // A draft is a lifecycle of its own (independent of approval), so it wins the tint and gets a
+  // distinct grape colour (none of the approval states use it). Otherwise fall back to the
+  // approval-status colour.
+  const label = isDraft ? 'Submission · Draft' : status && status !== 'NotRequired' ? `Submission · ${status}` : 'Submission'
   return (
     <Avatar
       icon={<DocumentBulletList20Regular />}
-      color={colorForApproval(status)}
+      color={isDraft ? 'grape' : colorForApproval(status)}
       size={size}
       aria-label={label}
     />

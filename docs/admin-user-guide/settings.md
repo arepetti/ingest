@@ -48,8 +48,11 @@ The built-in templates and the model each one is rendered against:
 | `notification.pendingApproval` | Submission pending approval | `service.name`, `service.label`, `submissionId`, `submittedAt`, `schemas[]` (strings), `sampleCount` |
 | `notification.approved`   | Submission approved     | `service.name`, `service.label`, `submissionId`, `submittedAt`, `schemas[]`, `sampleCount`, `decidedBy`, `note` |
 | `notification.rejected`   | Submission rejected     | `service.name`, `service.label`, `submissionId`, `submittedAt`, `schemas[]`, `sampleCount`, `decidedBy`, `reason` |
+| `notification.draftSaved` | Draft saved nudge       | `service.name`, `service.label`, `submissionId`, `submittedAt`, `schemas[]` (strings), `sampleCount`, `editPath` |
 
 Reference fields with the usual Liquid syntax, e.g. `{{ service.label }}` or `{% for item in items %}{{ item.value }}{% endfor %}`.
+
+> The draft nudge's `editPath` is a **relative** path (e.g. `/submissions/{id}/edit`), shown as plain text rather than a link — the server doesn't know its own public URL, so recipients paste it after their console address.
 
 ## Notifications
 
@@ -58,6 +61,7 @@ The **Notifications** section controls *which events generate emails* and *who r
 - **Upcoming submission reminder** — a required value's cadence window is about to close and nothing has been submitted yet. Set the **lead time** (hours before the window closes) to control when it fires.
 - **Missed submission alert** — a required value's *previous* window closed without a submission (the deadline passed).
 - **Submission with warnings notice** — a submission was accepted but carried validation warnings.
+- **Draft saved nudge** — a submission was [saved as a draft](submissions.md#saving-a-draft). Unlike the others this is a deliberate, **un-deduplicated** nudge: it fires on *every* draft save (create or re-save) so collaborators are prompted to keep filling it in. It's event-driven (sent the moment the draft is saved, not on the timer) and independent of the approval feature — it appears whether or not approval is enabled. The email carries the relative edit path to reopen the draft. Off by default.
 
 When the [approval workflow](approval-process.md) is enabled (`Approval:Enabled`) three more triggers appear:
 
@@ -72,7 +76,7 @@ For each trigger you choose the recipients (additive):
 
 **Run now** triggers the job immediately (it also runs on a timer — `Notifications:Scheduler:PollMinutes`). Each event is **deduplicated**: the same window/submission is notified at most once, no matter how often the job runs. Enabling a trigger never floods recipients with a backlog — "upcoming" only looks at windows inside the lead time, "missed" only at the just-closed window, and "warnings" only at submissions from the last few days.
 
-Unlike the three scheduled triggers above, the **approval notices are event-driven**: they are sent the moment a submission is held pending, approved, or rejected (not on the timer, and not affected by **Run now**).
+Unlike the three scheduled triggers above, the **approval notices and the draft nudge are event-driven**: they are sent the moment a submission is held pending, approved, rejected, or saved as a draft (not on the timer, and not affected by **Run now**). The draft nudge is also the one trigger that is **not** deduplicated — every draft save re-notifies, by design.
 
 Generated emails land in the outbox and are delivered by the sender like any other; watch their status on **Audit → Sent emails**.
 

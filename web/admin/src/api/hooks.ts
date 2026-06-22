@@ -388,7 +388,7 @@ export const useExploreScorecard = (
 }
 
 export const useSubmissions = (
-  params: { page: number; pageSize: number; serviceId?: string; schemaName?: string; from?: string; to?: string; approvalStatus?: ApprovalStatus },
+  params: { page: number; pageSize: number; serviceId?: string; schemaName?: string; from?: string; to?: string; approvalStatus?: ApprovalStatus; draft?: boolean },
   enabled: boolean = true,
 ) => {
   const search = new URLSearchParams({
@@ -400,6 +400,7 @@ export const useSubmissions = (
   if (params.from)       search.set('from', params.from)
   if (params.to)         search.set('to', params.to)
   if (params.approvalStatus) search.set('approvalStatus', params.approvalStatus)
+  if (params.draft !== undefined) search.set('draft', String(params.draft))
   return useQuery({
     queryKey: ['submissions', params],
     queryFn: () => api.get<Paged<Submission>>(`/api/admin/submissions?${search}`),
@@ -508,8 +509,8 @@ export const useSubmission = (id?: string, enabled: boolean = true) =>
 export const useAdminCreateSubmission = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (req: AdminSubmissionInput) =>
-      api.post<SubmissionWriteResponse>('/api/admin/submissions', req),
+    mutationFn: ({ req, draft }: { req: AdminSubmissionInput; draft?: boolean }) =>
+      api.post<SubmissionWriteResponse>(`/api/admin/submissions${draft ? '?draft=true' : ''}`, req),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['submissions'] }),
   })
 }
@@ -517,8 +518,8 @@ export const useAdminCreateSubmission = () => {
 export const useAdminUpdateSubmission = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, req }: { id: string; req: AdminSubmissionInput }) =>
-      api.put<SubmissionWriteResponse>(`/api/admin/submissions/${id}`, req),
+    mutationFn: ({ id, req, draft }: { id: string; req: AdminSubmissionInput; draft?: boolean }) =>
+      api.put<SubmissionWriteResponse>(`/api/admin/submissions/${id}${draft ? '?draft=true' : ''}`, req),
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ['submissions'] })
       qc.invalidateQueries({ queryKey: ['submission', v.id] })
@@ -971,7 +972,7 @@ export const useMySchemas = (enabled: boolean = true) =>
   })
 
 export const useMySubmissions = (
-  params: { page: number; pageSize: number; schemaName?: string; from?: string; to?: string },
+  params: { page: number; pageSize: number; schemaName?: string; from?: string; to?: string; draft?: boolean },
   enabled: boolean = true,
 ) => {
   const search = new URLSearchParams({
@@ -981,6 +982,7 @@ export const useMySubmissions = (
   if (params.schemaName) search.set('schemaName', params.schemaName)
   if (params.from) search.set('from', params.from)
   if (params.to)   search.set('to', params.to)
+  if (params.draft !== undefined) search.set('draft', String(params.draft))
   return useQuery({
     queryKey: ['my-submissions', params],
     queryFn: () => api.get<Paged<Submission>>(`/api/submissions?${search}`),
@@ -999,8 +1001,8 @@ export const useMySubmission = (id?: string, enabled: boolean = true) =>
 export const useCreateMySubmission = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (req: { samples: SampleInput[] }) =>
-      api.post<SubmissionWriteResponse>('/api/submissions', req),
+    mutationFn: ({ samples, draft }: { samples: SampleInput[]; draft?: boolean }) =>
+      api.post<SubmissionWriteResponse>(`/api/submissions${draft ? '?draft=true' : ''}`, { samples }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['my-submissions'] }),
   })
 }
@@ -1008,8 +1010,8 @@ export const useCreateMySubmission = () => {
 export const useReplaceMySubmission = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, req }: { id: string; req: { samples: SampleInput[] } }) =>
-      api.put<SubmissionWriteResponse>(`/api/submissions/${id}`, req),
+    mutationFn: ({ id, samples, draft }: { id: string; samples: SampleInput[]; draft?: boolean }) =>
+      api.put<SubmissionWriteResponse>(`/api/submissions/${id}${draft ? '?draft=true' : ''}`, { samples }),
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ['my-submissions'] })
       qc.invalidateQueries({ queryKey: ['my-submission', v.id] })

@@ -15,6 +15,7 @@ public sealed record NotificationRuleUpdate(bool Enabled, bool NotifyServiceAcco
 /// <param name="PendingApproval">Pending-approval notice rule.</param>
 /// <param name="Approved">Approved-notice rule.</param>
 /// <param name="Rejected">Rejected-notice rule.</param>
+/// <param name="DraftSaved">Draft-saved nudge rule.</param>
 /// <param name="UpcomingLeadHours">Lead time before a window closes that an upcoming reminder fires.</param>
 /// <param name="AdminRecipientAccountIds">Accounts that receive the admin-list copy.</param>
 public sealed record NotificationSettingsUpdate(
@@ -24,6 +25,7 @@ public sealed record NotificationSettingsUpdate(
     NotificationRuleUpdate PendingApproval,
     NotificationRuleUpdate Approved,
     NotificationRuleUpdate Rejected,
+    NotificationRuleUpdate DraftSaved,
     int UpcomingLeadHours,
     IReadOnlyList<Guid> AdminRecipientAccountIds);
 
@@ -74,6 +76,18 @@ public interface IApprovalNotificationService
 
     /// <summary>Notify that a pending submission was rejected, carrying the reviewer's reason if supplied.</summary>
     Task NotifyRejectedAsync(Submission submission, string? reason, CancellationToken ct = default);
+}
+
+/// <summary>
+/// Event-driven notification fired every time a submission is saved as a draft (create or re-save).
+/// A deliberate nudge for the people collaborating on the draft — there is no dedupe, so each save
+/// re-notifies. Like <see cref="IApprovalNotificationService"/> it is best-effort: it self-gates on
+/// the email master switch and the draft-saved rule, and never throws into the calling write path.
+/// </summary>
+public interface IDraftNotificationService
+{
+    /// <summary>Notify that a submission has been saved as a draft (service-account contact + configured copies).</summary>
+    Task NotifyDraftSavedAsync(Submission submission, CancellationToken ct = default);
 }
 
 /// <summary>

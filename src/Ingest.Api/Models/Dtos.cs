@@ -492,7 +492,8 @@ public sealed record SubmissionDto(
     SubmissionSource Source,
     ApprovalStatus ApprovalStatus,
     List<ApproverSpecDto> RequiredApprovers,
-    List<SubmissionApprovalDto> Approvals)
+    List<SubmissionApprovalDto> Approvals,
+    bool IsDraft)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static SubmissionDto From(Submission s) => new(
@@ -502,7 +503,8 @@ public sealed record SubmissionDto(
         s.SubmittedAt, s.ReplacedAt, s.CreatedAt, s.CreatedBy, s.ModifiedAt, s.ModifiedBy, s.IsDeleted,
         s.Source, s.ApprovalStatus,
         (s.RequiredApprovers ?? new()).Select(ApproverSpecDto.From).ToList(),
-        (s.Approvals ?? new()).Select(SubmissionApprovalDto.From).ToList());
+        (s.Approvals ?? new()).Select(SubmissionApprovalDto.From).ToList(),
+        s.IsDraft);
 }
 
 /// <summary>
@@ -773,6 +775,7 @@ public sealed record NotificationRuleDto(bool Enabled, bool NotifyServiceAccount
 /// <param name="PendingApproval">Pending-approval notice rule.</param>
 /// <param name="Approved">Approved-notice rule.</param>
 /// <param name="Rejected">Rejected-notice rule.</param>
+/// <param name="DraftSaved">Draft-saved nudge rule.</param>
 /// <param name="UpcomingLeadHours">Lead time (hours) before a window closes that an upcoming reminder fires.</param>
 /// <param name="AdminRecipientAccountIds">Accounts that receive the admin-list copy.</param>
 public sealed record NotificationSettingsDto(
@@ -782,6 +785,7 @@ public sealed record NotificationSettingsDto(
     NotificationRuleDto PendingApproval,
     NotificationRuleDto Approved,
     NotificationRuleDto Rejected,
+    NotificationRuleDto DraftSaved,
     int UpcomingLeadHours,
     List<Guid> AdminRecipientAccountIds)
 {
@@ -793,6 +797,7 @@ public sealed record NotificationSettingsDto(
         NotificationRuleDto.From(s.PendingApproval),
         NotificationRuleDto.From(s.Approved),
         NotificationRuleDto.From(s.Rejected),
+        NotificationRuleDto.From(s.DraftSaved),
         s.UpcomingLeadHours,
         s.AdminRecipientAccountIds);
 }
@@ -804,6 +809,7 @@ public sealed record NotificationSettingsDto(
 /// <param name="PendingApproval">Pending-approval notice rule.</param>
 /// <param name="Approved">Approved-notice rule.</param>
 /// <param name="Rejected">Rejected-notice rule.</param>
+/// <param name="DraftSaved">Draft-saved nudge rule.</param>
 /// <param name="UpcomingLeadHours">Lead time (hours, clamped 1..720).</param>
 /// <param name="AdminRecipientAccountIds">Accounts that receive the admin-list copy.</param>
 public sealed record UpdateNotificationSettingsRequest(
@@ -813,6 +819,7 @@ public sealed record UpdateNotificationSettingsRequest(
     NotificationRuleDto PendingApproval,
     NotificationRuleDto Approved,
     NotificationRuleDto Rejected,
+    NotificationRuleDto DraftSaved,
     int UpcomingLeadHours,
     List<Guid>? AdminRecipientAccountIds = null);
 

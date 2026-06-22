@@ -29,6 +29,7 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     /// rendered them inactive).
     /// </remarks>
     /// <param name="input">Submission payload (schema name plus the list of samples).</param>
+    /// <param name="draft">When true, save as a work-in-progress draft: relaxed validation, excluded from every live stream and from approval until published.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="201">The submission was accepted; the body carries its new id and any warnings.</response>
     /// <response code="400">Validation failed. The <c>errors</c> field on the problem-details body lists every offending value/rule.</response>
@@ -37,9 +38,9 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     [ProducesResponseType(typeof(SubmissionWriteResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Create([FromBody] SubmissionInput input, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] SubmissionInput input, [FromQuery] bool draft, CancellationToken ct)
     {
-        var written = await service.CreateMineAsync(User.CurrentAccountId(), input, Request.ResolveSource(), ct);
+        var written = await service.CreateMineAsync(User.CurrentAccountId(), input, Request.ResolveSource(), draft, ct);
         return Created($"/api/submissions/{written.Submission.Id}",
             new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
@@ -54,9 +55,10 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     /// </remarks>
     /// <param name="id">Id of the submission to replace.</param>
     /// <param name="input">New submission payload.</param>
+    /// <param name="draft">When true, save the (already-draft) submission as a draft; false on an existing draft publishes it. A published submission cannot be returned to draft.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">The replacement succeeded; the body carries the updated submission's id and any warnings.</response>
-    /// <response code="400">Validation failed, or the cadence window for that submission has already closed.</response>
+    /// <response code="400">Validation failed, the cadence window for that submission has already closed, or an attempt was made to return a published submission to draft.</response>
     /// <response code="403">The submission belongs to a different account.</response>
     /// <response code="404">No submission with that id, or no matching schema.</response>
     [HttpPut("{id:guid}")]
@@ -64,9 +66,9 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Replace(Guid id, [FromBody] SubmissionInput input, CancellationToken ct)
+    public async Task<IActionResult> Replace(Guid id, [FromBody] SubmissionInput input, [FromQuery] bool draft, CancellationToken ct)
     {
-        var written = await service.ReplaceMineAsync(User.CurrentAccountId(), id, input, Request.ResolveSource(), ct);
+        var written = await service.ReplaceMineAsync(User.CurrentAccountId(), id, input, Request.ResolveSource(), draft, ct);
         return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
 
@@ -95,6 +97,7 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     /// <param name="from">Lower bound on submission timestamp (inclusive). Omit for no lower bound.</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive). Omit for no upper bound.</param>
     /// <param name="schemaName">Restrict to submissions for the given schema. Omit for all schemas.</param>
+    /// <param name="draft">Restrict to drafts (<c>true</c>) or exclude them (<c>false</c>); omit to return both.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">A page of submissions.</response>
     [HttpGet]
@@ -106,12 +109,13 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         [FromQuery] string? schemaName,
+        [FromQuery] bool? draft,
         CancellationToken ct)
     {
         var result = await service.ListMineAsync(
             User.CurrentAccountId(),
             RequestHelpers.ToPageRequest(page, pageSize, sort, false),
-            from, to, schemaName, ct);
+            from, to, schemaName, draft, ct);
         return Ok(result.Map(SubmissionDto.From));
     }
 }

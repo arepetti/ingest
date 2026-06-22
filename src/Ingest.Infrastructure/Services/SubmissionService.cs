@@ -29,6 +29,7 @@ public sealed class SubmissionService : ISubmissionService
     private readonly IApprovalSettingsService _approvalSettings;
     private readonly IApprovalRulesService _approvalRules;
     private readonly IApprovalNotificationService _approvalNotifier;
+    private readonly IDraftNotificationService _draftNotifier;
     private readonly bool _webhooksEnabled;
     private readonly bool _approvalEnabled;
     private readonly ILogger<SubmissionService> _logger;
@@ -47,6 +48,7 @@ public sealed class SubmissionService : ISubmissionService
     /// <param name="approvalRules">Cross-cutting per-service/per-schema approval rules, applied additively to the schema/global policy.</param>
     /// <param name="approvalOptions">Bound approval options (the master switch gating the whole workflow).</param>
     /// <param name="approvalNotifier">Sends the approval-lifecycle emails (pending/approved/rejected); self-gates on the email switch.</param>
+    /// <param name="draftNotifier">Sends the draft-saved nudge on every draft save; self-gates on the email switch and its rule.</param>
     /// <param name="logger">Logger; webhook publishing failures are logged but never fail an accepted write.</param>
     public SubmissionService(
         ISubmissionRepository submissions,
@@ -62,6 +64,7 @@ public sealed class SubmissionService : ISubmissionService
         IApprovalRulesService approvalRules,
         IOptions<ApprovalOptions> approvalOptions,
         IApprovalNotificationService approvalNotifier,
+        IDraftNotificationService draftNotifier,
         ILogger<SubmissionService> logger)
     {
         _submissions = submissions;
@@ -75,6 +78,7 @@ public sealed class SubmissionService : ISubmissionService
         _approvalSettings = approvalSettings;
         _approvalRules = approvalRules;
         _approvalNotifier = approvalNotifier;
+        _draftNotifier = draftNotifier;
         _webhooksEnabled = webhookOptions.Value.Enabled;
         _approvalEnabled = approvalOptions.Value.Enabled;
         _logger = logger;
@@ -83,33 +87,35 @@ public sealed class SubmissionService : ISubmissionService
     // ── Service-facing ──
 
     /// <inheritdoc />
-    public async Task<SubmissionWriteResult> CreateMineAsync(Guid callerAccountId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, CancellationToken ct = default)
+    public async Task<SubmissionWriteResult> CreateMineAsync(Guid callerAccountId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, CancellationToken ct = default)
     {
         var account = await _accounts.GetByIdAsync(callerAccountId, ct: ct)
             ?? throw new NotFoundException("Account");
         var visible = await LoadVisibleAsync(account.Id, ct);
 
         var submission = MapInput(account, input, visible, source);
-        var validation = await ValidateOrThrow(account, submission, isReplacement: false, existing: null, ct);
+        submission.IsDraft = draft;
+        var validation = await ValidateOrThrow(account, submission, isReplacement: false, existing: null, draft, ct);
 
         // Strip samples the validator told us to drop (EnabledIf/VisibleIf == false). The
         // associated warnings are already in validation.Warnings; the surviving samples are
-        // what gets persisted and projected.
+        // what gets persisted and projected. (Draft mode never discards, so this is a no-op there.)
         submission.Samples = FilterDiscarded(submission.Samples, validation.DiscardedSamples);
         submission.Warnings = validation.Warnings.ToList();
 
-        await ApplyApprovalForWriteAsync(submission, visible, ct);
+        await ApplyDraftOrApprovalAsync(submission, visible, draft, ct);
         await PersistAsync(submission, visible, isReplacement: false, ct);
         return new SubmissionWriteResult(submission, validation.Warnings);
     }
 
     /// <inheritdoc />
-    public async Task<SubmissionWriteResult> ReplaceMineAsync(Guid callerAccountId, Guid submissionId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, CancellationToken ct = default)
+    public async Task<SubmissionWriteResult> ReplaceMineAsync(Guid callerAccountId, Guid submissionId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, CancellationToken ct = default)
     {
         var existing = await _submissions.GetByIdAsync(submissionId, ct: ct)
             ?? throw new NotFoundException($"Submission '{submissionId}'");
         if (existing.ServiceAccountId != callerAccountId)
             throw new ForbiddenException("Submission belongs to a different account.");
+        EnsureDraftTransitionAllowed(existing, draft);
 
         var account = await _accounts.GetByIdAsync(existing.ServiceAccountId, ct: ct)
             ?? throw new NotFoundException("Account");
@@ -118,18 +124,20 @@ public sealed class SubmissionService : ISubmissionService
         // Cadence window: a service can only revise samples whose cadence period is still open.
         // We evaluate against the EXISTING samples (each value's declared cadence + its recorded
         // timestamp) so that backdating new samples can't be used to circumvent the limit. Admins
-        // wanting to override go through AdminReplaceAsync instead.
-        if (ClosedCadenceError(existing, visible) is { } cadenceError)
+        // wanting to override go through AdminReplaceAsync instead. Drafts are exempt — nothing is
+        // live yet, and window uniqueness is (re-)enforced by the validator when they're published.
+        if (!existing.IsDraft && ClosedCadenceError(existing, visible) is { } cadenceError)
             throw new ForbiddenException(cadenceError);
 
         var replacement = MapInput(account, input, visible, source);
         replacement.Id = existing.Id;
-        var validation = await ValidateOrThrow(account, replacement, isReplacement: true, existing, ct);
+        var validation = await ValidateOrThrow(account, replacement, isReplacement: true, existing, draft, ct);
 
         existing.Samples = FilterDiscarded(replacement.Samples, validation.DiscardedSamples);
         existing.Warnings = validation.Warnings.ToList();
         existing.Source = source;
-        await ApplyApprovalForWriteAsync(existing, visible, ct);
+        existing.IsDraft = draft;
+        await ApplyDraftOrApprovalAsync(existing, visible, draft, ct);
         await PersistAsync(existing, visible, isReplacement: true, ct);
         return new SubmissionWriteResult(existing, validation.Warnings);
     }
@@ -145,45 +153,47 @@ public sealed class SubmissionService : ISubmissionService
     }
 
     /// <inheritdoc />
-    public Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default) =>
-        _submissions.ListAsync(request, callerAccountId, from, to, schemaName, ct: ct);
+    public Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, bool? draft = null, CancellationToken ct = default) =>
+        _submissions.ListAsync(request, callerAccountId, from, to, schemaName, draft: draft, ct: ct);
 
     // ── Admin-facing ──
 
     /// <inheritdoc />
-    public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, ApprovalStatus? approvalStatus = null, CancellationToken ct = default) =>
-        _submissions.ListAsync(request, serviceId, from, to, schemaName, approvalStatus, ct);
+    public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, ApprovalStatus? approvalStatus = null, bool? draft = null, CancellationToken ct = default) =>
+        _submissions.ListAsync(request, serviceId, from, to, schemaName, approvalStatus, draft, ct);
 
     /// <inheritdoc />
     public Task<Submission?> GetAsync(Guid submissionId, bool includeDeleted, CancellationToken ct = default) =>
         _submissions.GetByIdAsync(submissionId, includeDeleted, ct);
 
     /// <inheritdoc />
-    public async Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, DateTime? submittedAt = null, CancellationToken ct = default)
+    public async Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, DateTime? submittedAt = null, bool draft = false, CancellationToken ct = default)
     {
         var service = await _accounts.GetByIdAsync(input.ServiceAccountId, ct: ct)
             ?? throw new NotFoundException($"Service '{input.ServiceAccountId}'");
         var visible = await LoadVisibleAsync(service.Id, ct);
 
         var submission = MapInput(service, new SubmissionInput(input.Samples), visible, source);
+        submission.IsDraft = draft;
         // Back-fill case: date the record to the supplied instant (e.g. the sample timestamp on a
         // bulk import) instead of letting the repository stamp "now".
         if (submittedAt is { } at)
             submission.SubmittedAt = DateTime.SpecifyKind(at, DateTimeKind.Utc);
-        var validation = await ValidateOrThrow(service, submission, isReplacement: false, existing: null, ct);
+        var validation = await ValidateOrThrow(service, submission, isReplacement: false, existing: null, draft, ct);
 
         submission.Samples = FilterDiscarded(submission.Samples, validation.DiscardedSamples);
         submission.Warnings = validation.Warnings.ToList();
-        await ApplyApprovalForWriteAsync(submission, visible, ct);
+        await ApplyDraftOrApprovalAsync(submission, visible, draft, ct);
         await PersistAsync(submission, visible, isReplacement: false, ct);
         return new SubmissionWriteResult(submission, validation.Warnings);
     }
 
     /// <inheritdoc />
-    public async Task<SubmissionWriteResult> AdminReplaceAsync(Guid submissionId, AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, CancellationToken ct = default)
+    public async Task<SubmissionWriteResult> AdminReplaceAsync(Guid submissionId, AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, bool draft = false, CancellationToken ct = default)
     {
         var existing = await _submissions.GetByIdAsync(submissionId, ct: ct)
             ?? throw new NotFoundException($"Submission '{submissionId}'");
+        EnsureDraftTransitionAllowed(existing, draft);
 
         // The service of an existing submission is immutable; the input value is ignored if it differs.
         var service = await _accounts.GetByIdAsync(existing.ServiceAccountId, ct: ct)
@@ -192,12 +202,13 @@ public sealed class SubmissionService : ISubmissionService
 
         var replacement = MapInput(service, new SubmissionInput(input.Samples), visible, source);
         replacement.Id = existing.Id;
-        var validation = await ValidateOrThrow(service, replacement, isReplacement: true, existing, ct);
+        var validation = await ValidateOrThrow(service, replacement, isReplacement: true, existing, draft, ct);
 
         existing.Samples = FilterDiscarded(replacement.Samples, validation.DiscardedSamples);
         existing.Warnings = validation.Warnings.ToList();
         existing.Source = source;
-        await ApplyApprovalForWriteAsync(existing, visible, ct);
+        existing.IsDraft = draft;
+        await ApplyDraftOrApprovalAsync(existing, visible, draft, ct);
         await PersistAsync(existing, visible, isReplacement: true, ct);
         return new SubmissionWriteResult(existing, validation.Warnings);
     }
@@ -254,12 +265,44 @@ public sealed class SubmissionService : ISubmissionService
         };
     }
 
-    private async Task<SubmissionValidationResult> ValidateOrThrow(Account account, Submission submission, bool isReplacement, Submission? existing, CancellationToken ct)
+    private async Task<SubmissionValidationResult> ValidateOrThrow(Account account, Submission submission, bool isReplacement, Submission? existing, bool draft, CancellationToken ct)
     {
-        var result = await _validator.ValidateAsync(account, submission, isReplacement, existing, ct);
+        var result = await _validator.ValidateAsync(account, submission, isReplacement, existing, draft, ct);
         if (!result.IsValid)
             throw new ValidationException(result.Errors);
         return result;
+    }
+
+    /// <summary>
+    /// Reject the one illegal draft transition: a submission that is already published (live,
+    /// pending, or rejected — anything that isn't currently a draft) cannot be pulled back to draft.
+    /// Going the other way (draft → publish) and re-saving a draft as a draft are both fine.
+    /// </summary>
+    private static void EnsureDraftTransitionAllowed(Submission existing, bool draft)
+    {
+        if (draft && !existing.IsDraft)
+            throw new ValidationException(new[]
+            {
+                "This submission has already been published and cannot be returned to draft. " +
+                "Edit it directly, or clone it into a new draft.",
+            });
+    }
+
+    /// <summary>
+    /// Stamp the approval state for a write. A draft never enters the approval workflow — it is left
+    /// a clean slate (no required approvers, no recorded decisions) until it is published, at which
+    /// point the normal source-aware policy runs through <see cref="ApplyApprovalForWriteAsync"/>.
+    /// </summary>
+    private async Task ApplyDraftOrApprovalAsync(Submission submission, IReadOnlyDictionary<string, Schema> visible, bool draft, CancellationToken ct)
+    {
+        if (draft)
+        {
+            submission.ApprovalStatus = ApprovalStatus.NotRequired;
+            submission.RequiredApprovers = new List<ApproverSpec>();
+            submission.Approvals = new List<SubmissionApproval>();
+            return;
+        }
+        await ApplyApprovalForWriteAsync(submission, visible, ct);
     }
 
     private static List<Sample> FilterDiscarded(IEnumerable<Sample> samples, IReadOnlySet<SampleRef> discarded)
@@ -277,11 +320,12 @@ public sealed class SubmissionService : ISubmissionService
         else
             await _submissions.AddAsync(submission, ct);
 
-        // A submission only feeds the live read model (OData / Explore) once it's live: never
-        // required approval, or already approved. Pending/Rejected submissions have no projection,
-        // so replacing a previously-approved submission (which flips it to Pending) also removes
-        // its live rows here via the empty-list replace.
-        var live = IsLive(submission.ApprovalStatus);
+        // A submission only feeds the live read model (OData / Explore) once it's live: not a draft,
+        // and never required approval or already approved. Drafts and Pending/Rejected submissions
+        // have no projection, so replacing a previously-approved submission (which flips it to
+        // Pending, or back to a draft is disallowed) also removes its live rows here via the
+        // empty-list replace.
+        var live = IsLive(submission);
         var projections = live
             ? SampleProjectionBuilder.Build(submission, visible)
             : Enumerable.Empty<SampleProjection>();
@@ -296,8 +340,14 @@ public sealed class SubmissionService : ISubmissionService
 
         // The accepted webhook fires only when the submission is actually live. For approval-gated
         // submissions that happens later, on the approve transition (see ApproveAsync). A submission
-        // held Pending instead emits the pending-approval signal so reviewers are alerted.
-        if (live)
+        // held Pending instead emits the pending-approval signal so reviewers are alerted. A draft
+        // emits no webhook at all — it isn't a business event yet — but does send a deliberate nudge
+        // to the people filling it in (Step 6), on every save (create and re-save).
+        if (submission.IsDraft)
+        {
+            await _draftNotifier.NotifyDraftSavedAsync(submission, ct);
+        }
+        else if (live)
         {
             await PublishAcceptedAsync(submission, isReplacement, ct);
         }
@@ -309,8 +359,9 @@ public sealed class SubmissionService : ISubmissionService
         }
     }
 
-    private static bool IsLive(ApprovalStatus status) =>
-        status is ApprovalStatus.NotRequired or ApprovalStatus.Approved;
+    private static bool IsLive(Submission submission) =>
+        !submission.IsDraft &&
+        submission.ApprovalStatus is ApprovalStatus.NotRequired or ApprovalStatus.Approved;
 
     /// <summary>
     /// Resolve the effective approval policy for a write and stamp the submission accordingly. Always

@@ -116,6 +116,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationSettingsService, NotificationSettingsService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IApprovalNotificationService, ApprovalNotificationService>();
+        services.AddScoped<IDraftNotificationService, DraftNotificationService>();
 
         // Outbound webhooks. Like email these are always registered (cheap); behaviour is gated by
         // Webhooks:Enabled (controllers 404, the dispatcher worker only registers when enabled, and

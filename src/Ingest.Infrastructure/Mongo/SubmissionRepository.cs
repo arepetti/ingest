@@ -32,6 +32,7 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
         DateTime? to = null,
         string? schemaName = null,
         ApprovalStatus? approvalStatus = null,
+        bool? draft = null,
         CancellationToken ct = default)
     {
         var filter = ApplySoftDelete(Builders<Submission>.Filter.Empty, request.IncludeDeleted);
@@ -39,6 +40,8 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Eq(s => s.ServiceAccountId, sid));
         if (approvalStatus is { } status)
             filter = Builders<Submission>.Filter.And(filter, ApprovalStatusFilter(status));
+        if (draft is { } isDraft)
+            filter = Builders<Submission>.Filter.And(filter, DraftFilter(isDraft));
         if (from is { } f)
             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Gte(s => s.SubmittedAt, DateTime.SpecifyKind(f, DateTimeKind.Utc)));
         if (to is { } t)
@@ -92,6 +95,18 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
                 Builders<Submission>.Filter.Eq(s => s.ApprovalStatus, status),
                 Builders<Submission>.Filter.Exists(s => s.ApprovalStatus, false))
             : Builders<Submission>.Filter.Eq(s => s.ApprovalStatus, status);
+
+    /// <summary>
+    /// Filter for the draft flag. Legacy submissions that predate the draft feature have no
+    /// <c>isDraft</c> field; they are non-drafts (live the moment they landed), so the
+    /// "not a draft" match additionally accepts documents where the field is absent.
+    /// </summary>
+    private static FilterDefinition<Submission> DraftFilter(bool isDraft) =>
+        isDraft
+            ? Builders<Submission>.Filter.Eq(s => s.IsDraft, true)
+            : Builders<Submission>.Filter.Or(
+                Builders<Submission>.Filter.Eq(s => s.IsDraft, false),
+                Builders<Submission>.Filter.Exists(s => s.IsDraft, false));
 
     /// <inheritdoc />
     public Task AddAsync(Submission submission, CancellationToken ct = default)

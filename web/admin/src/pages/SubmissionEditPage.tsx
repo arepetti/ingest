@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Button, Card, Dropdown, Field, Input,
+  Menu, MenuItem, MenuList, MenuPopover, MenuTrigger,
   MessageBar, MessageBarBody, MessageBarTitle,
-  Option, Title2, Toolbar, ToolbarButton,
+  Option, SplitButton, Title2, Toolbar, ToolbarButton,
   makeStyles, tokens,
 } from '@fluentui/react-components'
 import { ArrowLeft20Regular } from '@fluentui/react-icons'
@@ -182,21 +183,25 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
   // VisibleIf hide/grey values and Warning rules surface inline as the user types.
   const { rowStates } = useSampleRules(schema, rows)
 
-  function buildPayload(): SampleInput[] | null {
+  function buildPayload(draft: boolean): SampleInput[] | null {
     if (!schema) return null
     // Only include rows the user actually filled — booleans use a tri-state dropdown so "unset" is a
-    // first-class option there too. Required-but-empty values are reported back to the user.
-    // Rows hidden/disabled by EnabledIf/VisibleIf are silently dropped here (the server would do
-    // the same and emit a warning).
-    const dropped = new Set(rowStates.filter(s => s.discarded).map(s => s.name))
+    // first-class option there too. On a normal save, required-but-empty values are reported back to
+    // the user and rows hidden/disabled by EnabledIf/VisibleIf are silently dropped (the server would
+    // do the same and emit a warning). A draft is deliberately partial: it keeps every filled value
+    // (no conditional-display drop, mirroring the server's relaxed draft validation) and never blocks
+    // on missing required values.
+    const dropped = draft ? new Set<string>() : new Set(rowStates.filter(st => st.discarded).map(st => st.name))
     const filled = rows.filter(r => isFilled(r.value) && !dropped.has(r.name))
-    const filledNames = new Set(filled.map(r => r.name))
-    const missing = schema.values
-      .filter(v => v.required && v.enabled && !filledNames.has(v.name) && !dropped.has(v.name))
-      .map(v => v.label || v.name)
-    if (missing.length > 0) {
-      setMissingRequired(missing)
-      return null
+    if (!draft) {
+      const filledNames = new Set(filled.map(r => r.name))
+      const missing = schema.values
+        .filter(v => v.required && v.enabled && !filledNames.has(v.name) && !dropped.has(v.name))
+        .map(v => v.label || v.name)
+      if (missing.length > 0) {
+        setMissingRequired(missing)
+        return null
+      }
     }
     setMissingRequired([])
     return filled.map(r => ({
@@ -208,57 +213,61 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
     }))
   }
 
-  async function onSave() {
+  async function onSave(draft: boolean) {
     setSubmitError(null)
     setServerWarnings([])
     if (!serviceId) { setSubmitError('Pick a service first.'); return }
     if (!schema)    { setSubmitError('Pick a schema first.'); return }
 
-    const samples = buildPayload()
+    const samples = buildPayload(draft)
     if (samples === null) return
 
     try {
       // If the server reports warnings we surface them and stay on the page so the user can
-      // see what happened before navigating away. Otherwise navigate to the detail view.
+      // see what happened before navigating away. Otherwise navigate on.
       const targetId = isEdit && id ? id : undefined
       let warnings: string[] = []
       let createdId: string | undefined
 
       if (isService) {
         if (targetId) {
-          const r = await myUpdate.mutateAsync({ id: targetId, req: { samples } })
+          const r = await myUpdate.mutateAsync({ id: targetId, samples, draft })
           warnings = r.warnings ?? []
         } else {
-          const r = await myCreate.mutateAsync({ samples })
+          const r = await myCreate.mutateAsync({ samples, draft })
           warnings = r.warnings ?? []
           createdId = r.id
         }
       } else {
         const payload: AdminSubmissionInput = { serviceAccountId: serviceId, samples }
         if (targetId) {
-          const r = await adminUpdate.mutateAsync({ id: targetId, req: payload })
+          const r = await adminUpdate.mutateAsync({ id: targetId, req: payload, draft })
           warnings = r.warnings ?? []
         } else {
-          const r = await adminCreate.mutateAsync(payload)
+          const r = await adminCreate.mutateAsync({ req: payload, draft })
           warnings = r.warnings ?? []
           createdId = r.id
         }
       }
 
+      const savedId = targetId ?? createdId
       if (warnings.length > 0) {
         setServerWarnings(warnings)
         return
       }
-      // Land the user on the read-only form view — same layout they were just editing, so
-      // their eye stays anchored to the values they entered. The raw-table "view details"
-      // page is still reachable from the drawer / row actions on the listing.
-      nav(`/submissions/${targetId ?? createdId}/view`)
+      // A draft lands back on the editor so collaborators can keep filling it in; a normal
+      // save/publish lands on the read-only form view — same layout they were just editing, so
+      // their eye stays anchored to the values they entered.
+      nav(`/submissions/${savedId}/${draft ? 'edit' : 'view'}`)
     } catch (e) {
       setSubmitError(formatApiError(e))
     }
   }
 
   const isBusy = adminCreate.isPending || adminUpdate.isPending || myCreate.isPending || myUpdate.isPending
+  // Whether the submission being edited is currently a draft. Drives the toolbar: a draft offers
+  // Publish (primary) + Save as draft; a published submission keeps the plain Save changes.
+  const editingDraft = isEdit && !!existing.data?.isDraft
   const selectedService = !isService ? services.data?.items.find(a => a.id === serviceId) : undefined
   // Best-effort detection: the source submission (being edited or cloned) used more than one
   // schema, so only the chosen schema's values will be carried over on save.
@@ -269,13 +278,59 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
       <div className={s.toolbar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Button appearance="subtle" icon={<ArrowLeft20Regular />} onClick={() => nav(-1)}>Back</Button>
-          <Title2>{readOnly ? 'View submission' : isEdit ? 'Edit submission' : 'New submission'}</Title2>
+          <Title2>{readOnly ? 'View submission' : editingDraft ? 'Edit draft' : isEdit ? 'Edit submission' : 'New submission'}</Title2>
         </div>
         {!readOnly && (
           <Toolbar>
-            <ToolbarButton appearance="primary" disabled={isBusy} onClick={onSave}>
-              {isEdit ? 'Save changes' : 'Submit'}
-            </ToolbarButton>
+            {editingDraft ? (
+              // Editing a draft: Publish (runs full validation + approval) is primary; the menu keeps
+              // it a draft.
+              <Menu positioning="below-end">
+                <MenuTrigger disableButtonEnhancement>
+                  {(triggerProps) => (
+                    <SplitButton
+                      menuButton={triggerProps}
+                      primaryActionButton={{ onClick: () => onSave(false) }}
+                      appearance="primary"
+                      disabled={isBusy}
+                    >
+                      Publish
+                    </SplitButton>
+                  )}
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    <MenuItem onClick={() => onSave(true)}>Save as draft</MenuItem>
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
+            ) : isEdit ? (
+              // Editing a published submission: no draft option — it can't be pulled back to draft.
+              <ToolbarButton appearance="primary" disabled={isBusy} onClick={() => onSave(false)}>
+                Save changes
+              </ToolbarButton>
+            ) : (
+              // Create / clone: Submit is primary; the menu saves a draft instead.
+              <Menu positioning="below-end">
+                <MenuTrigger disableButtonEnhancement>
+                  {(triggerProps) => (
+                    <SplitButton
+                      menuButton={triggerProps}
+                      primaryActionButton={{ onClick: () => onSave(false) }}
+                      appearance="primary"
+                      disabled={isBusy}
+                    >
+                      Submit
+                    </SplitButton>
+                  )}
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    <MenuItem onClick={() => onSave(true)}>Save as draft</MenuItem>
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
+            )}
           </Toolbar>
         )}
       </div>

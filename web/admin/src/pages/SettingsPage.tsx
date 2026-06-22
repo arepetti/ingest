@@ -567,6 +567,7 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
   const [pendingApproval, setPendingApproval] = useState<NotificationRule>(initial.pendingApproval)
   const [approved, setApproved] = useState<NotificationRule>(initial.approved)
   const [rejected, setRejected] = useState<NotificationRule>(initial.rejected)
+  const [draftSaved, setDraftSaved] = useState<NotificationRule>(initial.draftSaved)
   const [leadHours, setLeadHours] = useState(String(initial.upcomingLeadHours))
   const [recipients, setRecipients] = useState<string[]>(initial.adminRecipientAccountIds ?? [])
   const [error, setError] = useState<string | null>(null)
@@ -583,6 +584,7 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
       await update.mutateAsync({
         upcoming, missed, warnings,
         pendingApproval, approved, rejected,
+        draftSaved,
         upcomingLeadHours: Number(leadHours) || 24,
         adminRecipientAccountIds: recipients,
       })
@@ -624,6 +626,12 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
       )}
       <RuleEditor title="Missed submission alert" rule={missed} onChange={setMissed} />
       <RuleEditor title="Submission with warnings notice" rule={warnings} onChange={setWarnings} />
+      <RuleEditor
+        title="Draft saved nudge"
+        rule={draftSaved}
+        onChange={setDraftSaved}
+        hint="Sent on every draft save (no dedupe) to nudge collaborators. The email shows a relative path you paste after your console's address — it isn't a clickable link."
+      />
 
       {approvalEnabled && (
         <>

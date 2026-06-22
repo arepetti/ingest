@@ -8,10 +8,10 @@ The grid lists every submission across every service, newest first. Filters at t
 
 - **Service** — narrow to a specific account.
 - **Schema** — narrow to a specific schema.
-- **Approval** — narrow by approval state (only shown when the [approval workflow](approval-process.md) is enabled). The dashboard's **Review** action deep-links here pre-filtered to `Pending`.
+- **Status** — narrow by state. **Draft** is always offered; the approval states (`Pending`, `Approved`, `Rejected`, `Not required`) are added when the [approval workflow](approval-process.md) is enabled. The dashboard's **Review** action deep-links here pre-filtered to `Pending`.
 - **Date range** — preset (*last week*, *last month*, *last year*) or *custom* with two date pickers.
 
-When the approval workflow is enabled, a **Status** column shows each submission's approval state, and pending rows get quick **Approve** (✓) / **Reject** (✕) actions before the row menu. See [approval-process.md](approval-process.md) for the full reviewer workflow.
+A **Status** column shows each submission's state: a **Draft** badge for work-in-progress drafts, otherwise its approval state. When the approval workflow is enabled, pending rows get quick **Approve** (✓) / **Reject** (✕) actions before the row menu. See [approval-process.md](approval-process.md) for the full reviewer workflow.
 
 The **Warnings** column shows a count badge when a submission carries non-blocking warnings (and a dash when it has none). Warnings are recorded at the last write, so the count reflects the current stored state of the submission. Submissions created before warnings were stored show no count.
 
@@ -99,6 +99,18 @@ Notes on CSV values:
 ## Editing a submission
 
 Row menu → **Edit**. Same form as create, pre-populated. Admin edits ignore the cadence-window restriction entirely — you can rewrite a submission from two years ago. The `ModifiedBy` audit field records your identity.
+
+## Saving a draft
+
+A **draft** is a work-in-progress submission you can save and come back to later without it counting as a real submission. Use it when a report can't be completed in one sitting — you're waiting on a number, or several people fill in different parts.
+
+- **Saving.** In the submission editor the primary button is a split button: its menu offers **Save as draft** alongside the normal **Submit**/**Publish**. Saving a draft keeps you on the editor so you can keep working.
+- **Relaxed validation.** A draft only has to be structurally sound — each value you *have* filled in must be the right type and within its declared min/max, length, or regex. Everything else is deferred: required values may be left blank, cadence "one per period" duplicates are allowed, conditional show/hide rules don't discard anything, and value-/schema-level validation and warning rules don't run. The full pipeline runs the moment you publish, so nothing partial ever reaches reporting.
+- **Out of reporting.** A draft never appears in the OData / Power BI feeds, the Explore charts, or the status rows, and it never enters the approval workflow or fires the accepted/pending webhooks — exactly like a pending submission. It shows a grey **Draft** badge in the grid and the read-only drawer.
+- **Publishing.** Open the draft and choose **Submit**/**Publish**. It is re-validated in full and, if it passes, becomes a normal submission (entering approval if the schema/source requires it). A published submission **cannot be returned to draft** — clone it into a fresh draft instead.
+- **Nudges.** Each time a draft is saved (create or re-save) Ingest can send a "draft saved" email to the people working on it. It's off by default; an admin enables it under **Settings → Notifications → Draft saved nudge** (see [settings.md § Notifications](settings.md)).
+
+Drafts are independent of the approval feature — they work the same whether or not approval is enabled.
 
 ## Cloning into a new submission
 

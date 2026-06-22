@@ -69,6 +69,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         Submission submission,
         bool isReplacement,
         Submission? existing,
+        bool draft = false,
         CancellationToken ct = default)
     {
         var errors = new List<string>();
@@ -137,6 +138,11 @@ public sealed class SubmissionValidator : ISubmissionValidator
                 continue;
             }
 
+            // Draft mode keeps only the structural checks above (schema/value existence +
+            // enabled-state); conditional-display gating is part of the relaxed pipeline that
+            // runs on publish, so a half-filled draft never has its samples silently discarded.
+            if (draft) continue;
+
             // EnabledIf / VisibleIf: false-y discards the sample with a warning. We evaluate
             // against the FULL submitted context (before pruning) so rules like
             // "VisibleIf: type == 'A'" see the sibling value 'type' regardless of order.
@@ -167,6 +173,15 @@ public sealed class SubmissionValidator : ISubmissionValidator
             if (value is null || !schema.Enabled || !value.Enabled) continue;
             if (discarded.Contains(new SampleRef(schema.Name, value.Name))) continue;
 
+            // The shape check (type + min/max + length + regex) runs in every mode: a draft must
+            // still reject malformed or out-of-range *present* values so corrupt data can't be
+            // parked in a draft and later slip through.
+            ValidateValueShape(schema, value, sample, errors);
+
+            // Everything below is a relaxed-in-draft rule (expression rules, cadence, modifiability,
+            // warnings). They all re-run on publish through the full pipeline.
+            if (draft) continue;
+
             if (!contextCache.TryGetValue(schema.Name, out var schemaContext))
             {
                 schemaContext = BuildRuleContext(schema, samplesBySchema.GetValueOrDefault(schema.Name) ?? new());
@@ -174,7 +189,6 @@ public sealed class SubmissionValidator : ISubmissionValidator
             }
             var history = await HistoryFor(schema);
 
-            ValidateValueShape(schema, value, sample, errors);
             EvaluateValueValidator(service, schema, value, sample, schemaContext, history, errors);
             await CheckCadenceAsync(service.Id, schema, value, sample, isReplacement, existing, errors, ct);
 
@@ -195,9 +209,11 @@ public sealed class SubmissionValidator : ISubmissionValidator
         }
 
         // Pass 3: schema-level submission validators. Evaluated against the surviving context so
-        // rules don't trip on values their own EnabledIf/VisibleIf already filtered out.
+        // rules don't trip on values their own EnabledIf/VisibleIf already filtered out. Skipped in
+        // draft mode — a cross-value rule can't be satisfied while the set is still being filled in.
         foreach (var (schemaName, samples) in samplesBySchema)
         {
+            if (draft) break;
             if (!visible.TryGetValue(schemaName, out var schema)) continue;
             if (schema.SubmissionValidations.Count == 0) continue;
 
@@ -244,8 +260,9 @@ public sealed class SubmissionValidator : ISubmissionValidator
         // a single-schema submission without the validator flagging every required value of
         // every *other* schema the service is wired up to. A value isn't "missing" if its own
         // EnabledIf/VisibleIf would discard it anyway — that's the whole point of conditional
-        // values, so we re-evaluate gating against the surviving context per value.
-        if (!isReplacement)
+        // values, so we re-evaluate gating against the surviving context per value. Skipped in
+        // draft mode: the whole point of a draft is to save a partially-filled submission.
+        if (!isReplacement && !draft)
         {
             var presented = submission.Samples
                 .Where(s => !discarded.Contains(new SampleRef(s.SchemaName, s.ValueName)))

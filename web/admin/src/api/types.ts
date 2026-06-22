@@ -324,6 +324,8 @@ export interface Submission {
   requiredApprovers: ApproverSpec[]
   /** Recorded approve/reject decisions, newest last. */
   approvals: SubmissionApproval[]
+  /** True while this is a work-in-progress draft: excluded from every live stream and from approval until published. `false` on legacy rows. */
+  isDraft: boolean
 }
 
 /** Body shape for admin-on-behalf-of submission create/replace. */
@@ -599,6 +601,7 @@ export interface NotificationSettings {
   pendingApproval: NotificationRule
   approved: NotificationRule
   rejected: NotificationRule
+  draftSaved: NotificationRule
   upcomingLeadHours: number
   adminRecipientAccountIds: string[]
 }

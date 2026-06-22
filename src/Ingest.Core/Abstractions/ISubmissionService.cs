@@ -25,11 +25,13 @@ public interface ISubmissionService
     /// <summary>Create a new submission attributed to the calling account.</summary>
     /// <param name="callerAccountId">Account id taken from the bearer credential.</param>
     /// <param name="input">Submission payload (schema name + samples).</param>
+    /// <param name="source">Where the submission originated (drives the source-aware approval policy).</param>
+    /// <param name="draft">When true, save as a work-in-progress draft: relaxed validation, no projection, no approval, kept out of every live stream.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The persisted submission together with any non-blocking warnings.</returns>
     /// <exception cref="NotFoundException">The referenced schema does not exist or isn't visible to the caller.</exception>
     /// <exception cref="ValidationException">Per-value or schema-level validators rejected the payload.</exception>
-    Task<SubmissionWriteResult> CreateMineAsync(Guid callerAccountId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, CancellationToken ct = default);
+    Task<SubmissionWriteResult> CreateMineAsync(Guid callerAccountId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, CancellationToken ct = default);
 
     /// <summary>Replace one of the caller's submissions in-place.</summary>
     /// <remarks>
@@ -40,12 +42,18 @@ public interface ISubmissionService
     /// <param name="callerAccountId">Account id taken from the bearer credential.</param>
     /// <param name="submissionId">Id of the submission to replace.</param>
     /// <param name="input">Replacement payload.</param>
+    /// <param name="source">Where the submission originated (drives the source-aware approval policy).</param>
+    /// <param name="draft">
+    /// When true, save the submission as a draft (relaxed validation, no projection/approval). Only a
+    /// submission that is already a draft may be saved with <paramref name="draft"/> true; once
+    /// published it cannot return to draft. <paramref name="draft"/> false on an existing draft publishes it.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The updated submission together with any non-blocking warnings.</returns>
     /// <exception cref="NotFoundException">No such submission, or no matching schema.</exception>
     /// <exception cref="ForbiddenException">The submission belongs to a different account, or its cadence window is already closed.</exception>
-    /// <exception cref="ValidationException">Per-value or schema-level validators rejected the payload.</exception>
-    Task<SubmissionWriteResult> ReplaceMineAsync(Guid callerAccountId, Guid submissionId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, CancellationToken ct = default);
+    /// <exception cref="ValidationException">Per-value or schema-level validators rejected the payload, or an attempt was made to return a published submission to draft.</exception>
+    Task<SubmissionWriteResult> ReplaceMineAsync(Guid callerAccountId, Guid submissionId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, CancellationToken ct = default);
 
     /// <summary>Fetch one of the caller's own submissions by id.</summary>
     /// <param name="callerAccountId">Account id taken from the bearer credential.</param>
@@ -61,9 +69,10 @@ public interface ISubmissionService
     /// <param name="from">Lower bound on submission timestamp (inclusive); <c>null</c> for no lower bound.</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive); <c>null</c> for no upper bound.</param>
     /// <param name="schemaName">Restrict to submissions for this schema when non-null.</param>
+    /// <param name="draft">When non-null, restrict to drafts (<c>true</c>) or non-drafts (<c>false</c>); <c>null</c> returns both.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A page of the caller's submissions.</returns>
-    Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, CancellationToken ct = default);
+    Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, bool? draft = null, CancellationToken ct = default);
 
     // ── Admin-facing ──
 
@@ -73,8 +82,10 @@ public interface ISubmissionService
     /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
     /// <param name="schemaName">When non-null, restrict the listing to submissions for a single schema.</param>
+    /// <param name="approvalStatus">When non-null, restrict the listing to a single approval state.</param>
+    /// <param name="draft">When non-null, restrict to drafts (<c>true</c>) or non-drafts (<c>false</c>); <c>null</c> returns both.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, ApprovalStatus? approvalStatus = null, CancellationToken ct = default);
+    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, ApprovalStatus? approvalStatus = null, bool? draft = null, CancellationToken ct = default);
 
     /// <summary>Fetch any submission by id.</summary>
     /// <param name="submissionId">Submission id.</param>
@@ -91,20 +102,26 @@ public interface ISubmissionService
     /// data (e.g. bulk import) so the record is dated to when it was measured rather than to now.
     /// <c>null</c> (the default) stamps the current time as usual.
     /// </param>
+    /// <param name="draft">When true, save as a work-in-progress draft: relaxed validation, no projection, no approval, kept out of every live stream.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The persisted submission together with any non-blocking warnings.</returns>
     /// <exception cref="NotFoundException">The referenced service or schema does not exist.</exception>
     /// <exception cref="ValidationException">Validators rejected the payload.</exception>
-    Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, DateTime? submittedAt = null, CancellationToken ct = default);
+    Task<SubmissionWriteResult> AdminCreateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, DateTime? submittedAt = null, bool draft = false, CancellationToken ct = default);
 
     /// <summary>Replace any submission. No cadence-window restriction; the audit trail records the calling admin.</summary>
     /// <param name="submissionId">Id of the submission to replace.</param>
     /// <param name="input">Replacement payload.</param>
+    /// <param name="source">Where the submission originated (drives the source-aware approval policy).</param>
+    /// <param name="draft">
+    /// When true, save the submission as a draft. Only a submission that is already a draft may be
+    /// saved with <paramref name="draft"/> true; <paramref name="draft"/> false on an existing draft publishes it.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The updated submission together with any non-blocking warnings.</returns>
     /// <exception cref="NotFoundException">No submission with that id, or no matching schema.</exception>
-    /// <exception cref="ValidationException">Validators rejected the payload.</exception>
-    Task<SubmissionWriteResult> AdminReplaceAsync(Guid submissionId, AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, CancellationToken ct = default);
+    /// <exception cref="ValidationException">Validators rejected the payload, or an attempt was made to return a published submission to draft.</exception>
+    Task<SubmissionWriteResult> AdminReplaceAsync(Guid submissionId, AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, bool draft = false, CancellationToken ct = default);
 
     /// <summary>Soft-delete a submission and its derived sample projections. Idempotent.</summary>
     /// <param name="submissionId">Submission id.</param>

@@ -31,6 +31,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
     /// <param name="schemaName">Restrict the listing to submissions for the given schema.</param>
     /// <param name="approvalStatus">Restrict the listing to a single approval state (e.g. <c>Pending</c> for the review queue).</param>
+    /// <param name="draft">Restrict to drafts (<c>true</c>) or exclude them (<c>false</c>); omit to return both.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">A page of submissions.</response>
     [HttpGet]
@@ -45,10 +46,11 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
         [FromQuery] DateTime? to,
         [FromQuery] string? schemaName,
         [FromQuery] ApprovalStatus? approvalStatus,
+        [FromQuery] bool? draft,
         CancellationToken ct)
     {
         var result = await service.ListAsync(
-            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, schemaName, approvalStatus, ct);
+            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, schemaName, approvalStatus, draft, ct);
         return Ok(result.Map(SubmissionDto.From));
     }
 
@@ -112,6 +114,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     /// (fired <c>Warning</c> rules or samples discarded by <c>EnabledIf</c> / <c>VisibleIf</c>).
     /// </remarks>
     /// <param name="input">Submission payload including the target <c>serviceId</c>.</param>
+    /// <param name="draft">When true, save as a work-in-progress draft (relaxed validation, excluded from every live stream and from approval until published).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="201">The submission was created.</response>
     /// <response code="400">Validation failed.</response>
@@ -123,9 +126,9 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> Create([FromBody] AdminSubmissionInput input, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] AdminSubmissionInput input, [FromQuery] bool draft, CancellationToken ct)
     {
-        var written = await service.AdminCreateAsync(input, Request.ResolveSource(), ct: ct);
+        var written = await service.AdminCreateAsync(input, Request.ResolveSource(), draft: draft, ct: ct);
         return Created($"/api/admin/submissions/{written.Submission.Id}",
             new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
@@ -165,9 +168,10 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     /// </remarks>
     /// <param name="id">Submission id.</param>
     /// <param name="input">New submission payload.</param>
+    /// <param name="draft">When true, save the (already-draft) submission as a draft; false on an existing draft publishes it. A published submission cannot be returned to draft.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">The replacement succeeded.</response>
-    /// <response code="400">Validation failed.</response>
+    /// <response code="400">Validation failed, or an attempt was made to return a published submission to draft.</response>
     /// <response code="404">No submission with that id (or no matching schema).</response>
     /// <response code="403">Caller is not an Admin.</response>
     [HttpPut("{id:guid}")]
@@ -176,9 +180,9 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> Replace(Guid id, [FromBody] AdminSubmissionInput input, CancellationToken ct)
+    public async Task<IActionResult> Replace(Guid id, [FromBody] AdminSubmissionInput input, [FromQuery] bool draft, CancellationToken ct)
     {
-        var written = await service.AdminReplaceAsync(id, input, Request.ResolveSource(), ct);
+        var written = await service.AdminReplaceAsync(id, input, Request.ResolveSource(), draft: draft, ct: ct);
         return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
 

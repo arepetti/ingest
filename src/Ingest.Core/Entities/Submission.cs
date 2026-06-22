@@ -82,6 +82,16 @@ public sealed class Submission : AuditedEntity
     /// approval. Legacy documents deserialize to an empty list.
     /// </summary>
     public List<SubmissionApproval> Approvals { get; set; } = new();
+
+    /// <summary>
+    /// True while this submission is a work-in-progress draft: it is excluded from the live read
+    /// model (OData / Explore / status rows) and from the accepted/pending webhooks exactly like a
+    /// Pending submission, and the approval workflow does not run for it until it is published.
+    /// A dedicated flag (rather than an <see cref="ApprovalStatus"/> value) so drafts work even when
+    /// the approval feature is off. Legacy documents deserialize to <c>false</c> (never a draft).
+    /// Once a submission is published it cannot return to draft.
+    /// </summary>
+    public bool IsDraft { get; set; }
 }
 
 /// <summary>

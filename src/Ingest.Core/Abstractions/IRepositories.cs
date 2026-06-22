@@ -248,6 +248,8 @@ public interface ISubmissionRepository
     /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
     /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
     /// <param name="schemaName">Restrict to submissions containing at least one sample for this schema when non-null.</param>
+    /// <param name="approvalStatus">Restrict to a single approval state when non-null.</param>
+    /// <param name="draft">When non-null, restrict to drafts (<c>true</c>) or non-drafts (<c>false</c>); <c>null</c> returns both.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A page of submissions with the total count.</returns>
     Task<PagedResult<Submission>> ListAsync(
@@ -257,6 +259,7 @@ public interface ISubmissionRepository
         DateTime? to = null,
         string? schemaName = null,
         ApprovalStatus? approvalStatus = null,
+        bool? draft = null,
         CancellationToken ct = default);
 
     /// <summary>

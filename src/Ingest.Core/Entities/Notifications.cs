@@ -22,6 +22,9 @@ public enum NotificationKind
 
     /// <summary>A pending submission was rejected and will not go live.</summary>
     Rejected = 5,
+
+    /// <summary>A submission was saved as a work-in-progress draft (fired on every draft save).</summary>
+    DraftSaved = 6,
 }
 
 /// <summary>
@@ -68,6 +71,13 @@ public sealed class NotificationSettings : AuditedEntity
 
     /// <summary>Rule for the "submission rejected" notice (carries the reviewer's reason, if any).</summary>
     public NotificationRule Rejected { get; set; } = new();
+
+    /// <summary>
+    /// Rule for the "draft saved" nudge. Fires on every draft save (no dedupe). The default recipient
+    /// is the submission's service-account contact — the people filling the values in — with optional
+    /// admin/operator copies. Independent of the approval feature.
+    /// </summary>
+    public NotificationRule DraftSaved { get; set; } = new();
 
     /// <summary>
     /// How many hours before a cadence window closes an "upcoming" reminder should fire. A value

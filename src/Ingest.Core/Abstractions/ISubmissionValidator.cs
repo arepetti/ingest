@@ -41,6 +41,13 @@ public interface ISubmissionValidator
     /// <param name="submission">The submission being validated (already mapped onto domain entities).</param>
     /// <param name="isReplacement">True when this is an update on an existing submission, false for a create.</param>
     /// <param name="existing">The previous submission when <paramref name="isReplacement"/> is true; <c>null</c> on create.</param>
+    /// <param name="draft">
+    /// True for a work-in-progress draft save. In draft mode only the structural checks run
+    /// (schema/value existence + enabled-state, JSON→type coercion, and per-value shape/range);
+    /// required-value presence, cadence one-per-window duplicates, conditional-display discards,
+    /// value- and schema-level expression rules, and warning rules are all skipped. Publishing
+    /// re-runs the full pipeline, so nothing partial reaches the live model.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The aggregated validation outcome, including any discarded samples and warnings.</returns>
     Task<SubmissionValidationResult> ValidateAsync(
@@ -48,5 +55,6 @@ public interface ISubmissionValidator
         Submission submission,
         bool isReplacement,
         Submission? existing,
+        bool draft = false,
         CancellationToken ct = default);
 }
