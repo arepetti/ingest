@@ -381,6 +381,12 @@ Content-Type: application/json
 
 Send `null` to skip an optional value entirely (or just omit the sample).
 
+**Query parameters**
+
+| Param   | Default | Notes |
+|---------|---------|-------|
+| `draft` | `false` | When `true`, save as a work-in-progress **draft** (see [Drafts](#drafts-optional)). Validation is relaxed and the submission stays out of every live stream and the approval workflow until it's published. |
+
 **201 Created**
 
 ```http
@@ -454,6 +460,12 @@ Content-Type: application/json
 }
 ```
 
+**Query parameters**
+
+| Param   | Default | Notes |
+|---------|---------|-------|
+| `draft` | `false` | Controls the [draft](#drafts-optional) state of the result. On a submission that is currently a draft, `draft=true` re-saves it as a draft and `draft=false` (the default) **publishes** it (running the full validation pipeline). A submission that has already been published **cannot** be returned to draft — `draft=true` against it is rejected with a 400. |
+
 **200 OK**
 
 ```http
@@ -472,7 +484,7 @@ Same shape as the `POST` response — the submission id plus any non-blocking wa
 | Code | When |
 |------|------|
 | 200  | Replacement saved. |
-| 400  | Validation failed **or** the cadence window has closed. The latter shows up as a validation error message. |
+| 400  | Validation failed, the cadence window has closed, **or** an attempt was made to return an already-published submission to draft. Each shows up as a validation error message. |
 | 403  | The submission belongs to a different account. |
 | 404  | No such submission, or no matching schema. |
 
@@ -505,6 +517,7 @@ X-Api-Key: ...
   "warnings": [],
   "submittedAt": "2026-05-12T09:01:33Z",
   "replacedAt":  null,
+  "isDraft":     false,
   "createdAt":   "2026-05-12T09:01:33Z",
   "createdBy":   "roads-team",
   "modifiedAt":  "2026-05-12T09:01:33Z",
@@ -512,6 +525,8 @@ X-Api-Key: ...
   "isDeleted":   false
 }
 ```
+
+`isDraft` is `true` while the submission is a work-in-progress [draft](#drafts-optional) and `false` once it's a normal (published) submission. Legacy submissions that predate the field report `false`.
 
 The `warnings` array is **persisted with the submission** and reflects whatever the validator produced at the last write (create or replace). It is always present; an empty array means "no warnings" — including for legacy submissions created before warnings were stored. This is the same content the write endpoints return (see [Warnings](#warnings)), kept on the record so it can be reviewed later.
 
@@ -537,6 +552,7 @@ Page through your own submissions, optionally filtered by date.
 | `sort`     | `createdAt` for newest-first; default is the repository's own ordering. |
 | `from`     | Inclusive lower bound on `SubmittedAt`. |
 | `to`       | Exclusive upper bound on `SubmittedAt`. |
+| `draft`    | Restrict to [drafts](#drafts-optional) (`true`) or exclude them (`false`); omit to return both. |
 
 **Request**
 
@@ -593,6 +609,20 @@ If an administrator has enabled the [submission approval workflow](../admin-user
 - **Source.** Submissions are tagged with a source so policies can target manual vs. API traffic. Direct API calls default to `Api`; the admin console tags its own writes as `Manual`. You can override with the optional `X-Ingest-Source: api|manual` header, but you normally shouldn't.
 - **Re-submitting.** Re-sending data for a window that already has a submission replaces it and, when approval applies, resets it to `Pending` — even if the previous one was approved. Editing an approved submission therefore removes it from reporting until it's approved again.
 - **Approving** is an admin/approver action and is not part of the service-facing API.
+
+---
+
+## Drafts (optional)
+
+A **draft** is a work-in-progress submission you can save and come back to later without it counting as a real submission — useful when a report can't be completed in one call (you're waiting on a number, or several people fill in different parts). Drafts work the same whether or not the approval workflow is enabled.
+
+- **Saving.** Pass `?draft=true` on `POST /api/submissions` (new draft) or `PUT /api/submissions/{id}` (re-save an existing draft). Validation is **relaxed**: each value you *did* send must still be the right type and within its declared `min`/`max`, length and `regexPattern`, but required values may be missing, the one-per-cadence-window check is skipped, and the conditional-display (`Enabled if` / `Visible if`), per-value, schema-level and warning rules don't run.
+- **Out of reporting.** A draft is held out of the OData feed, Explore and `/api/me/status` — and out of the accepted/pending webhooks — exactly like a submission [awaiting approval](../admin-user-guide/approval-process.md#the-lifecycle). The approval policy isn't resolved until you publish.
+- **Publishing.** Replace the draft with `?draft=false` (the default) — `PUT /api/submissions/{id}` without the flag publishes it. The full validation pipeline runs, and on success it becomes a normal submission (entering approval if a policy applies).
+- **No going back.** Once a submission is published it **cannot** be returned to draft — a `draft=true` replacement of a published submission is rejected with a 400. Clone it into a fresh draft instead (an admin-console action; see [submissions.md § Cloning into a new submission](../admin-user-guide/submissions.md#cloning-into-a-new-submission)).
+- **Telling drafts apart.** `GET /api/submissions/{id}` carries an `isDraft` flag, and `GET /api/submissions?draft=true|false` filters the listing.
+
+The full operator-facing walkthrough is in [submissions.md § Saving a draft](../admin-user-guide/submissions.md#saving-a-draft).
 
 ---
 

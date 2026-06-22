@@ -8,13 +8,13 @@ Ingest exposes its sample data as an **OData v4 feed** at `/odata/samples`. Exce
 
 The feed serves rows from the `SampleProjection` collection: **one row per sample** (not per submission), fully denormalised, so Excel gets readable, self-contained data without any joins.
 
-The columns are identical to the Power BI feed — see [powerbi/samples.md § Columns](powerbi/samples.md#columns) for the full column table (`ServiceName`, `SchemaName`, `ValueName`, `ValueType`, the typed `*Value` columns, `Timestamp`, `Cadence`, `PeriodStart`/`PeriodEnd`, and the audit fields).
+The columns are identical to the Power BI feed — see [powerbi/samples.md § Columns](powerbi/samples.md#columns) for the full column table (`ServiceName`, `SchemaName`, `ValueName`, `ValueType`, the typed `*Value` columns, `Timestamp`, `SubmittedAt` (when the submission was reported, distinct from the measurement `Timestamp`), `Cadence`, `PeriodStart`/`PeriodEnd`, and the audit fields).
 
 Server-side limits: page size 500, max `$top` of 5000 per request. Power Query handles paging transparently.
 
 ## Required role
 
-The feed is gated by the **Operator** policy: any account with role `Operator` or `Admin` can read it. A `Service`-role key cannot.
+The feed is gated by the **`query:read`** capability: any account with role `Operator` or `Admin` can read it. A `Service`-role key cannot. (The optional [`/odata/schemas`](powerbi/schemas.md) metadata feed mentioned below is gated by **`schemas:read`** instead — also carried by an Operator/Admin key, so the same credential reads both.)
 
 Issue a dedicated **Operator** credential for reporting — revoking it later then doesn't affect anybody else. See the [admin guide](../admin-user-guide/accounts.md) for how to create one.
 

@@ -19,6 +19,8 @@ It's a **Settings → Webhooks** section gated by the `webhooks:read` capability
 > The two `window.*` events are discovered by the same background job that drives the **upcoming / missed email reminders** ([settings.md → Notifications](settings.md#notifications)). They fire whether or not the matching *email* trigger is enabled — subscribing a webhook is enough to make the job look for them. The cadence of the timer is `Notifications:Scheduler:PollMinutes`.
 >
 > The three `submission.*_approval` / `submission.approved` / `submission.rejected` events only ever fire while the [approval workflow](approval-process.md) is enabled (`Approval:Enabled`) — a submission has to be held pending for them to make sense. Like the accepted/warnings events they are emitted synchronously by the write/decision and are independent of the email triggers.
+>
+> A submission [saved as a draft](submissions.md#saving-a-draft) emits **no** webhook — it isn't a live business event yet, so neither `submission.accepted` nor `submission.pending_approval` fires. Those events fire only when the draft is **published** (and then exactly as a first-time submission would). The draft save instead sends the separate [draft-saved email nudge](settings.md#notifications), which is not a webhook.
 
 ## Registering an endpoint
 

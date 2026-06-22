@@ -18,7 +18,7 @@ Read [**client/**](client/README.md). The README explains how to obtain a key an
 
 ### "I'm a data analyst / PowerBI report author"
 
-Go to [**setup/powerbi/**](setup/powerbi/README.md). It covers the OData feeds (data + RAG scorecard), sample queries, and Power Query gotchas. You'll need an Operator-role key from your admin first.
+Go to [**setup/powerbi/**](setup/powerbi/README.md). It covers the OData feeds (data, RAG scorecard, and schema-metadata catalogue), sample queries, and Power Query gotchas. You'll need an Operator-role key from your admin first.
 
 ### "I deploy the service"
 

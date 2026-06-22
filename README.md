@@ -114,6 +114,7 @@ Everything Ingest does, in one place:
 - **Seven cadences** — daily, weekly, fortnightly (Monday-anchored), monthly, quarterly, semi-annually, and yearly; values in the same schema can differ.
 - **Per-service visibility** — services only ever see the schemas they're entitled to submit against.
 - **Schema versioning** — track changes over time, with a "new value" indicator in the editor.
+- **Target bands (RAG)** — optional Red/Amber/Green ranges per numeric value, drawn as shaded zones behind the Explore and historical charts. Reporting metadata only — never enforced.
 
 **Validation that runs before data lands**
 
@@ -127,17 +128,17 @@ Everything Ingest does, in one place:
 
 - Manage services and accounts, issue/rotate/revoke API keys, disable accounts.
 - Author schemas and their validation rules — no editor or redeploy.
-- Browse and filter submissions; create or edit data **on behalf of** a service; bulk-import history from JSON/CSV.
+- Browse and filter submissions; create or edit data **on behalf of** a service; **save work-in-progress drafts** and **clone** an existing submission into a new one; bulk-import history from JSON/CSV.
 - A status dashboard and **missing-submissions** analytics — who's up to date, who's behind, per KPI per period.
 - One-click historical plotting — with optional period-over-period comparison (e.g. this year vs last) and saveable filter presets — plus HTML + Liquid **reports** (single-submission or period roll-ups).
 
 **Integration & reporting**
 
 - **Full REST API** — every console action is a documented HTTP endpoint, so a cron job, Azure Function, or integration platform can submit automatically.
-- **OData v4 feed** at `/odata/samples` — Power BI talks to it out of the box; also reachable as paged JSON.
+- **OData v4 feeds** — `/odata/samples` (raw data, carrying a `SubmittedAt` reporting-time column alongside the measurement timestamp), `/odata/scorecard` (the cross-schema RAG status board) and `/odata/schemas` (a filterable schema-metadata catalogue); Power BI talks to them out of the box, and the samples data is also reachable as paged JSON.
 - **Outbound webhooks** — signed (HMAC-SHA256), durably queued, auto-retrying HTTP pushes on `submission.accepted` / `submission.warnings` / `window.upcoming` / `window.missed`, to wire into Teams, Power Automate, or your own service without polling.
 - **Microsoft Teams integration** — a bot that prompts a user or channel for the KPI values still outstanding, as an interactive Adaptive Card filled in and submitted straight from Teams. Daily or on demand, scoped to chosen services and schemas, hidden/disabled fields omitted and warnings surfaced. See [docs/setup/ms-teams.md](docs/setup/ms-teams.md).
-- **Email notifications** — upcoming-reminder, missed-alert, and submission-warning emails with editable Liquid templates and configurable recipients.
+- **Email notifications** — upcoming-reminder, missed-alert, submission-warning, and draft-saved-nudge emails with editable Liquid templates and configurable recipients.
 
 **Security, governance & operations**
 
