@@ -97,7 +97,7 @@ Expected. The projection has a separate column per type so Power BI gets correct
 
 ### My report needs joins to schema metadata
 
-The flat projection deliberately denormalises `SchemaName` / `ValueName` / `ServiceName`, but schema-level metadata — *label*, *unit*, *required*, target bands — lives in `/api/admin/schemas`, not in the feed. Until the planned [`/odata/schemas`](README.md#odata-endpoints) feed lands, pull that endpoint as a **second query** (Get Data → Web, same `X-Api-Key` header) and join on the names in Power Query. (For target bands specifically, the [scorecard feed](scorecard.md) already carries the band edges per cell.)
+The flat projection deliberately denormalises `SchemaName` / `ValueName` / `ServiceName`, but schema-level metadata — *label*, *unit*, *required*, target bands — isn't in this feed. Pull it from the dedicated [**schemas feed**](schemas.md) as a second OData query (same `X-Api-Key` header) and relate it on `SchemaName` + `ValueName` — see [schemas.md → Power BI source](schemas.md#power-bi-source) for the expand-and-join recipe. (For target bands specifically, the [scorecard feed](scorecard.md) also carries the band edges per cell.)
 
 ### A value I expect is missing
 

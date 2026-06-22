@@ -134,7 +134,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
     .AddOData(o => o.Select().Filter().OrderBy().Count().SetMaxTop(5000)
-        .AddRouteComponents("odata", EdmModelBuilderExtensions.BuildSamplesEdmModel()));
+        .AddRouteComponents("odata", EdmModelBuilderExtensions.BuildEdmModel()));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

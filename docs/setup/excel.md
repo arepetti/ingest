@@ -116,7 +116,7 @@ Update the `ApiKey` parameter's value (Power Query Editor → **Manage Parameter
 Expected — only the `*Value` column matching the row's `ValueType` is populated. Use the flatten step above to collapse them into one `Value` column.
 
 **My report needs schema metadata (label, unit, required).**
-The flat projection denormalises only `SchemaName`/`ValueName`/`ServiceName`. Schema-level metadata lives at `/api/admin/schemas`; pull it as a second query (**From Web** against that endpoint with the same `X-Api-Key` header) and merge on the names in Power Query.
+The flat projection denormalises only `SchemaName`/`ValueName`/`ServiceName`. Pull the labels, units, cadences and band edges from the dedicated [`/odata/schemas`](powerbi/schemas.md) feed as a second OData query (same `X-Api-Key` header) and merge on the names. (The older approach — a **From Web** query against the `/api/admin/schemas` JSON endpoint — still works if you prefer it.)
 
 **It's slow / pulling too much.**
 Pre-filter at the source (see above) so the server returns less, and remove columns you don't need early in the query.
