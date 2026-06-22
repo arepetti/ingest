@@ -38,7 +38,7 @@ The feed serves rows from the `SampleProjection` collection: **one row per sampl
 
 **`Timestamp` vs `SubmittedAt`** — `Timestamp` is *when it happened* (the measurement), `SubmittedAt` is *when it was reported*. They differ for back-filled history and late entries; use `Timestamp` for trend axes and `SubmittedAt` to audit reporting punctuality.
 
-> **Legacy rows and `SubmittedAt`.** The projection is rebuilt on every submission save, so `SubmittedAt` is set for everything saved since the field was introduced. Rows from older submissions not re-saved since carry the default `0001-01-01`; re-saving (or replacing) the submission backfills it.
+> **Legacy rows and `SubmittedAt`.** The projection is rebuilt on every submission save, so `SubmittedAt` is set for everything saved since the field was introduced. Rows from older submissions not re-saved since carry the default `0001-01-01`; re-saving or replacing the submission backfills it (a brand-new submission's accept time is always stamped). The handful of submissions old enough to predate the field on the parent submission itself keep the default until re-created.
 
 ## Pre-filtering at the source
 
