@@ -5,7 +5,7 @@ import type {
   ErasureMode, ErasureResult,
   ApiKey, GeneratedApiKey,
   Cadence,
-  ExploreAggregation, ExploreSeries,
+  ExploreAggregation, ExploreSeries, ExploreScorecard, ScorecardMode, ScorecardPeriod,
   Schema, SchemaHistory, SchemaVersionHistoryEntry, SchemaVersionSnapshot, UpsertSchemaRequest,
   Submission, AdminSubmissionInput, SampleInput, ServiceStatus, Me, Paged,
   SubmissionWriteResponse, BulkImportRequest, BulkImportResult, BackupImportResult, AccountsImportResult,
@@ -359,6 +359,31 @@ export const useExploreSeries = (params: ExploreSeriesParams, enabled: boolean =
     queryKey: ['explore-series', params],
     queryFn: () => api.get<ExploreSeries>(`/api/admin/explore/series?${search}`),
     enabled: enabled && !!params.schema,
+  })
+}
+
+/**
+ * Cross-schema RAG scorecard: every enabled schema's banded numeric values, with each reporting
+ * service's sample classified green/amber/red. Powers the Explore page's Scorecard tab.
+ *
+ * `mode` chooses between each service's latest sample and a single period; `period` selects which
+ * period that is when `mode` is `LastPeriod`.
+ */
+export const useExploreScorecard = (
+  serviceIds: string[] | undefined,
+  mode: ScorecardMode = 'LatestAvailable',
+  period: ScorecardPeriod = 'Current',
+  enabled: boolean = true,
+) => {
+  const search = new URLSearchParams()
+  for (const sid of serviceIds ?? []) search.append('serviceIds', sid)
+  search.set('mode', mode)
+  search.set('period', period)
+  const qs = search.toString()
+  return useQuery({
+    queryKey: ['explore-scorecard', serviceIds ?? [], mode, period],
+    queryFn: () => api.get<ExploreScorecard>(`/api/admin/explore/scorecard${qs ? `?${qs}` : ''}`),
+    enabled,
   })
 }
 

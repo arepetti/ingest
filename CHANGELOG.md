@@ -11,6 +11,8 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 - Approval rules (in Settings): require approval per service and per schema, on top of each schema's own policy.
 - Configuration backup (in Tools): export and restore all Settings-page configuration for copying configuration between environments or recovering it after a disaster.
 - Explore "compare with previous": overlay the Trend chart with the same selection shifted back by 1 month, 6 months, or 1 year to read this period against an earlier one.
+- OData scorecard feed (`/odata/scorecard(mode,period)`): the cross-schema Red/Amber/Green status board as a flat, PowerBI-ready feed — one row per (schema, value, service) cell, including the target band edges and the RAG status as text.
+- `SubmittedAt` (when a submission was reported, distinct from the measurement timestamp) is now exposed on the OData `samples` feed and the admin query endpoint.
 - Explore view presets: save up to five named filter/view selections in the browser and reload them from a dropdown.
 - Accounts bulk export/import: a portable, key-free JSON of all accounts.
 

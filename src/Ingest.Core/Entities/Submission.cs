@@ -128,6 +128,15 @@ public sealed class SampleProjection : AuditedEntity
     /// <summary>When the sample was measured.</summary>
     public DateTime Timestamp { get; set; }
 
+    /// <summary>
+    /// When the parent <see cref="Submission"/> was first accepted by the API (snapshot of
+    /// <see cref="Submission.SubmittedAt"/>). Lets reporting tools tell "when it happened" (the
+    /// measurement <see cref="Timestamp"/>) apart from "when it was reported". Legacy projection
+    /// documents that predate this field deserialize to <c>default</c> until the submission is
+    /// next saved and the projection is rebuilt.
+    /// </summary>
+    public DateTime SubmittedAt { get; set; }
+
     /// <summary>Free-form note from the parent <see cref="Sample"/>.</summary>
     public string? Note { get; set; }
 

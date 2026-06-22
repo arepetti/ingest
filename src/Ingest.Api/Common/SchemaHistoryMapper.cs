@@ -13,7 +13,7 @@ internal static class SchemaHistoryMapper
         h.SchemaName,
         h.Label,
         h.Values.Select(v => new SchemaValueHistoryDto(
-            v.ValueName, v.Label, v.Type, v.Cadence, v.Unit,
+            v.ValueName, v.Label, v.Type, v.Cadence, v.Unit, v.GreenMin, v.GreenMax, v.AmberMin, v.AmberMax,
             v.Buckets.Select(b => new HistoryBucketDto(
                 b.PeriodStart, b.PeriodEnd, b.Min, b.Max, b.Average, b.Count)).ToList()))
         .ToList());

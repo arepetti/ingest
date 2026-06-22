@@ -376,6 +376,13 @@ public sealed class SchemaService : ISchemaService
                 errors.Add($"Value '{v.Name}' has SinceVersion {since} greater than the schema's version {schema.Version}.");
         }
 
+        // RAG target band: a presentational hint, never enforced against samples, but the band
+        // itself must be internally coherent so the green/amber/red classification is well defined.
+        // The green (ideal) range must sit inside the amber (acceptable) range; each edge is
+        // individually optional, but an inner edge requires the matching outer edge on its side.
+        foreach (var v in schema.Values)
+            ValidateTargetBand(v, errors);
+
         // Layout: every value-ref resolves; no value is referenced more than once; section nodes
         // have a non-empty caption; nesting is bounded.
         var valueNames = new HashSet<string>(schema.Values.Select(v => v.Name), StringComparer.OrdinalIgnoreCase);
@@ -396,6 +403,42 @@ public sealed class SchemaService : ISchemaService
 
     private static bool IsValidValueName(string? name) =>
         !string.IsNullOrWhiteSpace(name) && _identifierPattern.IsMatch(name);
+
+    /// <summary>
+    /// Validates the Red/Amber/Green target band on a single value. The band is never enforced
+    /// against samples — these checks only guarantee the band is internally coherent so the
+    /// green/amber/red classification is unambiguous on charts. Edges are individually optional;
+    /// the rules are: (1) any present edges, read in the canonical order
+    /// <c>AmberMin → GreenMin → GreenMax → AmberMax</c>, must be non-decreasing; (2) a green
+    /// (inner) edge requires the matching amber (outer) edge on the same side.
+    /// </summary>
+    private static void ValidateTargetBand(SchemaValue v, List<string> errors)
+    {
+        // Canonical low-to-high order of the four edges; nulls are skipped.
+        var edges = new (string Label, double? Value)[]
+        {
+            ("AmberMin", v.AmberMin),
+            ("GreenMin", v.GreenMin),
+            ("GreenMax", v.GreenMax),
+            ("AmberMax", v.AmberMax),
+        };
+
+        (string Label, double Value)? prev = null;
+        foreach (var (label, value) in edges)
+        {
+            if (value is not { } current) continue;
+            if (prev is { } p && p.Value > current)
+                errors.Add($"Value '{v.Name}' has an out-of-order target band: {p.Label} ({p.Value}) must be less than or equal to {label} ({current}).");
+            prev = (label, current);
+        }
+
+        // Inner (green) needs outer (amber) on its own side, so the ideal range always sits within
+        // an acceptable range rather than dropping straight to red.
+        if (v.GreenMin is not null && v.AmberMin is null)
+            errors.Add($"Value '{v.Name}' sets GreenMin without AmberMin; the ideal range needs an acceptable lower bound around it.");
+        if (v.GreenMax is not null && v.AmberMax is null)
+            errors.Add($"Value '{v.Name}' sets GreenMax without AmberMax; the ideal range needs an acceptable upper bound around it.");
+    }
 
     private static void ValidateLayoutNodes(
         IReadOnlyList<SchemaLayoutNode> nodes,
@@ -462,6 +505,10 @@ public sealed class SchemaService : ISchemaService
         Enabled = v.Enabled,
         Min = v.Min,
         Max = v.Max,
+        GreenMin = v.GreenMin,
+        GreenMax = v.GreenMax,
+        AmberMin = v.AmberMin,
+        AmberMax = v.AmberMax,
         MinDate = v.MinDate,
         MaxDate = v.MaxDate,
         MinLength = v.MinLength,
@@ -536,7 +583,7 @@ public sealed class SchemaService : ISchemaService
             .ToLookup(b => b.Name, StringComparer.OrdinalIgnoreCase);
 
         var valueHistories = numericValues.Select(v => new SchemaValueHistory(
-            v.Name, v.Label, v.Type, v.Cadence, v.Unit,
+            v.Name, v.Label, v.Type, v.Cadence, v.Unit, v.GreenMin, v.GreenMax, v.AmberMin, v.AmberMax,
             bucketsByValue[v.Name]
                 .OrderBy(b => b.PeriodStart)
                 .Select(b => new HistoryBucket(b.PeriodStart, b.PeriodEnd, b.Min, b.Max, b.Avg, b.Count))

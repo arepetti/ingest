@@ -176,6 +176,33 @@ public sealed class SchemaValue
     /// <summary>Inclusive upper bound for <see cref="SchemaValueType.Integer"/> / <see cref="SchemaValueType.Number"/>.</summary>
     public double? Max { get; set; }
 
+    /// <summary>
+    /// Optional lower edge of the <b>ideal (green)</b> range in the Red/Amber/Green target band.
+    /// Never enforced — it's reporting metadata surfaced on charts (Explore, historical view) as a
+    /// shaded band. Only meaningful for <see cref="SchemaValueType.Integer"/> /
+    /// <see cref="SchemaValueType.Number"/>. Must lie inside the amber range: requires
+    /// <see cref="AmberMin"/> and satisfies <c>AmberMin ≤ GreenMin ≤ GreenMax ≤ AmberMax</c>.
+    /// </summary>
+    public double? GreenMin { get; set; }
+
+    /// <summary>
+    /// Optional upper edge of the <b>ideal (green)</b> range (see <see cref="GreenMin"/>). Never
+    /// enforced. Requires <see cref="AmberMax"/>.
+    /// </summary>
+    public double? GreenMax { get; set; }
+
+    /// <summary>
+    /// Optional lower edge of the <b>acceptable (amber)</b> range. Values below it are "red". Never
+    /// enforced; purely a charting hint. Forms the outer band that the green range must sit within.
+    /// </summary>
+    public double? AmberMin { get; set; }
+
+    /// <summary>
+    /// Optional upper edge of the <b>acceptable (amber)</b> range (see <see cref="AmberMin"/>).
+    /// Values above it are "red". Never enforced.
+    /// </summary>
+    public double? AmberMax { get; set; }
+
     /// <summary>Inclusive lower bound for <see cref="SchemaValueType.Date"/>.</summary>
     public DateTime? MinDate { get; set; }
 
@@ -231,6 +258,58 @@ public sealed class SchemaValue
     /// <c>0 &lt;= SinceVersion &lt;= Schema.Version</c>.
     /// </summary>
     public int? SinceVersion { get; set; }
+
+    /// <summary>
+    /// True when this value carries any edge of the Red/Amber/Green target band. Because the
+    /// validator forbids a green edge without its matching amber edge, the presence of any amber
+    /// edge is enough — but we check all four so the flag is robust to data written out-of-band.
+    /// </summary>
+    public bool HasTargetBand =>
+        AmberMin is not null || AmberMax is not null || GreenMin is not null || GreenMax is not null;
+
+    /// <summary>
+    /// Classify a numeric sample against this value's RAG band. Mirrors exactly how the band is
+    /// drawn on charts: outside the acceptable (amber) range is <see cref="RagStatus.Red"/>; inside
+    /// the ideal (green) range is <see cref="RagStatus.Green"/>; inside the acceptable range but
+    /// outside the ideal range (or when no green range is defined) is <see cref="RagStatus.Amber"/>.
+    /// Returns <c>null</c> when no band is configured (see <see cref="HasTargetBand"/>).
+    /// </summary>
+    /// <param name="value">The numeric sample value to classify.</param>
+    public RagStatus? ClassifyRag(double value)
+    {
+        if (!HasTargetBand) return null;
+
+        // Outside the acceptable range → red.
+        if (AmberMin is { } amberMin && value < amberMin) return RagStatus.Red;
+        if (AmberMax is { } amberMax && value > amberMax) return RagStatus.Red;
+
+        // Inside the acceptable range. "Green" only exists when an ideal range is defined; a missing
+        // green edge lets the green zone reach the acceptable edge on that side (matching the chart).
+        var hasGreen = GreenMin is not null || GreenMax is not null;
+        if (!hasGreen) return RagStatus.Amber;
+
+        var greenLow = GreenMin ?? AmberMin;
+        var greenHigh = GreenMax ?? AmberMax;
+        var aboveLow = greenLow is not { } low || value >= low;
+        var belowHigh = greenHigh is not { } high || value <= high;
+        return aboveLow && belowHigh ? RagStatus.Green : RagStatus.Amber;
+    }
+}
+
+/// <summary>
+/// Red/Amber/Green status of a numeric sample relative to its value's target band. Ordered by
+/// severity (best → worst) so callers can compare or sort if they need to.
+/// </summary>
+public enum RagStatus
+{
+    /// <summary>Inside the ideal (green) range.</summary>
+    Green = 0,
+
+    /// <summary>Inside the acceptable (amber) range but outside the ideal range.</summary>
+    Amber = 1,
+
+    /// <summary>Outside the acceptable range.</summary>
+    Red = 2,
 }
 
 /// <summary>

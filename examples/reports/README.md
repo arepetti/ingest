@@ -2,7 +2,7 @@
 
 Ready-made report templates you can upload to an Ingest deployment **without changing the product code**. A report is a server-rendered HTML page (with a small YAML front-matter block and a [Liquid](https://shopify.github.io/liquid/) body) that renders against either a single submission or an aggregated period of submissions for a schema. An administrator uploads one via **Reports → Upload report** in the admin console; operators then view and re-render it with different filters.
 
-Reports are a deliberately simple, developer-oriented feature for small canned summaries — **not** an analytics tool. For real exploration, slicing and charting, point Power BI (or any OData client) at the `/odata/samples` feed instead. See [docs/setup/powerbi.md](../../docs/setup/powerbi.md).
+Reports are a deliberately simple, developer-oriented feature for small canned summaries — **not** an analytics tool. For real exploration, slicing and charting, point Power BI (or any OData client) at the `/odata/samples` feed instead. See [docs/setup/powerbi/](../../docs/setup/powerbi/README.md).
 
 ## Templates
 

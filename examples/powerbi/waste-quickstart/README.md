@@ -22,7 +22,7 @@ Prefer a ready-made model across all three schemas? Use the full [ingest-samples
    - `BaseUrl` — e.g. `https://ingest.example.org` (no trailing slash).
    - `ApiKey` — your key, form `keyId.secret`.
 2. **New source query.** **Home > New Source > Blank Query**, open the **Advanced Editor**, and paste [samples.m](samples.m). Rename the query to `Samples`. Click **Done**.
-3. **Anonymous auth.** If prompted for credentials, pick **Anonymous** — the key rides along as the `X-Api-Key` header from the query, not the dialog. ([Why?](../../../docs/setup/powerbi.md#why-anonymous--custom-header))
+3. **Anonymous auth.** If prompted for credentials, pick **Anonymous** — the key rides along as the `X-Api-Key` header from the query, not the dialog. ([Why?](../../../docs/setup/powerbi/README.md#why-anonymous--custom-header))
 4. **Flatten the value.** With `Samples` selected: **Add Column > Custom Column**, name it `Value`, and paste the body of [value.m](value.m). Leave the original `*Value` columns in place — the measures use them.
 5. **Close & Apply.**
 6. **Add the measures.** For each block in [measures.dax](measures.dax): **Modeling > New measure** and paste it.
@@ -32,7 +32,7 @@ Prefer a ready-made model across all three schemas? Use the full [ingest-samples
    - Cards — `[Routes missed]`, `[Recycling rate %]`.
    - Slicer — `ServiceName`.
 
-> For proper time-intelligence (YTD, same-period-last-year), add a calendar table and relate it to `Timestamp` — see [docs/setup/powerbi.md § Suggested data model](../../../docs/setup/powerbi.md#suggested-data-model). The full [ingest-samples](../ingest-samples/) project already includes one.
+> For proper time-intelligence (YTD, same-period-last-year), add a calendar table and relate it to `Timestamp` — see [docs/setup/powerbi/samples.md § Suggested data model](../../../docs/setup/powerbi/samples.md#suggested-data-model). The full [ingest-samples](../ingest-samples/) project already includes one.
 
 ## Pre-filtering more
 
@@ -42,10 +42,10 @@ Prefer a ready-made model across all three schemas? Use the full [ingest-samples
 BaseUrl & "/odata/samples?$filter=SchemaName eq 'garbage_collection' and ServiceName eq 'roads-team' and Timestamp ge 2025-06-01T00:00:00Z"
 ```
 
-See [docs/setup/powerbi.md § Pre-filtering at the source](../../../docs/setup/powerbi.md#pre-filtering-at-the-source) for the full set of options.
+See [docs/setup/powerbi/samples.md § Pre-filtering at the source](../../../docs/setup/powerbi/samples.md#pre-filtering-at-the-source) for the full set of options.
 
 ## See also
 
-- [docs/setup/powerbi.md](../../../docs/setup/powerbi.md) — the authoritative guide (column reference, data model, refresh).
+- [docs/setup/powerbi/](../../../docs/setup/powerbi/README.md) — the authoritative guide (column references, data model, refresh).
 - [ingest-samples](../ingest-samples/) — the full PBIP across all three schemas.
 - [Power BI examples index](../README.md)

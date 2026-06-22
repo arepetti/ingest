@@ -36,6 +36,7 @@ const useStyles = makeStyles({
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'start' },
   flagsRow: { display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' },
   sectionLabel: { color: tokens.colorNeutralForeground3, fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginTop: '12px' },
+  bandHelp: { color: tokens.colorNeutralForeground3, fontSize: '12px', marginBottom: '4px' },
   valuesToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   valueCard: { padding: '12px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '6px' },
   valueHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
@@ -699,6 +700,27 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
             </Field>
             <Field label="Max">
               <Input type="number" disabled={disabled} value={value.max?.toString() ?? ''} onChange={(_, v) => onChange({ max: v.value === '' ? null : Number(v.value) })} />
+            </Field>
+          </div>
+          <div className={s.sectionLabel}>Target band (RAG, optional)</div>
+          <div className={s.bandHelp}>
+            Reporting-only Red/Amber/Green ranges shown as shaded bands on charts — never enforced. The
+            acceptable (amber) range is the outer band; the ideal (green) range sits inside it. Outside
+            the amber range is red. Each edge is optional, but a green edge needs the matching amber edge
+            on the same side, and edges must read low-to-high: amber min ≤ green min ≤ green max ≤ amber max.
+          </div>
+          <div className={s.twoCol}>
+            <Field label="Acceptable (amber) min" hint="Below this is red. Outer lower edge.">
+              <Input type="number" disabled={disabled} value={value.amberMin?.toString() ?? ''} onChange={(_, v) => onChange({ amberMin: v.value === '' ? null : Number(v.value) })} />
+            </Field>
+            <Field label="Acceptable (amber) max" hint="Above this is red. Outer upper edge.">
+              <Input type="number" disabled={disabled} value={value.amberMax?.toString() ?? ''} onChange={(_, v) => onChange({ amberMax: v.value === '' ? null : Number(v.value) })} />
+            </Field>
+            <Field label="Ideal (green) min" hint="Inner lower edge. Needs an amber min.">
+              <Input type="number" disabled={disabled} value={value.greenMin?.toString() ?? ''} onChange={(_, v) => onChange({ greenMin: v.value === '' ? null : Number(v.value) })} />
+            </Field>
+            <Field label="Ideal (green) max" hint="Inner upper edge. Needs an amber max.">
+              <Input type="number" disabled={disabled} value={value.greenMax?.toString() ?? ''} onChange={(_, v) => onChange({ greenMax: v.value === '' ? null : Number(v.value) })} />
             </Field>
           </div>
         </>

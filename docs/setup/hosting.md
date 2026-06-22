@@ -474,7 +474,7 @@ There's no single correct number — it depends on how many services submit, how
 | Per client IP | **~60–120 requests/minute** | Comfortably above a single analyst + a paging Power BI refresh, which can fire many OData pages back-to-back. Set too low and a legitimate full-history refresh will trip it. |
 | Whole app (all IPs) | **~300–600 requests/minute** | Caps total inbound while leaving headroom for several services and refreshes at once. |
 
-Power BI paging is the usual reason a too-aggressive per-IP limit causes trouble: an unfiltered refresh issues hundreds of sequential page requests from one address (see [performance.md § Data volume](performance.md#data-volume) and [powerbi.md § Pre-filtering at the source](powerbi.md#pre-filtering-at-the-source)). If you rate-limit, either pre-filter those refreshes or set the per-IP window high enough to absorb a full page run.
+Power BI paging is the usual reason a too-aggressive per-IP limit causes trouble: an unfiltered refresh issues hundreds of sequential page requests from one address (see [performance.md § Data volume](performance.md#data-volume) and [powerbi/samples.md § Pre-filtering at the source](powerbi/samples.md#pre-filtering-at-the-source)). If you rate-limit, either pre-filter those refreshes or set the per-IP window high enough to absorb a full page run.
 
 Azure Front Door (Standard/Premium) is the typical place to enforce this in front of Container Apps. A custom WAF rule expresses the per-IP rule above:
 
@@ -714,7 +714,7 @@ Before you call it "production":
 - [ ] Liveness/readiness probes are wired.
 - [ ] Rate limiting and (if needed) IP allow-listing are configured at the ingress / proxy — see [Network controls](#network-controls) and [§ Picking a rate limit](#picking-a-rate-limit).
 - [ ] Logs flow to Log Analytics or Application Insights.
-- [ ] You've validated PowerBI can connect with an Operator-role key (see [powerbi.md](powerbi.md)).
+- [ ] You've validated PowerBI can connect with an Operator-role key (see [powerbi/](powerbi/README.md)).
 - [ ] **If using SSO:** `Sso__EnableSso=true`, the client id/secret are sourced from Key Vault (not inline), the production redirect URI is registered with each IdP, and at least one admin's identity is linked to a `User` account (so you're not locked out if a key is lost).
 - [ ] A backup of `mongo-cs` (your Mongo connection string) is stored somewhere you can find without logging into Azure.
 - [ ] **Database backups** are configured at the MongoDB layer (provider automated backups or scheduled `mongodump`) — see [Backups](#backups). On Cosmos DB vCore these are automatic; confirm the tier supports them and the retention window meets your needs. The in-app export/import is *not* a substitute.

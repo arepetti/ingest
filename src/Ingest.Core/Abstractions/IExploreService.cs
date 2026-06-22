@@ -100,6 +100,96 @@ public sealed record ExploreSeriesResult(
     IReadOnlyList<ExploreServiceRef> Services,
     IReadOnlyList<ExploreValueSeries> Values);
 
+/// <summary>How the scorecard picks which sample represents each service.</summary>
+public enum ScorecardMode
+{
+    /// <summary>Each service's most recent submission for the value, however old. Services that never reported are omitted.</summary>
+    LatestAvailable = 0,
+
+    /// <summary>
+    /// Only one specific period (see <see cref="ScorecardPeriod"/>). Every service that has ever
+    /// reported the value is shown; one that didn't submit that period gets a "missing" cell.
+    /// </summary>
+    LastPeriod = 1,
+}
+
+/// <summary>Which period <see cref="ScorecardMode.LastPeriod"/> looks at, relative to now.</summary>
+public enum ScorecardPeriod
+{
+    /// <summary>The period that contains "now", even though it is still open.</summary>
+    Current = 0,
+
+    /// <summary>The most recent fully-elapsed period (the one before the current).</summary>
+    LatestClosed = 1,
+}
+
+/// <summary>Filter options for an <see cref="IExploreService.GetScorecardAsync"/> call.</summary>
+/// <param name="ServiceIds">Restrict to these services. <c>null</c> or empty means "every service".</param>
+/// <param name="Mode">Whether to show each service's latest sample or a single period.</param>
+/// <param name="Period">Which period to read when <paramref name="Mode"/> is <see cref="ScorecardMode.LastPeriod"/>.</param>
+public sealed record ExploreScorecardQuery(
+    IReadOnlyList<Guid>? ServiceIds,
+    ScorecardMode Mode = ScorecardMode.LatestAvailable,
+    ScorecardPeriod Period = ScorecardPeriod.Current);
+
+/// <summary>
+/// One service's sample for a banded value, with its RAG classification. A "missing" cell (the
+/// service didn't submit the requested period) carries a <c>null</c> <see cref="Status"/>,
+/// <see cref="Value"/> and <see cref="SubmissionId"/>, with the period it was expected for.
+/// </summary>
+/// <param name="ServiceId">Service account id (join key back to <see cref="ExploreScorecardResult.Services"/>).</param>
+/// <param name="SubmissionId">Submission the sample came from, so the UI can deep-link to it; <c>null</c> when missing.</param>
+/// <param name="Value">The numeric value the service reported; <c>null</c> when missing.</param>
+/// <param name="Status">Where <paramref name="Value"/> falls in the value's target band; <c>null</c> when missing.</param>
+/// <param name="PeriodStart">Inclusive start of the period the sample belongs to (or was expected for).</param>
+/// <param name="PeriodEnd">Exclusive end of that period.</param>
+/// <param name="SubmittedAt">When the submission carrying the sample was accepted; <c>null</c> when missing.</param>
+public sealed record ExploreScorecardCell(
+    Guid ServiceId,
+    Guid? SubmissionId,
+    double? Value,
+    RagStatus? Status,
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    DateTime? SubmittedAt);
+
+/// <summary>A single banded value and the latest RAG status of every service that reported it.</summary>
+/// <param name="ValueName">Machine-style value name.</param>
+/// <param name="Label">Friendly label, if one was set.</param>
+/// <param name="Unit">Unit of measure carried on the schema definition.</param>
+/// <param name="Cadence">Cadence the value is collected on (snapshot from the schema definition).</param>
+/// <param name="AmberMin">Lower edge of the acceptable (amber) range, or <c>null</c>.</param>
+/// <param name="GreenMin">Lower edge of the ideal (green) range, or <c>null</c>.</param>
+/// <param name="GreenMax">Upper edge of the ideal (green) range, or <c>null</c>.</param>
+/// <param name="AmberMax">Upper edge of the acceptable (amber) range, or <c>null</c>.</param>
+/// <param name="Cells">One cell per service that has a latest sample, ordered by service id.</param>
+public sealed record ExploreScorecardValue(
+    string ValueName,
+    string? Label,
+    string? Unit,
+    Cadence Cadence,
+    double? AmberMin,
+    double? GreenMin,
+    double? GreenMax,
+    double? AmberMax,
+    IReadOnlyList<ExploreScorecardCell> Cells);
+
+/// <summary>One enabled schema's banded values for the scorecard, grouped under the schema.</summary>
+/// <param name="SchemaName">Machine-style schema name.</param>
+/// <param name="SchemaLabel">Friendly schema label.</param>
+/// <param name="Values">Banded numeric values that have at least one reporting service.</param>
+public sealed record ExploreScorecardSchema(
+    string SchemaName,
+    string? SchemaLabel,
+    IReadOnlyList<ExploreScorecardValue> Values);
+
+/// <summary>The result of an <see cref="IExploreService.GetScorecardAsync"/> call.</summary>
+/// <param name="Services">Every service appearing in the result, with labels resolved.</param>
+/// <param name="Schemas">Enabled schemas that have at least one banded value with data.</param>
+public sealed record ExploreScorecardResult(
+    IReadOnlyList<ExploreServiceRef> Services,
+    IReadOnlyList<ExploreScorecardSchema> Schemas);
+
 /// <summary>
 /// Lightweight, in-app analytics over the denormalised sample projection: per-value, per-cadence
 /// buckets with a per-service breakdown, for the bundled "Explore" page. Deliberately small — it
@@ -116,4 +206,14 @@ public interface IExploreService
     /// numeric values (or no samples) returns a non-null result with empty <see cref="ExploreSeriesResult.Values"/>.
     /// </returns>
     Task<ExploreSeriesResult?> GetSeriesAsync(ExploreSeriesQuery query, CancellationToken ct = default);
+
+    /// <summary>
+    /// Build a cross-schema RAG scorecard: every enabled schema's numeric values that carry a
+    /// target band, with each reporting service's latest sample classified green/amber/red. Powers
+    /// the Explore page's at-a-glance status board. Schemas and values with no banded data are
+    /// omitted entirely.
+    /// </summary>
+    /// <param name="query">Service filter.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<ExploreScorecardResult> GetScorecardAsync(ExploreScorecardQuery query, CancellationToken ct = default);
 }

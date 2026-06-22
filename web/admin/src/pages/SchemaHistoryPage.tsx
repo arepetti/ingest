@@ -8,11 +8,12 @@ import { ArrowLeft20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { formatApiError } from '../api/client'
 import {
-  CartesianGrid, ComposedChart, ErrorBar, Line, ResponsiveContainer,
+  CartesianGrid, ComposedChart, ErrorBar, Line, ReferenceArea, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { useSchemaHistory } from '../api/hooks'
 import type { SchemaValueHistory } from '../api/types'
+import { ragBandRects } from '../utils/targetBand'
 import { cadenceLabel } from '../utils/cadence'
 import { formatPeriodLabel } from '../utils/periodFormat'
 
@@ -78,6 +79,7 @@ export function SchemaHistoryPage() {
 function ValueChartCard({ value }: { value: SchemaValueHistory }) {
   const s = useStyles()
   const rows = useMemo(() => toChartRows(value), [value])
+  const bandRects = useMemo(() => ragBandRects(value), [value])
   const yAxisLabel = value.unit ? `${value.label || value.valueName} (${value.unit})` : (value.label || value.valueName)
 
   return (
@@ -99,6 +101,18 @@ function ValueChartCard({ value }: { value: SchemaValueHistory }) {
         <ResponsiveContainer width="100%" height={240}>
           <ComposedChart data={rows} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={tokens.colorNeutralStroke2} />
+            {bandRects.map(r => (
+              // Open edges (undefined y1/y2) anchor to the axis extent, so half-open bands still shade.
+              <ReferenceArea
+                key={r.key}
+                y1={r.y1}
+                y2={r.y2}
+                ifOverflow="extendDomain"
+                fill={r.tone === 'green' ? tokens.colorPaletteGreenBackground2 : tokens.colorPaletteYellowBackground2}
+                fillOpacity={0.3}
+                strokeOpacity={0}
+              />
+            ))}
             <XAxis dataKey="period" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} />
             <Tooltip

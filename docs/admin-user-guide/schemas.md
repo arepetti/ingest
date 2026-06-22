@@ -22,6 +22,7 @@ Schema (package)
       ├─ Required, Modifiable, Enabled  ← per-value gates
       ├─ SinceVersion (optional)        ← schema version the value was introduced in
       ├─ Min / Max / MinDate / MaxDate / MinLength / MaxLength / RegexPattern
+      ├─ RAG band (optional, numeric)  ← GreenMin/Max + AmberMin/Max; shown on charts; never enforced
       └─ Expression fields           ← Value validation, Warning, Enabled if, Visible if
 ```
 
@@ -46,6 +47,7 @@ Each value has its own cadence: a monthly schema can contain weekly KPIs perfect
    - **Cadence** — `Daily`, `Weekly`, `Fortnightly` (every 2 weeks), `Monthly`, `Quarterly`, `Semi-annually` (every 6 months) or `Yearly`. The validator uses this to enforce "one sample per period". Fortnightly windows are Monday-anchored and aligned to a fixed reference so every service sees the same biweek boundaries; quarterly maps to calendar quarters (Q1 = Jan–Mar, Q2 = Apr–Jun, Q3 = Jul–Sep, Q4 = Oct–Dec); semi-annual maps to H1 (Jan–Jun) and H2 (Jul–Dec).
    - **Required** / **Modifiable** / **Enabled** — per-value flags. `Modifiable` and `Enabled` AND with the package-level flags.
    - **Min / Max / MinDate / MaxDate / MinLength / MaxLength / RegexPattern** — type-specific shape constraints. Only the ones that make sense for the chosen type take effect.
+   - **RAG target band** — *(Integer / Number only)* an optional Red/Amber/Green band describing where a KPI *should* sit. See [The RAG target band](#the-rag-target-band) below. Unlike Min/Max it is **never enforced** — out-of-band samples are still accepted — it's purely reporting metadata drawn on the [Explore](explore.md) and historical charts.
    - Four expression fields (described in [Expression fields on a value](#expression-fields-on-a-value) below).
 4. Click **Save**.
 
@@ -71,6 +73,36 @@ A few authoring rules of thumb:
 Any warnings these rules produce are **stored on the submission**, not just shown once at submit time. They appear as a count in the Submissions grid and as a list in the submission view (see [submissions.md](submissions.md)), so operators and admins can review them whenever they revisit a record.
 
 The full syntax, operators, helpers and recipes are in [validation.md](validation.md). The submission editor evaluates the same expressions live so admins can see hide/grey/warning behaviour as they type test data.
+
+## The RAG target band
+
+Numeric values (`Integer` / `Number`) can carry an optional **Red/Amber/Green band** that says where the KPI *should* sit. It is **never enforced** — a sample outside the band is accepted exactly as before — it's purely reporting metadata, drawn as shaded zones behind the line on the [Explore](explore.md) trend chart and the [historical-data view](#viewing-historical-data). It gives a leadership audience an at-a-glance read on whether a service is on target.
+
+The band is two **nested ranges** defined by four optional numbers:
+
+```
+   RED   │   AMBER   │       GREEN       │   AMBER   │   RED
+─────────┼───────────┼───────────────────┼───────────┼─────────▶
+      AmberMin     GreenMin          GreenMax     AmberMax
+   └──────────────  Acceptable range  ──────────────┘
+                └──────  Ideal range  ──────┘
+```
+
+- **Acceptable (amber) range** — `Acceptable min` … `Acceptable max`. Anything outside it is **red**.
+- **Ideal (green) range** — `Ideal min` … `Ideal max`, sitting inside the acceptable range. Inside it is **green**; inside the acceptable range but outside the ideal range is **amber**.
+
+Every edge is optional, so you can describe exactly the shape you need:
+
+- **Acceptable range only** — a simple in-range (amber) vs out-of-range (red) band, with no finer "ideal" distinction.
+- **One-sided** — e.g. set only `Ideal max` + `Acceptable max` for a "lower is better" KPI (no minimums), or only the minimums for "higher is better".
+- **Full four-edge band** — the complete green-inside-amber picture.
+
+The server validates that the band is **coherent** (and rejects the schema otherwise):
+
+- Edges read low-to-high: `Acceptable min ≤ Ideal min ≤ Ideal max ≤ Acceptable max` (for whichever are set).
+- The ideal range needs a surrounding acceptable range **on the same side**: `Ideal min` requires `Acceptable min`, and `Ideal max` requires `Acceptable max`. (You can have an acceptable range without an ideal one, but not the other way round.)
+
+On the charts a missing outer edge means "no red on that side" — the band simply extends to the edge of the chart.
 
 ## Multi-line expression authoring
 
@@ -215,7 +247,7 @@ Admins bypass restriction (1) via the on-behalf-of submission endpoints. Restric
 
 ## Viewing historical data
 
-Row menu → **View historical data** opens a per-value time series chart, one chart per numeric value in the schema, with min/max/average per cadence bucket. Useful for sanity-checking that data has been arriving steadily.
+Row menu → **View historical data** opens a per-value time series chart, one chart per numeric value in the schema, with min/max/average per cadence bucket. Useful for sanity-checking that data has been arriving steadily. Any value with a [RAG target band](#the-rag-target-band) shows it as green/amber shaded zones behind its chart.
 
 In the schema view drawer the same affordance is a **split button**: the primary action still opens the historical-data charts, and the chevron menu adds **View version history** (also available from the row menu).
 

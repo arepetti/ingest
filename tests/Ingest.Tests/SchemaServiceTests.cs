@@ -425,6 +425,141 @@ public class SchemaServiceTests
         Assert.Null(await svc.CloneAsync(Guid.NewGuid()));
     }
 
+    // ── RAG target band ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Create_round_trips_full_rag_band()
+    {
+        var svc = NewService(out _);
+        var s = NewSchema();
+        s.Values[0].AmberMin = 0;
+        s.Values[0].GreenMin = 10;
+        s.Values[0].GreenMax = 90;
+        s.Values[0].AmberMax = 100;
+        var created = await svc.CreateAsync(s);
+        Assert.Equal(0, created.Values[0].AmberMin);
+        Assert.Equal(10, created.Values[0].GreenMin);
+        Assert.Equal(90, created.Values[0].GreenMax);
+        Assert.Equal(100, created.Values[0].AmberMax);
+    }
+
+    [Fact]
+    public async Task Create_accepts_amber_only_band()
+    {
+        // The outer (acceptable) band may stand alone — no inner ideal range required.
+        var svc = NewService(out _);
+        var s = NewSchema();
+        s.Values[0].AmberMin = 5;
+        s.Values[0].AmberMax = 50;
+        var created = await svc.CreateAsync(s);
+        Assert.Equal(5, created.Values[0].AmberMin);
+        Assert.Equal(50, created.Values[0].AmberMax);
+        Assert.Null(created.Values[0].GreenMin);
+        Assert.Null(created.Values[0].GreenMax);
+    }
+
+    [Fact]
+    public async Task Create_accepts_one_sided_band()
+    {
+        // "Lower is better": only the upper edges are set (no minimums).
+        var svc = NewService(out _);
+        var s = NewSchema();
+        s.Values[0].GreenMax = 5;
+        s.Values[0].AmberMax = 10;
+        var created = await svc.CreateAsync(s);
+        Assert.Equal(5, created.Values[0].GreenMax);
+        Assert.Equal(10, created.Values[0].AmberMax);
+    }
+
+    [Fact]
+    public async Task Create_rejects_out_of_order_band()
+    {
+        var svc = NewService(out _);
+        var s = NewSchema();
+        s.Values[0].AmberMin = 0;
+        s.Values[0].GreenMin = 90; // green min above green max
+        s.Values[0].GreenMax = 10;
+        s.Values[0].AmberMax = 100;
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(s));
+        Assert.Contains(ex.Errors, e => e.Contains("out-of-order"));
+    }
+
+    [Fact]
+    public async Task Create_rejects_green_above_amber_ceiling()
+    {
+        var svc = NewService(out _);
+        var s = NewSchema();
+        s.Values[0].GreenMax = 120; // ideal ceiling pokes outside the acceptable ceiling
+        s.Values[0].AmberMax = 100;
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(s));
+        Assert.Contains(ex.Errors, e => e.Contains("out-of-order"));
+    }
+
+    [Fact]
+    public async Task Create_rejects_green_min_without_amber_min()
+    {
+        var svc = NewService(out _);
+        var s = NewSchema();
+        s.Values[0].GreenMin = 10;
+        s.Values[0].GreenMax = 90;
+        s.Values[0].AmberMax = 100; // amber max present, but no amber min for the green min
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(s));
+        Assert.Contains(ex.Errors, e => e.Contains("GreenMin without AmberMin"));
+    }
+
+    [Fact]
+    public async Task Create_rejects_green_max_without_amber_max()
+    {
+        var svc = NewService(out _);
+        var s = NewSchema();
+        s.Values[0].AmberMin = 0;
+        s.Values[0].GreenMin = 10;
+        s.Values[0].GreenMax = 90; // green max present, but no amber max
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(s));
+        Assert.Contains(ex.Errors, e => e.Contains("GreenMax without AmberMax"));
+    }
+
+    [Fact]
+    public async Task Clone_copies_rag_band()
+    {
+        var svc = NewService(out _);
+        var s = NewSchema(name: "alpha");
+        s.Values[0].AmberMin = 0;
+        s.Values[0].GreenMin = 5;
+        s.Values[0].GreenMax = 25;
+        s.Values[0].AmberMax = 30;
+        var source = await svc.CreateAsync(s);
+
+        var clone = await svc.CloneAsync(source.Id);
+
+        Assert.NotNull(clone);
+        Assert.Equal(0, clone!.Values[0].AmberMin);
+        Assert.Equal(5, clone.Values[0].GreenMin);
+        Assert.Equal(25, clone.Values[0].GreenMax);
+        Assert.Equal(30, clone.Values[0].AmberMax);
+    }
+
+    [Fact]
+    public async Task History_exposes_rag_band_on_value_timeline()
+    {
+        var svc = NewService(out _);
+        var s = NewSchema(name: "banded");
+        s.Values[0].AmberMin = 0;
+        s.Values[0].GreenMin = 1;
+        s.Values[0].GreenMax = 2;
+        s.Values[0].AmberMax = 3;
+        await svc.CreateAsync(s);
+
+        var history = await svc.GetHistoryAsync("banded");
+
+        Assert.NotNull(history);
+        var tonnes = Assert.Single(history!.Values, v => v.ValueName == "tonnes");
+        Assert.Equal(0, tonnes.AmberMin);
+        Assert.Equal(1, tonnes.GreenMin);
+        Assert.Equal(2, tonnes.GreenMax);
+        Assert.Equal(3, tonnes.AmberMax);
+    }
+
     // ── Example submission ──────────────────────────────────────────────────────────────────
 
     [Fact]

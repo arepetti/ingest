@@ -320,4 +320,4 @@ Repository-level integration tests would require a real Mongo and were intention
 - [../admin-user-guide/README.md](../admin-user-guide/README.md) — how to operate the system from the admin SPA.
 - [../admin-user-guide/validation.md](../admin-user-guide/validation.md) — writing validation rules at sample and schema level.
 - [../setup/hosting.md](../setup/hosting.md) — deploying to Azure.
-- [../setup/powerbi.md](../setup/powerbi.md) — connecting reporting tools.
+- [../setup/powerbi/](../setup/powerbi/README.md) — connecting reporting tools.

@@ -54,4 +54,32 @@ public sealed class ExploreController(IExploreService explore) : ControllerBase
         var result = await explore.GetSeriesAsync(query, ct);
         return result is null ? NotFound() : Ok(ExploreSeriesResponse.FromResult(result));
     }
+
+    /// <summary>
+    /// Cross-schema RAG scorecard: every enabled schema's numeric values that carry a target band,
+    /// with each reporting service's sample classified green/amber/red. Schemas and values with no
+    /// banded history are omitted.
+    /// </summary>
+    /// <param name="serviceIds">Restrict to these services (repeatable). Omit for every service.</param>
+    /// <param name="mode">
+    /// <see cref="ScorecardMode.LatestAvailable"/> (default) shows each service's most recent sample;
+    /// <see cref="ScorecardMode.LastPeriod"/> shows one period and marks non-reporting services as missing.
+    /// </param>
+    /// <param name="period">
+    /// Which period <see cref="ScorecardMode.LastPeriod"/> reads: <see cref="ScorecardPeriod.Current"/>
+    /// (default, the open period) or <see cref="ScorecardPeriod.LatestClosed"/> (the last elapsed period).
+    /// </param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The scorecard. <see cref="ExploreScorecardResponse"/>.</response>
+    [HttpGet("scorecard")]
+    [ProducesResponseType(typeof(ExploreScorecardResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetScorecard(
+        [FromQuery] List<Guid>? serviceIds,
+        [FromQuery] ScorecardMode mode,
+        [FromQuery] ScorecardPeriod period,
+        CancellationToken ct)
+    {
+        var result = await explore.GetScorecardAsync(new ExploreScorecardQuery(serviceIds, mode, period), ct);
+        return Ok(ExploreScorecardResponse.FromResult(result));
+    }
 }

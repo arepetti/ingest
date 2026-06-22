@@ -40,6 +40,7 @@ public static class SampleProjectionBuilder
                 ValueName = s.ValueName,
                 ValueType = def.Type,
                 Timestamp = DateTime.SpecifyKind(s.Timestamp, DateTimeKind.Utc),
+                SubmittedAt = DateTime.SpecifyKind(submission.SubmittedAt, DateTimeKind.Utc),
                 Note = s.Note,
                 Cadence = def.Cadence,
                 PeriodStart = start,

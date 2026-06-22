@@ -1,8 +1,8 @@
 # Power BI examples
 
-Ready-made starting points for exploring Ingest data in **Power BI**, pointed at the OData feed at `/odata/samples`. This is the [recommended, primary way to explore Ingest data](../../docs/setup/powerbi.md) — the admin SPA dashboard and built-in reports are deliberately basic; real slicing, trends and charting belong in a BI tool.
+Ready-made starting points for exploring Ingest data in **Power BI**, pointed at the OData feed at `/odata/samples`. This is the [recommended, primary way to explore Ingest data](../../docs/setup/powerbi/README.md) — the admin SPA dashboard and built-in reports are deliberately basic; real slicing, trends and charting belong in a BI tool.
 
-Both artifacts here use the exact connection recipe from [docs/setup/powerbi.md](../../docs/setup/powerbi.md): an OData feed with **Anonymous** auth plus an `X-Api-Key` custom header, with the key held in a Power Query **parameter** rather than baked into the file.
+Both artifacts here use the exact connection recipe from [docs/setup/powerbi/](../../docs/setup/powerbi/README.md): an OData feed with **Anonymous** auth plus an `X-Api-Key` custom header, with the key held in a Power Query **parameter** rather than baked into the file.
 
 ## The two artifacts
 
@@ -24,6 +24,6 @@ The feed is gated by the **Operator** policy: any account with role `Operator` o
 
 ## See also
 
-- [docs/setup/powerbi.md](../../docs/setup/powerbi.md) — the full connection guide: column reference, header recipe, pre-filtering, data-model tips, scheduled refresh.
+- [docs/setup/powerbi/](../../docs/setup/powerbi/README.md) — the full connection guide: column references, header recipe, query options, data-model tips, scheduled refresh.
 - [docs/setup/excel.md](../../docs/setup/excel.md) — the same feed in Excel, the cheapest analyst on-ramp.
 - [examples index](../README.md)

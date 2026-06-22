@@ -18,7 +18,7 @@ ingest-samples/
 
 The model:
 
-- **`Samples`** — the OData feed, with the doc's [flatten step](../../../docs/setup/powerbi.md#suggested-data-model) adding a single `Value` column, plus a `NumericValue` calculated column (`COALESCE(NumberValue, IntegerValue)`) so Number and Integer KPIs aggregate together, and a `Date` column for the relationship. A handful of starter **measures** are defined (total tonnes, recycling rate, avg contamination, routes missed, avg active employees, budget actual, revenue collected).
+- **`Samples`** — the OData feed, with the doc's [flatten step](../../../docs/setup/powerbi/samples.md#suggested-data-model) adding a single `Value` column, plus a `NumericValue` calculated column (`COALESCE(NumberValue, IntegerValue)`) so Number and Integer KPIs aggregate together, and a `Date` column for the relationship. A handful of starter **measures** are defined (total tonnes, recycling rate, avg contamination, routes missed, avg active employees, budget actual, revenue collected).
 - **`Calendar`** — a DAX calendar (`CALENDAR(2024-01-01, 2027-12-31)`) related to `Samples[Date]`, for time-intelligence and clean month/quarter axes.
 
 ## First-time setup (required)
@@ -29,7 +29,7 @@ Because the key must not live in the file, the connection is driven by two **par
 2. Go to **Home > Transform data > Edit parameters** (or **Manage parameters**) and set:
    - **`BaseUrl`** — your deployment, e.g. `https://ingest.example.org` (no trailing slash).
    - **`ApiKey`** — an **Operator** (or Admin) API key in the form `keyId.secret`. A `Service`-role key will get a 401.
-3. When prompted for credentials on the OData source, choose **Anonymous** — the key travels as the `X-Api-Key` header set by the query, not through the credential dialog. (See [why anonymous + header](../../../docs/setup/powerbi.md#why-anonymous--custom-header).)
+3. When prompted for credentials on the OData source, choose **Anonymous** — the key travels as the `X-Api-Key` header set by the query, not through the credential dialog. (See [why anonymous + header](../../../docs/setup/powerbi/README.md#why-anonymous--custom-header).)
 4. **Close & Apply.** The model refreshes against your data.
 
 > Don't commit your key. Leave `ApiKey` as the placeholder in `expressions.tmdl`; set the real value locally, and at workspace level when publishing to the Power BI service.
@@ -54,7 +54,7 @@ The three pages (**Waste**, **Workforce**, **Finance**) open with a title and a 
 
 ## Refresh & publish
 
-After publishing to the Power BI service, set **Data source credentials > Anonymous** and configure a **Refresh schedule** (Daily is plenty). Behind a private network, add an on-premises data gateway. Full detail: [docs/setup/powerbi.md § Refresh schedule](../../../docs/setup/powerbi.md#refresh-schedule).
+After publishing to the Power BI service, set **Data source credentials > Anonymous** and configure a **Refresh schedule** (Daily is plenty). Behind a private network, add an on-premises data gateway. Full detail: [docs/setup/powerbi/README.md § Refresh schedule](../../../docs/setup/powerbi/README.md#refresh-schedule).
 
 ## If the project won't open
 
@@ -65,6 +65,6 @@ This PBIP is authored by hand and **hasn't been round-tripped through Power BI D
 
 ## See also
 
-- [docs/setup/powerbi.md](../../../docs/setup/powerbi.md) — the authoritative connection guide (column reference, pre-filtering, data model, refresh).
+- [docs/setup/powerbi/](../../../docs/setup/powerbi/README.md) — the authoritative connection guide (column references, pre-filtering, data model, refresh).
 - [waste-quickstart](../waste-quickstart/) — the no-project, copy-paste version (waste only).
 - [Power BI examples index](../README.md)

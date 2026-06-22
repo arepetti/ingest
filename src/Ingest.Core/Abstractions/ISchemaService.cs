@@ -24,6 +24,10 @@ public sealed record HistoryBucket(
 /// <param name="Type">Original value type (only numeric values produce non-empty buckets).</param>
 /// <param name="Cadence">The cadence used to group samples into buckets.</param>
 /// <param name="Unit">Unit of measure carried on the schema definition.</param>
+/// <param name="GreenMin">Optional lower edge of the ideal (green) range, for charting.</param>
+/// <param name="GreenMax">Optional upper edge of the ideal (green) range, for charting.</param>
+/// <param name="AmberMin">Optional lower edge of the acceptable (amber) range, for charting.</param>
+/// <param name="AmberMax">Optional upper edge of the acceptable (amber) range, for charting.</param>
 /// <param name="Buckets">Ordered series of aggregated samples.</param>
 public sealed record SchemaValueHistory(
     string ValueName,
@@ -31,6 +35,10 @@ public sealed record SchemaValueHistory(
     SchemaValueType Type,
     Cadence Cadence,
     string? Unit,
+    double? GreenMin,
+    double? GreenMax,
+    double? AmberMin,
+    double? AmberMax,
     IReadOnlyList<HistoryBucket> Buckets);
 
 /// <summary>Aggregated numeric history for an entire schema.</summary>

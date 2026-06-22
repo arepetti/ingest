@@ -46,7 +46,7 @@ With ~30 services each actively reporting against ~3 schemas:
 
 That footprint sits well inside the M30 cluster's 32 GB disk. Index definitions on `samples` — especially `by_service_schema_value_time` — support the filter patterns analysts and Power BI use; see [architecture/architecture.md § Mongo indexes](../architecture/architecture.md#mongo-indexes).
 
-A full OData scan of the entire history without `$filter` requires on the order of **300–500 HTTP pages** at the default page size of 500 (maximum `$top` per request: 5000). Filtered refreshes — last 12–24 months, one service, one schema — typically pull **5k–50k rows** instead. Pre-filtering at the source is the main lever for refresh duration; see [powerbi.md § Pre-filtering at the source](powerbi.md#pre-filtering-at-the-source).
+A full OData scan of the entire history without `$filter` requires on the order of **300–500 HTTP pages** at the default page size of 500 (maximum `$top` per request: 5000). Filtered refreshes — last 12–24 months, one service, one schema — typically pull **5k–50k rows** instead. Pre-filtering at the source is the main lever for refresh duration; see [powerbi/samples.md § Pre-filtering at the source](powerbi/samples.md#pre-filtering-at-the-source).
 
 ```mermaid
 flowchart LR
@@ -187,6 +187,6 @@ For a typical council deployment — low admin UI use, API-driven submissions, a
 ## Related reading
 
 - [hosting.md](hosting.md) — Azure deployment steps and replica sizing.
-- [powerbi.md](powerbi.md) — OData auth, pre-filtering, and refresh behaviour.
+- [powerbi/](powerbi/README.md) — OData auth, pre-filtering, and refresh behaviour.
 - [architecture/architecture.md](../architecture/architecture.md) — request flow, validation pipeline, indexes, background workers.
 - [admin-user-guide/troubleshooting.md](../admin-user-guide/troubleshooting.md) — common operational issues.

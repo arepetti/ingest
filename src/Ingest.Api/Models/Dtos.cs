@@ -185,6 +185,10 @@ public sealed record GeneratedApiKeyResponse(ApiKeyDto Key, string Plaintext);
 /// <param name="Enabled">When false, samples are rejected at validation time.</param>
 /// <param name="Min">Inclusive numeric lower bound.</param>
 /// <param name="Max">Inclusive numeric upper bound.</param>
+/// <param name="GreenMin">Optional lower edge of the ideal (green) range in the RAG target band. Non-enforced; charts only.</param>
+/// <param name="GreenMax">Optional upper edge of the ideal (green) range. Non-enforced; charts only.</param>
+/// <param name="AmberMin">Optional lower edge of the acceptable (amber) range; below it is "red". Non-enforced; charts only.</param>
+/// <param name="AmberMax">Optional upper edge of the acceptable (amber) range; above it is "red". Non-enforced; charts only.</param>
 /// <param name="MinDate">Inclusive date lower bound.</param>
 /// <param name="MaxDate">Inclusive date upper bound.</param>
 /// <param name="MinLength">String minimum length.</param>
@@ -209,6 +213,10 @@ public sealed record SchemaValueDto(
     bool Enabled,
     double? Min,
     double? Max,
+    double? GreenMin,
+    double? GreenMax,
+    double? AmberMin,
+    double? AmberMax,
     DateTime? MinDate,
     DateTime? MaxDate,
     int? MinLength,
@@ -224,7 +232,7 @@ public sealed record SchemaValueDto(
     public static SchemaValueDto From(SchemaValue v) => new(
         v.Name, v.Label, v.Description, v.Notes, v.Caption, v.Type, v.Unit, v.Cadence,
         v.Required, v.Modifiable, v.Enabled,
-        v.Min, v.Max, v.MinDate, v.MaxDate, v.MinLength, v.MaxLength, v.RegexPattern, v.ValueValidation,
+        v.Min, v.Max, v.GreenMin, v.GreenMax, v.AmberMin, v.AmberMax, v.MinDate, v.MaxDate, v.MinLength, v.MaxLength, v.RegexPattern, v.ValueValidation,
         v.EnabledIf, v.VisibleIf, v.Warning, v.SinceVersion);
 
     /// <summary>Convert the wire DTO back into a domain entity (used by upsert endpoints).</summary>
@@ -243,6 +251,10 @@ public sealed record SchemaValueDto(
         Enabled = Enabled,
         Min = Min,
         Max = Max,
+        GreenMin = GreenMin,
+        GreenMax = GreenMax,
+        AmberMin = AmberMin,
+        AmberMax = AmberMax,
         MinDate = MinDate,
         MaxDate = MaxDate,
         MinLength = MinLength,
@@ -887,6 +899,7 @@ public sealed record QueryRequest(
 /// <param name="DateValue">Populated when <see cref="ValueType"/> is <see cref="SchemaValueType.Date"/>.</param>
 /// <param name="BooleanValue">Populated when <see cref="ValueType"/> is <see cref="SchemaValueType.Boolean"/>.</param>
 /// <param name="Timestamp">Measurement timestamp.</param>
+/// <param name="SubmittedAt">When the parent submission was first accepted by the API.</param>
 /// <param name="Note">Note carried from the original sample.</param>
 /// <param name="Cadence">Cadence snapshot from the schema definition.</param>
 /// <param name="PeriodStart">Cadence bucket start (inclusive).</param>
@@ -905,6 +918,7 @@ public sealed record SampleProjectionDto(
     DateTime? DateValue,
     bool? BooleanValue,
     DateTime Timestamp,
+    DateTime SubmittedAt,
     string? Note,
     Cadence Cadence,
     DateTime PeriodStart,
@@ -914,7 +928,7 @@ public sealed record SampleProjectionDto(
     public static SampleProjectionDto From(SampleProjection s) => new(
         s.Id, s.SubmissionId, s.ServiceAccountId, s.ServiceName, s.SchemaName, s.ValueName, s.ValueType,
         s.StringValue, s.NumberValue, s.IntegerValue, s.DateValue, s.BooleanValue,
-        s.Timestamp, s.Note, s.Cadence, s.PeriodStart, s.PeriodEnd);
+        s.Timestamp, s.SubmittedAt, s.Note, s.Cadence, s.PeriodStart, s.PeriodEnd);
 }
 
 /// <summary>Per-value status snapshot.</summary>
@@ -1044,6 +1058,10 @@ public sealed record HistoryBucketDto(
 /// <param name="Type">Numeric type (<see cref="SchemaValueType.Number"/> or <see cref="SchemaValueType.Integer"/>).</param>
 /// <param name="Cadence">Cadence of the buckets.</param>
 /// <param name="Unit">Unit of measure (informational).</param>
+/// <param name="GreenMin">Optional lower edge of the ideal (green) range, overlaid on the chart.</param>
+/// <param name="GreenMax">Optional upper edge of the ideal (green) range, overlaid on the chart.</param>
+/// <param name="AmberMin">Optional lower edge of the acceptable (amber) range, overlaid on the chart.</param>
+/// <param name="AmberMax">Optional upper edge of the acceptable (amber) range, overlaid on the chart.</param>
 /// <param name="Buckets">Buckets ordered chronologically.</param>
 public sealed record SchemaValueHistoryDto(
     string ValueName,
@@ -1051,6 +1069,10 @@ public sealed record SchemaValueHistoryDto(
     SchemaValueType Type,
     Cadence Cadence,
     string? Unit,
+    double? GreenMin,
+    double? GreenMax,
+    double? AmberMin,
+    double? AmberMax,
     List<HistoryBucketDto> Buckets);
 
 /// <summary>Historical view of a schema: one timeline per numeric value, grouped by cadence.</summary>
@@ -1144,6 +1166,69 @@ public sealed record ExploreSeriesResponse(
         r.SchemaName, r.SchemaLabel, r.Aggregation, r.From, r.To,
         r.Services.Select(ExploreServiceRefDto.From).ToList(),
         r.Values.Select(ExploreValueSeriesDto.From).ToList());
+}
+
+/// <summary>One service's RAG-classified sample for a banded value on the scorecard.</summary>
+/// <param name="ServiceId">Service account id (join key back to <see cref="ExploreScorecardResponse.Services"/>).</param>
+/// <param name="SubmissionId">Submission the sample came from, so the UI can deep-link to it; <c>null</c> when missing.</param>
+/// <param name="Value">The numeric value the service reported; <c>null</c> when missing.</param>
+/// <param name="Status">Where <paramref name="Value"/> falls in the value's target band; <c>null</c> when missing.</param>
+/// <param name="PeriodStart">Inclusive start of the period the sample belongs to (or was expected for).</param>
+/// <param name="PeriodEnd">Exclusive end of that period.</param>
+public sealed record ExploreScorecardCellDto(
+    Guid ServiceId,
+    Guid? SubmissionId,
+    double? Value,
+    RagStatus? Status,
+    DateTime PeriodStart,
+    DateTime PeriodEnd)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreScorecardCellDto From(ExploreScorecardCell c) => new(
+        c.ServiceId, c.SubmissionId, c.Value, c.Status, c.PeriodStart, c.PeriodEnd);
+}
+
+/// <summary>A banded value and the latest RAG status of every service that reported it.</summary>
+/// <param name="ValueName">Machine-style value name.</param>
+/// <param name="Label">Friendly label.</param>
+/// <param name="Unit">Unit of measure.</param>
+/// <param name="Cells">One cell per reporting service.</param>
+public sealed record ExploreScorecardValueDto(
+    string ValueName,
+    string? Label,
+    string? Unit,
+    List<ExploreScorecardCellDto> Cells)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreScorecardValueDto From(ExploreScorecardValue v) => new(
+        v.ValueName, v.Label, v.Unit, v.Cells.Select(ExploreScorecardCellDto.From).ToList());
+}
+
+/// <summary>One enabled schema's banded values, grouped under the schema for the scorecard.</summary>
+/// <param name="SchemaName">Machine-style schema name.</param>
+/// <param name="SchemaLabel">Friendly schema label.</param>
+/// <param name="Values">Banded numeric values with at least one reporting service.</param>
+public sealed record ExploreScorecardSchemaDto(
+    string SchemaName,
+    string? SchemaLabel,
+    List<ExploreScorecardValueDto> Values)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreScorecardSchemaDto From(ExploreScorecardSchema s) => new(
+        s.SchemaName, s.SchemaLabel, s.Values.Select(ExploreScorecardValueDto.From).ToList());
+}
+
+/// <summary>Wire shape of <c>GET /api/admin/explore/scorecard</c>: a cross-schema RAG status board.</summary>
+/// <param name="Services">Every service appearing in the result, with labels resolved.</param>
+/// <param name="Schemas">Enabled schemas that have at least one banded value with data.</param>
+public sealed record ExploreScorecardResponse(
+    List<ExploreServiceRefDto> Services,
+    List<ExploreScorecardSchemaDto> Schemas)
+{
+    /// <summary>Project the domain result onto the wire shape.</summary>
+    public static ExploreScorecardResponse FromResult(ExploreScorecardResult r) => new(
+        r.Services.Select(ExploreServiceRefDto.From).ToList(),
+        r.Schemas.Select(ExploreScorecardSchemaDto.From).ToList());
 }
 
 /// <summary>Wire representation of a stored Liquid report.</summary>

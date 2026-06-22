@@ -34,7 +34,7 @@ Scripts that collect data from a source system and submit it to Ingest — the "
 
 ### Power BI
 
-Ready-made starting points for exploring the data in Power BI over the `/odata/samples` feed — the [recommended way to explore Ingest data](../docs/setup/powerbi.md). See [powerbi/](powerbi/README.md).
+Ready-made starting points for exploring the data in Power BI over the `/odata/samples` feed — the [recommended way to explore Ingest data](../docs/setup/powerbi/README.md). See [powerbi/](powerbi/README.md).
 
 | Example | What it is |
 |---------|-----------|

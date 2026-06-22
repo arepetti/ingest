@@ -1,5 +1,7 @@
 using Ingest.Core.Abstractions;
+using Ingest.Core.Common;
 using Ingest.Core.Entities;
+using Ingest.Core.Validation;
 
 namespace Ingest.Infrastructure.Services;
 
@@ -63,14 +65,7 @@ public sealed class ExploreService : IExploreService
         var serviceNameById = rows
             .GroupBy(r => r.ServiceAccountId)
             .ToDictionary(g => g.Key, g => g.Last().ServiceName);
-        var serviceRefs = new List<ExploreServiceRef>(serviceNameById.Count);
-        foreach (var (id, name) in serviceNameById)
-        {
-            var acc = await _accounts.GetByIdAsync(id, includeDeleted: true, ct);
-            serviceRefs.Add(new ExploreServiceRef(id, acc?.Name ?? name, acc?.Label));
-        }
-        serviceRefs.Sort((a, b) => string.Compare(
-            a.ServiceLabel ?? a.ServiceName, b.ServiceLabel ?? b.ServiceName, StringComparison.OrdinalIgnoreCase));
+        var serviceRefs = await ResolveServiceRefsAsync(serviceNameById, ct);
 
         var rowsByValue = rows
             .Where(r => Numeric(r).HasValue)
@@ -107,6 +102,194 @@ public sealed class ExploreService : IExploreService
 
         return new ExploreSeriesResult(
             schema.Name, schema.Label, query.Aggregation, query.From, query.To, serviceRefs, valueSeries);
+    }
+
+    /// <inheritdoc />
+    public async Task<ExploreScorecardResult> GetScorecardAsync(ExploreScorecardQuery query, CancellationToken ct = default)
+    {
+        // Page through every schema (the repo clamps page size to 500). They come back sorted by
+        // label then name, so the scorecard's schema order is stable.
+        var allSchemas = new List<Schema>();
+        for (var pageNo = 1; ; pageNo++)
+        {
+            var page = await _schemas.ListAsync(new PageRequest(pageNo, SchemaPageSize), ct);
+            allSchemas.AddRange(page.Items);
+            if (page.Items.Count < SchemaPageSize || allSchemas.Count >= page.Total) break;
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var scorecardSchemas = new List<ExploreScorecardSchema>();
+        // One shared map so a service's label is resolved once even if it reports across schemas.
+        var serviceNameById = new Dictionary<Guid, string>();
+
+        // In last-period mode the board shows every service a schema applies to (so non-reporters
+        // surface as "missing"), so we resolve the expected audience per schema up front using the
+        // same visibility rule as the missing-submissions dashboard.
+        var expectedBySchema = query.Mode == ScorecardMode.LastPeriod
+            ? await BuildExpectedServicesAsync(query.ServiceIds, ct)
+            : null;
+
+        foreach (var schema in allSchemas)
+        {
+            if (!schema.Enabled) continue;
+
+            // Only currently-collected, banded numeric values belong on an at-a-glance status board.
+            var banded = schema.Values
+                .Where(v => v.Enabled && v.Type is SchemaValueType.Number or SchemaValueType.Integer && v.HasTargetBand)
+                .ToList();
+            if (banded.Count == 0) continue;
+
+            var rows = await _samples.GetForExploreAsync(
+                schema.Name, banded.Select(v => v.Name).ToList(), query.ServiceIds, from: null, to: null, ct);
+
+            var rowsByValue = rows
+                .Where(r => Numeric(r).HasValue)
+                .ToLookup(r => r.ValueName, StringComparer.OrdinalIgnoreCase);
+
+            // Expected audience for this schema (last-period mode only); empty in latest-available.
+            var expected = expectedBySchema is null
+                ? new List<Account>()
+                : expectedBySchema.GetValueOrDefault(schema.Name) ?? new List<Account>();
+            var expectedIds = expected.Select(a => a.Id).ToList();
+
+            var valueCards = new List<ExploreScorecardValue>();
+            foreach (var v in banded)
+            {
+                var cells = query.Mode == ScorecardMode.LastPeriod
+                    ? LastPeriodCells(rowsByValue[v.Name], expectedIds, v, query.Period, nowUtc)
+                    : LatestAvailableCells(rowsByValue[v.Name], v);
+
+                if (cells.Count == 0) continue;
+                valueCards.Add(new ExploreScorecardValue(
+                    v.Name, v.Label, v.Unit, v.Cadence,
+                    v.AmberMin, v.GreenMin, v.GreenMax, v.AmberMax, cells));
+            }
+
+            if (valueCards.Count == 0) continue;
+
+            // Resolve labels for every service that appears: the expected audience in last-period
+            // mode (present and missing alike), or just the reporters in latest-available mode.
+            if (query.Mode == ScorecardMode.LastPeriod)
+                foreach (var acc in expected) serviceNameById.TryAdd(acc.Id, acc.Name);
+            else
+                foreach (var r in rows) serviceNameById.TryAdd(r.ServiceAccountId, r.ServiceName);
+
+            scorecardSchemas.Add(new ExploreScorecardSchema(schema.Name, schema.Label, valueCards));
+        }
+
+        var serviceRefs = await ResolveServiceRefsAsync(serviceNameById, ct);
+        return new ExploreScorecardResult(serviceRefs, scorecardSchemas);
+    }
+
+    /// <summary>Page size used to sweep schemas for the scorecard; matches the repository's clamp.</summary>
+    private const int SchemaPageSize = 500;
+
+    /// <summary>
+    /// "Latest available" cells: each service's most recent sample for the value (newest period
+    /// wins, ties broken on the measurement timestamp). Services that never reported are absent.
+    /// </summary>
+    private static List<ExploreScorecardCell> LatestAvailableCells(IEnumerable<SampleProjection> rows, SchemaValue v) =>
+        rows
+            .GroupBy(r => r.ServiceAccountId)
+            .Select(g => g.OrderByDescending(r => r.PeriodStart).ThenByDescending(r => r.Timestamp).First())
+            .Select(r =>
+            {
+                var value = Numeric(r)!.Value;
+                return new ExploreScorecardCell(
+                    r.ServiceAccountId, r.SubmissionId, value, v.ClassifyRag(value),
+                    r.PeriodStart, r.PeriodEnd, r.SubmittedAt);
+            })
+            .OrderBy(c => c.ServiceId)
+            .ToList();
+
+    /// <summary>
+    /// "Last period" cells: for the one target period, one cell per service the schema applies to
+    /// (<paramref name="expectedServiceIds"/>) — a classified one if it submitted that period,
+    /// otherwise a "missing" (null status/value) cell anchored to the target period. With no
+    /// expected services the value contributes nothing and is dropped by the caller.
+    /// </summary>
+    private static List<ExploreScorecardCell> LastPeriodCells(
+        IEnumerable<SampleProjection> rows, IEnumerable<Guid> expectedServiceIds,
+        SchemaValue v, ScorecardPeriod period, DateTime nowUtc)
+    {
+        var (start, end) = period == ScorecardPeriod.LatestClosed
+            ? CadenceCalculator.PreviousBucketFor(v.Cadence, nowUtc)
+            : CadenceCalculator.BucketFor(v.Cadence, nowUtc);
+
+        var rowsByService = rows
+            .Where(r => r.PeriodStart == start)
+            .GroupBy(r => r.ServiceAccountId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.Timestamp).First());
+
+        return expectedServiceIds
+            .Select(sid =>
+            {
+                if (!rowsByService.TryGetValue(sid, out var hit))
+                    return new ExploreScorecardCell(sid, null, null, null, start, end, null);
+                var value = Numeric(hit)!.Value;
+                return new ExploreScorecardCell(
+                    sid, hit.SubmissionId, value, v.ClassifyRag(value), start, end, hit.SubmittedAt);
+            })
+            .OrderBy(c => c.ServiceId)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Map every enabled schema to the enabled Service-role accounts it applies to, using the same
+    /// audience rule as the missing-submissions dashboard (<see cref="ISchemaRepository.ListVisibleToAsync"/>:
+    /// global schemas reach every service, restricted ones only their listed services). Honours the
+    /// <paramref name="serviceIds"/> filter so the board can be scoped to a team. Keyed by schema name.
+    /// </summary>
+    private async Task<Dictionary<string, List<Account>>> BuildExpectedServicesAsync(
+        IReadOnlyList<Guid>? serviceIds, CancellationToken ct)
+    {
+        var filter = serviceIds is { Count: > 0 } ? new HashSet<Guid>(serviceIds) : null;
+        var bySchema = new Dictionary<string, List<Account>>(StringComparer.OrdinalIgnoreCase);
+
+        // Page through service accounts so a registry with > 500 services still works.
+        for (int page = 1; ; page++)
+        {
+            var accounts = await _accounts.ListAsync(
+                new PageRequest(page, 200, Sort: "name"), role: AccountRole.Service, ct: ct);
+            if (accounts.Items.Count == 0) break;
+
+            foreach (var account in accounts.Items)
+            {
+                // A disabled service can't report, so listing it as "missing" would be misleading.
+                if (!account.Enabled) continue;
+                if (filter is not null && !filter.Contains(account.Id)) continue;
+
+                foreach (var schema in await _schemas.ListVisibleToAsync(account.Id, ct))
+                {
+                    if (!bySchema.TryGetValue(schema.Name, out var list))
+                        bySchema[schema.Name] = list = new List<Account>();
+                    list.Add(account);
+                }
+            }
+
+            if (accounts.Items.Count < 200) break;
+        }
+
+        return bySchema;
+    }
+
+    /// <summary>
+    /// Resolve friendly service labels for the ids that appear in a result, falling back to the
+    /// machine name snapshotted on the samples when the account can't be loaded. Returns the refs
+    /// sorted by label (then name) so the UI lists services consistently.
+    /// </summary>
+    private async Task<List<ExploreServiceRef>> ResolveServiceRefsAsync(
+        IReadOnlyDictionary<Guid, string> serviceNameById, CancellationToken ct)
+    {
+        var refs = new List<ExploreServiceRef>(serviceNameById.Count);
+        foreach (var (id, name) in serviceNameById)
+        {
+            var acc = await _accounts.GetByIdAsync(id, includeDeleted: true, ct);
+            refs.Add(new ExploreServiceRef(id, acc?.Name ?? name, acc?.Label));
+        }
+        refs.Sort((a, b) => string.Compare(
+            a.ServiceLabel ?? a.ServiceName, b.ServiceLabel ?? b.ServiceName, StringComparison.OrdinalIgnoreCase));
+        return refs;
     }
 
     /// <summary>Pull a numeric value out of a projection regardless of whether it was a Number or an Integer.</summary>

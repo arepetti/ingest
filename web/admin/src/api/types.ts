@@ -213,6 +213,14 @@ export interface SchemaValue {
   enabled: boolean
   min?: number | null
   max?: number | null
+  /** Lower edge of the ideal (green) range in the RAG target band. Non-enforced; charts only. */
+  greenMin?: number | null
+  /** Upper edge of the ideal (green) range. Non-enforced; charts only. */
+  greenMax?: number | null
+  /** Lower edge of the acceptable (amber) range; below it is "red". Non-enforced; charts only. */
+  amberMin?: number | null
+  /** Upper edge of the acceptable (amber) range; above it is "red". Non-enforced; charts only. */
+  amberMax?: number | null
   minDate?: string | null
   maxDate?: string | null
   minLength?: number | null
@@ -644,6 +652,14 @@ export interface SchemaValueHistory {
   type: SchemaValueType
   cadence: Cadence
   unit?: string | null
+  /** Lower edge of the ideal (green) range, overlaid on the chart when set. */
+  greenMin?: number | null
+  /** Upper edge of the ideal (green) range, overlaid on the chart when set. */
+  greenMax?: number | null
+  /** Lower edge of the acceptable (amber) range, overlaid on the chart when set. */
+  amberMin?: number | null
+  /** Upper edge of the acceptable (amber) range, overlaid on the chart when set. */
+  amberMax?: number | null
   buckets: HistoryBucket[]
 }
 
@@ -720,6 +736,52 @@ export interface ExploreServiceRef {
   serviceId: string
   serviceName: string
   serviceLabel?: string | null
+}
+
+/** Red/Amber/Green status of a value against its target band. Mirrors the C# enum member names. */
+export type RagStatus = 'Green' | 'Amber' | 'Red'
+
+/** Which sample the scorecard shows per service. Mirrors the C# enum member names. */
+export type ScorecardMode = 'LatestAvailable' | 'LastPeriod'
+
+/** Which period `LastPeriod` mode reads. Mirrors the C# enum member names. */
+export type ScorecardPeriod = 'Current' | 'LatestClosed'
+
+/**
+ * One service's RAG-classified sample for a banded value on the scorecard. A "missing" cell (the
+ * service didn't submit the requested period) has `status`, `value` and `submissionId` all null.
+ */
+export interface ExploreScorecardCell {
+  serviceId: string
+  /** Submission the sample came from, so the card can deep-link to it; null when missing. */
+  submissionId: string | null
+  /** The numeric value the service reported; null when missing. */
+  value: number | null
+  /** Where `value` falls in the value's target band; null when missing. */
+  status: RagStatus | null
+  periodStart: string
+  periodEnd: string
+}
+
+/** A banded value and the latest RAG status of every service that reported it. */
+export interface ExploreScorecardValue {
+  valueName: string
+  label?: string | null
+  unit?: string | null
+  cells: ExploreScorecardCell[]
+}
+
+/** One enabled schema's banded values, grouped under the schema for the scorecard. */
+export interface ExploreScorecardSchema {
+  schemaName: string
+  schemaLabel?: string | null
+  values: ExploreScorecardValue[]
+}
+
+/** Response shape of `GET /api/admin/explore/scorecard`: a cross-schema RAG status board. */
+export interface ExploreScorecard {
+  services: ExploreServiceRef[]
+  schemas: ExploreScorecardSchema[]
 }
 
 /** Response shape of `GET /api/admin/explore/series`. */

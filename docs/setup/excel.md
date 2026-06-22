@@ -1,6 +1,6 @@
 # Excel integration (OData)
 
-> **The cheapest analyst on-ramp.** If your team already has Microsoft 365, Excel can read the Ingest data directly through the same OData feed Power BI uses — no extra licence, no new tool to learn. Reach for Excel when an analyst wants to **poke at the numbers, pivot, and chart ad-hoc**. For shared, always-on dashboards, see [powerbi.md](powerbi.md) (rich dashboards) or a free always-on option.
+> **The cheapest analyst on-ramp.** If your team already has Microsoft 365, Excel can read the Ingest data directly through the same OData feed Power BI uses — no extra licence, no new tool to learn. Reach for Excel when an analyst wants to **poke at the numbers, pivot, and chart ad-hoc**. For shared, always-on dashboards, see [powerbi/](powerbi/README.md) (rich dashboards) or a free always-on option.
 
 Ingest exposes its sample data as an **OData v4 feed** at `/odata/samples`. Excel's **Get & Transform** (Power Query) — built into Microsoft 365 and Excel 2016+ — consumes it directly. This guide walks through the recommended setup.
 
@@ -8,7 +8,7 @@ Ingest exposes its sample data as an **OData v4 feed** at `/odata/samples`. Exce
 
 The feed serves rows from the `SampleProjection` collection: **one row per sample** (not per submission), fully denormalised, so Excel gets readable, self-contained data without any joins.
 
-The columns are identical to the Power BI feed — see [powerbi.md § What you get](powerbi.md#what-you-get) for the full column table (`ServiceName`, `SchemaName`, `ValueName`, `ValueType`, the typed `*Value` columns, `Timestamp`, `Cadence`, `PeriodStart`/`PeriodEnd`, and the audit fields).
+The columns are identical to the Power BI feed — see [powerbi/samples.md § Columns](powerbi/samples.md#columns) for the full column table (`ServiceName`, `SchemaName`, `ValueName`, `ValueType`, the typed `*Value` columns, `Timestamp`, `Cadence`, `PeriodStart`/`PeriodEnd`, and the audit fields).
 
 Server-side limits: page size 500, max `$top` of 5000 per request. Power Query handles paging transparently.
 
@@ -20,7 +20,7 @@ Issue a dedicated **Operator** credential for reporting — revoking it later th
 
 ## Why "Anonymous + custom header"?
 
-Like Power BI, Excel's OData connector doesn't natively support API-key auth — its credential dialog offers Anonymous, Windows, Basic, Web API, and Organizational account, none of which send an arbitrary `X-Api-Key` header. The supported workaround is to choose **Anonymous** and add the header through Power Query's `OData.Feed` `Headers` option, exactly as in [powerbi.md](powerbi.md#why-anonymous--custom-header). This works on refresh too.
+Like Power BI, Excel's OData connector doesn't natively support API-key auth — its credential dialog offers Anonymous, Windows, Basic, Web API, and Organizational account, none of which send an arbitrary `X-Api-Key` header. The supported workaround is to choose **Anonymous** and add the header through Power Query's `OData.Feed` `Headers` option, exactly as in [powerbi/README.md](powerbi/README.md#why-anonymous--custom-header). This works on refresh too.
 
 ## Setup (recommended: OData feed + header)
 
@@ -52,7 +52,7 @@ To rotate the key later, just update the parameter's value — no need to edit t
 
 ## Pre-filtering at the source
 
-For large deployments, ask the server for less data by appending OData query options to the URL in the source step. The same filters documented for Power BI apply — see [powerbi.md § Pre-filtering at the source](powerbi.md#pre-filtering-at-the-source). For example, last 12 months for one service:
+For large deployments, ask the server for less data by appending OData query options to the URL in the source step. The same filters documented for Power BI apply — see [powerbi/samples.md § Pre-filtering at the source](powerbi/samples.md#pre-filtering-at-the-source). For example, last 12 months for one service:
 
 ```m
 Source = OData.Feed(
@@ -88,13 +88,13 @@ Then right-click and **Remove** the individual `*Value` columns to keep the tabl
   - **Values:** `Value` — set the summary to **Sum** or **Average** as appropriate
 3. Use `Cadence` + `PeriodStart` for trends that already align to the cadence buckets the validator uses, so periods don't split awkwardly.
 
-> Excel groups dates well, but for serious time-intelligence (year-to-date, same-period-last-year) Power BI's data model is stronger — see [powerbi.md § Suggested data model](powerbi.md#suggested-data-model).
+> Excel groups dates well, but for serious time-intelligence (year-to-date, same-period-last-year) Power BI's data model is stronger — see [powerbi/samples.md § Suggested data model](powerbi/samples.md#suggested-data-model).
 
 ## Refreshing
 
 - **Manual:** **Data → Refresh All** (or right-click the table → **Refresh**).
 - **On open / on a timer:** **Data → Queries & Connections → right-click the query → Properties**, then tick **Refresh data when opening the file** and/or **Refresh every N minutes**.
-- **Unattended/scheduled refresh** isn't something desktop Excel does on its own — the workbook has to be open. If you need a dataset that refreshes on a schedule for others to consume, publish to the **Power BI service** instead ([powerbi.md § Refresh schedule](powerbi.md#refresh-schedule)) or drive a refresh with **Power Automate Desktop**.
+- **Unattended/scheduled refresh** isn't something desktop Excel does on its own — the workbook has to be open. If you need a dataset that refreshes on a schedule for others to consume, publish to the **Power BI service** instead ([powerbi/README.md § Refresh schedule](powerbi/README.md#refresh-schedule)) or drive a refresh with **Power Automate Desktop**.
 
 ## Alternative: From Web (header set in the dialog, no M editing)
 
@@ -102,7 +102,7 @@ If you'd rather not touch the Advanced Editor, you can use **Data → Get Data �
 
 ## Alternative: the admin query endpoint (JSON)
 
-If OData isn't an option, `POST /api/admin/query` returns the same projection as paged JSON. It's a POST with a JSON body, which is awkward to call from Excel's UI, so prefer the OData feed above for Excel. See [powerbi.md § Alternative: the admin query endpoint](powerbi.md#alternative-the-admin-query-endpoint) for the request shape if you script it.
+If OData isn't an option, `POST /api/admin/query` returns the same projection as paged JSON. It's a POST with a JSON body, which is awkward to call from Excel's UI, so prefer the OData feed above for Excel. See [powerbi/samples.md § Alternative: the admin query endpoint](powerbi/samples.md#alternative-the-admin-query-endpoint) for the request shape if you script it.
 
 ## Troubleshooting
 
@@ -123,7 +123,7 @@ Pre-filter at the source (see above) so the server returns less, and remove colu
 
 ## See also
 
-- [powerbi.md](powerbi.md) — the same feed in Power BI, with the full column table, data-model tips, and scheduled refresh.
+- [powerbi/](powerbi/README.md) — the same feeds in Power BI, with the full column references, data-model tips, and scheduled refresh.
 - [../admin-user-guide/accounts.md](../admin-user-guide/accounts.md) — creating the Operator credential this guide needs.
 - [../client/api.md](../client/api.md) — the API surface, including `POST /api/admin/query`.
 
