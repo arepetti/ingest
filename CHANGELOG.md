@@ -10,8 +10,8 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 - `average(...)` built-in in expressions.
 - Expression editor in the schema editor: CodeMirror-based syntax highlighting, autocomplete, and error squiggles (loaded on demand).
 - Admins can delete (not just revoke) an API Key.
-- Explore anomaly detection: a **Highlight anomalies** toggle on the Trend chart (z-score / robust MAD against the preceding history, with a tunable window and sensitivity) that rings outliers and shows z-scores in the tooltip.
-- Explore **Anomalies** tab: a cross-schema board flagging values that deviate from their own recent history for the current/latest-closed period (green = normal, yellow = anomaly, grey = not submitted); clicking a card jumps to the matching Trend chart with highlighting on.
+- Explore anomaly detection: a **Highlight anomalies** toggle on the Trend chart.
+- Explore **Anomalies** tab: a cross-schema board flagging values that deviate from their own recent history.
 - Explore series API: `anomaly` / `anomalyWindow` / `anomalyThreshold` / `anomalyRobust` parameters, plus the new `GET /api/admin/explore/anomalies` endpoint.
 
 ### Documentation
@@ -19,6 +19,7 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 - Admin guide: calculated values section.
 - Admin guide: Explore anomaly detection and the Anomalies tab.
 - Client API reference: `kind` / `expression` on schema values.
+- Power BI: incremental-refresh recipe for the samples feed (partition on the immutable `SubmittedAt`, `ModifiedAt` change-detection folding caveat, and the retroactive-edit pitfall), with a how-to note in the `ingest-samples` example.
 
 ## 0.4.0
 

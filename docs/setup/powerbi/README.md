@@ -112,6 +112,8 @@ After publishing to the Power BI service:
 
 > **Want fresher-than-scheduled?** Trigger an on-demand refresh the moment new data lands by wiring a `submission.accepted` webhook to the Power BI refresh API — see [admin-user-guide/webhooks.md § Recipe: refresh a Power BI dataset on accept](../../admin-user-guide/webhooks.md#recipe-refresh-a-power-bi-dataset-on-accept).
 
+> **Big history refreshing slowly?** That recipe is about *freshness*; for *load size and time* on a multi-year dataset use **incremental refresh**, partitioning on the immutable `SubmittedAt` column. See [samples.md § Incremental refresh](samples.md#incremental-refresh-large--multi-year-history).
+
 ## Troubleshooting
 
 **"Unable to connect" / 401.**

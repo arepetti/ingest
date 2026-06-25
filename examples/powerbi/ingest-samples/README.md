@@ -56,6 +56,25 @@ The three pages (**Waste**, **Workforce**, **Finance**) open with a title and a 
 
 After publishing to the Power BI service, set **Data source credentials > Anonymous** and configure a **Refresh schedule** (Daily is plenty). Behind a private network, add an on-premises data gateway. Full detail: [docs/setup/powerbi/README.md § Refresh schedule](../../../docs/setup/powerbi/README.md#refresh-schedule).
 
+### Turning on incremental refresh
+
+This project loads the **whole** `Samples` feed on every refresh, which is the right default for a demo. On a real multi-year deployment that gets slow — switch the `Samples` table to **incremental refresh** so old data loads once and only a recent window is re-queried.
+
+The key choice: **partition on `SubmittedAt`** (stamped once, never moved) and not on `Timestamp` (the back-datable measurement time). To enable it here:
+
+1. Add Date/Time parameters `RangeStart` and `RangeEnd` (**Manage Parameters**).
+2. Edit the `Samples` partition query to filter on `SubmittedAt` between them, *before* the `Added Value` flatten step:
+
+   ```m
+   Filtered = Table.SelectRows(Source, each
+       [SubmittedAt] >= DateTimeZone.From(RangeStart) and
+       [SubmittedAt] <  DateTimeZone.From(RangeEnd)),
+   ```
+
+3. Right-click **Samples → Incremental refresh**, set an archive span and a refresh window.
+
+The full recipe — folding, the `ModifiedAt` change-detection caveat, and the "corrections to old data won't reflect until a full refresh" pitfall — is in [docs/setup/powerbi/samples.md § Incremental refresh](../../../docs/setup/powerbi/samples.md#incremental-refresh-large--multi-year-history). It isn't baked into this PBIP on purpose: a manually-authored `refreshPolicy` would load no data on first open and defeats the demo.
+
 ## If the project won't open
 
 This PBIP is authored by hand and **hasn't been round-tripped through Power BI Desktop** in this repo, so Desktop may want to repair or re-serialise a file on first open. If it refuses to load:

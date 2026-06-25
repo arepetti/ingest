@@ -87,6 +87,58 @@ Power BI handles the long (one-row-per-sample) format well as-is, but for cleane
 
 The [`ingest-samples` example project](../../../examples/powerbi/ingest-samples/) ships all of this pre-built (the `Value` column, a `NumericValue` column, a calendar table and a handful of starter measures).
 
+## Incremental refresh (large / multi-year history)
+
+A full refresh re-reads the whole feed every time — fine for a small deployment, slow once you have a few years of history (the feed [pages at 500 rows](README.md#server-side-limits--paging), so a big unfiltered reload is many sequential requests). **Power BI [incremental refresh](https://learn.microsoft.com/power-bi/connect-data/incremental-refresh-overview)** fixes that: it loads old data once, then on each refresh only re-queries a recent window. The samples feed is built for this — but **partition on the right column**, or you'll get silently stale dashboards.
+
+### Partition on `SubmittedAt`, not `Timestamp`
+
+Incremental refresh slices the table into date partitions and, after the first load, only ever re-reads partitions inside the *refresh window*; everything older is archived and never re-queried until a full refresh. That only works if a row's partition key **never changes**. Here's the difference:
+
+| Column | Stable per row? | Use it for |
+|--------|-----------------|------------|
+| `Timestamp` | **No** — it's the measurement time, freely back-dated by submitters and editable. A back-dated or corrected sample would jump partitions (or land in an already-archived one). | The **report axis** (the relationship to your calendar table). |
+| `SubmittedAt` | **Yes** — stamped once when the submission is first accepted and never moved on edit, replace, or approval. | The **partition key** for incremental refresh. |
+
+So you partition by *reporting time* (`SubmittedAt`) while your visuals still trend by *measurement time* (`Timestamp`). Report consumers never see the difference — partitioning is invisible to them.
+
+### Set it up
+
+1. **Create the two reserved parameters.** Incremental refresh requires parameters named exactly `RangeStart` and `RangeEnd`, both of type **Date/Time**. **Home → Manage Parameters → New** for each (any default values; Power BI overrides them per partition).
+2. **Filter the source on `SubmittedAt` between them**, so the filter folds to an OData `$filter ... ge / lt` and each partition is one small server request:
+
+   ```m
+   Source = OData.Feed(
+       BaseUrl & "/odata/samples",
+       null,
+       [ Implementation = "2.0", Headers = [ #"X-Api-Key" = ApiKey ] ]
+   ),
+   Filtered = Table.SelectRows(Source, each
+       [SubmittedAt] >= DateTimeZone.From(RangeStart) and
+       [SubmittedAt] <  DateTimeZone.From(RangeEnd))
+   ```
+
+   `SubmittedAt` is `Edm.DateTimeOffset`, so wrap the (Date/Time) parameters in `DateTimeZone.From` to keep the comparison — and therefore the fold — clean. Keep your flatten/`Value` steps *after* this filter.
+3. **Define the policy.** Right-click the `Samples` table → **Incremental refresh** → toggle it on and choose, for example, *Archive data starting **3 years** before refresh date* and *Incrementally refresh data in the last **2 months***. Pick the archive span to cover the history you report on and the refresh window to comfortably exceed how late a correction ever arrives (see the caveat below).
+4. **(Optional) Detect data changes → `ModifiedAt`.** With this ticked, Power BI skips re-loading an in-window partition unless its `ModifiedAt` moved — `ModifiedAt` is refreshed whenever a submission's projection is rebuilt, so an edit bumps it. *Caveat:* the feed folds `$filter` / `$select` / `$orderby` / `$count` but **not** `$apply` aggregation, so the per-partition `max(ModifiedAt)` probe can't be pushed to the server and Power BI computes it by reading that partition's rows. Inside a tight refresh window that's bounded and harmless, but it means the big win here is **archiving the old partitions**, not the change-detection probe. Leave it off and a tight window if you prefer simplicity.
+5. **Verify it folds.** In Power Query, **Tools → Query Diagnostics** (or right-click the `Filtered` step → *View Native Query* isn't available for OData, so use diagnostics) and confirm you see one `$filter=SubmittedAt ge … and SubmittedAt lt …` request per partition rather than one giant pull.
+
+### The caveat you must plan around
+
+Because partitions outside the refresh window are never re-read, three things **won't reach an already-published dataset** until the next *full* refresh, when they touch data whose `SubmittedAt` is older than the window:
+
+- an **admin editing/correcting an old submission**,
+- a **bulk history import back-filled with old dates** — [imported submissions are dated to their first sample's timestamp](../../admin-user-guide/submissions.md#bulk-importing-historical-submissions-requires-submissionssubmit), so they land in old partitions, not today's,
+- a **soft-deleted** old submission (its rows linger in the archived partition).
+
+Normal *late reporting* is fine: a January figure submitted today gets `SubmittedAt = today`, lands in the current (in-window) partition, and is picked up. The problem is only retroactive changes to *old* `SubmittedAt`. Mitigations:
+
+- **Size the refresh window** to exceed your realistic correction lag (a council that fixes prior-month numbers should refresh the last *two* months, not two weeks).
+- **Run a one-off full refresh after a bulk history import** (or do the import *before* first publishing the dataset).
+- **Schedule an occasional full refresh** (e.g. monthly) as a backstop so any stray old edit eventually lands.
+
+If retroactive edits to deep history are routine for you, incremental refresh may cost more vigilance than it's worth — stay on full refresh, or keep the archive span short.
+
 ## Troubleshooting
 
 For connection/auth/refresh issues common to every feed, see the [hub troubleshooting](README.md#troubleshooting). Feed-specific gotchas:
