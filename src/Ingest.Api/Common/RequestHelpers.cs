@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Ingest.Api.Auth;
 using Ingest.Api.Models;
+using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Microsoft.AspNetCore.Http;
@@ -42,6 +43,32 @@ public static class RequestHelpers
     /// <returns>The account name, or null when the claim is absent (e.g. anonymous request).</returns>
     public static string? CurrentAccountName(this ClaimsPrincipal user) =>
         user.FindFirstValue(AuthConstants.AccountNameClaim);
+
+    /// <summary>
+    /// Parse the <c>omit</c> query parameter on the validate endpoints into a set of pipeline toggles.
+    /// Accepts a comma-separated, case-insensitive list of check names to skip; today only
+    /// <c>cadence</c> is recognised (the parser is intentionally extensible — add a token here and a
+    /// matching flag on <see cref="SubmissionValidationOptions"/> per future check). A blank/absent
+    /// value runs the full pipeline.
+    /// </summary>
+    /// <param name="omit">The raw <c>omit</c> query value, e.g. <c>cadence</c>.</param>
+    /// <returns>The resolved options.</returns>
+    /// <exception cref="ValidationException">An unrecognised token was supplied.</exception>
+    public static SubmissionValidationOptions ParseValidationOptions(string? omit)
+    {
+        if (string.IsNullOrWhiteSpace(omit)) return SubmissionValidationOptions.Full;
+
+        var skipCadence = false;
+        foreach (var raw in omit.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (string.Equals(raw, "cadence", StringComparison.OrdinalIgnoreCase))
+                skipCadence = true;
+            else
+                throw new ValidationException(new[] { $"Unknown 'omit' value '{raw}'. Supported values: cadence." });
+        }
+
+        return new SubmissionValidationOptions(SkipCadence: skipCadence);
+    }
 
     /// <summary>Compose a <see cref="PageRequest"/> from the conventional query-string parameters.</summary>
     /// <param name="page">1-based page number; defaults to 1 when null.</param>

@@ -157,6 +157,15 @@ Values with a blank or duplicate name can't be referenced by rules, so the previ
 > [!IMPORTANT]
 > **The preview is a best-effort, client-side approximation — the server is always authoritative.** Rules are translated and evaluated in your browser, so some behaviour can differ: regular expressions use the browser's engine (not .NET's), and submission helpers such as `sampleTimestamp()`, `sampleNote()`, and `serviceName()` aren't available client-side (they evaluate to empty). Treat a green preview as encouraging, not a guarantee — confirm any rule you rely on with a real submission or an API call before publishing.
 
+### Validating on the server
+
+For an authoritative check, the **Test submission** row action on the schemas list (next to **Edit**) opens the same form and runs the *real* server validation without saving anything. Because it validates the **stored** schema, it's only available for **saved** schemas — not the unsaved editor draft. Some checks depend on context the browser doesn't have, so the dialog asks for two things, shown at the top:
+
+- **Validate as service** — the Service-role account to validate against. This determines which schemas are visible, what the service's submission history is (so `latest()` / `previous()` rules and the one-per-period cadence check have real data), and which approval policy applies.
+- **Sample timestamp** — the instant every sample is stamped with, which decides the cadence window and anchors any date/history rules.
+
+You can also tick **Skip cadence (one-per-period) checks** to ignore whether a value has already been submitted for the period — handy when you only want to confirm the shape and rules. Fill in the form, then press **Validate**: the result shows whether a real submission would be **accepted**, lists the server's errors and warnings, notes any conditionally-discarded values, and previews the **would-be approval state** (accepted immediately, or held for approval). The schema must be assigned to the chosen service for this to be meaningful — it validates the stored schema as that service would see it.
+
 ## Schema versioning
 
 Every schema carries an integer **Version**. New schemas start at `1`. When you introduce a new value to an existing schema:

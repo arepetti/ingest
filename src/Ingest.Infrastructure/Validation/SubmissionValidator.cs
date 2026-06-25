@@ -70,8 +70,10 @@ public sealed class SubmissionValidator : ISubmissionValidator
         bool isReplacement,
         Submission? existing,
         bool draft = false,
+        SubmissionValidationOptions? options = null,
         CancellationToken ct = default)
     {
+        var skipCadence = options?.SkipCadence == true;
         var errors = new List<string>();
         var warnings = new List<string>();
         var discarded = new HashSet<SampleRef>();
@@ -190,7 +192,10 @@ public sealed class SubmissionValidator : ISubmissionValidator
             var history = await HistoryFor(schema);
 
             EvaluateValueValidator(service, schema, value, sample, schemaContext, history, errors);
-            await CheckCadenceAsync(service.Id, schema, value, sample, isReplacement, existing, errors, ct);
+            // Cadence is a context-dependent check (depends on this service's live/pending history in
+            // the sample's window); validate-only callers can opt out of it (e.g. CI shape checks).
+            if (!skipCadence)
+                await CheckCadenceAsync(service.Id, schema, value, sample, isReplacement, existing, errors, ct);
 
             var modifiable = schema.Modifiable && value.Modifiable;
             if (isReplacement && !modifiable)

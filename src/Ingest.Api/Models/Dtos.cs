@@ -520,6 +520,46 @@ public sealed record SubmissionDto(
 /// </param>
 public sealed record SubmissionWriteResponse(Guid Id, IReadOnlyList<string> Warnings);
 
+/// <summary>Wire shape of one (schema, value) pair that a dry-run would discard before persistence.</summary>
+/// <param name="SchemaName">Machine-style schema name.</param>
+/// <param name="ValueName">Machine-style value name inside the schema.</param>
+public sealed record SampleRefDto(string SchemaName, string ValueName)
+{
+    /// <summary>Project the domain reference onto the wire shape.</summary>
+    public static SampleRefDto From(SampleRef r) => new(r.SchemaName, r.ValueName);
+}
+
+/// <summary>
+/// Result of a validate-only (dry-run) submission. Reports exactly what a real submission would do
+/// — validity, blocking errors, non-blocking warnings, conditionally-discarded samples, and the
+/// approval state it would land in — without persisting anything. The HTTP status is always 200,
+/// even when <paramref name="Valid"/> is false: inspect <paramref name="Valid"/> / <paramref name="Errors"/>
+/// for the verdict (a non-200 means the request itself couldn't be processed).
+/// </summary>
+/// <param name="Valid">True when a real submission of this payload would be accepted.</param>
+/// <param name="Errors">Blocking validation errors, one per rejected rule. Empty when <paramref name="Valid"/> is true.</param>
+/// <param name="Warnings">Non-blocking diagnostics (fired <c>Warning</c> rules, <c>EnabledIf</c>/<c>VisibleIf</c> discard notices).</param>
+/// <param name="DiscardedSamples">Samples that would be dropped before persistence because their <c>EnabledIf</c>/<c>VisibleIf</c> rule is false.</param>
+/// <param name="ApprovalStatus">The approval state the submission would land in (<c>NotRequired</c> = live immediately; <c>Pending</c> = held for approval).</param>
+/// <param name="RequiredApprovers">Approvers that would govern the submission when it would be held for approval; empty otherwise.</param>
+public sealed record SubmissionValidationResponse(
+    bool Valid,
+    IReadOnlyList<string> Errors,
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<SampleRefDto> DiscardedSamples,
+    ApprovalStatus ApprovalStatus,
+    IReadOnlyList<ApproverSpecDto> RequiredApprovers)
+{
+    /// <summary>Project the service-layer outcome onto the wire shape.</summary>
+    public static SubmissionValidationResponse From(SubmissionValidationOutcome o) => new(
+        o.Valid,
+        o.Errors,
+        o.Warnings,
+        o.DiscardedSamples.Select(SampleRefDto.From).ToList(),
+        o.ApprovalStatus,
+        o.RequiredApprovers.Select(ApproverSpecDto.From).ToList());
+}
+
 /// <summary>Wire shape of a single designated approver in an approval policy.</summary>
 /// <param name="AccountId">Account designated as an approver (ignored for the <c>ServiceOwner</c> kind).</param>
 /// <param name="Requirement">Whether this approver is <c>Required</c> or <c>Optional</c>.</param>

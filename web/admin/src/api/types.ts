@@ -341,6 +341,25 @@ export interface SubmissionWriteResponse {
   warnings: string[]
 }
 
+/** One (schema, value) pair a dry-run validation would discard before persistence. */
+export interface SampleRef {
+  schemaName: string
+  valueName: string
+}
+
+/**
+ * Verdict from a validate-only (dry-run) submission: what a real submission would do, without
+ * saving. `valid` is the headline; the rest explains why and previews the would-be approval state.
+ */
+export interface SubmissionValidationResponse {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+  discardedSamples: SampleRef[]
+  approvalStatus: ApprovalStatus
+  requiredApprovers: ApproverSpec[]
+}
+
 /** File format accepted by the admin bulk import endpoint. */
 export type BulkImportFormat = 'Json' | 'Csv'
 

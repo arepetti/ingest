@@ -13,6 +13,27 @@ namespace Ingest.Core.Abstractions;
 public sealed record SubmissionWriteResult(Submission Submission, IReadOnlyList<string> Warnings);
 
 /// <summary>
+/// Outcome of a validate-only (dry-run) submission pass: the full create/replace pipeline runs —
+/// mapping, the complete validator, conditional-display discards, and the would-be approval
+/// stamping — but nothing is persisted and no side effect fires. Returned by the <c>validate</c>
+/// endpoints so API/CI clients (and the admin preview) can see exactly what a real submission
+/// would do without writing anything.
+/// </summary>
+/// <param name="Valid">True when no rule rejected the input — i.e. a real submission would be accepted.</param>
+/// <param name="Errors">Blocking validation errors, one per rejected rule. Empty when <paramref name="Valid"/> is true.</param>
+/// <param name="Warnings">Non-blocking diagnostics (fired <c>Warning</c> rules, <c>EnabledIf</c>/<c>VisibleIf</c> discard notices).</param>
+/// <param name="DiscardedSamples">Samples that would be dropped before persistence because their <c>EnabledIf</c>/<c>VisibleIf</c> rule is false.</param>
+/// <param name="ApprovalStatus">The approval state the submission would land in if submitted now (<c>NotRequired</c>/<c>Pending</c>).</param>
+/// <param name="RequiredApprovers">The approvers that would govern the submission, when it would be held for approval; empty otherwise.</param>
+public sealed record SubmissionValidationOutcome(
+    bool Valid,
+    IReadOnlyList<string> Errors,
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<SampleRef> DiscardedSamples,
+    ApprovalStatus ApprovalStatus,
+    IReadOnlyList<ApproverSpec> RequiredApprovers);
+
+/// <summary>
 /// Submission lifecycle for both service-driven and admin-driven flows. Owns every non-validation
 /// rule on submissions: caller-vs-owner matching, the Service-role cadence-window check on
 /// replacement, and the projection rebuild that keeps the OData/PowerBI feed in sync. The actual
@@ -74,6 +95,42 @@ public interface ISubmissionService
     /// <returns>A page of the caller's submissions.</returns>
     Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, bool? draft = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Validate a would-be new submission for the calling account WITHOUT persisting anything. Runs
+    /// the exact create pipeline (mapping, the full validator, conditional-display discards, and the
+    /// would-be approval stamping) but stops before persistence — no document, projection, audit,
+    /// webhook, or email. Unlike <see cref="CreateMineAsync"/> it never throws on a validation
+    /// failure: the errors are returned in the outcome instead.
+    /// </summary>
+    /// <param name="callerAccountId">Account id taken from the bearer credential.</param>
+    /// <param name="input">Submission payload to validate.</param>
+    /// <param name="source">Where the submission would originate (drives the source-aware approval preview).</param>
+    /// <param name="draft">When true, validate under the relaxed draft rules instead of a full publish.</param>
+    /// <param name="options">Optional pipeline toggles (e.g. skip cadence); <c>null</c> runs everything.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The dry-run outcome: validity, errors, warnings, discards, and the would-be approval state.</returns>
+    /// <exception cref="NotFoundException">The calling account no longer exists.</exception>
+    Task<SubmissionValidationOutcome> ValidateMineAsync(Guid callerAccountId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, SubmissionValidationOptions? options = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Validate a would-be replacement of one of the caller's submissions WITHOUT persisting. Mirrors
+    /// <see cref="ReplaceMineAsync"/> — including ownership, the draft-transition guard, the
+    /// Service-role cadence-window check, and modifiability — but returns validation errors instead
+    /// of throwing them, and never writes. Genuine lookup/authorization failures still throw.
+    /// </summary>
+    /// <param name="callerAccountId">Account id taken from the bearer credential.</param>
+    /// <param name="submissionId">Id of the submission that would be replaced.</param>
+    /// <param name="input">Replacement payload to validate.</param>
+    /// <param name="source">Where the submission would originate (drives the source-aware approval preview).</param>
+    /// <param name="draft">When true, validate under the relaxed draft rules instead of a full publish.</param>
+    /// <param name="options">Optional pipeline toggles (e.g. skip cadence); <c>null</c> runs everything.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The dry-run outcome for the replacement.</returns>
+    /// <exception cref="NotFoundException">No submission with that id, or no matching schema.</exception>
+    /// <exception cref="ForbiddenException">The submission belongs to a different account, or its cadence window is already closed.</exception>
+    /// <exception cref="ValidationException">An attempt was made to validate returning a published submission to draft.</exception>
+    Task<SubmissionValidationOutcome> ValidateMineReplaceAsync(Guid callerAccountId, Guid submissionId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, SubmissionValidationOptions? options = null, CancellationToken ct = default);
+
     // ── Admin-facing ──
 
     /// <summary>Page through submissions across the entire registry.</summary>
@@ -122,6 +179,22 @@ public interface ISubmissionService
     /// <exception cref="NotFoundException">No submission with that id, or no matching schema.</exception>
     /// <exception cref="ValidationException">Validators rejected the payload, or an attempt was made to return a published submission to draft.</exception>
     Task<SubmissionWriteResult> AdminReplaceAsync(Guid submissionId, AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, bool draft = false, CancellationToken ct = default);
+
+    /// <summary>
+    /// Validate a would-be submission on behalf of a named service WITHOUT persisting. Backs the
+    /// admin UI's server-side schema preview: the admin authenticates by capability (not as the
+    /// service), names the service to validate as, and gets the same dry-run outcome a real
+    /// submission would produce. Runs the full create pipeline minus persistence; returns errors
+    /// rather than throwing them.
+    /// </summary>
+    /// <param name="input">Submission payload including the target <c>ServiceAccountId</c> to validate as.</param>
+    /// <param name="source">Where the submission would originate (drives the source-aware approval preview).</param>
+    /// <param name="draft">When true, validate under the relaxed draft rules instead of a full publish.</param>
+    /// <param name="options">Optional pipeline toggles (e.g. skip cadence); <c>null</c> runs everything.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The dry-run outcome for the would-be submission.</returns>
+    /// <exception cref="NotFoundException">The referenced service does not exist.</exception>
+    Task<SubmissionValidationOutcome> AdminValidateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, bool draft = false, SubmissionValidationOptions? options = null, CancellationToken ct = default);
 
     /// <summary>Soft-delete a submission and its derived sample projections. Idempotent.</summary>
     /// <param name="submissionId">Submission id.</param>

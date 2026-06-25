@@ -315,14 +315,14 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
         </div>
         {req && (
           <Toolbar>
+            <ToolbarButton icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>
+              Preview
+            </ToolbarButton>
             {!readOnly && (
               <ToolbarButton appearance="primary" disabled={isBusy} onClick={onSave}>
                 {isEdit ? 'Save changes' : 'Create schema'}
               </ToolbarButton>
             )}
-            <ToolbarButton icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>
-              Preview
-            </ToolbarButton>
           </Toolbar>
         )}
       </div>

@@ -164,7 +164,7 @@ public class SubmissionDraftTests
 
     private sealed class AlwaysValid : ISubmissionValidator
     {
-        public Task<SubmissionValidationResult> ValidateAsync(Account service, Submission submission, bool isReplacement, Submission? existing, bool draft = false, CancellationToken ct = default) =>
+        public Task<SubmissionValidationResult> ValidateAsync(Account service, Submission submission, bool isReplacement, Submission? existing, bool draft = false, SubmissionValidationOptions? options = null, CancellationToken ct = default) =>
             Task.FromResult(new SubmissionValidationResult(true, Array.Empty<string>(), Array.Empty<string>(), new HashSet<SampleRef>()));
     }
 

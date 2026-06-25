@@ -30,6 +30,22 @@ public sealed record SubmissionValidationResult(
     IReadOnlySet<SampleRef> DiscardedSamples);
 
 /// <summary>
+/// Optional toggles that relax parts of the validation pipeline. The default ("run everything")
+/// is what every real write uses. Intended for the validate-only endpoints — e.g. an API client
+/// running shape checks in CI that wants to ignore the context-dependent cadence duplicate check.
+/// Designed to grow: add a flag here (and a token to the endpoint's <c>omit</c> parser) per check.
+/// </summary>
+/// <param name="SkipCadence">
+/// When true, skip the cadence one-per-window duplicate checks (both the live-projection check and
+/// the pending-submission check). Everything else still runs.
+/// </param>
+public sealed record SubmissionValidationOptions(bool SkipCadence = false)
+{
+    /// <summary>Run the full pipeline. The default for every real submission write.</summary>
+    public static readonly SubmissionValidationOptions Full = new();
+}
+
+/// <summary>
 /// Runs every validation rule attached to a submission's schema: per-value checks (type, min/max,
 /// required), value-level expression rules, and schema-level rules that see all samples at once
 /// and can compare values to each other.
@@ -48,6 +64,10 @@ public interface ISubmissionValidator
     /// value- and schema-level expression rules, and warning rules are all skipped. Publishing
     /// re-runs the full pipeline, so nothing partial reaches the live model.
     /// </param>
+    /// <param name="options">
+    /// Optional pipeline toggles. <c>null</c> (the default) runs the full pipeline — what every real
+    /// write uses. Validate-only callers can pass a relaxed set (e.g. <c>SkipCadence</c>).
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The aggregated validation outcome, including any discarded samples and warnings.</returns>
     Task<SubmissionValidationResult> ValidateAsync(
@@ -56,5 +76,6 @@ public interface ISubmissionValidator
         bool isReplacement,
         Submission? existing,
         bool draft = false,
+        SubmissionValidationOptions? options = null,
         CancellationToken ct = default);
 }

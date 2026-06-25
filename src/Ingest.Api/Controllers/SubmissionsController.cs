@@ -72,6 +72,60 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
         return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
 
+    /// <summary>Validate a would-be submission without saving anything (dry run).</summary>
+    /// <remarks>
+    /// Runs the <em>exact</em> pipeline a real <see cref="Create"/> runs — schema visibility, per-value
+    /// shape, value- and schema-level rules, cadence one-per-window duplicates, required values, and
+    /// the would-be approval policy — but persists nothing and fires no webhook/email. Ideal for
+    /// integration development and CI: post your payload and check the <c>valid</c> flag. The status
+    /// is always 200 (even when invalid); read <c>valid</c> / <c>errors</c> for the verdict.
+    /// Pass <c>?omit=cadence</c> to skip the context-dependent cadence duplicate check when you only
+    /// want to verify the submission's shape (e.g. replaying fixtures in CI).
+    /// </remarks>
+    /// <param name="input">Submission payload to validate.</param>
+    /// <param name="draft">When true, validate under the relaxed draft rules instead of a full publish.</param>
+    /// <param name="omit">Comma-separated checks to skip; currently only <c>cadence</c> is supported.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Validation ran; the body carries the verdict (valid/errors/warnings/would-be approval).</response>
+    /// <response code="400">The request itself was malformed (e.g. an unrecognised <c>omit</c> value).</response>
+    [HttpPost("validate")]
+    [ProducesResponseType(typeof(SubmissionValidationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Validate([FromBody] SubmissionInput input, [FromQuery] bool draft, [FromQuery] string? omit, CancellationToken ct)
+    {
+        var options = RequestHelpers.ParseValidationOptions(omit);
+        var outcome = await service.ValidateMineAsync(User.CurrentAccountId(), input, Request.ResolveSource(), draft, options, ct);
+        return Ok(SubmissionValidationResponse.From(outcome));
+    }
+
+    /// <summary>Validate a would-be replacement of one of the caller's submissions without saving (dry run).</summary>
+    /// <remarks>
+    /// Mirrors <see cref="Replace"/> — including the cadence-window restriction, the draft-transition
+    /// rule, and per-value modifiability — but persists nothing. Returns 200 with the verdict on a
+    /// validation failure; genuine problems with the request still surface as 4xx (e.g. 404 for an
+    /// unknown id, 403 when the submission belongs to another account or its window has closed).
+    /// </remarks>
+    /// <param name="id">Id of the submission that would be replaced.</param>
+    /// <param name="input">Replacement payload to validate.</param>
+    /// <param name="draft">When true, validate under the relaxed draft rules instead of a full publish.</param>
+    /// <param name="omit">Comma-separated checks to skip; currently only <c>cadence</c> is supported.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Validation ran; the body carries the verdict.</response>
+    /// <response code="400">The request itself was malformed, or an attempt was made to return a published submission to draft.</response>
+    /// <response code="403">The submission belongs to a different account, or its cadence window has already closed.</response>
+    /// <response code="404">No submission with that id.</response>
+    [HttpPost("{id:guid}/validate")]
+    [ProducesResponseType(typeof(SubmissionValidationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ValidateReplace(Guid id, [FromBody] SubmissionInput input, [FromQuery] bool draft, [FromQuery] string? omit, CancellationToken ct)
+    {
+        var options = RequestHelpers.ParseValidationOptions(omit);
+        var outcome = await service.ValidateMineReplaceAsync(User.CurrentAccountId(), id, input, Request.ResolveSource(), draft, options, ct);
+        return Ok(SubmissionValidationResponse.From(outcome));
+    }
+
     /// <summary>Fetch one of the caller's own submissions by id.</summary>
     /// <param name="id">Submission id.</param>
     /// <param name="ct">Cancellation token.</param>

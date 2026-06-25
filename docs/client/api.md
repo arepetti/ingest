@@ -492,6 +492,71 @@ Same shape as the `POST` response — the submission id plus any non-blocking wa
 
 ---
 
+## `POST /api/submissions/validate`
+
+Run a **dry run**: validate a payload through the *exact* same pipeline as `POST /api/submissions` — schema visibility, type/range/regex shape, conditional display, per-value and schema-level rules, the cadence one-per-window duplicate check, required values, and the would-be approval decision — **without saving anything**. No submission, projection, audit entry, webhook, or email is produced.
+
+This is the endpoint to call from your **integration tests / CI**: post a fixture and assert on `valid`. It accepts the same body and the same `draft` flag as `POST /api/submissions`.
+
+**Request**
+
+```http
+POST /api/submissions/validate HTTP/1.1
+X-Api-Key: ...
+Content-Type: application/json
+
+{
+  "samples": [
+    { "schemaName": "monthly_kpis", "valueName": "tonnes", "value": 127.5, "timestamp": "2026-05-12T08:00:00Z", "note": null }
+  ]
+}
+```
+
+**Query parameters**
+
+| Param   | Default | Notes |
+|---------|---------|-------|
+| `draft` | `false` | When `true`, validate under the relaxed [draft](#drafts-optional) rules instead of a full publish. |
+| `omit`  | *(none)* | Comma-separated list of checks to skip. Currently only `cadence` is recognised — `?omit=cadence` skips the context-dependent one-per-window duplicate check, so you can validate a fixture's **shape** in CI without it tripping on a period that's already been filled. Any other value is a 400. The parameter is designed to grow. |
+
+**200 OK** — always 200 when the request was processed, *even when the payload is invalid*. Inspect `valid`:
+
+```http
+HTTP/1.1 200 OK
+
+{
+  "valid": false,
+  "errors": [
+    "Value 'monthly_kpis / tonnes' above max (100)."
+  ],
+  "warnings": [],
+  "discardedSamples": [],
+  "approvalStatus": "NotRequired",
+  "requiredApprovers": []
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `valid` | `true` when a real submission of this payload would be accepted. |
+| `errors` | Blocking validation errors (the same messages a real submit would return as a 400). Empty when `valid` is `true`. |
+| `warnings` | Non-blocking diagnostics (fired `Warning` rules, `Enabled if` / `Visible if` discard notices). |
+| `discardedSamples` | The `(schemaName, valueName)` pairs that would be dropped before persistence because their conditional-display rule is false. |
+| `approvalStatus` | The approval state the submission would land in: `NotRequired` (live immediately) or `Pending` (held for approval). |
+| `requiredApprovers` | The approvers that would govern the submission when it would be held for approval; empty otherwise. |
+
+**Status codes**
+
+| Code | When |
+|------|------|
+| 200  | Validation ran; read `valid` / `errors` for the verdict. |
+| 400  | The request itself was malformed (e.g. an unrecognised `omit` value). Validation *failures* are **not** 400 here — they come back as `200` with `valid: false`. |
+| 401  | Missing/invalid key. |
+
+> A separate `POST /api/submissions/{id}/validate` validates a would-be **replacement** of an existing submission, mirroring `PUT /api/submissions/{id}` (including the cadence-window restriction). It returns `403`/`404` for the same reasons the real `PUT` does, and otherwise the same `200` verdict body.
+
+---
+
 ## `GET /api/submissions/{id}`
 
 Fetch one of your own submissions.
@@ -745,6 +810,31 @@ if resp.status_code == 400:
 
 resp.raise_for_status()
 print("created", resp.json()["id"])
+```
+
+### Validate in CI without writing anything
+
+Use `POST /api/submissions/validate` to fail your build *before* you ever send real data. Add `?omit=cadence` so a fixture you replay every run doesn't trip the one-per-window check — you're testing the payload's shape and rules, not the live calendar.
+
+```python
+import os, requests
+
+resp = requests.post(
+    "https://ingest.example.org/api/submissions/validate?omit=cadence",
+    headers={"X-Api-Key": os.environ["INGEST_KEY"]},
+    json={"samples": payload},
+    timeout=10,
+)
+resp.raise_for_status()           # 4xx only if the request itself was malformed
+verdict = resp.json()
+
+if not verdict["valid"]:
+    for err in verdict["errors"]:
+        print("ingest validation:", err)
+    raise SystemExit(2)
+
+for warn in verdict["warnings"]:
+    print("ingest warning:", warn)
 ```
 
 ### Confirm the bucket is satisfied

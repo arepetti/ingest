@@ -36,6 +36,10 @@ Ingest is meant to be extended **without changing the product code**, and ships 
 - **Reports** — [`examples/reports/html/*.html`](../examples/reports/html/) — HTML + Liquid templates to upload (see [admin-user-guide/reports.md](admin-user-guide/reports.md)).
 - **Integrations** — [`examples/integrations/`](../examples/integrations/README.md) — minimal scripts (Python, PowerShell, C#, Java) that push KPIs from a council's waste-collection or HR system (CSV export or vendor REST API) to the [service API](client/api.md).
 
+### "I'm deciding whether to adopt it — what does owning it cost?"
+
+Read [**ownership.md**](ownership.md). It lays out the real cost of ownership in **effort** (not money): what's mandatory vs optional, what runs where, how big each piece is (hosting, secrets, SSO, email, webhooks, Teams, disaster recovery, API integrations), and an honest comparison with the hand-made Excel/SharePoint setups it replaces — which carry the same duties, just hidden.
+
 ### "I'm responsible for data protection / GDPR"
 
 Read [**gdpr.md**](gdpr.md). It describes the EU GDPR features the product provides (UK GDPR / DPA 2018 apply the same article numbers) — erasure (anonymise or delete), retention purge, and per-subject data export (DSAR) — where each one lives, and what stays the controller's responsibility.
@@ -48,6 +52,7 @@ Read [**gdpr.md**](gdpr.md). It describes the EU GDPR features the product provi
 | [architecture/](architecture/README.md)                             | System overview: solution layout, domain model, request flow, validation pipeline, cadence, Mongo, Aspire, configuration, plus the auth model end-to-end. |
 | [client/](client/README.md)                                         | Everything a service-side developer needs: how to obtain a key, how to use it, full API reference. |
 | [setup/](setup/README.md)                                           | Production deployment to Azure, full configuration reference, capacity/performance expectations, plus connecting PowerBI / OData clients. |
+| [ownership.md](ownership.md)                                        | The real cost of ownership in **effort** (not money): mandatory vs optional pieces, what runs where, per-feature effort (hosting, secrets, SSO, email, webhooks, Teams, DR, integrations), and an honest comparison with hand-made Excel/SharePoint setups. |
 | [gdpr.md](gdpr.md)                                                  | Data-protection (EU GDPR; UK GDPR / DPA 2018 equivalent) features: erasure, retention purge, personal-data export, and what's out of scope. |
 
 ## Conventions used across the docs

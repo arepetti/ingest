@@ -9,7 +9,7 @@ import {
 } from '@fluentui/react-components'
 import {
   Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, ChartMultiple20Regular,
-  Copy20Regular, Delete20Regular, Edit20Regular, History20Regular, MoreHorizontal20Regular,
+  CloudCheckmark20Regular, Copy20Regular, Delete20Regular, Edit20Regular, History20Regular, MoreHorizontal20Regular,
   ShieldCheckmark16Regular,
 } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
@@ -20,6 +20,7 @@ import {
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
+import { SchemaPreviewDialog } from '../components/SchemaPreviewDialog'
 import { SchemaAvatar } from '../components/Avatars'
 import { schemaRequiresApproval } from '../utils/approvers'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
@@ -120,6 +121,9 @@ export function SchemasPage() {
   const nav = useNavigate()
   const { me, has } = useCapabilities()
   const canManage = has('schemas:manage')
+  // "Test submission" runs a dry-run validation on behalf of a service, which the admin API gates
+  // behind submissions:submit (no data is written).
+  const canTest = has('submissions:submit')
   const approvalEnabled = !!me?.approvalEnabled
   const globalDefaultRequired = !!me?.approvalDefaultRequired
   const [page, setPage] = useState(1)
@@ -132,6 +136,7 @@ export function SchemasPage() {
   const clone = useCloneSchema()
 
   const [viewing, setViewing] = useState<Schema | null>(null)
+  const [testing, setTesting] = useState<Schema | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   // Surfaces failures from the row/drawer actions that no longer have an inline editor to host
   // their errors (clone, "download example").
@@ -340,6 +345,9 @@ export function SchemasPage() {
                       { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => openEdit(sc) },
                       { key: 'clone', label: 'Clone', icon: <Copy20Regular />, onClick: () => onCloneSchema(sc) },
                     ] : []),
+                    ...(canTest ? [
+                      { key: 'test', label: 'Test submission', icon: <CloudCheckmark20Regular />, onClick: () => setTesting(sc) },
+                    ] : []),
                     {
                       key: 'history',
                       label: 'View historical data',
@@ -451,6 +459,15 @@ export function SchemasPage() {
           )}
         </DrawerBody>
       </Drawer>
+
+      {testing && (
+        <SchemaPreviewDialog
+          schema={testing}
+          open={!!testing}
+          mode="test"
+          onClose={() => setTesting(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Badge, Button, Card, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
-  DialogTitle, Field, Input, MessageBar, MessageBarBody, MessageBarTitle, Text,
+  Badge, Button, Card, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
+  DialogTitle, Divider, Dropdown, Field, Input, MessageBar, MessageBarBody, MessageBarTitle, Option, Spinner, Text,
   makeStyles, tokens,
 } from '@fluentui/react-components'
-import { CheckmarkCircle20Regular, Warning20Regular } from '@fluentui/react-icons'
-import type { Schema, SchemaValue } from '../api/types'
+import { CheckmarkCircle20Regular, Dismiss24Regular, Warning20Regular } from '@fluentui/react-icons'
+import type { SampleInput, Schema, SchemaValue, SubmissionValidationResponse } from '../api/types'
+import { useAccounts, useValidateSubmissionPreview } from '../api/hooks'
+import { formatApiError } from '../api/client'
 import { SchemaSampleFields, fromLocalInput, toLocalInput } from './SchemaSampleFields'
 import {
   interpretRuleResult, isFilled, safeEval, useSampleRules, type ValueRow,
@@ -21,7 +23,10 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
   },
-  body: { display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 },
+  // Keep DialogBody as Fluent's native grid (title / content / actions). We only stretch it to fill
+  // the tall surface; overriding `display` here breaks the grid and pushes the title's close action
+  // onto its own line.
+  body: { minHeight: 0, flex: 1 },
   content: { display: 'flex', flexDirection: 'column', gap: '12px', overflow: 'hidden', flex: 1, minHeight: 0 },
   // Two columns on wide screens (form | results), stacking under a narrow surface.
   grid: {
@@ -45,6 +50,13 @@ const useStyles = makeStyles({
   findingTarget: { fontWeight: tokens.fontWeightSemibold },
   okBanner: { display: 'flex', gap: '8px', alignItems: 'center', color: tokens.colorPaletteGreenForeground1, fontSize: tokens.fontSizeBase200 },
   muted: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
+  serverResults: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' },
+  serverList: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' },
+  // The "validate as service" controls embedded at the top in Test-submission mode.
+  serverControls: { display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' },
+  serverControlField: { minWidth: '260px', flex: 1 },
+  // Right-align the footer buttons like every other dialog in the app.
+  actions: { display: 'flex', justifyContent: 'flex-end', gap: '8px' },
 })
 
 /** A single problem the preview surfaces. `scope` groups them; `target` is the value label when relevant. */
@@ -55,25 +67,41 @@ interface Finding {
 }
 
 /**
- * Interactive, client-side preview of a schema's submission form. Renders the live form from the
- * *unsaved* schema definition, lets the author type values, and reports — best-effort — how the
- * schema's rules would behave: conditional display + inline warnings (via the shared form), plus
- * a results panel covering missing-required, basic shape checks, per-value validation, and
- * schema-level validation. The server remains authoritative; a persistent disclaimer says so.
+ * Interactive preview of a schema's submission form. Two modes:
+ *
+ * - `preview` (default) — best-effort, **client-side** preview from the (possibly unsaved) schema:
+ *   renders the live form, evaluates rules in the browser, and reports conditional display, inline
+ *   warnings, missing-required, shape, per-value and schema-level findings. The server stays
+ *   authoritative; a persistent disclaimer says so.
+ * - `test` — "Test submission" against a **saved** schema: the same form, plus a service picker and
+ *   timestamp at the top, and a primary **Validate** action that runs the real server validation
+ *   (cadence, history, approval) without saving. Used from the schema list's row action.
  */
 export function SchemaPreviewDialog({
-  schema, open, onClose,
+  schema, open, onClose, mode = 'preview',
 }: {
   schema: Schema
   open: boolean
   onClose: () => void
+  mode?: 'preview' | 'test'
 }) {
   const s = useStyles()
+  const serverMode = mode === 'test'
 
   // Default the sample timestamp to "now". Mirrors the submission editor's single-timestamp model;
   // it also seeds Date-typed inputs that the author leaves blank in their own head.
   const [timestamp, setTimestamp] = useState(() => new Date().toISOString())
   const [rows, setRows] = useState<ValueRow[]>([])
+
+  // Test-submission (server validation) state — only used when serverMode is true. The real check
+  // needs a concrete service (visibility/cadence/history/approval) and timestamped samples, so the
+  // user supplies the service here; the timestamp is shared with the form below.
+  const services = useAccounts({ role: 'Service' }, open && serverMode)
+  const validate = useValidateSubmissionPreview()
+  const [serviceId, setServiceId] = useState<string | undefined>(undefined)
+  const [skipCadence, setSkipCadence] = useState(false)
+  const [serverResult, setServerResult] = useState<SubmissionValidationResponse | null>(null)
+  const [serverError, setServerError] = useState<string | null>(null)
 
   // Drop values with a blank name (can't be referenced by rules) and keep only the first of any
   // duplicate name (the server would reject a save, but the editor lets you get there transiently).
@@ -98,6 +126,8 @@ export function SchemaPreviewDialog({
     if (!open) return
     setRows(usableValues.map(v => ({ name: v.name, def: v, value: null, note: '' })))
     setTimestamp(new Date().toISOString())
+    setServerResult(null)
+    setServerError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -109,6 +139,46 @@ export function SchemaPreviewDialog({
 
   function patchRow(name: string, patch: Partial<ValueRow>) {
     setRows(rs => rs.map(r => r.name === name ? { ...r, ...patch } : r))
+  }
+
+  function resetValues() {
+    setRows(usableValues.map(v => ({ name: v.name, def: v, value: null, note: '' })))
+    setTimestamp(new Date().toISOString())
+    setServerResult(null)
+    setServerError(null)
+  }
+
+  // Run the real server validation as the chosen service (Test-submission mode only). The endpoint
+  // always returns 200 with a verdict; a thrown error here means the request itself failed.
+  async function runServer() {
+    if (!serviceId) return
+    setServerError(null)
+    setServerResult(null)
+    try {
+      const r = await validate.mutateAsync({
+        serviceAccountId: serviceId,
+        samples: buildServerSamples(timestamp),
+        omit: skipCadence ? 'cadence' : undefined,
+      })
+      setServerResult(r)
+    } catch (e) {
+      setServerError(formatApiError(e))
+    }
+  }
+
+  // Build the samples to send to the server, mirroring SubmissionEditPage.buildPayload for a
+  // publish: only filled rows that aren't conditionally discarded, stamped with the chosen time.
+  function buildServerSamples(ts: string): SampleInput[] {
+    const dropped = new Set(rowStates.filter(st => st.discarded).map(st => st.name))
+    return rows
+      .filter(r => isFilled(r.value) && !dropped.has(r.name))
+      .map(r => ({
+        schemaName: previewSchema.name,
+        valueName: r.name,
+        value: r.value,
+        timestamp: ts,
+        note: r.note || null,
+      }))
   }
 
   // Everything in the results panel, recomputed as the user types (and again once rule scripts
@@ -159,21 +229,41 @@ export function SchemaPreviewDialog({
 
   const hasValues = usableValues.length > 0
 
+  const serviceItems = services.data?.items ?? []
+  const selectedService = serviceItems.find(a => a.id === serviceId)
+  const sampleCount = buildServerSamples(timestamp).length
+  const title = `${serverMode ? 'Test submission' : 'Preview'}: ${schema.label || schema.name || 'Untitled schema'}`
+
   return (
     <Dialog open={open} onOpenChange={(_, d) => { if (!d.open) onClose() }}>
       <DialogSurface className={s.surface}>
         <DialogBody className={s.body}>
-          <DialogTitle>Preview: {schema.label || schema.name || 'Untitled schema'}</DialogTitle>
+          <DialogTitle
+            action={<Button appearance="subtle" aria-label="Close" icon={<Dismiss24Regular />} onClick={onClose} />}
+          >
+            {title}
+          </DialogTitle>
           <DialogContent className={s.content}>
-            <MessageBar intent="info">
-              <MessageBarBody>
-                <MessageBarTitle>Best-effort preview</MessageBarTitle>
-                This renders the form and evaluates rules <strong>in your browser</strong> against the
-                unsaved schema. The server stays authoritative — some semantics differ here
-                (regex dialect, and helpers like <code>sampleTimestamp()</code>/<code>serviceName()</code> aren&apos;t
-                available client-side), so always confirm with a real submission or the API before relying on a rule.
-              </MessageBarBody>
-            </MessageBar>
+            {serverMode ? (
+              <MessageBar intent="info">
+                <MessageBarBody>
+                  <MessageBarTitle>Test submission</MessageBarTitle>
+                  Runs the real server validation as the chosen service — including cadence duplicates,
+                  history rules, and the would-be approval state — without saving anything. Fill in the form,
+                  pick a service, then <strong>Validate</strong>.
+                </MessageBarBody>
+              </MessageBar>
+            ) : (
+              <MessageBar intent="info">
+                <MessageBarBody>
+                  <MessageBarTitle>Best-effort preview</MessageBarTitle>
+                  This renders the form and evaluates rules <strong>in your browser</strong> against the
+                  unsaved schema. The server stays authoritative — some semantics differ here
+                  (regex dialect, and helpers like <code>sampleTimestamp()</code>/<code>serviceName()</code> aren&apos;t
+                  available client-side), so always confirm with a real submission or the API before relying on a rule.
+                </MessageBarBody>
+              </MessageBar>
+            )}
 
             {skipped.length > 0 && (
               <MessageBar intent="warning">
@@ -184,6 +274,45 @@ export function SchemaPreviewDialog({
               </MessageBar>
             )}
 
+            {serverMode && hasValues && (
+              <Card className={s.formCard}>
+                <div className={s.serverControls}>
+                  <Field label="Validate as service" required className={s.serverControlField}>
+                    <Dropdown
+                      placeholder={services.isLoading ? 'Loading services...' : 'Select a service'}
+                      value={selectedService ? (selectedService.label || selectedService.name) : ''}
+                      selectedOptions={serviceId ? [serviceId] : []}
+                      onOptionSelect={(_, d) => setServiceId(d.optionValue)}
+                    >
+                      {serviceItems.map(a => (
+                        <Option key={a.id} value={a.id} text={a.label || a.name}>
+                          {a.label || a.name}
+                        </Option>
+                      ))}
+                    </Dropdown>
+                  </Field>
+                  <Field label="Sample timestamp" className={s.serverControlField}
+                    hint="Used for every sample and any date/cadence/history rules.">
+                    <Input
+                      type="datetime-local"
+                      value={toLocalInput(timestamp)}
+                      onChange={(_, v) => setTimestamp(v.value ? fromLocalInput(v.value) : new Date().toISOString())}
+                    />
+                  </Field>
+                </div>
+                <Checkbox
+                  label="Skip cadence (one-per-period) checks"
+                  checked={skipCadence}
+                  onChange={(_, d) => setSkipCadence(!!d.checked)}
+                />
+                <Text className={s.muted}>
+                  {sampleCount === 0
+                    ? 'No filled values yet — fill in the form below first.'
+                    : `${sampleCount} value${sampleCount === 1 ? '' : 's'} will be validated. The schema must be saved and visible to the chosen service.`}
+                </Text>
+              </Card>
+            )}
+
             {!hasValues ? (
               <MessageBar intent="warning">
                 <MessageBarBody>This schema has no usable values to preview yet. Add a value first.</MessageBarBody>
@@ -192,14 +321,16 @@ export function SchemaPreviewDialog({
               <div className={s.grid}>
                 <div className={s.formCol}>
                   <Card className={s.formCard}>
-                    <Field label="Sample timestamp" className={s.pickerRow}
-                      hint="Used for the samples and any date-based rules that read a Date value.">
-                      <Input
-                        type="datetime-local"
-                        value={toLocalInput(timestamp)}
-                        onChange={(_, v) => setTimestamp(v.value ? fromLocalInput(v.value) : new Date().toISOString())}
-                      />
-                    </Field>
+                    {!serverMode && (
+                      <Field label="Sample timestamp" className={s.pickerRow}
+                        hint="Used for the samples and any date-based rules that read a Date value.">
+                        <Input
+                          type="datetime-local"
+                          value={toLocalInput(timestamp)}
+                          onChange={(_, v) => setTimestamp(v.value ? fromLocalInput(v.value) : new Date().toISOString())}
+                        />
+                      </Field>
+                    )}
                     <SchemaSampleFields
                       schema={previewSchema}
                       rows={rows}
@@ -223,24 +354,39 @@ export function SchemaPreviewDialog({
                     <Text className={s.muted}>
                       Conditional display (hide/grey) and inline warnings appear on the form to the left.
                     </Text>
+
+                    {serverMode && (serverError || serverResult) && (
+                      <>
+                        <Divider />
+                        <span className={s.resultsTitle}>Server validation</span>
+                        {serverError && (
+                          <MessageBar intent="error">
+                            <MessageBarBody style={{ whiteSpace: 'pre-line' }}>{serverError}</MessageBarBody>
+                          </MessageBar>
+                        )}
+                        {serverResult && <ServerVerdict result={serverResult} styles={s} />}
+                      </>
+                    )}
                   </Card>
                 </div>
               </div>
             )}
           </DialogContent>
-          <DialogActions>
+          <DialogActions className={s.actions}>
             {hasValues && (
+              <Button appearance="secondary" onClick={resetValues}>Reset values</Button>
+            )}
+            <Button appearance="secondary" onClick={onClose}>Close</Button>
+            {serverMode && hasValues && (
               <Button
-                appearance="secondary"
-                onClick={() => {
-                  setRows(usableValues.map(v => ({ name: v.name, def: v, value: null, note: '' })))
-                  setTimestamp(new Date().toISOString())
-                }}
+                appearance="primary"
+                icon={validate.isPending ? <Spinner size="tiny" /> : undefined}
+                disabled={!serviceId || validate.isPending}
+                onClick={runServer}
               >
-                Reset values
+                Validate
               </Button>
             )}
-            <Button appearance="primary" onClick={onClose}>Close</Button>
           </DialogActions>
         </DialogBody>
       </DialogSurface>
@@ -282,6 +428,59 @@ function FindingGroupList({ findings, styles }: { findings: Finding[]; styles: R
         )
       })}
     </>
+  )
+}
+
+/** Render the server's dry-run verdict: validity headline, would-be approval, then errors/warnings/discards. */
+function ServerVerdict({ result, styles }: { result: SubmissionValidationResponse; styles: ReturnType<typeof useStyles> }) {
+  const approvalNote = result.approvalStatus === 'Pending'
+    ? `Would be held for approval (${result.requiredApprovers.length} approver${result.requiredApprovers.length === 1 ? '' : 's'} required).`
+    : 'Would be accepted immediately (no approval required).'
+
+  return (
+    <div className={styles.serverResults}>
+      {result.valid ? (
+        <div className={styles.okBanner}>
+          <CheckmarkCircle20Regular />
+          <span>Valid — a real submission would be accepted.</span>
+        </div>
+      ) : (
+        <Badge appearance="tint" color="danger">Invalid — {result.errors.length} error{result.errors.length === 1 ? '' : 's'}</Badge>
+      )}
+
+      {result.errors.length > 0 && (
+        <ul className={styles.serverList}>
+          {result.errors.map((e, i) => (
+            <li key={i} className={styles.finding}>
+              <Warning20Regular className={styles.findingFail} />
+              <span>{e}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {result.warnings.length > 0 && (
+        <>
+          <Badge appearance="tint" color="warning" size="small">Warnings</Badge>
+          <ul className={styles.serverList}>
+            {result.warnings.map((w, i) => (
+              <li key={i} className={styles.finding}>
+                <Warning20Regular className={styles.findingOk} />
+                <span>{w}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {result.discardedSamples.length > 0 && (
+        <Text className={styles.muted}>
+          Discarded by EnabledIf/VisibleIf: {result.discardedSamples.map(d => d.valueName).join(', ')}.
+        </Text>
+      )}
+
+      {result.valid && <Text className={styles.muted}>{approvalNote}</Text>}
+    </div>
   )
 }
 

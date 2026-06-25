@@ -156,6 +156,35 @@ public sealed class SubmissionService : ISubmissionService
     public Task<PagedResult<Submission>> ListMineAsync(Guid callerAccountId, PageRequest request, DateTime? from, DateTime? to, string? schemaName, bool? draft = null, CancellationToken ct = default) =>
         _submissions.ListAsync(request, callerAccountId, from, to, schemaName, draft: draft, ct: ct);
 
+    /// <inheritdoc />
+    public async Task<SubmissionValidationOutcome> ValidateMineAsync(Guid callerAccountId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, SubmissionValidationOptions? options = null, CancellationToken ct = default)
+    {
+        var account = await _accounts.GetByIdAsync(callerAccountId, ct: ct)
+            ?? throw new NotFoundException("Account");
+        return await DryRunAsync(account, input, source, draft, isReplacement: false, existing: null, options, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<SubmissionValidationOutcome> ValidateMineReplaceAsync(Guid callerAccountId, Guid submissionId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, SubmissionValidationOptions? options = null, CancellationToken ct = default)
+    {
+        // Mirror ReplaceMineAsync's guards exactly so the dry-run verdict matches a real replace:
+        // ownership, the draft-transition rule, and the Service-role cadence window all still apply.
+        var existing = await _submissions.GetByIdAsync(submissionId, ct: ct)
+            ?? throw new NotFoundException($"Submission '{submissionId}'");
+        if (existing.ServiceAccountId != callerAccountId)
+            throw new ForbiddenException("Submission belongs to a different account.");
+        EnsureDraftTransitionAllowed(existing, draft);
+
+        var account = await _accounts.GetByIdAsync(existing.ServiceAccountId, ct: ct)
+            ?? throw new NotFoundException("Account");
+        var visible = await LoadVisibleAsync(account.Id, ct);
+
+        if (!existing.IsDraft && ClosedCadenceError(existing, visible) is { } cadenceError)
+            throw new ForbiddenException(cadenceError);
+
+        return await DryRunAsync(account, input, source, draft, isReplacement: true, existing, options, ct, visible);
+    }
+
     // ── Admin-facing ──
 
     /// <inheritdoc />
@@ -214,6 +243,14 @@ public sealed class SubmissionService : ISubmissionService
     }
 
     /// <inheritdoc />
+    public async Task<SubmissionValidationOutcome> AdminValidateAsync(AdminSubmissionInput input, SubmissionSource source = SubmissionSource.Manual, bool draft = false, SubmissionValidationOptions? options = null, CancellationToken ct = default)
+    {
+        var service = await _accounts.GetByIdAsync(input.ServiceAccountId, ct: ct)
+            ?? throw new NotFoundException($"Service '{input.ServiceAccountId}'");
+        return await DryRunAsync(service, new SubmissionInput(input.Samples), source, draft, isReplacement: false, existing: null, options, ct);
+    }
+
+    /// <inheritdoc />
     public async Task DeleteAsync(Guid submissionId, CancellationToken ct = default)
     {
         var existing = await _submissions.GetByIdAsync(submissionId, ct: ct);
@@ -267,10 +304,51 @@ public sealed class SubmissionService : ISubmissionService
 
     private async Task<SubmissionValidationResult> ValidateOrThrow(Account account, Submission submission, bool isReplacement, Submission? existing, bool draft, CancellationToken ct)
     {
-        var result = await _validator.ValidateAsync(account, submission, isReplacement, existing, draft, ct);
+        var result = await _validator.ValidateAsync(account, submission, isReplacement, existing, draft, options: null, ct);
         if (!result.IsValid)
             throw new ValidationException(result.Errors);
         return result;
+    }
+
+    /// <summary>
+    /// Shared validate-only (dry-run) pipeline behind every <c>validate</c> entry point. Runs exactly
+    /// what a real create/replace runs up to and including the would-be approval stamping — mapping,
+    /// the full validator, conditional-display discards, approval resolution — but never persists and
+    /// fires no side effect. Unlike the write paths it does NOT throw on validation failure: the
+    /// errors come back in the outcome so callers (CI clients, the admin preview) get the full verdict.
+    /// </summary>
+    private async Task<SubmissionValidationOutcome> DryRunAsync(
+        Account account,
+        SubmissionInput input,
+        SubmissionSource source,
+        bool draft,
+        bool isReplacement,
+        Submission? existing,
+        SubmissionValidationOptions? options,
+        CancellationToken ct,
+        IReadOnlyDictionary<string, Schema>? visible = null)
+    {
+        visible ??= await LoadVisibleAsync(account.Id, ct);
+
+        var submission = MapInput(account, input, visible, source);
+        submission.IsDraft = draft;
+        if (existing is not null) submission.Id = existing.Id;
+
+        var validation = await _validator.ValidateAsync(account, submission, isReplacement, existing, draft, options, ct);
+
+        // Mirror the write path's post-validation steps so the previewed approval state is the one a
+        // real submission would land in: drop discarded samples, then resolve the approval policy.
+        submission.Samples = FilterDiscarded(submission.Samples, validation.DiscardedSamples);
+        submission.Warnings = validation.Warnings.ToList();
+        await ApplyDraftOrApprovalAsync(submission, visible, draft, ct);
+
+        return new SubmissionValidationOutcome(
+            validation.IsValid,
+            validation.Errors,
+            validation.Warnings,
+            validation.DiscardedSamples.ToList(),
+            submission.ApprovalStatus,
+            submission.RequiredApprovers);
     }
 
     /// <summary>

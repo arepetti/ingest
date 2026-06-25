@@ -8,7 +8,7 @@ import type {
   ExploreAggregation, ExploreSeries, ExploreScorecard, ScorecardMode, ScorecardPeriod,
   Schema, SchemaHistory, SchemaVersionHistoryEntry, SchemaVersionSnapshot, UpsertSchemaRequest,
   Submission, AdminSubmissionInput, SampleInput, ServiceStatus, Me, Paged,
-  SubmissionWriteResponse, BulkImportRequest, BulkImportResult, BackupImportResult, AccountsImportResult,
+  SubmissionWriteResponse, SubmissionValidationResponse, BulkImportRequest, BulkImportResult, BackupImportResult, AccountsImportResult,
   MissingByCadence, MissingPeriodReport, MissingHistory,
   Report, RenderReportRequest, ReportRenderResponse,
   AuthProvider,
@@ -1018,6 +1018,30 @@ export const useReplaceMySubmission = () => {
     },
   })
 }
+
+/**
+ * Validate a would-be submission on behalf of a service WITHOUT saving (admin dry run). Backs the
+ * schema preview's "Validate on server" action. The endpoint always returns 200 with a verdict;
+ * a rejected promise here means the request itself failed (e.g. bad `omit`, missing service).
+ */
+export const useValidateSubmissionPreview = () =>
+  useMutation({
+    mutationFn: ({ serviceAccountId, samples, draft, omit }: {
+      serviceAccountId: string
+      samples: SampleInput[]
+      draft?: boolean
+      omit?: string
+    }) => {
+      const search = new URLSearchParams()
+      if (draft) search.set('draft', 'true')
+      if (omit) search.set('omit', omit)
+      const qs = search.toString()
+      return api.post<SubmissionValidationResponse>(
+        `/api/admin/submissions/validate${qs ? `?${qs}` : ''}`,
+        { serviceAccountId, samples },
+      )
+    },
+  })
 
 // --- Reports ------------------------------------------------------------------------------
 

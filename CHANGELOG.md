@@ -6,6 +6,7 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 
 ### Added
 
+- Submission validate endpoints (`POST /api/submissions/validate` and `.../{id}/validate`): run the full submission pipeline — validation, cadence, approval preview — without saving anything, so API clients can dry-run a payload (e.g. in CI). Supports `?omit=cadence` to skip the one-per-period check. The schema preview gains a "Validate on server" action that uses it (pick a service and timestamp) for an authoritative check.
 - Validation rules can now compare a submission against the service's own history: `latest("value")` returns the most recent live value and `previous("value")` returns the value from the immediately preceding cadence period.
 - Microsoft Teams integration: a bot prompts a user or channel for outstanding required values.
 - Approval rules (in Settings): require approval per service and per schema, on top of each schema's own policy.

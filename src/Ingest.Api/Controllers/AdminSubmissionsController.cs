@@ -133,6 +133,35 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
             new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
 
+    /// <summary>Validate a would-be submission on behalf of a service without saving (dry run).</summary>
+    /// <remarks>
+    /// Backs the admin schema preview's "Validate on server" action: pick a service to validate as,
+    /// supply the samples (with timestamps), and get the same verdict a real submission would produce
+    /// — including cadence duplicates, history-based rules, and the would-be approval state — without
+    /// writing anything. The status is always 200 (even when invalid); read <c>valid</c> / <c>errors</c>.
+    /// Pass <c>?omit=cadence</c> to skip the cadence duplicate check.
+    /// </remarks>
+    /// <param name="input">Submission payload including the target <c>serviceAccountId</c> to validate as.</param>
+    /// <param name="draft">When true, validate under the relaxed draft rules instead of a full publish.</param>
+    /// <param name="omit">Comma-separated checks to skip; currently only <c>cadence</c> is supported.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Validation ran; the body carries the verdict.</response>
+    /// <response code="400">The request itself was malformed (e.g. an unrecognised <c>omit</c> value).</response>
+    /// <response code="404">The target service does not exist.</response>
+    /// <response code="403">Caller lacks the submissions:submit capability.</response>
+    [HttpPost("validate")]
+    [Authorize(Policy = Capabilities.SubmissionsSubmit)]
+    [ProducesResponseType(typeof(SubmissionValidationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Validate([FromBody] AdminSubmissionInput input, [FromQuery] bool draft, [FromQuery] string? omit, CancellationToken ct)
+    {
+        var options = RequestHelpers.ParseValidationOptions(omit);
+        var outcome = await service.AdminValidateAsync(input, Request.ResolveSource(), draft, options, ct);
+        return Ok(SubmissionValidationResponse.From(outcome));
+    }
+
     /// <summary>Bulk-import historical submissions for a single service from a JSON or CSV file.</summary>
     /// <remarks>
     /// Admin-only convenience for back-filling history. Parsing is strict — a file that can't be
