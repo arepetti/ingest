@@ -311,8 +311,6 @@ The test project (`tests/Ingest.Tests`) focuses on the core domain logic:
 - The submission service end-to-end with an in-memory fake repository.
 - Email secret encryption round-trip (`EmailSecretProtector`) and Liquid email rendering (`EmailContentBuilder`).
 
-Repository-level integration tests would require a real Mongo and were intentionally skipped at this stage.
-
 ## Further reading
 
 - [authentication.md](authentication.md) — how API keys work end-to-end.

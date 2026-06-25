@@ -87,8 +87,6 @@ The suite focuses on the core domain logic:
 - Cadence bucketing.
 - The submission service end-to-end with an in-memory fake repository.
 
-Repository-level integration tests would require a real Mongo and were intentionally skipped at this stage.
-
 ## Building the production image
 
 The Dockerfile bundles the compiled API and the built admin SPA into a single image:

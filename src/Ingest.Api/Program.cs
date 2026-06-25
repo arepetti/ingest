@@ -263,3 +263,7 @@ if (Directory.Exists(webRoot))
 }
 
 app.Run();
+
+// Exposes the implicitly-generated Program entry-point class to the integration test project so
+// it can spin the whole app up via WebApplicationFactory<Program>. Has no effect on the running host.
+public partial class Program;
