@@ -79,7 +79,7 @@ The whole system ships as a single Docker image bundling the API and the admin S
 | **Just kicking the tyres**                        | The whole thing running locally in a couple of minutes with **only Docker** — no .NET SDK, Node, or MongoDB to install.                                                                          | [docs/setup/quickstart.md](docs/setup/quickstart.md)                                     |
 | A **council administrator** running the catalogue | The web console for managing services, schemas, submissions, and watching status across all services.                                                                                            | [docs/admin-user-guide/](docs/admin-user-guide/README.md)                                |
 | A **service** sending KPI data                    | A stable REST API that lets a scheduled job or an existing back-office system push KPIs automatically — no more weekly form-filling. A web form is there as a fallback (or for getting started). | [docs/client/](docs/client/README.md)                                                    |
-| A **data analyst / report author**                | A direct OData feed for Power BI (and equivalents), with examples and refresh-schedule guidance.                                                                                                 | [docs/setup/powerbi/](docs/setup/powerbi/README.md)                                           |
+| A **data analyst / report author**                | A direct OData feed for Power BI (and equivalents), with examples and refresh-schedule guidance.                                                                                                 | [docs/setup/powerbi/](docs/setup/powerbi/README.md)                                      |
 | A **DevOps / SRE** rolling it out                 | A step-by-step Azure deployment, an exhaustive configuration reference, and an operational checklist.                                                                                            | [docs/setup/](docs/setup/README.md)                                                      |
 | A **developer / contributor**                     | Clean-architecture-ish layering, full XML doc comments, a focused test suite, and Aspire-driven local dev.                                                                                       | [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/architecture/](docs/architecture/README.md) |
 
@@ -98,9 +98,9 @@ Long-form docs live under `[docs/](docs/README.md)` and are split by audience:
 
 Ingest is designed to be extended **without changing the product code**. The three extension points each ship ready-to-use, copy-pasteable examples for contributors and council developers who want to add a useful data page or pipeline of their own:
 
-- **Schemas** — [`examples/schemas/*.json`](examples/schemas/) — example KPI packages (garbage collection, weekly workforce, finance month-end close). Upload one through the admin console (**Schemas → New schema → Upload JSON…**) as-is, or adapt it. See [docs/admin-user-guide/schemas.md](docs/admin-user-guide/schemas.md).
-- **Reports** — [`examples/reports/html/*.html`](examples/reports/html/) — HTML + Liquid templates (single-submission summaries and period roll-ups) you upload to add a small, server-rendered data page. No editor, no redeploy. See [docs/admin-user-guide/reports.md](docs/admin-user-guide/reports.md).
-- **Integrations** — [`examples/integrations/`](examples/integrations/README.md) — minimal scripts (Python, PowerShell, C#, Java) showing how a council's existing waste-collection or HR software (a CSV export, or a vendor REST API) can push KPIs to the API on a schedule.
+- **Schemas** — `[examples/schemas/*.json](examples/schemas/)` — example KPI packages (garbage collection, weekly workforce, finance month-end close). Upload one through the admin console (**Schemas → New schema → Upload JSON…**) as-is, or adapt it. See [docs/admin-user-guide/schemas.md](docs/admin-user-guide/schemas.md).
+- **Reports** — `[examples/reports/html/*.html](examples/reports/html/)` — HTML + Liquid templates (single-submission summaries and period roll-ups) you upload to add a small, server-rendered data page. No editor, no redeploy. See [docs/admin-user-guide/reports.md](docs/admin-user-guide/reports.md).
+- **Integrations** — `[examples/integrations/](examples/integrations/README.md)` — minimal scripts (Python, PowerShell, C#, Java) showing how a council's existing waste-collection or HR software (a CSV export, or a vendor REST API) can push KPIs to the API on a schedule.
 
 Schemas and reports are uploaded through the admin console; integrations run wherever your scripts run. None of them require touching or rebuilding the application.
 
@@ -158,7 +158,7 @@ Ingest is an open-source project maintained by **a single developer in their spa
 - **Security issues** — please report **privately**, never in a public issue: [SECURITY.md](SECURITY.md).
 - **How the project is run** (and how to become a co-maintainer — they're welcome) — [GOVERNANCE.md](GOVERNANCE.md).
 - **Relying on it in production?** Go ahead — but plan to self-support: the code is small and layered, every public type is documented, and [docs/](docs/README.md) covers deployment, configuration, and disaster recovery. The MIT licence means you can always fork and maintain your own copy.
-- **What does owning it actually cost?** [docs/ownership.md](docs/ownership.md) is an honest, manager-facing breakdown of the *effort* (not money) involved — what's mandatory vs optional, what runs where, and how it compares to the hand-made Excel/SharePoint setups it replaces.
+- **What does owning it actually cost?** [docs/ownership.md](docs/ownership.md) is an honest, manager-facing breakdown of the *effort* (not money) involved — what's mandatory vs optional, what runs where, and how it compares to the hand-made Excel/SharePoint/Access/OneDrive setups it replaces.
 
 ## License
 

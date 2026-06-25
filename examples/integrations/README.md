@@ -16,6 +16,7 @@ These are **educated-guess illustrations** of how a council's existing software 
 | [hr-workforce-vendor-api-python](hr-workforce-vendor-api-python/) | HR / workforce | Vendor REST API | Python | `weekly_workforce` |
 | [hr-workforce-itrent](hr-workforce-itrent/) | HR / workforce | MHR iTrent OData API | C# (.NET 10), PowerShell, Python | `weekly_workforce` |
 | [hr-workforce-itrent-api-csharp](hr-workforce-itrent-api-csharp/) | HR / workforce | MHR iTrent REST API (OAuth2) | C# (.NET 10) | `weekly_workforce` |
+| [hr-workforce-itrent-azure-function-csharp](hr-workforce-itrent-azure-function-csharp/) | HR / workforce | MHR iTrent REST API + Azure Function timer | C# (.NET isolated) | `weekly_workforce` |
 
 The spread is intentional: two domains, two source styles (a scheduled **CSV/Excel export** vs a **REST API**), and several languages (Python, PowerShell, C#, Java). Whatever your real system looks like, one of these is close enough to adapt — the four waste **CSV** examples are the same logic in four languages, so pick whichever your team is comfortable maintaining.
 
@@ -45,7 +46,7 @@ The spread is intentional: two domains, two source styles (a scheduled **CSV/Exc
 
 These scripts are one-shot: they push the current period's data and exit, so you run them on a schedule (daily for waste, weekly for HR). On Windows the simplest option is **Task Scheduler**, driven from the command line with `schtasks`.
 
-> This is a deliberately **naive example**: the schedule runs on an operator's own computer, so it only fires when that machine is on, awake, and signed in, and the API key sits in a local file. It's fine for a quick trial or a small team. A more robust setup runs the job in the cloud — an **Azure Function** (timer trigger), **Power Automate**, an **Azure Logic App**, a CI/CD scheduled pipeline, or a cron job on an always-on server — with the key held in a secrets store (Key Vault, the platform's secret manager) rather than a `.cmd`. The mapping logic is identical; only where it runs and how the secret is stored change.
+> This is a deliberately **naive example**: the schedule runs on an operator's own computer, so it only fires when that machine is on, awake, and signed in, and the API key sits in a local file. It's fine for a quick trial or a small team. A more robust setup runs the job in the cloud — an **Azure Function** (timer trigger), **Power Automate**, an **Azure Logic App**, a CI/CD scheduled pipeline, or a cron job on an always-on server — with the key held in a secrets store (Key Vault, the platform's secret manager) rather than a `.cmd`. The mapping logic is identical; only where it runs and how the secret is stored change. For a worked version of the Azure Function approach, see [hr-workforce-itrent-azure-function-csharp](hr-workforce-itrent-azure-function-csharp/) — the same iTrent logic on a weekly `[TimerTrigger]`, with secrets in Function App settings / Key Vault.
 
 A reliable pattern is a tiny wrapper `.cmd` that sets the secrets and invokes the script, then a scheduled task that runs the wrapper. Create `run-waste.cmd` next to the example (keep it out of source control — it holds your key):
 
