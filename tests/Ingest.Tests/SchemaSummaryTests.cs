@@ -92,6 +92,7 @@ public class SchemaSummaryTests
             {
                 "Name", "Label", "Description", "Type", "Unit", "Cadence", "Required", "Enabled",
                 "Min", "Max", "AmberMin", "GreenMin", "GreenMax", "AmberMax",
+                "Kind", "Expression",
             },
             valueProps);
     }
@@ -139,6 +140,27 @@ public class SchemaSummaryTests
         Assert.Null(v.GreenMax);
         Assert.Null(v.AmberMax);
         Assert.Null(v.Label);
+    }
+
+    [Fact]
+    public void From_copies_kind_and_expression_on_calculated_values()
+    {
+        var schema = new Schema
+        {
+            Name = "calc",
+            Values = new List<SchemaValue>
+            {
+                new()
+                {
+                    Name = "total", Type = SchemaValueType.Number, Cadence = Cadence.Monthly,
+                    Kind = SchemaValueKind.Calculated, Expression = "a + b",
+                },
+            },
+        };
+
+        var v = Assert.Single(SchemaSummary.From(schema).Values);
+        Assert.Equal(SchemaValueKind.Calculated, v.Kind);
+        Assert.Equal("a + b", v.Expression);
     }
 
     [Fact]

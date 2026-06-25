@@ -13,7 +13,7 @@
  * the UI lie in the rejecting direction.
  */
 import { useEffect, useMemo, useState } from 'react'
-import type { Schema, SchemaValue } from '../api/types'
+import type { Schema, SchemaValue, SchemaValueType } from '../api/types'
 import { ExpressionError, isTruthy, prefetchExpressions, tryEvaluateExpression } from './expression'
 
 /** One editable row in a submission/preview form: the value definition plus what the user typed. */
@@ -70,7 +70,102 @@ export function buildRuleVariables(rows: ValueRow[]): Record<string, unknown> {
       if (r.def.max !== null && r.def.max !== undefined) ctx[`${r.name}.maximum`] = r.def.max
     }
   }
+  computeDerivedValues(rows, ctx)
   return ctx
+}
+
+function isCalculated(def: SchemaValue): boolean {
+  return def.kind === 'Calculated'
+}
+
+/** Evaluate calculated values in dependency order and inject results into the context bag. */
+function computeDerivedValues(rows: ValueRow[], ctx: Record<string, unknown>): void {
+  const calculated = rows.filter(r => isCalculated(r.def) && r.def.expression?.trim())
+  if (calculated.length === 0) return
+
+  const calcNames = new Set(calculated.map(r => r.name.toLowerCase()))
+  const deps = new Map<string, string[]>()
+  for (const row of calculated) {
+    const refs = extractIdentifierRefs(row.def.expression!)
+      .filter(id => calcNames.has(id.toLowerCase()) && id.toLowerCase() !== row.name.toLowerCase())
+    deps.set(row.name, refs)
+  }
+
+  const ordered: ValueRow[] = []
+  const visited = new Set<string>()
+  const visiting = new Set<string>()
+
+  function visit(name: string): boolean {
+    if (visited.has(name)) return true
+    if (visiting.has(name)) return false
+    visiting.add(name)
+    for (const dep of deps.get(name) ?? []) {
+      if (!visit(dep)) return false
+    }
+    visiting.delete(name)
+    visited.add(name)
+    const row = calculated.find(r => r.name.toLowerCase() === name.toLowerCase())
+    if (row) ordered.push(row)
+    return true
+  }
+
+  for (const row of calculated) {
+    if (!visit(row.name)) {
+      ordered.length = 0
+      ordered.push(...calculated)
+      break
+    }
+  }
+
+  for (const row of ordered) {
+    const expr = row.def.expression!.trim()
+    try {
+      const raw = tryEvaluateExpression(expr, ctx)
+      ctx[row.name] = coerceDerivedValue(raw, row.def.type)
+    } catch {
+      ctx[row.name] = null
+    }
+  }
+}
+
+/** Rough identifier extraction for client-side dependency ordering (matches server topo). */
+function extractIdentifierRefs(expression: string): string[] {
+  const ids = new Set<string>()
+  const re = /\b([A-Za-z_][A-Za-z0-9_]*)\b/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(expression)) !== null) {
+    const id = m[1]
+    const lower = id.toLowerCase()
+    if (lower === 'if' || lower === 'and' || lower === 'or' || lower === 'not' || lower === 'null') continue
+    ids.add(id)
+  }
+  return [...ids]
+}
+
+export function coerceDerivedValue(raw: unknown, type: SchemaValueType): unknown {
+  if (raw === null || raw === undefined) return null
+  switch (type) {
+    case 'String': return String(raw)
+    case 'Integer': {
+      const n = Number(raw)
+      return Number.isFinite(n) ? Math.trunc(n) : null
+    }
+    case 'Number': {
+      const n = Number(raw)
+      return Number.isFinite(n) ? n : null
+    }
+    case 'Date': {
+      if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw.toISOString()
+      const d = new Date(String(raw))
+      return Number.isNaN(d.getTime()) ? null : d.toISOString()
+    }
+    case 'Boolean':
+      if (typeof raw === 'boolean') return raw
+      if (typeof raw === 'number') return raw !== 0 && !Number.isNaN(raw)
+      if (typeof raw === 'string') return raw.toLowerCase() === 'true'
+      return null
+    default: return null
+  }
 }
 
 /**
@@ -152,7 +247,7 @@ export function useSampleRules(schema: Schema | undefined, rows: ValueRow[]) {
     if (!schema) return
     const exprs: (string | null | undefined)[] = []
     for (const v of schema.values) {
-      exprs.push(v.enabledIf, v.visibleIf, v.warning, v.valueValidation)
+      exprs.push(v.enabledIf, v.visibleIf, v.warning, v.valueValidation, v.expression)
     }
     for (const rule of schema.submissionValidations ?? []) exprs.push(rule)
     let cancelled = false
@@ -162,7 +257,7 @@ export function useSampleRules(schema: Schema | undefined, rows: ValueRow[]) {
     return () => { cancelled = true }
   }, [schema])
 
-  const ruleVariables = useMemo(() => buildRuleVariables(rows), [rows])
+  const ruleVariables = useMemo(() => buildRuleVariables(rows), [rows, rulesReady])
 
   const rowStates = useMemo(() => {
     // `rulesReady` is read here so the memo invalidates once new translations land in the

@@ -238,7 +238,9 @@ X-Api-Key: ...
       "warning": null,
       "enabledIf": null,
       "visibleIf": null,
-      "sinceVersion": null
+      "sinceVersion": null,
+      "kind": "UserDefined",
+      "expression": null
     }
   ],
   "layout": [
@@ -261,6 +263,15 @@ X-Api-Key: ...
 > - At the schema level: `layout` (the UI grouping tree the admin SPA renders as sections in submission forms) and `versionModifiedAt` (server-managed timestamp anchoring the admin SPA's time-limited "New" badge).
 >
 > `version` and per-value `sinceVersion` are informational for clients but server-validated: `version` is monotonic and `sinceVersion` must satisfy `0 ≤ sinceVersion ≤ schema.version`.
+
+Each value also carries:
+
+| Field | Meaning |
+|-------|---------|
+| `kind` | `UserDefined` (default) or `Calculated`. Calculated values are computed from sibling values in the same submission and must not be submitted. |
+| `expression` | NCalc formula when `kind` is `Calculated`; otherwise `null`. |
+
+Calculated values appear in read responses (OData `/odata/samples`, scorecard, query, explore, history) as extra projection rows with `IsDerived: true` (PascalCase on OData feeds). Submitting a sample for a calculated value name returns **400** with an error.
 
 **Status codes**
 

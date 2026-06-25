@@ -70,11 +70,12 @@ const useStyles = makeStyles({
  * editor and the schema-editor preview can share the exact same look and behaviour.
  */
 export function SchemaSampleFields({
-  schema, rows, rowStates, readOnly = false, onPatchRow,
+  schema, rows, rowStates, ruleVariables, readOnly = false, onPatchRow,
 }: {
   schema: Schema
   rows: ValueRow[]
   rowStates: RowState[]
+  ruleVariables?: Record<string, unknown>
   readOnly?: boolean
   onPatchRow: (name: string, patch: Partial<ValueRow>) => void
 }) {
@@ -134,6 +135,7 @@ export function SchemaSampleFields({
               schemaEnabled={schema.enabled}
               schema={schema}
               state={state}
+              ruleVariables={ruleVariables}
               readOnly={readOnly}
               onChange={patch => onPatchRow(row.name, patch)}
             />
@@ -145,24 +147,24 @@ export function SchemaSampleFields({
 }
 
 function SchemaValueRow({
-  row, first, schemaEnabled, schema, state, readOnly, onChange,
+  row, first, schemaEnabled, schema, state, ruleVariables, readOnly, onChange,
 }: {
   row: ValueRow
   first: boolean
   schemaEnabled: boolean
-  /** Parent schema — needed by `ValueLabel` for the version-bump anchor + cadence. */
   schema: Schema
   state: RowState
+  ruleVariables?: Record<string, unknown>
   /** View mode: every input disabled, "Add notes" button suppressed when there's no existing note. */
   readOnly?: boolean
   onChange: (patch: Partial<ValueRow>) => void
 }) {
   const s = useStyles()
   const def = row.def
+  const calculated = def.kind === 'Calculated'
   // The row is "inert" (not editable) when the page is read-only, the schema/value is disabled,
-  // or an EnabledIf rule says so. We still render the row in the latter case so the user sees
-  // why it's locked.
-  const inert = !!readOnly || !schemaEnabled || !def.enabled || state.disabled
+  // an EnabledIf rule says so, or the value is calculated.
+  const inert = !!readOnly || !schemaEnabled || !def.enabled || state.disabled || calculated
   // Keep the row compact by default. The textarea pops out either when the user opts in,
   // or when the row already carries a note (e.g. while editing an existing submission).
   const [notesOpened, setNotesOpened] = useState(false)
@@ -179,8 +181,9 @@ function SchemaValueRow({
           {/* Same visual treatment as the cadence badge — both are neutral metadata pills. */}
           <Badge appearance="outline" color="informative" size="small">{friendlyTypeLabel(def.type)}</Badge>
           <Badge appearance="outline" color="informative" size="small">{cadenceLabel(def.cadence)}</Badge>
-          {def.required && <Badge appearance="outline" color="severe" size="small">required</Badge>}
-          {!def.required && <Badge appearance="outline" color="subtle" size="small">optional</Badge>}
+          {def.required && !calculated && <Badge appearance="outline" color="severe" size="small">required</Badge>}
+          {!def.required && !calculated && <Badge appearance="outline" color="subtle" size="small">optional</Badge>}
+          {calculated && <Badge appearance="outline" color="informative" size="small">calculated</Badge>}
           {inert && <Badge appearance="outline" color="subtle" size="small">disabled</Badge>}
         </div>
         <span className={s.valueLabelMeta}>{valueHint(def)}</span>
@@ -193,12 +196,13 @@ function SchemaValueRow({
         <SampleValueInput
           valueDef={def}
           value={row.value}
+          displayValue={calculated ? (state.disabled ? null : ruleVariables?.[row.name]) : undefined}
           onChange={v => onChange({ value: v })}
           disabled={inert}
         />
       </Field>
 
-      {showNotes ? (
+      {!calculated && (showNotes ? (
         <Field label="Note">
           <Textarea
             value={row.note}
@@ -222,19 +226,30 @@ function SchemaValueRow({
             Add notes
           </Button>
         </div>
-      )}
+      ))}
     </div>
   )
 }
 
 function SampleValueInput({
-  valueDef, value, onChange, disabled,
+  valueDef, value, displayValue, onChange, disabled,
 }: {
   valueDef: SchemaValue
   value: unknown
+  /** When set (calculated values), show this read-only formatted value instead of the editable input. */
+  displayValue?: unknown
   onChange: (v: unknown) => void
   disabled?: boolean
 }) {
+  if (displayValue !== undefined) {
+    return (
+      <Input
+        disabled
+        readOnly
+        value={formatDisplayValue(displayValue, valueDef)}
+      />
+    )
+  }
   switch (valueDef.type as SchemaValueType) {
     case 'Boolean':
       // Tri-state: "(empty)" means "not provided" — distinct from explicit false. We surface
@@ -299,6 +314,15 @@ function SampleValueInput({
         ? <Textarea {...common} rows={3} />
         : <Input {...common} />
     }
+  }
+}
+
+function formatDisplayValue(value: unknown, def: SchemaValue): string {
+  if (value === null || value === undefined) return ''
+  switch (def.type) {
+    case 'Boolean': return value === true ? 'Yes' : value === false ? 'No' : ''
+    case 'Date': return typeof value === 'string' ? value : String(value)
+    default: return String(value)
   }
 }
 

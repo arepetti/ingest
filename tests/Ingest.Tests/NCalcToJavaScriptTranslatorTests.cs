@@ -89,4 +89,11 @@ public class NCalcToJavaScriptTranslatorTests
         Assert.Contains("tonnes_collected.maximum", t.Identifiers);
         Assert.Contains("tonnes_collected", t.Identifiers);
     }
+
+    [Fact]
+    public void Average_is_emitted_as_helper_call()
+    {
+        var js = Translate("average(2, 4, 6)");
+        Assert.Contains("H.call(\"average\"", js);
+    }
 }

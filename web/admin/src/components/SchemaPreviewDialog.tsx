@@ -171,7 +171,7 @@ export function SchemaPreviewDialog({
   function buildServerSamples(ts: string): SampleInput[] {
     const dropped = new Set(rowStates.filter(st => st.discarded).map(st => st.name))
     return rows
-      .filter(r => isFilled(r.value) && !dropped.has(r.name))
+      .filter(r => isFilled(r.value) && !dropped.has(r.name) && r.def.kind !== 'Calculated')
       .map(r => ({
         schemaName: previewSchema.name,
         valueName: r.name,
@@ -194,7 +194,7 @@ export function SchemaPreviewDialog({
     // Missing required — mirrors buildPayload: a required+enabled value that's neither filled nor
     // dropped by a conditional-display rule.
     for (const v of usableValues) {
-      if (v.required && v.enabled && !filledNames.has(v.name) && !dropped.has(v.name)) {
+      if (v.required && v.enabled && v.kind !== 'Calculated' && !filledNames.has(v.name) && !dropped.has(v.name)) {
         out.push({ scope: 'required', target: v.label || v.name, message: 'required value is empty' })
       }
     }
@@ -335,6 +335,7 @@ export function SchemaPreviewDialog({
                       schema={previewSchema}
                       rows={rows}
                       rowStates={rowStates}
+                      ruleVariables={ruleVariables}
                       onPatchRow={patchRow}
                     />
                   </Card>

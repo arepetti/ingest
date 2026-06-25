@@ -5,7 +5,7 @@ import type { PeriodFilterState } from '../utils/usePeriodFilter'
 const useStyles = makeStyles({
   field: { display: 'flex', flexDirection: 'column', gap: '4px' },
   label: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  dropdown: { minWidth: '160px' },
+  dropdown: { minWidth: '200px' },
 })
 
 /**
@@ -22,7 +22,6 @@ export function PeriodFilter({ state, onChange }: { state: PeriodFilterState; on
         <span className={s.label}>Period</span>
         <Dropdown
           className={s.dropdown}
-          size="small"
           selectedOptions={[state.interval]}
           value={INTERVAL_LABELS[state.interval]}
           onOptionSelect={(_, d) => {
@@ -41,7 +40,6 @@ export function PeriodFilter({ state, onChange }: { state: PeriodFilterState; on
             <span className={s.label}>From</span>
             <Input
               type="datetime-local"
-              size="small"
               value={state.customFrom}
               onChange={(_, v) => { state.setCustomFrom(v.value); onChange?.() }}
             />
@@ -50,7 +48,6 @@ export function PeriodFilter({ state, onChange }: { state: PeriodFilterState; on
             <span className={s.label}>To</span>
             <Input
               type="datetime-local"
-              size="small"
               value={state.customTo}
               onChange={(_, v) => { state.setCustomTo(v.value); onChange?.() }}
             />

@@ -53,4 +53,16 @@ public interface IApiKeyService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The revoked key, or <c>null</c> if no such key exists for the account.</returns>
     Task<ApiKey?> RevokeAsync(Guid accountId, Guid keyId, CancellationToken ct = default);
+
+    /// <summary>Permanently delete a key, whether it is still active or already revoked.</summary>
+    /// <remarks>
+    /// Unlike <see cref="RevokeAsync"/> (which keeps a revoked row around), this removes the key
+    /// entirely. Scoped to the (account, key) pair so a stray id from another account can't be
+    /// deleted here.
+    /// </remarks>
+    /// <param name="accountId">Account that owns the key.</param>
+    /// <param name="keyId">Key to delete.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns><c>true</c> when a key was deleted; <c>false</c> if no such key exists for the account.</returns>
+    Task<bool> DeleteAsync(Guid accountId, Guid keyId, CancellationToken ct = default);
 }

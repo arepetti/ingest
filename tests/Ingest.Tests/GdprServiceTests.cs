@@ -308,6 +308,7 @@ public class GdprServiceTests
         public Task<IReadOnlyList<ApiKey>> GetActiveByAccountAsync(Guid accountId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(ApiKey key, CancellationToken ct = default) => throw new NotSupportedException();
         public Task UpdateAsync(ApiKey key, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default) => Task.FromResult(Store.RemoveAll(k => k.Id == id) > 0);
     }
 
     private sealed class FakeSubmissions : ISubmissionRepository

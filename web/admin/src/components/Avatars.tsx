@@ -1,6 +1,6 @@
 import { Avatar, type AvatarProps } from '@fluentui/react-components'
 import { DocumentBulletList20Regular } from '@fluentui/react-icons'
-import type { Account, AccountRole, ApprovalStatus, AuditChangeType, AuditTargetType, Schema } from '../api/types'
+import type { Account, AccountRole, ApprovalStatus, AuditChangeType, AuditTargetType, Schema, SchemaValueType } from '../api/types'
 
 type AvatarColor = AvatarProps['color']
 type AvatarSize = AvatarProps['size']
@@ -137,6 +137,30 @@ export function StatusAvatar({
       color={colorForStatus(status)}
       size={size}
       aria-label={`${label} · ${status}`}
+    />
+  )
+}
+
+// Single-letter tag per value type (Integer/Number/Date/Boolean/String all start distinctly).
+const VALUE_TYPE_INITIALS: Record<SchemaValueType, string> = {
+  String:  'S',
+  Integer: 'I',
+  Number:  'N',
+  Date:    'D',
+  Boolean: 'B',
+}
+
+export function SchemaValueAvatar({ type, enabled, size = 32 }: { type: SchemaValueType; enabled: boolean; size?: AvatarSize }) {
+  // Mirrors SchemaAvatar: a stable per-type colour when enabled, neutral 'anchor' plus a small
+  // offline badge when disabled — so disabled reads from the badge indicator, not a colour shade.
+  return (
+    <Avatar
+      initials={VALUE_TYPE_INITIALS[type]}
+      color={enabled ? 'colorful' : 'anchor'}
+      idForColor={enabled ? type : undefined}
+      size={size}
+      badge={enabled ? undefined : { status: 'offline' }}
+      aria-label={`${type}${enabled ? '' : ' (disabled)'}`}
     />
   )
 }

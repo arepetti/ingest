@@ -6,6 +6,7 @@ using Ingest.Core.Validation;
 using MongoDB.Driver;
 using Ingest.Infrastructure.Approvals;
 using Ingest.Infrastructure.Mongo;
+using Ingest.Infrastructure.Services;
 using Microsoft.Extensions.Options;
 
 namespace Ingest.Infrastructure.Validation;
@@ -132,6 +133,11 @@ public sealed class SubmissionValidator : ISubmissionValidator
             if (value is null)
             {
                 errors.Add($"Value '{sample.ValueName}' is not defined in schema '{Display(schema)}'.");
+                continue;
+            }
+            if (value.IsCalculated)
+            {
+                errors.Add($"Value '{sample.ValueName}' is calculated and cannot be submitted.");
                 continue;
             }
             if (!value.Enabled)
@@ -293,7 +299,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
 
                 foreach (var v in schema.Values)
                 {
-                    if (!v.Enabled || !v.Required) continue;
+                    if (!v.Enabled || !v.Required || v.IsCalculated) continue;
                     if (presented.Contains((schema.Name, v.Name))) continue;
                     var fns = BuildHistoryFunctions(history.Latest, history.Previous, v.Name);
                     if (IsConditionFalseSilent(v.EnabledIf, context, fns)) continue;
@@ -320,12 +326,12 @@ public sealed class SubmissionValidator : ISubmissionValidator
     /// <c>[tonnes_collected.maximum]</c> in their rules; the bare identifier
     /// <c>tonnes_collected</c> refers to the submitted value.
     /// </remarks>
-    private static Dictionary<string, object?> BuildRuleContext(
+    private Dictionary<string, object?> BuildRuleContext(
         Schema schema,
         IReadOnlyList<(Sample sample, SchemaValue? def)> samples)
     {
         var byValue = samples
-            .Where(t => t.def is not null)
+            .Where(t => t.def is not null && !t.def.IsCalculated)
             .GroupBy(t => t.def!.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => (object?)g.First().sample.Value, StringComparer.OrdinalIgnoreCase);
 
@@ -339,6 +345,8 @@ public sealed class SubmissionValidator : ISubmissionValidator
                 if (v.Max is { } M) parameters[$"{v.Name}.maximum"] = M;
             }
         }
+
+        DerivedValueCalculator.ComputeInto(schema, parameters, _evaluator);
         return parameters;
     }
 

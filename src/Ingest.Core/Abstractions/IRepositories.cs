@@ -112,6 +112,15 @@ public interface IApiKeyRepository
     Task UpdateAsync(ApiKey key, CancellationToken ct = default);
 
     /// <summary>
+    /// Permanently remove a single API key by id. Unlike <see cref="UpdateAsync"/>-driven revocation
+    /// (which keeps the row for the audit trail), this drops the document entirely. Idempotent.
+    /// </summary>
+    /// <param name="id">Key id to remove.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns><c>true</c> when a row was removed; <c>false</c> when no such key existed.</returns>
+    Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
     /// Permanently remove every API key belonging to an account. Used by the GDPR erasure path
     /// (both anonymise and full-delete drop the account's credentials).
     /// </summary>

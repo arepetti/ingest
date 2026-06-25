@@ -30,6 +30,13 @@ public static class Json
         return value ?? throw new InvalidOperationException($"Response body deserialised to null ({typeof(T).Name}).");
     }
 
+    /// <summary>Read the response body as a <see cref="JsonElement"/> without checking status.</summary>
+    public static async Task<JsonElement> ReadJsonBodyAsync(this HttpResponseMessage response)
+    {
+        var value = await response.Content.ReadFromJsonAsync<JsonElement>(Options);
+        return value;
+    }
+
     /// <summary>Read the response body as a <see cref="JsonElement"/>, throwing on a non-success status.</summary>
     public static async Task<JsonElement> ReadJsonAsync(this HttpResponseMessage response)
     {

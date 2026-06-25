@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
-  Accordion, AccordionHeader, AccordionItem, AccordionPanel,
-  Badge, Body1, Button, Card, CardHeader, Checkbox, Dialog, DialogActions,
-  DialogBody, DialogContent, DialogSurface, DialogTitle, Divider,
+  Badge, Body1, Button, Card, Checkbox, Dialog, DialogActions,
+  DialogBody, DialogContent, DialogSurface, DialogTitle, Divider, Drawer, DrawerBody,
   Dropdown, Field, Input, MessageBar, MessageBarBody, MessageBarTitle,
-  Option, Radio, RadioGroup, Spinner, Tab, TabList, Textarea, Title2, Toolbar, ToolbarButton, Tooltip,
+  Option, Radio, RadioGroup, Spinner, Tab, TabList, mergeClasses,
+  Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
+  Textarea, Title2, Toolbar, ToolbarButton, Tooltip,
   makeStyles, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowLeft20Regular, Delete20Regular, Dismiss16Regular, Eye20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowLeft20Regular, CheckmarkCircle16Regular, Delete20Regular, Dismiss16Regular, Edit20Regular, ErrorCircle16Regular, Eye20Regular } from '@fluentui/react-icons'
 import type {
   Account, ApprovalPolicy,
-  Cadence, Schema, SchemaLayoutNode, SchemaValue, SchemaValueType, UpsertSchemaRequest,
+  Cadence, Schema, SchemaLayoutNode, SchemaValue, SchemaValueKind, SchemaValueType, UpsertSchemaRequest,
 } from '../api/types'
 import { useAccounts, useCreateSchema, useMe, useSchemas, useSchemaVersionSnapshot, useSubmissions, useUpdateSchema } from '../api/hooks'
 import { accountHasCapability } from '../api/capabilities'
@@ -25,6 +26,11 @@ import { confirmDelete } from '../utils/confirm'
 import { formatDateTime } from '../utils/format'
 import { validateExpression, type ExpressionSyntaxResult } from '../utils/expression'
 import { emptySchema, emptyValue, isValidValueName, toRequest } from '../utils/schema'
+import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
+import { RowActions } from '../components/RowActions'
+import { SchemaValueAvatar } from '../components/Avatars'
+import { ExpressionField } from '../components/ExpressionField'
+import { clickableRowProps } from '../utils/a11y'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -38,11 +44,42 @@ const useStyles = makeStyles({
   sectionLabel: { color: tokens.colorNeutralForeground3, fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginTop: '12px' },
   bandHelp: { color: tokens.colorNeutralForeground3, fontSize: '12px', marginBottom: '4px' },
   valuesToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  valueCard: { padding: '12px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '6px' },
-  valueHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+  drawerToolbar: {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '0 16px',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  // Values are listed in a click-to-edit data grid; a row opens the editor in a right-side drawer.
+  row: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
+  rowClickable: {
+    cursor: 'pointer',
+    ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '-2px' },
+  },
+  valuesTable: { width: '100%' },
+  // max-width:0 + truncate is the table-cell "take leftover width then clip" trick: with the other
+  // columns capped below, Name soaks up all the remaining width.
+  nameCell: { maxWidth: 0, width: 'auto' },
+  truncate: { display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  // Keep the secondary columns content-sized so they don't steal space from Name.
+  colMeta: { width: '120px', whiteSpace: 'nowrap' },
+  colFlag: { width: '110px', whiteSpace: 'nowrap' },
+  actionsHeader: { width: '56px', textAlign: 'right' },
+  actionsCell: { width: '56px', textAlign: 'right' },
+  drawer: { width: 'max(600px, 50vw)' },
+  drawerForm: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' },
   rulesList: { display: 'flex', flexDirection: 'column', gap: '8px' },
   ruleRow: { display: 'flex', alignItems: 'flex-start', gap: '8px' },
   ruleTextarea: { flex: 1 },
+  // Fixed-height status line under each expression editor: reserving the height stops the layout
+  // jumping as the indicator cycles through Checking… → Valid / Syntax error.
+  ruleStatus: {
+    display: 'flex', alignItems: 'center', gap: '4px',
+    minHeight: '16px', marginTop: '4px', fontSize: tokens.fontSizeBase200,
+  },
+  ruleStatusChecking: { color: tokens.colorNeutralForeground3 },
+  ruleStatusOk: { color: tokens.colorPaletteGreenForeground1 },
+  ruleStatusError: { color: tokens.colorPaletteRedForeground1 },
   dialogOptions: { display: 'flex', flexDirection: 'column', gap: '4px' },
   optionHint: { color: tokens.colorNeutralForeground3, fontSize: '12px', marginLeft: '28px' },
   readOnlyLayout: { opacity: 0.85 },
@@ -132,6 +169,15 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
   // reference them by name. Values added in this session are absent from the set and stay freely
   // editable until saved.
   const [lockedValueNames, setLockedValueNames] = useState<Set<string>>(new Set())
+  // Index of the value whose editor drawer is open (null = closed), and whether that drawer is
+  // expanded to full width.
+  const [editingValueIndex, setEditingValueIndex] = useState<number | null>(null)
+  const [valueDrawerExpanded, setValueDrawerExpanded] = useState(false)
+
+  function closeValueDrawer() {
+    setEditingValueIndex(null)
+    setValueDrawerExpanded(false)
+  }
 
   const existing = isEdit ? schemasQuery.data?.items.find(sc => sc.name === name) : undefined
 
@@ -177,7 +223,12 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
     setReq(prev => prev ? { ...prev, values: prev.values.map((v, i) => i === index ? { ...v, ...patch } : v) } : prev)
   }
   function addValue() {
+    // Append a blank value and immediately open its drawer. `req.values.length` is the index the
+    // new value lands at (it's appended), captured before the state update applies.
+    const newIndex = req?.values.length ?? 0
     setReq(prev => prev ? { ...prev, values: [...prev.values, emptyValue()] } : prev)
+    setEditingValueIndex(newIndex)
+    setValueDrawerExpanded(false)
   }
   function removeValue(index: number) {
     const target = req?.values[index]
@@ -194,6 +245,8 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
       if (!ok) return
     }
     setReq(prev => prev ? { ...prev, values: prev.values.filter((_, i) => i !== index) } : prev)
+    // Indices shift after removal, so just close the editor rather than trying to track the move.
+    closeValueDrawer()
   }
 
   function patchValidation(index: number, text: string) {
@@ -436,14 +489,18 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
                 )}
                 {req.submissionValidations.map((rule, i) => (
                   <div key={i} className={s.ruleRow}>
-                    <Textarea
-                      className={s.ruleTextarea}
-                      rows={8}
-                      value={rule}
-                      disabled={readOnly}
-                      placeholder="e.g. if(expenses > revenue, 'expenses cannot exceed revenue', null)"
-                      onChange={(_, v) => patchValidation(i, v.value)}
-                    />
+                    <div className={s.ruleTextarea}>
+                      <ExpressionField
+                        rows={8}
+                        value={rule}
+                        disabled={readOnly}
+                        lint
+                        identifiers={req.values.map(v => v.name)}
+                        placeholder="e.g. if(expenses > revenue, 'expenses cannot exceed revenue', null)"
+                        ariaLabel={`Submission validation rule ${i + 1}`}
+                        onChange={(v) => patchValidation(i, v)}
+                      />
+                    </div>
                     {!readOnly && (
                       <Tooltip content="Remove rule" relationship="label">
                         <Button
@@ -486,39 +543,65 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
               {!readOnly && <Button appearance="primary" icon={<Add20Regular />} size="small" onClick={addValue}>Add value</Button>}
             </div>
 
-            {req.values.length === 0 && (
+            {req.values.length === 0 ? (
               <MessageBar intent="info">
                 <MessageBarBody>A schema needs at least one value to be useful.</MessageBarBody>
               </MessageBar>
+            ) : (
+              <Table size="small" className={s.valuesTable}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHeaderCell>Name</TableHeaderCell>
+                    <TableHeaderCell className={s.colMeta}>Type</TableHeaderCell>
+                    <TableHeaderCell className={s.colMeta}>Cadence</TableHeaderCell>
+                    <TableHeaderCell className={s.colMeta}>Kind</TableHeaderCell>
+                    <TableHeaderCell className={s.colFlag}>Enabled</TableHeaderCell>
+                    <TableHeaderCell className={s.colFlag}>Required</TableHeaderCell>
+                    {!readOnly && <TableHeaderCell className={s.actionsHeader}>Actions</TableHeaderCell>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {req.values.map((v, i) => {
+                    const display = v.label || v.name || `(value #${i + 1})`
+                    return (
+                      <TableRow
+                        key={i}
+                        className={`${s.row} ${s.rowClickable}`}
+                        {...clickableRowProps(() => { setEditingValueIndex(i); setValueDrawerExpanded(false) }, `Edit value ${display}`)}
+                      >
+                        <TableCell className={s.nameCell}>
+                          <TableCellLayout media={<SchemaValueAvatar type={v.type} enabled={v.enabled} />} description={v.label && v.name ? v.name : undefined}>
+                            <Tooltip content={display} relationship="label">
+                              <strong className={s.truncate}>{display}</strong>
+                            </Tooltip>
+                          </TableCellLayout>
+                        </TableCell>
+                        <TableCell className={s.colMeta}>{v.type}</TableCell>
+                        <TableCell className={s.colMeta}>{cadenceLabel(v.cadence)}</TableCell>
+                        <TableCell className={s.colMeta}>{v.kind === 'Calculated' ? 'Calculated' : 'User-defined'}</TableCell>
+                        <TableCell className={s.colFlag}>
+                          <Badge appearance="outline" color={v.enabled ? 'success' : 'subtle'}>
+                            {v.enabled ? 'Enabled' : 'Disabled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={s.colFlag}>{v.required ? 'Yes' : 'No'}</TableCell>
+                        {!readOnly && (
+                          <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
+                            <RowActions
+                              ariaLabel={`Actions for ${display}`}
+                              actions={[
+                                { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => setEditingValueIndex(i) },
+                                { key: 'delete', label: 'Remove', icon: <Delete20Regular />, destructive: true, onClick: () => removeValue(i) },
+                              ]}
+                            />
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             )}
-
-            <Accordion multiple collapsible>
-              {req.values.map((v, i) => (
-                <AccordionItem key={i} value={String(i)}>
-                  <AccordionHeader>
-                    <div className={s.valueHeader}>
-                      <span>
-                        <strong>{v.label || v.name || `(value #${i + 1})`}</strong>
-                        {v.name && <span style={{ color: '#888' }}> · {v.name}</span>}
-                        {' '}<Badge appearance="outline" color={v.enabled ? 'success' : 'subtle'} size="small">{v.type}</Badge>
-                        {' '}<Badge appearance="outline" color="informative" size="small">{cadenceLabel(v.cadence)}</Badge>
-                        {v.required && <> <Badge appearance="outline" color="severe" size="small">required</Badge></>}
-                      </span>
-                    </div>
-                  </AccordionHeader>
-                  <AccordionPanel>
-                    <ValueEditor
-                      value={v}
-                      schemaVersion={req.version ?? 1}
-                      nameLocked={lockedValueNames.has(v.name)}
-                      disabled={readOnly}
-                      onChange={patch => patchValue(i, patch)}
-                      onRemove={() => removeValue(i)}
-                    />
-                  </AccordionPanel>
-                </AccordionItem>
-              ))}
-            </Accordion>
             </div>
             )}
 
@@ -556,6 +639,46 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
             )}
           </div>
         </Card>
+      )}
+
+      {req && (
+        <Drawer
+          type="overlay"
+          separator
+          position="end"
+          open={editingValueIndex !== null}
+          onOpenChange={(_, d) => { if (!d.open) closeValueDrawer() }}
+          className={s.drawer}
+          style={valueDrawerExpanded ? { width: DRAWER_EXPANDED_WIDTH } : undefined}
+        >
+          <DrawerHeaderWithClose
+            title={editingValueIndex !== null
+              ? (req.values[editingValueIndex]?.label || req.values[editingValueIndex]?.name || 'Value details')
+              : 'Value details'}
+            onClose={closeValueDrawer}
+            expanded={valueDrawerExpanded}
+            onToggleExpand={() => setValueDrawerExpanded(e => !e)}
+          />
+          {!readOnly && editingValueIndex !== null && (
+            <Toolbar className={s.drawerToolbar}>
+              <ToolbarButton icon={<Delete20Regular />} onClick={() => removeValue(editingValueIndex)}>Remove</ToolbarButton>
+            </Toolbar>
+          )}
+          <DrawerBody>
+            {editingValueIndex !== null && req.values[editingValueIndex] && (
+              <div className={s.drawerForm}>
+                <ValueEditor
+                  value={req.values[editingValueIndex]}
+                  schemaVersion={req.version ?? 1}
+                  nameLocked={lockedValueNames.has(req.values[editingValueIndex].name)}
+                  disabled={readOnly}
+                  valueNames={req.values.map(v => v.name)}
+                  onChange={patch => patchValue(editingValueIndex, patch)}
+                />
+              </div>
+            )}
+          </DrawerBody>
+        </Drawer>
       )}
 
       <Dialog open={versionDialogOpen} onOpenChange={(_, d) => setVersionDialogOpen(d.open)}>
@@ -605,25 +728,27 @@ function normalisePayload(req: UpsertSchemaRequest): UpsertSchemaRequest {
   return { ...req, submissionValidations: req.submissionValidations.filter(v => v.trim().length > 0) }
 }
 
-function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onRemove }: {
+function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, valueNames }: {
   value: SchemaValue
   /** Parent schema's current `version` — used to bound the "Since version" input. */
   schemaVersion: number
   /** When true the value already exists in the saved schema, so its name is read-only (renaming would break rules/submissions). */
   nameLocked: boolean
-  /** When true the whole editor is read-only (snapshot view): inputs disabled, remove hidden. */
+  /** When true the whole editor is read-only (snapshot view): inputs disabled. */
   disabled?: boolean
   onChange: (patch: Partial<SchemaValue>) => void
-  onRemove: () => void
+  /** All value names in the schema — fed to the expression editors' autocomplete. */
+  valueNames: string[]
 }) {
   const s = useStyles()
+  const calculated = value.kind === 'Calculated'
+  const kinds: SchemaValueKind[] = ['UserDefined', 'Calculated']
+  // Sibling names (everything but this value) for the calculated Expression; the gating/warning
+  // rules can also reference this value itself, and value validation adds value/minimum/maximum.
+  const siblingNames = valueNames.filter(n => n && n !== value.name)
+  const validationVars = ['value', 'minimum', 'maximum', ...siblingNames]
   return (
-    <Card className={s.valueCard}>
-      <CardHeader
-        header={<strong>Value details</strong>}
-        action={disabled ? undefined : <Button appearance="subtle" icon={<Delete20Regular />} size="small" onClick={onRemove}>Remove</Button>}
-      />
-
+    <>
       <div className={s.twoCol}>
         <Field
           label="Name"
@@ -668,6 +793,36 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
         />
       </Field>
 
+      <Field label="Kind" hint="Calculated values are computed from sibling values in the same submission and are never submitted.">
+        <Dropdown
+          value={calculated ? 'Calculated' : 'User-defined'}
+          disabled={disabled}
+          selectedOptions={[value.kind ?? 'UserDefined']}
+          onOptionSelect={(_, d) => {
+            const kind = d.optionValue as SchemaValueKind
+            onChange({
+              kind,
+              required: kind === 'Calculated' ? false : value.required,
+              expression: kind === 'Calculated' ? (value.expression ?? '') : null,
+            })
+          }}
+        >
+          {kinds.map(k => <Option key={k} value={k}>{k === 'UserDefined' ? 'User-defined' : 'Calculated'}</Option>)}
+        </Dropdown>
+      </Field>
+
+      {calculated && (
+        <RuleTextarea
+          label="Expression"
+          hint="NCalc formula referencing sibling values in the same submission only (e.g. average(a, b)). Chaining to other calculated values is allowed."
+          rows={3}
+          disabled={disabled}
+          identifiers={siblingNames}
+          value={value.expression ?? ''}
+          onChange={(v) => onChange({ expression: v })}
+        />
+      )}
+
       <div className={s.twoCol}>
         <Field label="Type">
           <Dropdown value={value.type} disabled={disabled} selectedOptions={[value.type]} onOptionSelect={(_, d) => onChange({ type: d.optionValue as SchemaValueType })}>
@@ -686,12 +841,12 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
       </Field>
 
       <div className={s.flagsRow}>
-        <Checkbox label="Required" checked={value.required} disabled={disabled} onChange={(_, d) => onChange({ required: !!d.checked })} />
-        <Checkbox label="Modifiable" checked={value.modifiable} disabled={disabled} onChange={(_, d) => onChange({ modifiable: !!d.checked })} />
+        <Checkbox label="Required" checked={value.required} disabled={disabled || calculated} onChange={(_, d) => onChange({ required: !!d.checked })} />
+        <Checkbox label="Modifiable" checked={value.modifiable} disabled={disabled || calculated} onChange={(_, d) => onChange({ modifiable: !!d.checked })} />
         <Checkbox label="Enabled" checked={value.enabled} disabled={disabled} onChange={(_, d) => onChange({ enabled: !!d.checked })} />
       </div>
 
-      {(value.type === 'Integer' || value.type === 'Number') && (
+      {!calculated && (value.type === 'Integer' || value.type === 'Number') && (
         <>
           <div className={s.sectionLabel}>Numeric constraints</div>
           <div className={s.twoCol}>
@@ -702,6 +857,11 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
               <Input type="number" disabled={disabled} value={value.max?.toString() ?? ''} onChange={(_, v) => onChange({ max: v.value === '' ? null : Number(v.value) })} />
             </Field>
           </div>
+        </>
+      )}
+
+      {(value.type === 'Integer' || value.type === 'Number') && (
+        <>
           <div className={s.sectionLabel}>Target band (RAG, optional)</div>
           <div className={s.bandHelp}>
             Reporting-only Red/Amber/Green ranges shown as shaded bands on charts — never enforced. The
@@ -726,7 +886,7 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
         </>
       )}
 
-      {value.type === 'Date' && (
+      {!calculated && value.type === 'Date' && (
         <>
           <div className={s.sectionLabel}>Date constraints</div>
           <div className={s.twoCol}>
@@ -740,7 +900,7 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
         </>
       )}
 
-      {value.type === 'String' && (
+      {!calculated && value.type === 'String' && (
         <>
           <div className={s.sectionLabel}>String constraints</div>
           <div className={s.twoCol}>
@@ -758,19 +918,23 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
       )}
 
       <div className={s.sectionLabel}>Validation</div>
-      <RuleTextarea
-        label="Value validation"
-        hint="Runs against the submitted sample. Vars include value, minimum, maximum. Whitespace and line breaks are ignored."
-        rows={3}
-        disabled={disabled}
-        value={value.valueValidation ?? ''}
-        onChange={(v) => onChange({ valueValidation: v })}
-      />
+      {!calculated && (
+        <RuleTextarea
+          label="Value validation"
+          hint="Runs against the submitted sample. Vars include value, minimum, maximum. Whitespace and line breaks are ignored."
+          rows={3}
+          disabled={disabled}
+          identifiers={validationVars}
+          value={value.valueValidation ?? ''}
+          onChange={(v) => onChange({ valueValidation: v })}
+        />
+      )}
       <RuleTextarea
         label="Warning"
         hint="Optional rule that produces a non-blocking warning when true or when it returns a non-empty string."
         rows={3}
         disabled={disabled}
+        identifiers={validationVars}
         value={value.warning ?? ''}
         onChange={(v) => onChange({ warning: v })}
       />
@@ -781,6 +945,7 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
         hint="When false (or null) the value is disabled in the UI and a submitted sample is dropped with a warning. Empty = always enabled."
         rows={2}
         disabled={disabled}
+        identifiers={validationVars}
         value={value.enabledIf ?? ''}
         onChange={(v) => onChange({ enabledIf: v })}
       />
@@ -789,6 +954,7 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
         hint="When false (or null) the value is hidden in the UI. Server-side behaves like Enabled if. Empty = always visible."
         rows={2}
         disabled={disabled}
+        identifiers={validationVars}
         value={value.visibleIf ?? ''}
         onChange={(v) => onChange({ visibleIf: v })}
       />
@@ -796,7 +962,7 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
       <Field label="Notes">
         <Textarea value={value.notes ?? ''} disabled={disabled} onChange={(_, v) => onChange({ notes: v.value })} />
       </Field>
-    </Card>
+    </>
   )
 }
 
@@ -808,7 +974,7 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, onR
  * issues.
  */
 function RuleTextarea({
-  label, hint, rows, value, disabled, onChange,
+  label, hint, rows, value, disabled, onChange, identifiers, placeholder,
 }: {
   label: string
   hint?: string
@@ -816,7 +982,11 @@ function RuleTextarea({
   value: string
   disabled?: boolean
   onChange: (next: string) => void
+  /** Value names / context variables offered as autocomplete suggestions. */
+  identifiers?: string[]
+  placeholder?: string
 }) {
+  const s = useStyles()
   const [status, setStatus] = useState<'idle' | 'checking' | ExpressionSyntaxResult>('idle')
 
   useEffect(() => {
@@ -834,25 +1004,36 @@ function RuleTextarea({
     return () => { cancelled = true; window.clearTimeout(t) }
   }, [value])
 
-  // Fluent UI's `Field` decides which glyph to render based on `validationState`. If we pass
-  // `validationMessage` without a state it defaults to "error", which is why "Valid syntax"
-  // used to appear next to a red ✕ — the message text and the icon disagreed. Mirror the
-  // server's verdict here so the glyph and the message always tell the same story.
-  let validationState: 'success' | 'error' | 'none' = 'none'
-  let validationMessage: string | undefined
-  if (status !== 'idle' && status !== 'checking') {
+  // The status line lives in a fixed-height row (see `ruleStatus`) so cycling Checking… → Valid →
+  // Syntax error never reflows the form. "Checking…" is shown while the server round-trips instead
+  // of leaving the row blank, so there's no flash of empty space mid-edit. Read-only fields show
+  // nothing (they aren't validated).
+  let statusClass = s.ruleStatusChecking
+  let statusContent: ReactNode = null
+  if (status === 'checking') {
+    statusContent = <><Spinner size="extra-tiny" /> Checking…</>
+  } else if (status !== 'idle') {
     if (status.ok) {
-      validationState = 'success'
-      validationMessage = 'Valid syntax'
+      statusClass = s.ruleStatusOk
+      statusContent = <><CheckmarkCircle16Regular /> Valid syntax</>
     } else {
-      validationState = 'error'
-      validationMessage = `Syntax error: ${status.error}`
+      statusClass = s.ruleStatusError
+      statusContent = <><ErrorCircle16Regular /> Syntax error: {status.error}</>
     }
   }
 
   return (
-    <Field label={label} hint={hint} validationState={validationState} validationMessage={validationMessage}>
-      <Textarea rows={rows} value={value} disabled={disabled} onChange={(_, v) => onChange(v.value)} />
+    <Field label={label} hint={hint}>
+      <ExpressionField
+        rows={rows}
+        value={value}
+        disabled={disabled}
+        identifiers={identifiers}
+        placeholder={placeholder}
+        ariaLabel={label}
+        onChange={onChange}
+      />
+      {!disabled && <div className={mergeClasses(s.ruleStatus, statusClass)}>{statusContent}</div>}
     </Field>
   )
 }

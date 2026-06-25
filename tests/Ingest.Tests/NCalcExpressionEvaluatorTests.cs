@@ -145,4 +145,37 @@ public class NCalcExpressionEvaluatorTests
         Assert.False(warn.IsValid);
         Assert.Equal("Within 5 of cap.", warn.ErrorMessage);
     }
+
+    [Fact]
+    public void Average_over_numbers()
+    {
+        var ev = new NCalcExpressionEvaluator();
+        var result = ev.Evaluate("average(2, 4, 6)", NoVars);
+        Assert.Equal(4d, result);
+    }
+
+    [Fact]
+    public void Average_coerces_booleans_and_ignores_nulls()
+    {
+        var ev = new NCalcExpressionEvaluator();
+        var p = new Dictionary<string, object?> { ["flag"] = true, ["missing"] = null };
+        var result = ev.Evaluate("average(2, flag, missing, 4)", p);
+        Assert.Equal((2d + 1d + 4d) / 3d, result);
+    }
+
+    [Fact]
+    public void Average_with_no_numeric_args_returns_null()
+    {
+        var ev = new NCalcExpressionEvaluator();
+        Assert.Null(ev.Evaluate("average()", NoVars));
+        Assert.Null(ev.Evaluate("average(missing)", new Dictionary<string, object?> { ["missing"] = null }));
+    }
+
+    [Fact]
+    public void Average_rejects_non_numeric_non_boolean()
+    {
+        var ev = new NCalcExpressionEvaluator();
+        Assert.Throws<InvalidOperationException>(() => ev.Evaluate("average('x')", NoVars));
+        Assert.Throws<InvalidOperationException>(() => ev.Evaluate("average(now())", NoVars));
+    }
 }

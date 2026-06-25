@@ -1,5 +1,6 @@
 using Ingest.Core.Entities;
 using Ingest.Infrastructure.Services;
+using Ingest.Infrastructure.Validation;
 
 namespace Ingest.Tests;
 
@@ -104,5 +105,62 @@ public class SampleProjectionBuilderTests
         var row = Assert.Single(rows);
         Assert.Equal(default(DateTime), row.SubmittedAt);
         Assert.Equal(DateTimeKind.Utc, row.SubmittedAt.Kind);
+    }
+
+    [Fact]
+    public void Build_without_evaluator_emits_no_derived_rows()
+    {
+        var schema = new Schema
+        {
+            Name = "monthly_kpis", Enabled = true,
+            Values = new List<SchemaValue>
+            {
+                new() { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Monthly },
+                new() { Name = "total", Type = SchemaValueType.Number, Cadence = Cadence.Monthly, Kind = SchemaValueKind.Calculated, Expression = "a * 2" },
+            },
+        };
+        var schemas = new Dictionary<string, Schema> { ["monthly_kpis"] = schema };
+        var sub = SubmissionWith(new DateTime(2026, 5, 20, 9, 0, 0, DateTimeKind.Utc), new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc));
+        sub.Samples[0].SchemaName = "monthly_kpis";
+        sub.Samples[0].ValueName = "a";
+        sub.Samples[0].Value = 5d;
+
+        var rows = SampleProjectionBuilder.Build(sub, schemas).ToList();
+        Assert.Single(rows);
+        Assert.False(rows[0].IsDerived);
+    }
+
+    [Fact]
+    public void Build_with_evaluator_emits_derived_row()
+    {
+        var schema = new Schema
+        {
+            Name = "monthly_kpis", Enabled = true,
+            Values = new List<SchemaValue>
+            {
+                new() { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Monthly },
+                new() { Name = "total", Type = SchemaValueType.Number, Cadence = Cadence.Monthly, Kind = SchemaValueKind.Calculated, Expression = "a * 2" },
+            },
+        };
+        var schemas = new Dictionary<string, Schema> { ["monthly_kpis"] = schema };
+        var ts = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc);
+        var sub = new Submission
+        {
+            ServiceAccountId = Guid.NewGuid(),
+            ServiceName = "roads-team",
+            SubmittedAt = new DateTime(2026, 5, 20, 9, 0, 0, DateTimeKind.Utc),
+            Samples =
+            {
+                new Sample { SchemaName = "monthly_kpis", ValueName = "a", Value = 5d, Timestamp = ts },
+            },
+        };
+
+        var rows = SampleProjectionBuilder.Build(sub, schemas, new NCalcExpressionEvaluator()).ToList();
+        Assert.Equal(2, rows.Count);
+        var derived = Assert.Single(rows, r => r.IsDerived);
+        Assert.Equal("total", derived.ValueName);
+        Assert.Equal(10d, derived.NumberValue);
+        Assert.Equal(Cadence.Monthly, derived.Cadence);
+        Assert.Equal(ts, derived.Timestamp);
     }
 }

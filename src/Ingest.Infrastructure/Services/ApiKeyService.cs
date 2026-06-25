@@ -140,10 +140,24 @@ public sealed class ApiKeyService : IApiKeyService
         {
             key.RevokedAt = _audit.UtcNow;
             await _keys.UpdateAsync(key, ct);
-            // API keys have no delete; a revoke is the closest lifecycle equivalent, so it is
+            // A revoke is the soft lifecycle equivalent of a delete (the row is kept), so it is
             // logged as a Delete of the key.
             await _auditLog.RecordAsync(AuditTargetType.ApiKey, AuditChangeType.Delete, key.Id, key.KeyId, ct);
         }
         return key;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> DeleteAsync(Guid accountId, Guid keyId, CancellationToken ct = default)
+    {
+        // Same (account, key) pairing as revoke so a stray keyId from another account can't be deleted.
+        var all = await _keys.ListByAccountAsync(accountId, ct);
+        var key = all.FirstOrDefault(k => k.Id == keyId);
+        if (key is null) return false;
+
+        var deleted = await _keys.DeleteAsync(key.Id, ct);
+        if (deleted)
+            await _auditLog.RecordAsync(AuditTargetType.ApiKey, AuditChangeType.Delete, key.Id, key.KeyId, ct);
+        return deleted;
     }
 }

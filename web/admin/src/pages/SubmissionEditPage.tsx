@@ -181,22 +181,17 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
 
   // Prefetch + evaluate the schema's rules client-side (mirrors the server) so EnabledIf /
   // VisibleIf hide/grey values and Warning rules surface inline as the user types.
-  const { rowStates } = useSampleRules(schema, rows)
+  const { rowStates, ruleVariables } = useSampleRules(schema, rows)
 
   function buildPayload(draft: boolean): SampleInput[] | null {
     if (!schema) return null
-    // Only include rows the user actually filled — booleans use a tri-state dropdown so "unset" is a
-    // first-class option there too. On a normal save, required-but-empty values are reported back to
-    // the user and rows hidden/disabled by EnabledIf/VisibleIf are silently dropped (the server would
-    // do the same and emit a warning). A draft is deliberately partial: it keeps every filled value
-    // (no conditional-display drop, mirroring the server's relaxed draft validation) and never blocks
-    // on missing required values.
     const dropped = draft ? new Set<string>() : new Set(rowStates.filter(st => st.discarded).map(st => st.name))
-    const filled = rows.filter(r => isFilled(r.value) && !dropped.has(r.name))
+    const filled = rows.filter(r =>
+      isFilled(r.value) && !dropped.has(r.name) && r.def.kind !== 'Calculated')
     if (!draft) {
       const filledNames = new Set(filled.map(r => r.name))
       const missing = schema.values
-        .filter(v => v.required && v.enabled && !filledNames.has(v.name) && !dropped.has(v.name))
+        .filter(v => v.required && v.enabled && v.kind !== 'Calculated' && !filledNames.has(v.name) && !dropped.has(v.name))
         .map(v => v.label || v.name)
       if (missing.length > 0) {
         setMissingRequired(missing)
@@ -443,6 +438,7 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
             schema={schema}
             rows={rows}
             rowStates={rowStates}
+            ruleVariables={ruleVariables}
             readOnly={readOnly}
             onPatchRow={patchRow}
           />

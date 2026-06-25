@@ -27,6 +27,7 @@ import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/Draw
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import { ValueLabel } from '../components/ValueLabel'
+import { ExpressionField } from '../components/ExpressionField'
 import { cadenceLabel } from '../utils/cadence'
 import { confirmDelete } from '../utils/confirm'
 import { formatDate, formatDateTime } from '../utils/format'
@@ -101,8 +102,7 @@ const useStyles = makeStyles({
   rulesList: { display: 'flex', flexDirection: 'column', gap: '8px' },
   ruleRow: { display: 'flex', alignItems: 'flex-start', gap: '8px' },
   ruleTextarea: { flex: 1 },
-  monospace: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: '13px' },
-  preBlock: { whiteSpace: 'pre-wrap', margin: 0 },
+  rulesOl: { margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' },
 })
 
 const SCHEMA_EXPORT_COLUMNS: ExportColumn<Schema>[] = [
@@ -530,10 +530,10 @@ function SchemaViewBody({ schema, services, requiresApproval }: { schema: Schema
       {schema.submissionValidations.length > 0 && (
         <div>
           <div className={s.sectionLabel}>Submission validations</div>
-          <ol style={{ margin: 0, paddingLeft: '20px' }}>
+          <ol className={s.rulesOl}>
             {schema.submissionValidations.map((v, i) => (
               <li key={i}>
-                <pre className={`${s.monospace} ${s.preBlock}`}>{v}</pre>
+                <ExpressionField value={v} disabled rows={1} onChange={() => {}} ariaLabel={`Submission validation rule ${i + 1}`} />
               </li>
             ))}
           </ol>

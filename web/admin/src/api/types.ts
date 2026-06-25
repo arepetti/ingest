@@ -10,6 +10,9 @@ export type AccountKind = 'User' | 'Application'
 export type AccountRole = 'Service' | 'Operator' | 'Admin' | 'Approver'
 export type SchemaValueType = 'String' | 'Integer' | 'Number' | 'Date' | 'Boolean'
 
+/** Whether a schema value is submitted or computed from sibling values. */
+export type SchemaValueKind = 'UserDefined' | 'Calculated'
+
 // --- Approval workflow ---------------------------------------------------------------------
 
 /** Approval lifecycle state of a submission. `NotRequired` is the legacy/never-gated default. */
@@ -216,6 +219,10 @@ export interface SchemaValue {
    * read-only submission view (think <h2>). Plays no role server-side or in validation.
    */
   caption?: string | null
+  /** User-defined (submitted) or calculated (derived from sibling values). Defaults to UserDefined. */
+  kind?: SchemaValueKind
+  /** NCalc formula when kind is Calculated. */
+  expression?: string | null
   type: SchemaValueType
   unit?: string | null
   cadence: Cadence

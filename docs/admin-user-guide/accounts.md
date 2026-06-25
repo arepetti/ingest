@@ -96,7 +96,8 @@ Row menu → **Manage keys**. The drawer lists every key attached to the account
   - a **description** — a short free-form note (up to 200 characters) recording *who or why* the key exists, and
   - an **expiry** — a date up to two years from today, or blank for a key that never expires. Expired keys stop authenticating automatically — no revoke needed — and show as **Expired** in the list.
 - **Edit a description** — click the pencil next to any key's description to annotate it later (handy for keys created before you started recording this). The note is purely informational and never affects authentication.
-- **Revoke** (in the row menu of an individual key) — marks the key revoked. Idempotent; safe to click twice.
+- **Revoke** (on an active key) — marks the key revoked but keeps the row, so the history of "this key existed and was retired" stays visible. Idempotent; safe to click twice.
+- **Delete** (the bin icon, on any key) — permanently removes the key from the list. It works on an already-revoked key (to tidy up) and on a still-active one (which stops it working immediately, like a revoke, and then drops the row). There is no undo, so prefer **Revoke** when you want to keep the audit trail of the key. Requires the *Manage API keys* capability.
 
 > **Tip — temporary / cover keys.** The description and expiry pair up nicely for short-lived access. When someone needs the keys to a service or a reviewer account for a fixed window (covering annual leave, a contractor engagement, an incident), generate a **separate** key with a description like *"holiday cover for Jane — reviewer"* and an **expiry** on their last day. You then have an at-a-glance record of why each key exists and who it's for, and the temporary one disappears on its own when the cover ends — no diary reminder to revoke it. Keep the permanent and temporary keys distinct so revoking or expiring one never disrupts the other.
 

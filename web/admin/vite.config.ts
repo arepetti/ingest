@@ -18,6 +18,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    test: {
+      environment: 'node',
+    },
     server: {
       host: true,
       port,

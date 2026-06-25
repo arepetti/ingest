@@ -1,3 +1,4 @@
+using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
 using Ingest.Core.Validation;
 
@@ -19,73 +20,124 @@ public static class SampleProjectionBuilder
     /// validator so reaching this code path indicates a broken state and we'd rather degrade than
     /// crash the projection rebuild.
     /// </param>
-    /// <returns>One row per (resolvable) sample, in submission order.</returns>
-    public static IEnumerable<SampleProjection> Build(Submission submission, IReadOnlyDictionary<string, Schema> schemasByName)
+    /// <param name="evaluator">
+    /// When supplied, calculated schema values are evaluated and emitted as derived projection
+    /// rows (<see cref="SampleProjection.IsDerived"/> = <c>true</c>). When <c>null</c>, derived
+    /// rows are skipped (useful in unit tests that only care about submitted samples).
+    /// </param>
+    /// <returns>One row per (resolvable) sample, in submission order, plus derived rows per schema.</returns>
+    public static IEnumerable<SampleProjection> Build(
+        Submission submission,
+        IReadOnlyDictionary<string, Schema> schemasByName,
+        IExpressionEvaluator? evaluator = null)
     {
         foreach (var s in submission.Samples)
         {
             if (!schemasByName.TryGetValue(s.SchemaName, out var schema)) continue;
             var def = schema.Values.FirstOrDefault(v =>
                 string.Equals(v.Name, s.ValueName, StringComparison.OrdinalIgnoreCase));
-            if (def is null) continue;
+            if (def is null || def.IsCalculated) continue;
 
-            var (start, end) = CadenceCalculator.BucketFor(def.Cadence, s.Timestamp);
+            yield return ToProjection(submission, s, def);
+        }
 
-            var p = new SampleProjection
+        if (evaluator is null) yield break;
+
+        var schemaNames = submission.Samples
+            .Select(s => s.SchemaName)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var schemaName in schemaNames)
+        {
+            if (!schemasByName.TryGetValue(schemaName, out var schema)) continue;
+
+            var schemaSamples = submission.Samples
+                .Where(s => string.Equals(s.SchemaName, schemaName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (schemaSamples.Count == 0) continue;
+
+            var submitted = schemaSamples
+                .Where(s => schema.Values.FirstOrDefault(v =>
+                    string.Equals(v.Name, s.ValueName, StringComparison.OrdinalIgnoreCase)) is { IsCalculated: false })
+                .GroupBy(s => s.ValueName, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => (object?)g.First().Value, StringComparer.OrdinalIgnoreCase);
+
+            var context = DerivedValueCalculator.Compute(schema, submitted, evaluator);
+            var timestamp = schemaSamples.Max(s => s.Timestamp);
+
+            foreach (var def in schema.Values.Where(v => v.IsCalculated))
             {
-                SubmissionId = submission.Id,
-                ServiceAccountId = submission.ServiceAccountId,
-                ServiceName = submission.ServiceName ?? string.Empty,
-                SchemaName = s.SchemaName,
-                ValueName = s.ValueName,
-                ValueType = def.Type,
-                Timestamp = DateTime.SpecifyKind(s.Timestamp, DateTimeKind.Utc),
-                SubmittedAt = DateTime.SpecifyKind(submission.SubmittedAt, DateTimeKind.Utc),
-                Note = s.Note,
-                Cadence = def.Cadence,
-                PeriodStart = start,
-                PeriodEnd = end,
-            };
-
-            switch (def.Type)
-            {
-                case SchemaValueType.String: p.StringValue = s.Value as string; break;
-                case SchemaValueType.Integer: p.IntegerValue = ToLong(s.Value); break;
-                case SchemaValueType.Number: p.NumberValue = ToDouble(s.Value); break;
-                case SchemaValueType.Date: p.DateValue = ToDate(s.Value); break;
-                case SchemaValueType.Boolean: p.BooleanValue = s.Value as bool?; break;
+                if (!context.TryGetValue(def.Name, out var value) || value is null) continue;
+                yield return ToDerivedProjection(submission, schemaName, def, value, timestamp);
             }
-
-            yield return p;
         }
     }
 
-    private static long? ToLong(object? v) => v switch
+    private static SampleProjection ToProjection(Submission submission, Sample s, SchemaValue def)
     {
-        long l => l,
-        int i => i,
-        double d => (long)d,
-        decimal m => (long)m,
-        string s when long.TryParse(s, out var p) => p,
-        _ => null,
-    };
+        var (start, end) = CadenceCalculator.BucketFor(def.Cadence, s.Timestamp);
 
-    private static double? ToDouble(object? v) => v switch
-    {
-        double d => d,
-        float f => f,
-        int i => i,
-        long l => l,
-        decimal m => (double)m,
-        string s when double.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var p) => p,
-        _ => null,
-    };
+        var p = new SampleProjection
+        {
+            SubmissionId = submission.Id,
+            ServiceAccountId = submission.ServiceAccountId,
+            ServiceName = submission.ServiceName ?? string.Empty,
+            SchemaName = s.SchemaName,
+            ValueName = s.ValueName,
+            ValueType = def.Type,
+            Timestamp = DateTime.SpecifyKind(s.Timestamp, DateTimeKind.Utc),
+            SubmittedAt = DateTime.SpecifyKind(submission.SubmittedAt, DateTimeKind.Utc),
+            Note = s.Note,
+            Cadence = def.Cadence,
+            PeriodStart = start,
+            PeriodEnd = end,
+            IsDerived = false,
+        };
 
-    private static DateTime? ToDate(object? v) => v switch
+        ApplyTypedValue(p, def.Type, s.Value);
+        return p;
+    }
+
+    private static SampleProjection ToDerivedProjection(
+        Submission submission,
+        string schemaName,
+        SchemaValue def,
+        object value,
+        DateTime timestamp)
     {
-        DateTime dt => DateTime.SpecifyKind(dt, DateTimeKind.Utc),
-        DateTimeOffset dto => dto.UtcDateTime,
-        string s when DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var p) => p,
-        _ => null,
-    };
+        var ts = DateTime.SpecifyKind(timestamp, DateTimeKind.Utc);
+        var (start, end) = CadenceCalculator.BucketFor(def.Cadence, ts);
+
+        var p = new SampleProjection
+        {
+            SubmissionId = submission.Id,
+            ServiceAccountId = submission.ServiceAccountId,
+            ServiceName = submission.ServiceName ?? string.Empty,
+            SchemaName = schemaName,
+            ValueName = def.Name,
+            ValueType = def.Type,
+            Timestamp = ts,
+            SubmittedAt = DateTime.SpecifyKind(submission.SubmittedAt, DateTimeKind.Utc),
+            Note = null,
+            Cadence = def.Cadence,
+            PeriodStart = start,
+            PeriodEnd = end,
+            IsDerived = true,
+        };
+
+        ApplyTypedValue(p, def.Type, value);
+        return p;
+    }
+
+    private static void ApplyTypedValue(SampleProjection p, SchemaValueType type, object? value)
+    {
+        switch (type)
+        {
+            case SchemaValueType.String: p.StringValue = value as string ?? value?.ToString(); break;
+            case SchemaValueType.Integer: p.IntegerValue = SampleValueCoercion.ToLong(value); break;
+            case SchemaValueType.Number: p.NumberValue = SampleValueCoercion.ToDouble(value); break;
+            case SchemaValueType.Date: p.DateValue = SampleValueCoercion.ToDate(value); break;
+            case SchemaValueType.Boolean: p.BooleanValue = SampleValueCoercion.ToBoolean(value); break;
+        }
+    }
 }

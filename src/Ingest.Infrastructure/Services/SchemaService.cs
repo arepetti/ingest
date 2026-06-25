@@ -30,6 +30,7 @@ public sealed class SchemaService : ISchemaService
     private readonly ISubmissionRepository _submissions;
     private readonly IAccountRepository _accounts;
     private readonly IAuditContext _auditContext;
+    private readonly IExpressionTranslator _translator;
 
     /// <summary>Create a new <see cref="SchemaService"/>.</summary>
     /// <param name="schemas">Schema repository.</param>
@@ -39,6 +40,7 @@ public sealed class SchemaService : ISchemaService
     /// <param name="submissions">Submission repository, used to snapshot the submission count at save time.</param>
     /// <param name="accounts">Account repository, used to validate approval-policy approver references.</param>
     /// <param name="auditContext">Ambient who/when context for stamping the snapshot author + timestamp.</param>
+    /// <param name="translator">Expression translator for calculated-value syntax and reference checks.</param>
     public SchemaService(
         ISchemaRepository schemas,
         ISampleRepository samples,
@@ -46,7 +48,8 @@ public sealed class SchemaService : ISchemaService
         ISchemaVersionHistoryRepository versions,
         ISubmissionRepository submissions,
         IAccountRepository accounts,
-        IAuditContext auditContext)
+        IAuditContext auditContext,
+        IExpressionTranslator translator)
     {
         _schemas = schemas;
         _samples = samples;
@@ -55,6 +58,7 @@ public sealed class SchemaService : ISchemaService
         _submissions = submissions;
         _accounts = accounts;
         _auditContext = auditContext;
+        _translator = translator;
     }
 
     /// <inheritdoc />
@@ -343,7 +347,7 @@ public sealed class SchemaService : ISchemaService
     /// <see cref="ValidationException"/> aggregating all detected issues so the SPA can show a
     /// useful "everything that's wrong" summary instead of revealing one problem per round-trip.
     /// </summary>
-    private static void ValidateStructure(Schema schema)
+    private void ValidateStructure(Schema schema)
     {
         var errors = new List<string>();
 
@@ -382,6 +386,37 @@ public sealed class SchemaService : ISchemaService
         // individually optional, but an inner edge requires the matching outer edge on its side.
         foreach (var v in schema.Values)
             ValidateTargetBand(v, errors);
+
+        foreach (var v in schema.Values.Where(v => v.IsCalculated))
+        {
+            if (string.IsNullOrWhiteSpace(v.Expression))
+                errors.Add($"Value '{v.Name}' is calculated but has no expression.");
+            if (v.Required)
+                errors.Add($"Value '{v.Name}' is calculated and cannot be required.");
+            if (string.IsNullOrWhiteSpace(v.Expression)) continue;
+
+            var syntax = _translator.ValidateSyntax(v.Expression);
+            if (!syntax.Ok)
+                errors.Add($"Value '{v.Name}' expression syntax error: {syntax.Error}");
+
+            if (!ExpressionReferences.TryGetIdentifiers(v.Expression, out _, out var translateError, _translator))
+            {
+                errors.Add($"Value '{v.Name}' expression cannot be analysed: {translateError}");
+                continue;
+            }
+
+            if (ExpressionReferences.ReferencesSelf(v.Expression, v.Name, _translator))
+                errors.Add($"Value '{v.Name}' expression references itself.");
+
+            if (ExpressionReferences.ReferencesHistoryFunctions(v.Expression))
+                errors.Add($"Value '{v.Name}' expression must not use latest() or previous(); calculated values are sibling-only.");
+
+            foreach (var unknown in ExpressionReferences.UnknownIdentifiers(v.Expression, schema, _translator))
+                errors.Add($"Value '{v.Name}' expression references unknown identifier '{unknown}'.");
+        }
+
+        if (ExpressionReferences.HasCycleAmongCalculated(schema, _translator))
+            errors.Add("Calculated values contain a dependency cycle.");
 
         // Layout: every value-ref resolves; no value is referenced more than once; section nodes
         // have a non-empty caption; nesting is bounded.
@@ -519,6 +554,8 @@ public sealed class SchemaService : ISchemaService
         VisibleIf = v.VisibleIf,
         Warning = v.Warning,
         SinceVersion = v.SinceVersion,
+        Kind = v.Kind,
+        Expression = v.Expression,
     };
 
     private static ApprovalPolicy? CloneApproval(ApprovalPolicy? p) => p is null ? null : new ApprovalPolicy

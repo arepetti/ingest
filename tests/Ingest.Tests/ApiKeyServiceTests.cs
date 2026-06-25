@@ -177,6 +177,60 @@ public class ApiKeyServiceTests
         Assert.Null(updated);
     }
 
+    // ── Delete ──────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Delete_removes_an_active_key()
+    {
+        var svc = NewService(out _, out var keys, out var account);
+        var created = await svc.RotateAsync(account.Id);
+
+        var deleted = await svc.DeleteAsync(account.Id, created.Entity.Id);
+
+        Assert.True(deleted);
+        Assert.Empty(keys.Added);
+    }
+
+    [Fact]
+    public async Task Delete_removes_an_already_revoked_key()
+    {
+        var svc = NewService(out _, out var keys, out var account);
+        var created = await svc.RotateAsync(account.Id);
+        await svc.RevokeAsync(account.Id, created.Entity.Id);
+
+        var deleted = await svc.DeleteAsync(account.Id, created.Entity.Id);
+
+        Assert.True(deleted);
+        Assert.Empty(keys.Added);
+    }
+
+    [Fact]
+    public async Task Delete_returns_false_for_an_unknown_key()
+    {
+        var svc = NewService(out _, out var keys, out var account);
+        await svc.RotateAsync(account.Id);
+
+        var deleted = await svc.DeleteAsync(account.Id, Guid.NewGuid());
+
+        Assert.False(deleted);
+        Assert.Single(keys.Added); // the unrelated key is untouched
+    }
+
+    [Fact]
+    public async Task Delete_does_not_touch_a_key_owned_by_another_account()
+    {
+        var svc = NewService(out var accounts, out var keys, out var owner);
+        var other = new Account { Name = "other", Kind = AccountKind.Application, Role = AccountRole.Service, Enabled = true };
+        accounts.Seed(other);
+        var created = await svc.RotateAsync(owner.Id);
+
+        // Ask to delete the owner's key but while scoped to a different account.
+        var deleted = await svc.DeleteAsync(other.Id, created.Entity.Id);
+
+        Assert.False(deleted);
+        Assert.Single(keys.Added);
+    }
+
     // ── ApiKey.IsActive (the auth-handler gate) ─────────────────────────────────────────────
 
     [Fact]
@@ -284,6 +338,7 @@ public class ApiKeyServiceTests
 
         public Task AddAsync(ApiKey key, CancellationToken ct = default) { Added.Add(key); return Task.CompletedTask; }
         public Task UpdateAsync(ApiKey key, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<bool> DeleteAsync(Guid id, CancellationToken ct = default) => Task.FromResult(Added.RemoveAll(k => k.Id == id) > 0);
         public Task<long> HardDeleteByAccountAsync(Guid accountId, CancellationToken ct = default) => Task.FromResult(0L);
     }
 }

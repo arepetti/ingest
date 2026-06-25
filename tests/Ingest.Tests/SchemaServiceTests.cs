@@ -2,6 +2,7 @@ using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.Infrastructure.Services;
+using Ingest.Infrastructure.Validation;
 
 namespace Ingest.Tests;
 
@@ -16,7 +17,8 @@ public class SchemaServiceTests
     {
         repo = new FakeSchemaRepo();
         return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService(),
-            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock());
+            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock(),
+            new NCalcToJavaScriptTranslator());
     }
 
     private static SchemaService NewService(out FakeSchemaRepo repo, out FakeEmptySampleRepo samples)
@@ -24,7 +26,8 @@ public class SchemaServiceTests
         repo = new FakeSchemaRepo();
         samples = new FakeEmptySampleRepo();
         return new SchemaService(repo, samples, new NoopAuditLogService(),
-            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock());
+            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock(),
+            new NCalcToJavaScriptTranslator());
     }
 
     private static SchemaService NewServiceWithVersions(out FakeSchemaRepo repo, out FakeVersionHistoryRepo versions)
@@ -32,7 +35,8 @@ public class SchemaServiceTests
         repo = new FakeSchemaRepo();
         versions = new FakeVersionHistoryRepo();
         return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService(),
-            versions, new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock());
+            versions, new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock(),
+            new NCalcToJavaScriptTranslator());
     }
 
     /// <summary>
@@ -721,6 +725,122 @@ public class SchemaServiceTests
 
         var ex = await Assert.ThrowsAsync<ConflictException>(() => svc.DeleteAsync(created.Id));
         Assert.Contains("Demo schema", ex.Message);
+    }
+
+    [Fact]
+    public async Task Create_rejects_calculated_without_expression()
+    {
+        var svc = NewService(out _);
+        var schema = NewSchema(name: $"calc-{Guid.NewGuid():N}");
+        schema.Values = new List<SchemaValue>
+        {
+            new() { Name = "x", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Kind = SchemaValueKind.Calculated },
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(schema));
+        Assert.Contains("has no expression", ex.Errors[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Create_rejects_calculated_required()
+    {
+        var svc = NewService(out _);
+        var schema = NewSchema(name: $"calc-{Guid.NewGuid():N}");
+        schema.Values = new List<SchemaValue>
+        {
+            new() { Name = "x", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Kind = SchemaValueKind.Calculated, Expression = "1", Required = true },
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(schema));
+        Assert.Contains("cannot be required", ex.Errors[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Create_rejects_unknown_calculated_identifier()
+    {
+        var svc = NewService(out _);
+        var schema = NewSchema(name: $"calc-{Guid.NewGuid():N}");
+        schema.Values = new List<SchemaValue>
+        {
+            new() { Name = "x", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Kind = SchemaValueKind.Calculated, Expression = "unknown + 1" },
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(schema));
+        Assert.Contains("unknown identifier", ex.Errors[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Create_rejects_calculated_dependency_cycle()
+    {
+        var svc = NewService(out _);
+        var schema = NewSchema(name: $"calc-{Guid.NewGuid():N}");
+        schema.Values = new List<SchemaValue>
+        {
+            new() { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Kind = SchemaValueKind.Calculated, Expression = "b + 1" },
+            new() { Name = "b", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Kind = SchemaValueKind.Calculated, Expression = "a + 1" },
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(schema));
+        Assert.Contains("dependency cycle", ex.Errors[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Create_rejects_calculated_self_reference()
+    {
+        var svc = NewService(out _);
+        var schema = NewSchema(name: $"calc-{Guid.NewGuid():N}");
+        schema.Values = new List<SchemaValue>
+        {
+            new() { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Kind = SchemaValueKind.Calculated, Expression = "a + 1" },
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(schema));
+        Assert.Contains("references itself", ex.Errors[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Create_rejects_calculated_history_function()
+    {
+        var svc = NewService(out _);
+        var schema = NewSchema(name: $"calc-{Guid.NewGuid():N}");
+        schema.Values = new List<SchemaValue>
+        {
+            new() { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly },
+            new() { Name = "x", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Kind = SchemaValueKind.Calculated, Expression = "latest(a)" },
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(schema));
+        Assert.Contains("latest()", ex.Errors[0], StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sibling-only", ex.Errors[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Create_rejects_untranslatable_calculated_expression()
+    {
+        var repo = new FakeSchemaRepo();
+        var svc = new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService(),
+            new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock(),
+            new FailTranslateTranslator());
+        var schema = NewSchema(name: $"calc-{Guid.NewGuid():N}");
+        schema.Values = new List<SchemaValue>
+        {
+            new() { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly },
+            new() { Name = "x", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Kind = SchemaValueKind.Calculated, Expression = "a + 1" },
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(schema));
+        Assert.Contains("cannot be analysed", ex.Errors[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Simulates an expression that parses but cannot be translated to JavaScript.</summary>
+    private sealed class FailTranslateTranslator : IExpressionTranslator
+    {
+        private readonly NCalcToJavaScriptTranslator _inner = new();
+
+        public JsExpressionTranslation TranslateToJavaScript(string expression) =>
+            throw new NotSupportedException("simulated translation failure");
+
+        public ExpressionSyntaxResult ValidateSyntax(string expression) => _inner.ValidateSyntax(expression);
     }
 
     // ── In-memory repositories (just enough surface) ────────────────────────────────────────

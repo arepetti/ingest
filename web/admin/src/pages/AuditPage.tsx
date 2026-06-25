@@ -47,7 +47,7 @@ const useStyles = makeStyles({
   filters: { display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap' },
   field: { display: 'flex', flexDirection: 'column', gap: '4px' },
   fieldLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
-  filterDropdown: { minWidth: '160px' },
+  filterDropdown: { minWidth: '200px' },
   table: { tableLayout: 'fixed', width: '100%' },
   row: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
   truncate: { display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
@@ -284,7 +284,6 @@ function ChangesTab({
           <span className={s.fieldLabel}>Change type</span>
           <Dropdown
             className={s.filterDropdown}
-            size="small"
             selectedOptions={[change ?? ALL]}
             value={change ?? 'All'}
             onOptionSelect={(_, d) => {
@@ -300,7 +299,6 @@ function ChangesTab({
           <span className={s.fieldLabel}>Target type</span>
           <Dropdown
             className={s.filterDropdown}
-            size="small"
             selectedOptions={[targetType ?? ALL]}
             value={targetType ? targetTypeLabel(targetType) : 'All'}
             onOptionSelect={(_, d) => {
@@ -396,7 +394,6 @@ function SentEmailsTab({
           <span className={s.fieldLabel}>Status</span>
           <Dropdown
             className={s.filterDropdown}
-            size="small"
             selectedOptions={[status ?? ALL]}
             value={status ?? 'All'}
             onOptionSelect={(_, d) => {
@@ -503,7 +500,6 @@ function WebhookDeliveriesTab({
           <span className={s.fieldLabel}>Status</span>
           <Dropdown
             className={s.filterDropdown}
-            size="small"
             selectedOptions={[status ?? ALL]}
             value={status ?? 'All'}
             onOptionSelect={(_, d) => {

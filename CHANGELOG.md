@@ -2,13 +2,27 @@
 
 Notable changes per release. Versions are newest-first. No breaking changes have been released so far.
 
+## 0.5.0
+
+### Added
+
+- Calculated schema values: a value can be declared with `kind: Calculated` and an `expression` that derives its result from sibling values in the same submission.
+- `average(...)` built-in in expressions.
+- Expression editor in the schema editor: CodeMirror-based syntax highlighting, autocomplete, and error squiggles (loaded on demand).
+- Admins can delete (not just revoke) an API Key.
+
+### Documentation
+
+- Admin guide: calculated values section.
+- Client API reference: `kind` / `expression` on schema values.
+
 ## 0.4.0
 
 ### Added
 
-- API keys can carry an optional **description** — a free-form note (who/why the key exists) set when generating a key and editable afterwards. Handy for temporary or holiday-cover credentials, especially paired with an expiry.
-- Per-operator service scope: a back-office account (Operator/Approver) can be confined to a chosen subset of services via an assigned-services allowlist on the account editor. A scoped account only sees those services' data across every cross-service surface (submissions, the approval queue, status/missing reports, Explore, the OData/Power BI feed and the ad-hoc query) and is refused writes for any other service. An empty allowlist keeps the account unrestricted, so existing accounts are unchanged. `/api/me` now reports `assignedServiceIds`, and the SPA shows a "Limited view" badge when a session is scoped.
-- Submission validate endpoints (`POST /api/submissions/validate` and `.../{id}/validate`): run the full submission pipeline — validation, cadence, approval preview — without saving anything, so API clients can dry-run a payload (e.g. in CI). Supports `?omit=cadence` to skip the one-per-period check. The schema preview gains a "Validate on server" action that uses it (pick a service and timestamp) for an authoritative check.
+- API keys can carry an optional description.
+- Per-operator service scope: a back-office account (Operator/Approver) can be confined to a chosen subset of services.
+- Submission validate endpoints (`POST /api/submissions/validate` and `.../{id}/validate`): run the full submission pipeline — validation, cadence, approval preview — without saving anything, so API clients can dry-run a payload (e.g. in CI).
 - Validation rules can now compare a submission against the service's own history: `latest("value")` returns the most recent live value and `previous("value")` returns the value from the immediately preceding cadence period.
 - Microsoft Teams integration: a bot prompts a user or channel for outstanding required values.
 - Approval rules (in Settings): require approval per service and per schema, on top of each schema's own policy.

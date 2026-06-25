@@ -4,6 +4,7 @@ using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.Infrastructure.Approvals;
 using Ingest.Infrastructure.Services;
+using Ingest.Infrastructure.Validation;
 using Ingest.Infrastructure.Webhooks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -37,7 +38,7 @@ public class SubmissionDraftTests
             accounts.Store.Add(new Account { Id = ServiceId, Name = "roads", Label = "Roads", Email = "roads@example.com" });
 
             Service = new SubmissionService(
-                Submissions, Samples, Schemas, new AlwaysValid(), accounts,
+                Submissions, Samples, Schemas, new AlwaysValid(), new NCalcExpressionEvaluator(), accounts,
                 TimeProvider.System, new NoopAuditLogService(), Webhooks,
                 Options.Create(new WebhookOptions { Enabled = webhooksEnabled }),
                 new FakeApprovalSettings(), new FakeApprovalRules(),

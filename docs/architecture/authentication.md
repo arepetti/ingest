@@ -332,6 +332,8 @@ Two keys can be active for the same account at the same time, so you can roll ou
 
 `POST /api/admin/accounts/{id}/keys/{keyId}/revoke` is idempotent: revoking an already-revoked key returns 200 with the same row. There is no "unrevoke" — issue a new one instead.
 
+`DELETE /api/admin/accounts/{id}/keys/{keyId}` permanently removes a single key (returns `204`, or `404` if it isn't found on that account). It works on an active or an already-revoked key, and deleting an active one invalidates it immediately just like a revoke. Both revoke and delete require the `apikeys:manage` capability. Prefer **revoke** when you want to keep the row for the audit trail; **delete** is for housekeeping (e.g. clearing out long-retired keys).
+
 `DELETE /api/admin/accounts/{id}` soft-deletes the account, which causes every subsequent request to fail authentication because the loaded account is marked deleted. The keys remain in the database for audit; they just no longer authenticate anyone.
 
 ## Configuration knobs

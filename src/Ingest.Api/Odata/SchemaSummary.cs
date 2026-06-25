@@ -99,6 +99,12 @@ public sealed class SchemaValueSummary
     /// <summary>Upper edge of the acceptable (amber) RAG range, or <c>null</c>.</summary>
     public double? AmberMax { get; set; }
 
+    /// <summary>User-defined (submitted) or calculated (derived from sibling values).</summary>
+    public SchemaValueKind Kind { get; set; } = SchemaValueKind.UserDefined;
+
+    /// <summary>NCalc formula for calculated values; <c>null</c> for user-defined values.</summary>
+    public string? Expression { get; set; }
+
     /// <summary>Project a domain <see cref="SchemaValue"/> onto the simplified summary shape.</summary>
     /// <param name="v">The value to summarise.</param>
     /// <returns>The summary.</returns>
@@ -118,5 +124,7 @@ public sealed class SchemaValueSummary
         GreenMin = v.GreenMin,
         GreenMax = v.GreenMax,
         AmberMax = v.AmberMax,
+        Kind = v.Kind,
+        Expression = v.Expression,
     };
 }

@@ -59,6 +59,13 @@ public sealed class ApiKeyRepository : RepositoryBase<ApiKey>, IApiKeyRepository
     }
 
     /// <inheritdoc />
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var result = await Collection.DeleteOneAsync(k => k.Id == id, ct);
+        return result.DeletedCount > 0;
+    }
+
+    /// <inheritdoc />
     public Task<long> HardDeleteByAccountAsync(Guid accountId, CancellationToken ct = default) =>
         HardDeleteManyCoreAsync(Builders<ApiKey>.Filter.Eq(k => k.AccountId, accountId), ct);
 }

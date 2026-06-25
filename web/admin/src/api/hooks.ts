@@ -222,6 +222,16 @@ export const useRevokeApiKey = () => {
   })
 }
 
+/** Permanently delete a key (active or already revoked), removing it from the listing. */
+export const useDeleteApiKey = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ accountId, keyId }: { accountId: string; keyId: string }) =>
+      api.delete<void>(`/api/admin/accounts/${accountId}/keys/${keyId}`),
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['keys', v.accountId] }),
+  })
+}
+
 export const useSchemas = (
   params?: { includeDeleted?: boolean; page?: number; pageSize?: number },
   enabled: boolean = true,

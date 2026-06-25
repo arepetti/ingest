@@ -158,4 +158,10 @@ public sealed class SampleProjection : AuditedEntity
 
     /// <summary>Exclusive end of the cadence bucket.</summary>
     public DateTime PeriodEnd { get; set; }
+
+    /// <summary>
+    /// True when this row was computed from a calculated schema value rather than submitted.
+    /// Legacy projection documents deserialize to <c>false</c>.
+    /// </summary>
+    public bool IsDerived { get; set; }
 }

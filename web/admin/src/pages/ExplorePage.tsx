@@ -231,7 +231,6 @@ export function ExplorePage() {
             <span className={s.fieldLabel}>Schema</span>
             <Dropdown
               className={s.dropdown}
-              size="small"
               selectedOptions={schemaName ? [schemaName] : []}
               value={schema ? label(schema) : ''}
               placeholder="Select a schema"
@@ -247,7 +246,6 @@ export function ExplorePage() {
             <span className={s.fieldLabel}>Value</span>
             <Dropdown
               className={s.dropdown}
-              size="small"
               selectedOptions={activeValueName ? [activeValueName] : []}
               value={numericValues.find(v => v.name === activeValueName)?.label || activeValueName}
               placeholder="Select a value"
@@ -263,7 +261,6 @@ export function ExplorePage() {
           <span className={s.fieldLabel}>Services</span>
           <Dropdown
             className={s.dropdown}
-            size="small"
             multiselect
             selectedOptions={selectedServiceIds}
             value={selectedServiceIds.length === 0 ? 'All services' : `${selectedServiceIds.length} selected`}
@@ -287,7 +284,6 @@ export function ExplorePage() {
             </span>
             <Dropdown
               className={s.dropdown}
-              size="small"
               selectedOptions={[scMode]}
               value={scMode === 'period' ? 'Last period' : 'Latest available'}
               onOptionSelect={(_, d) => update({ scmode: d.optionValue === 'period' ? 'period' : null })}
@@ -303,7 +299,6 @@ export function ExplorePage() {
             <span className={s.fieldLabel}>Period</span>
             <Dropdown
               className={s.dropdown}
-              size="small"
               selectedOptions={[scPeriod]}
               value={scPeriod === 'closed' ? 'Latest closed' : 'Current'}
               onOptionSelect={(_, d) => update({ scperiod: d.optionValue === 'closed' ? 'closed' : null })}
@@ -327,7 +322,6 @@ export function ExplorePage() {
             </span>
             <Dropdown
               className={s.dropdown}
-              size="small"
               selectedOptions={[agg]}
               value={AGG_LABELS[agg]}
               onOptionSelect={(_, d) => update({ agg: (d.optionValue as ExploreAggregation) ?? null })}
@@ -356,7 +350,6 @@ export function ExplorePage() {
               </span>
               <Dropdown
                 className={s.dropdown}
-                size="small"
                 disabled={!canCompare}
                 selectedOptions={[comparing ? shift : 'off']}
                 value={comparing ? SHIFT_LABELS[shift as ShiftKey] : 'No'}

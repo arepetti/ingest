@@ -274,6 +274,22 @@ function callBuiltin(name: string, args: unknown[]): unknown {
     case 'hour':   { const d = toDate(args[0]); return d ? d.getUTCHours() : null }
     case 'minute': { const d = toDate(args[0]); return d ? d.getUTCMinutes() : null }
     case 'second': { const d = toDate(args[0]); return d ? d.getUTCSeconds() : null }
+    case 'average': {
+      let sum = 0
+      let count = 0
+      for (const a of args) {
+        if (a === null || a === undefined) continue
+        if (typeof a === 'boolean') { sum += a ? 1 : 0; count++; continue }
+        if (typeof a === 'number') {
+          if (!Number.isFinite(a)) throw new Error(`average() expects numeric or boolean arguments, got number.`)
+          sum += a
+          count++
+          continue
+        }
+        throw new Error(`average() expects numeric or boolean arguments, got ${typeof a}.`)
+      }
+      return count === 0 ? null : sum / count
+    }
     case 'latest':
     case 'previous': {
       // Historical values aren't available in the browser preview — the server resolves them
@@ -432,4 +448,9 @@ export function _clearExpressionCache(): void {
   pending.clear()
   syntaxCache.clear()
   syntaxPending.clear()
+}
+
+/** Test-only: invoke a built-in function through the same runtime path translated rules use. */
+export function _callBuiltin(name: string, args: unknown[]): unknown {
+  return callBuiltin(name, args)
 }

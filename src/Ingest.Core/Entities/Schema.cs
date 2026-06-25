@@ -2,6 +2,16 @@ using Ingest.Core.Common;
 
 namespace Ingest.Core.Entities;
 
+/// <summary>Whether a <see cref="SchemaValue"/> is submitted by callers or computed from sibling values.</summary>
+public enum SchemaValueKind
+{
+    /// <summary>Submitted by the service or admin on create/replace.</summary>
+    UserDefined = 0,
+
+    /// <summary>Computed from sibling values via <see cref="SchemaValue.Expression"/>; never submitted.</summary>
+    Calculated = 1,
+}
+
 /// <summary>Wire-level type of a <see cref="SchemaValue"/>. Drives shape validation and projection columns.</summary>
 public enum SchemaValueType
 {
@@ -152,8 +162,20 @@ public sealed class SchemaValue
     /// </summary>
     public string? Caption { get; set; }
 
+    /// <summary>User-defined (submitted) or calculated (derived from sibling values).</summary>
+    public SchemaValueKind Kind { get; set; } = SchemaValueKind.UserDefined;
+
+    /// <summary>
+    /// NCalc formula evaluated against sibling values when <see cref="Kind"/> is
+    /// <see cref="SchemaValueKind.Calculated"/>. Ignored for user-defined values.
+    /// </summary>
+    public string? Expression { get; set; }
+
     /// <summary>Expected wire-type of submitted samples.</summary>
     public SchemaValueType Type { get; set; }
+
+    /// <summary>True when this value is computed rather than submitted.</summary>
+    public bool IsCalculated => Kind == SchemaValueKind.Calculated;
 
     /// <summary>Unit of measure (e.g. <c>t</c>, <c>hours</c>, <c>%</c>). Displayed in the UI and PowerBI; not validated.</summary>
     public string? Unit { get; set; }

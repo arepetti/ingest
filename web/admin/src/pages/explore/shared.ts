@@ -49,7 +49,7 @@ export const useExploreStyles = makeStyles({
   field: { display: 'flex', flexDirection: 'column', gap: '4px' },
   fieldLabel: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, display: 'flex', alignItems: 'center', gap: '4px' },
   infoIcon: { color: tokens.colorNeutralForeground3, cursor: 'help' },
-  dropdown: { minWidth: '180px' },
+  dropdown: { minWidth: '200px' },
   statRow: { display: 'flex', gap: '12px', flexWrap: 'wrap' },
   stat: { padding: '12px 16px', minWidth: '120px' },
   statLabel: { color: tokens.colorNeutralForeground3, fontSize: '12px' },

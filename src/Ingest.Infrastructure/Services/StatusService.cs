@@ -61,6 +61,8 @@ public sealed class StatusService : IStatusService
 
             foreach (var v in schema.Values)
             {
+                if (v.IsCalculated) continue;
+
                 var (valueStart, valueEnd) = CadenceCalculator.BucketFor(v.Cadence, _audit.UtcNow);
                 SampleProjection? latest = null;
                 bool satisfied = false;
@@ -138,7 +140,7 @@ public sealed class StatusService : IStatusService
                     var prevTally = new Dictionary<Cadence, (int Missing, int Total)>();
                     foreach (var v in schema.Values)
                     {
-                        if (!v.Enabled || !v.Required) continue;
+                        if (!v.Enabled || !v.Required || v.IsCalculated) continue;
 
                         var cadence = v.Cadence;
                         var (cs, ce) = currentWindow[cadence];
@@ -314,7 +316,7 @@ public sealed class StatusService : IStatusService
             int missing = 0, total = 0;
             foreach (var v in schema.Values)
             {
-                if (!v.Enabled || !v.Required || v.Cadence != cadence) continue;
+                if (!v.Enabled || !v.Required || v.IsCalculated || v.Cadence != cadence) continue;
                 total++;
                 var satisfied = await _samples.ExistsInWindowAsync(account.Id, schema.Name, v.Name, start, end, ct);
                 if (!satisfied) missing++;

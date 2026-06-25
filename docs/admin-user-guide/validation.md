@@ -422,6 +422,24 @@ if(
 
 (That example also shows how to use `+` to splice numbers into a message — they're coerced to strings when concatenated with a string.)
 
+## Calculated values
+
+A schema value can be declared as **calculated** (`kind: Calculated`) instead of user-defined. A calculated value carries an NCalc **expression** (same dialect as validation rules) and is **never submitted** — the server computes it when building the read model, and the admin SPA recomputes it live for display.
+
+Calculated values still have a `type`, `unit`, `cadence`, and optional RAG band, so they appear in OData, scorecard, explore, history, and status like any other value (projection rows carry `isDerived: true`).
+
+**Important limitation:** an expression can reference **only sibling values within the same submission**. There is no cross-submission history (`latest()` / `previous()` are for validation rules comparing against past live data, not for defining calculated values), and no cross-schema references. Chaining is supported: one calculated value may reference another calculated value declared in the same schema.
+
+Derived rows are materialised when a submission is saved or approved — editing a calculated expression does **not** recompute historical derived values already stored in the read model.
+
+Calculated values cannot be marked `required` (they are never submitted). If a calculated value's expression evaluates to null (missing inputs, evaluation error), no derived row is emitted for that submission.
+
+Example: a schema with user-defined `a` and `b`, plus calculated `average_ab`:
+
+```json
+{ "name": "average_ab", "kind": "Calculated", "type": "Number", "cadence": "Monthly", "expression": "average(a, b)" }
+```
+
 ## Built-in functions
 
 Available in **both** sample-level and schema-level rules unless noted otherwise.
@@ -451,6 +469,7 @@ All of these accept a value of `Date` type, or a string that looks like a date.
 | `isNull(x)`                | `true` if `x` is missing/empty | Use this before comparing values that may be absent. |
 | `coalesce(a, b, …)`        | the first non-empty argument | Returns `null` if all are empty. |
 | `len(x)`                   | string length (or collection size) | Errors out for non-string non-collection inputs. |
+| `average(a, b, …)`         | arithmetic mean of numeric args | Booleans coerce to 1/0; nulls ignored; no numeric/bool args → `null`. |
 
 ### Context (who/what is being validated)
 

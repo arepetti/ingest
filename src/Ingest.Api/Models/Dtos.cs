@@ -214,6 +214,8 @@ public sealed record GeneratedApiKeyResponse(ApiKeyDto Key, string Plaintext);
 /// <param name="VisibleIf">Optional rule; equivalent to <paramref name="EnabledIf"/> server-side (the UI hides the input).</param>
 /// <param name="Warning">Optional rule; when truthy / non-empty produces a non-blocking warning on the response.</param>
 /// <param name="SinceVersion">Optional schema version in which this value was first introduced. <c>null</c> is treated as <c>1</c>. Server enforces <c>0 &lt;= SinceVersion &lt;= Schema.Version</c>.</param>
+/// <param name="Kind">User-defined (submitted) or calculated (derived from sibling values).</param>
+/// <param name="Expression">NCalc formula for calculated values; ignored when <paramref name="Kind"/> is user-defined.</param>
 public sealed record SchemaValueDto(
     string Name,
     string? Label,
@@ -241,14 +243,16 @@ public sealed record SchemaValueDto(
     string? EnabledIf = null,
     string? VisibleIf = null,
     string? Warning = null,
-    int? SinceVersion = null)
+    int? SinceVersion = null,
+    SchemaValueKind Kind = SchemaValueKind.UserDefined,
+    string? Expression = null)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static SchemaValueDto From(SchemaValue v) => new(
         v.Name, v.Label, v.Description, v.Notes, v.Caption, v.Type, v.Unit, v.Cadence,
         v.Required, v.Modifiable, v.Enabled,
         v.Min, v.Max, v.GreenMin, v.GreenMax, v.AmberMin, v.AmberMax, v.MinDate, v.MaxDate, v.MinLength, v.MaxLength, v.RegexPattern, v.ValueValidation,
-        v.EnabledIf, v.VisibleIf, v.Warning, v.SinceVersion);
+        v.EnabledIf, v.VisibleIf, v.Warning, v.SinceVersion, v.Kind, v.Expression);
 
     /// <summary>Convert the wire DTO back into a domain entity (used by upsert endpoints).</summary>
     public SchemaValue ToEntity() => new()
@@ -280,6 +284,8 @@ public sealed record SchemaValueDto(
         VisibleIf = VisibleIf,
         Warning = Warning,
         SinceVersion = SinceVersion,
+        Kind = Kind,
+        Expression = Expression,
     };
 }
 
@@ -966,6 +972,7 @@ public sealed record QueryRequest(
 /// <param name="Cadence">Cadence snapshot from the schema definition.</param>
 /// <param name="PeriodStart">Cadence bucket start (inclusive).</param>
 /// <param name="PeriodEnd">Cadence bucket end (exclusive).</param>
+/// <param name="IsDerived">True when the row was computed from a calculated schema value.</param>
 public sealed record SampleProjectionDto(
     Guid Id,
     Guid SubmissionId,
@@ -984,13 +991,14 @@ public sealed record SampleProjectionDto(
     string? Note,
     Cadence Cadence,
     DateTime PeriodStart,
-    DateTime PeriodEnd)
+    DateTime PeriodEnd,
+    bool IsDerived = false)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static SampleProjectionDto From(SampleProjection s) => new(
         s.Id, s.SubmissionId, s.ServiceAccountId, s.ServiceName, s.SchemaName, s.ValueName, s.ValueType,
         s.StringValue, s.NumberValue, s.IntegerValue, s.DateValue, s.BooleanValue,
-        s.Timestamp, s.SubmittedAt, s.Note, s.Cadence, s.PeriodStart, s.PeriodEnd);
+        s.Timestamp, s.SubmittedAt, s.Note, s.Cadence, s.PeriodStart, s.PeriodEnd, s.IsDerived);
 }
 
 /// <summary>Per-value status snapshot.</summary>

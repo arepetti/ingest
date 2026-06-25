@@ -13,7 +13,7 @@ import {
 import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, ArrowUpload20Regular, Checkmark20Regular, Delete20Regular, Dismiss20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, PersonAdd20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { useNavigate } from 'react-router-dom'
-import { accountsBackupExportUrl, fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCapabilities, useCreateAccount, useDeleteAccount, useEraseAccount, useImportAccountsBackup, useRevokeApiKey, useRotateApiKey, useUpdateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
+import { accountsBackupExportUrl, fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCapabilities, useCreateAccount, useDeleteAccount, useDeleteApiKey, useEraseAccount, useImportAccountsBackup, useRevokeApiKey, useRotateApiKey, useUpdateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
 import type { Account, AccountKind, AccountRole, ApiKey, AuthProvider, CreateAccountRequest, ErasureMode, ErasureResult, ExternalLogin, UpdateAccountRequest } from '../api/types'
 import { CAPABILITY_GROUPS, defaultCapabilitiesForRole, type Capability } from '../api/capabilities'
 import { downloadFromUrl, pickTextFile } from '../utils/download'
@@ -52,6 +52,7 @@ const useStyles = makeStyles({
   keyDescInner: { display: 'flex', gap: '4px', alignItems: 'center', minWidth: 0 },
   keyDescText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   keyDescInput: { flexGrow: 1, minWidth: 0 },
+  keyActions: { display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'flex-end' },
   row: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
   // max-width:0 is the classic "don't request width, take whatever's left and clip" trick for HTML
   // table cells — combined with the inner truncate class below, long labels/descriptions ellipsize
@@ -1058,6 +1059,7 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
   const rotate = useRotateApiKey()
   const revoke = useRevokeApiKey()
   const update = useUpdateApiKey()
+  const del = useDeleteApiKey()
   const [expiry, setExpiry] = useState('')
   const [description, setDescription] = useState('')
   // Which key's description is being edited inline, and its working text.
@@ -1087,6 +1089,18 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
     await update.mutateAsync({ accountId: k.accountId, keyId: k.id, description: editText.trim() || null })
     setEditingId(null)
     setEditText('')
+  }
+
+  function deleteKey(k: ApiKey) {
+    const ok = window.confirm(
+      `Permanently delete API key ${k.keyId}?\n\n` +
+      (k.revokedAt
+        ? 'This removes the revoked key from the list for good.'
+        : 'The key is still active — deleting it stops it working immediately, just like revoking, but also removes it from the list.') +
+      '\n\nThis cannot be undone.',
+    )
+    if (!ok) return
+    del.mutate({ accountId: k.accountId, keyId: k.id })
   }
 
   function keyStatus(k: { revokedAt?: string | null; expiresAt?: string | null }) {
@@ -1163,9 +1177,20 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                       <TableCell style={{ whiteSpace: 'nowrap' }}>{k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : 'Never'}</TableCell>
                       <TableCell>{keyStatus(k)}</TableCell>
                       <TableCell>
-                        {!k.revokedAt && (
-                          <Button size="small" onClick={() => revoke.mutate({ accountId: k.accountId, keyId: k.id })}>Revoke</Button>
-                        )}
+                        <div className={s.keyActions}>
+                          {!k.revokedAt && (
+                            <Button size="small" onClick={() => revoke.mutate({ accountId: k.accountId, keyId: k.id })}>Revoke</Button>
+                          )}
+                          <Tooltip content="Delete key" relationship="label">
+                            <Button
+                              size="small"
+                              appearance="subtle"
+                              icon={<Delete20Regular />}
+                              onClick={() => deleteKey(k)}
+                              aria-label={`Delete key ${k.keyId}`}
+                            />
+                          </Tooltip>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

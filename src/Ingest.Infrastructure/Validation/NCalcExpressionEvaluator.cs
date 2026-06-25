@@ -44,6 +44,19 @@ public sealed class NCalcExpressionEvaluator : IExpressionEvaluator
                 System.Collections.ICollection c => c.Count,
                 _ => throw new InvalidOperationException($"len() expects a string or collection, got {args[0]?.GetType().Name}."),
             },
+            ["average"] = args =>
+            {
+                double sum = 0;
+                var count = 0;
+                foreach (var a in args)
+                {
+                    if (a is null) continue;
+                    var n = ToAverageOperand(a);
+                    sum += n;
+                    count++;
+                }
+                return count == 0 ? null : sum / count;
+            },
         };
 
     /// <inheritdoc />
@@ -104,6 +117,18 @@ public sealed class NCalcExpressionEvaluator : IExpressionEvaluator
             values[i] = args.Parameters[i].Evaluate();
         return values;
     }
+
+    private static double ToAverageOperand(object a) => a switch
+    {
+        bool b => b ? 1.0 : 0.0,
+        double d when !double.IsNaN(d) => d,
+        float f when !float.IsNaN(f) => f,
+        int i => i,
+        long l => l,
+        decimal m => (double)m,
+        string s when double.TryParse(s, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out var p) => p,
+        _ => throw new InvalidOperationException($"average() expects numeric or boolean arguments, got {a.GetType().Name}."),
+    };
 
     private static DateTime RequireDate(object?[] args, int index, string fn)
     {

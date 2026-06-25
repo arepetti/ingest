@@ -22,6 +22,7 @@ public sealed class SubmissionService : ISubmissionService
     private readonly ISampleRepository _samples;
     private readonly ISchemaRepository _schemas;
     private readonly ISubmissionValidator _validator;
+    private readonly IExpressionEvaluator _evaluator;
     private readonly IAccountRepository _accounts;
     private readonly TimeProvider _time;
     private readonly IAuditLogService _audit;
@@ -39,6 +40,7 @@ public sealed class SubmissionService : ISubmissionService
     /// <param name="samples">Sample projection repository (rebuilt per submission save).</param>
     /// <param name="schemas">Schema repository for visibility checks.</param>
     /// <param name="validator">Validator that runs the full rule pipeline.</param>
+    /// <param name="evaluator">Expression evaluator used when rebuilding calculated projection rows.</param>
     /// <param name="accounts">Account repository for owner/service lookups.</param>
     /// <param name="time">Clock used to evaluate cadence windows on replacement.</param>
     /// <param name="audit">Audit log used to record create/edit/delete changes.</param>
@@ -55,6 +57,7 @@ public sealed class SubmissionService : ISubmissionService
         ISampleRepository samples,
         ISchemaRepository schemas,
         ISubmissionValidator validator,
+        IExpressionEvaluator evaluator,
         IAccountRepository accounts,
         TimeProvider time,
         IAuditLogService audit,
@@ -71,6 +74,7 @@ public sealed class SubmissionService : ISubmissionService
         _samples = samples;
         _schemas = schemas;
         _validator = validator;
+        _evaluator = evaluator;
         _accounts = accounts;
         _time = time;
         _audit = audit;
@@ -405,7 +409,7 @@ public sealed class SubmissionService : ISubmissionService
         // empty-list replace.
         var live = IsLive(submission);
         var projections = live
-            ? SampleProjectionBuilder.Build(submission, visible)
+            ? SampleProjectionBuilder.Build(submission, visible, _evaluator)
             : Enumerable.Empty<SampleProjection>();
         await _samples.ReplaceForSubmissionAsync(submission.Id, projections, ct);
 
@@ -540,7 +544,7 @@ public sealed class SubmissionService : ISubmissionService
             submission.ApprovalStatus = ApprovalStatus.Approved;
             var visible = await LoadVisibleAsync(submission.ServiceAccountId, ct);
             await _submissions.UpdateAsync(submission, ct);
-            var projections = SampleProjectionBuilder.Build(submission, visible);
+            var projections = SampleProjectionBuilder.Build(submission, visible, _evaluator);
             await _samples.ReplaceForSubmissionAsync(submission.Id, projections, ct);
             await _audit.RecordAsync(AuditTargetType.Submission, AuditChangeType.Approve, submission.Id, submission.ServiceName, note, ct);
             await PublishAcceptedAsync(submission, isReplacement: submission.ReplacedAt is not null, ct);

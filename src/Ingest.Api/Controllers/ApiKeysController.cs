@@ -93,4 +93,25 @@ public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
         var revoked = await service.RevokeAsync(accountId, keyId, ct);
         return revoked is null ? NotFound() : Ok(ApiKeyDto.From(revoked));
     }
+
+    /// <summary>Permanently delete an API key.</summary>
+    /// <remarks>
+    /// Unlike <see cref="Revoke"/>, this removes the key record entirely. It works whether the key
+    /// is still active or already revoked, so callers can tidy up old credentials. Deleting an
+    /// active key invalidates it immediately, just like a revoke.
+    /// </remarks>
+    /// <param name="accountId">Account that owns the key.</param>
+    /// <param name="keyId">Identifier of the key to delete.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="204">The key was deleted.</response>
+    /// <response code="404">No such key (or it belongs to a different account).</response>
+    [HttpDelete("{keyId:guid}")]
+    [Authorize(Policy = Capabilities.ApiKeysManage)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(Guid accountId, Guid keyId, CancellationToken ct)
+    {
+        var deleted = await service.DeleteAsync(accountId, keyId, ct);
+        return deleted ? NoContent() : NotFound();
+    }
 }
