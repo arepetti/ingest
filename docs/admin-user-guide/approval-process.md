@@ -37,6 +37,13 @@ Then:
 
 > The same account that submitted data may also approve it — approval is just a required extra step, not a separation-of-duties control. The **service owner** approver makes this explicit; if instead you need two distinct sign-offs, name two Required approver accounts.
 
+### Common approver recipes
+
+Two patterns cover most "the service signs off on its own data" needs:
+
+- **Service self-approval (light-touch automation).** Name the **service owner** as the single Required approver. The same account (or API key) that submits then approves — a deliberate extra step that catches an obviously-wrong automated push before it goes live, without involving anyone else. Pair it with a [source-scoped rule](#rules-per-service--schema) set to *API submissions only* to gate just the automated feed.
+- **Service-manager approval (separation of duties).** Create a dedicated **Approver-role account** for the manager, give it a [service scope](accounts.md#service-scope-limiting-an-operator-to-a-subset-of-services) covering only the services they manage, and grant it just `submissions:read` + `submissions:approve`. Name that account as the Required approver. Now the person who enters the data and the person who signs it off are different, the manager only ever sees their own services' queue, and they can't touch anything else in the system.
+
 ## Choosing what needs approval
 
 A policy is **source-aware**: you can require approval for manual (web-console) entries only, API submissions only, or both. This lets you, for example, trust an automated integration but review everything a human types in by hand — or vice-versa.

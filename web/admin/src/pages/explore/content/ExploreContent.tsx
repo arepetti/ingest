@@ -7,9 +7,22 @@ import { cadenceLabel } from '../../../utils/cadence'
 import {
   AGG_LABELS, fmt, rollup, useExploreStyles, valueTitle, type ExploreView, type ServiceRef,
 } from '../shared'
+import { AnomalySettings } from '../AnomalySettings'
 import { TrendView } from './TrendView'
 import { CompareView } from './CompareView'
 import { SnapshotView } from './SnapshotView'
+
+/** The anomaly-detection controls threaded down to the Trend view's header. */
+export interface AnomalyControls {
+  on: boolean
+  window: number
+  threshold: number
+  robust: boolean
+  onToggle: (v: boolean) => void
+  onWindow: (n: number) => void
+  onThreshold: (n: number) => void
+  onRobust: (b: boolean) => void
+}
 
 /**
  * The "traditional" Explore content: the Trend, Compare and Snapshot views plus their shared chrome
@@ -20,7 +33,7 @@ export function ExploreContent({
   view, schemaName, noNumeric, isLoading,
   values, services, agg,
   activeSeries, prevActiveSeries, activeValue, activeValueName,
-  combined, asTable, projecting, comparing, previousLabel, chartRef,
+  combined, asTable, projecting, comparing, previousLabel, chartRef, anomaly,
   onToggleCombined, onToggleProjection, onToggleTable,
 }: {
   view: ExploreView
@@ -40,6 +53,7 @@ export function ExploreContent({
   comparing: boolean
   previousLabel?: string
   chartRef: RefObject<HTMLDivElement | null>
+  anomaly: AnomalyControls
   onToggleCombined: (v: boolean) => void
   onToggleProjection: (v: boolean) => void
   onToggleTable: (v: boolean) => void
@@ -88,6 +102,18 @@ export function ExploreContent({
               <Switch label="Projection" checked={projecting} onChange={(_, d) => onToggleProjection(!!d.checked)} />
             )}
             <Switch label="View as table" checked={asTable} onChange={(_, d) => onToggleTable(!!d.checked)} />
+            {view === 'trend' && (
+              <AnomalySettings
+                enabled={anomaly.on}
+                onToggleEnabled={anomaly.onToggle}
+                window={anomaly.window}
+                threshold={anomaly.threshold}
+                robust={anomaly.robust}
+                onWindow={anomaly.onWindow}
+                onThreshold={anomaly.onThreshold}
+                onRobust={anomaly.onRobust}
+              />
+            )}
           </div>
         </div>
 
@@ -102,6 +128,7 @@ export function ExploreContent({
             previous={prevActiveSeries}
             previousLabel={comparing ? previousLabel : undefined}
             band={activeValue}
+            anomaly={anomaly.on}
             asTable={asTable}
             chartRef={chartRef}
           />

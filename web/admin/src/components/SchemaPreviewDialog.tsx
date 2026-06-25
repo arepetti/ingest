@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Badge, Button, Card, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
   DialogTitle, Divider, Dropdown, Field, Input, MessageBar, MessageBarBody, MessageBarTitle, Option, Spinner, Text,
@@ -8,7 +8,8 @@ import { CheckmarkCircle20Regular, Dismiss24Regular, Warning20Regular } from '@f
 import type { SampleInput, Schema, SchemaValue, SubmissionValidationResponse } from '../api/types'
 import { useAccounts, useValidateSubmissionPreview } from '../api/hooks'
 import { formatApiError } from '../api/client'
-import { SchemaSampleFields, fromLocalInput, toLocalInput } from './SchemaSampleFields'
+import { SchemaSampleFields } from './SchemaSampleFields'
+import { fromLocalInput, toLocalInput } from '../utils/datetimeLocal'
 import {
   interpretRuleResult, isFilled, safeEval, useSampleRules, type ValueRow,
 } from '../utils/sampleRules'
@@ -119,17 +120,20 @@ export function SchemaPreviewDialog({
     return { usableValues: usable, skipped: skip }
   }, [schema])
 
-  // (Re)seed the row model whenever the dialog opens. We intentionally key only on `open` (not on
-  // every schema-object identity change) so typed values survive incidental re-renders; the editor
-  // isn't interactable while this modal is up, so the schema can't meaningfully change underneath.
-  useEffect(() => {
-    if (!open) return
-    setRows(usableValues.map(v => ({ name: v.name, def: v, value: null, note: '' })))
-    setTimestamp(new Date().toISOString())
-    setServerResult(null)
-    setServerError(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  // (Re)seed the row model whenever the dialog opens. Done as a render-time reset keyed on the
+  // open→true transition (rather than an effect) so typed values survive incidental re-renders; the
+  // editor isn't interactable while this modal is up, so the schema can't meaningfully change
+  // underneath. See React's "you might not need an effect" reset-on-prop-change pattern.
+  const [wasOpen, setWasOpen] = useState(false)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) {
+      setRows(usableValues.map(v => ({ name: v.name, def: v, value: null, note: '' })))
+      setTimestamp(new Date().toISOString())
+      setServerResult(null)
+      setServerError(null)
+    }
+  }
 
   // A schema synthesized for the shared form/rule machinery, restricted to the usable values so
   // the layout walker and rule prefetch never trip over blank/duplicate names.

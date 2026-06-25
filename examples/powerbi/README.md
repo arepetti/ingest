@@ -8,10 +8,11 @@ Both artifacts here use the exact connection recipe from [docs/setup/powerbi/](.
 
 | Folder | What it is | Reach for it when… |
 |--------|-----------|--------------------|
+| [template/](template/) | Copy-paste pieces (schema-agnostic source + canonical org-wide measures) you assemble once and **export as a `.pbit`** to distribute. On open it prompts for `BaseUrl` / `ApiKey`. | You want one reusable file to hand round the org, with shared definitions like "% on time". |
 | [ingest-samples/](ingest-samples/) | A full **PBIP** (text-format Power BI project) you open in Power BI Desktop. Three report pages, one per [example schema](../schemas/README.md), with a flattened value column and a calendar table for time-intelligence. | You want a working report to open, point at your deployment, and build on. |
 | [waste-quickstart/](waste-quickstart/) | A **docs-only** mini-example: a README plus copy-paste `.m` and `.dax` snippets for the `garbage_collection` schema only. No project files. | You'd rather paste a couple of queries into a blank report and assemble it yourself in five minutes — or the full PBIP won't open and you want the raw pieces. |
 
-The full example covers all three schemas; the quickstart is intentionally just waste, as the smallest end-to-end illustration.
+The template is schema-agnostic and built to be saved as a `.pbit` and shared; the full example covers all three example schemas; the quickstart is intentionally just waste, as the smallest end-to-end illustration.
 
 ## Required role (both)
 

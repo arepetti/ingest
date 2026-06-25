@@ -257,7 +257,12 @@ export function useSampleRules(schema: Schema | undefined, rows: ValueRow[]) {
     return () => { cancelled = true }
   }, [schema])
 
-  const ruleVariables = useMemo(() => buildRuleVariables(rows), [rows, rulesReady])
+  const ruleVariables = useMemo(() => {
+    // `rulesReady` is read here so the memo invalidates once new translations land in the cache
+    // (calculated-value results read by buildRuleVariables come from that cache).
+    void rulesReady
+    return buildRuleVariables(rows)
+  }, [rows, rulesReady])
 
   const rowStates = useMemo(() => {
     // `rulesReady` is read here so the memo invalidates once new translations land in the

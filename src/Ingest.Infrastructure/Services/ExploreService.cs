@@ -1,4 +1,5 @@
 using Ingest.Core.Abstractions;
+using Ingest.Core.Analytics;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.Core.Validation;
@@ -100,8 +101,154 @@ public sealed class ExploreService : IExploreService
             return new ExploreValueSeries(v.Name, v.Label, v.Type, v.Cadence, v.Unit, buckets);
         }).ToList();
 
+        // Anomaly scoring is opt-in and purely a view aid: it adds a z-score + flag to each point
+        // without changing the reduced values. Done as a post-pass over the already-bucketed series.
+        if (query.Anomaly)
+        {
+            var window = AnomalyDetector.ClampWindow(query.AnomalyWindow);
+            var threshold = AnomalyDetector.ClampThreshold(query.AnomalyThreshold);
+            valueSeries = valueSeries
+                .Select(v => ScoreSeriesAnomalies(v, window, threshold, query.AnomalyRobust))
+                .ToList();
+        }
+
         return new ExploreSeriesResult(
             schema.Name, schema.Label, query.Aggregation, query.From, query.To, serviceRefs, valueSeries);
+    }
+
+    /// <summary>
+    /// Walk a value's chronological buckets and score each one against the values that precede it —
+    /// the overall (combined) line and every per-service line independently. A gap (a period a
+    /// service didn't report) is simply absent from that line's history, never treated as a zero.
+    /// Returns a new series with the anomaly fields populated; the reduced values are untouched.
+    /// </summary>
+    private static ExploreValueSeries ScoreSeriesAnomalies(
+        ExploreValueSeries series, int window, double threshold, bool robust)
+    {
+        var overallHistory = new List<double>();
+        var serviceHistory = new Dictionary<Guid, List<double>>();
+        var newBuckets = new List<ExploreBucket>(series.Buckets.Count);
+
+        foreach (var b in series.Buckets)
+        {
+            var (oz, oAnom) = AnomalyDetector.Score(Tail(overallHistory, window), b.Value, threshold, robust);
+
+            var newServices = new List<ExploreServicePoint>(b.Services.Count);
+            foreach (var sp in b.Services)
+            {
+                if (!serviceHistory.TryGetValue(sp.ServiceId, out var hist))
+                    serviceHistory[sp.ServiceId] = hist = new List<double>();
+                var (sz, sAnom) = AnomalyDetector.Score(Tail(hist, window), sp.Value, threshold, robust);
+                newServices.Add(sp with { Z = sz, IsAnomaly = sAnom });
+                hist.Add(sp.Value);
+            }
+
+            newBuckets.Add(b with { Z = oz, IsAnomaly = oAnom, Services = newServices });
+            overallHistory.Add(b.Value);
+        }
+
+        return series with { Buckets = newBuckets };
+    }
+
+    /// <summary>The last <paramref name="window"/> items of <paramref name="history"/> (or all of them when shorter).</summary>
+    private static IReadOnlyList<double> Tail(List<double> history, int window) =>
+        history.Count <= window ? history : history.GetRange(history.Count - window, window);
+
+    /// <inheritdoc />
+    public async Task<ExploreAnomalyResult> GetAnomaliesAsync(ExploreAnomalyQuery query, CancellationToken ct = default)
+    {
+        var window = AnomalyDetector.ClampWindow(query.Window);
+        var threshold = AnomalyDetector.ClampThreshold(query.Threshold);
+
+        // Resolve the schemas to scan: the requested names, or every schema when none were given.
+        var allSchemas = new List<Schema>();
+        for (var pageNo = 1; ; pageNo++)
+        {
+            var page = await _schemas.ListAsync(new PageRequest(pageNo, SchemaPageSize), ct);
+            allSchemas.AddRange(page.Items);
+            if (page.Items.Count < SchemaPageSize || allSchemas.Count >= page.Total) break;
+        }
+        if (query.SchemaNames is { Count: > 0 })
+        {
+            var wanted = new HashSet<string>(query.SchemaNames, StringComparer.OrdinalIgnoreCase);
+            allSchemas = allSchemas.Where(s => wanted.Contains(s.Name)).ToList();
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        // The board shows every service a schema applies to (so non-reporters surface as "missing"),
+        // using the same audience rule as the missing-submissions dashboard and the scorecard.
+        var expectedBySchema = await BuildExpectedServicesAsync(query.ServiceIds, ct);
+        var serviceNameById = new Dictionary<Guid, string>();
+        var schemasOut = new List<ExploreAnomalySchema>();
+
+        foreach (var schema in allSchemas)
+        {
+            if (!schema.Enabled) continue;
+
+            var numeric = schema.Values
+                .Where(v => v.Enabled && v.Type is SchemaValueType.Number or SchemaValueType.Integer)
+                .ToList();
+            if (numeric.Count == 0) continue;
+
+            var expected = expectedBySchema.GetValueOrDefault(schema.Name) ?? new List<Account>();
+            if (expected.Count == 0) continue;
+            var expectedIds = expected.Select(a => a.Id).ToList();
+
+            var rows = await _samples.GetForExploreAsync(
+                schema.Name, numeric.Select(v => v.Name).ToList(), query.ServiceIds, from: null, to: null, ct);
+            var rowsByValue = rows
+                .Where(r => Numeric(r).HasValue)
+                .ToLookup(r => r.ValueName, StringComparer.OrdinalIgnoreCase);
+
+            var valuesOut = new List<ExploreAnomalyValue>();
+            foreach (var v in numeric)
+            {
+                var (start, end) = query.Period == ScorecardPeriod.LatestClosed
+                    ? CadenceCalculator.PreviousBucketFor(v.Cadence, nowUtc)
+                    : CadenceCalculator.BucketFor(v.Cadence, nowUtc);
+
+                // Collapse to one value per (service, period): newest measurement wins, matching the
+                // scorecard. Then each service has a clean chronological series to score against.
+                var perServicePeriods = rowsByValue[v.Name]
+                    .GroupBy(r => r.ServiceAccountId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.GroupBy(r => r.PeriodStart)
+                              .Select(pg =>
+                              {
+                                  var pick = pg.OrderByDescending(r => r.Timestamp).First();
+                                  return (Period: pg.Key, Value: Numeric(pick)!.Value, pick.SubmissionId);
+                              })
+                              .OrderBy(x => x.Period)
+                              .ToList());
+
+                var cells = expectedIds.Select(sid =>
+                {
+                    if (!perServicePeriods.TryGetValue(sid, out var periods))
+                        return new ExploreAnomalyCell(sid, null, null, null, null, start, end);
+
+                    var targetIdx = periods.FindIndex(p => p.Period == start);
+                    if (targetIdx < 0)
+                        return new ExploreAnomalyCell(sid, null, null, null, null, start, end);
+
+                    var target = periods[targetIdx];
+                    var prior = periods.Where(p => p.Period < start).Select(p => p.Value).ToList();
+                    var (z, isAnom) = AnomalyDetector.Score(Tail(prior, window), target.Value, threshold, query.Robust);
+                    return new ExploreAnomalyCell(
+                        sid, target.SubmissionId, target.Value, z,
+                        isAnom ? AnomalyState.Anomaly : AnomalyState.Normal, start, end);
+                }).OrderBy(c => c.ServiceId).ToList();
+
+                valuesOut.Add(new ExploreAnomalyValue(v.Name, v.Label, v.Unit, v.Cadence, cells));
+            }
+
+            if (valuesOut.Count == 0) continue;
+            foreach (var acc in expected) serviceNameById.TryAdd(acc.Id, acc.Name);
+            schemasOut.Add(new ExploreAnomalySchema(schema.Name, schema.Label, valuesOut));
+        }
+
+        var serviceRefs = await ResolveServiceRefsAsync(serviceNameById, ct);
+        return new ExploreAnomalyResult(serviceRefs, schemasOut);
     }
 
     /// <inheritdoc />

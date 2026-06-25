@@ -16,7 +16,7 @@ Before tallying Ingest's costs, be fair about the baseline. A pile of hand-fille
 | **Backups** | "OneDrive version history", maybe. Often nobody knows. | Managed PITR backups (Cosmos) or your `mongodump` — documented. |
 | **Recovery** | No runbook. When the file corrupts or the author leaves, you reconstruct from memory. | A starting-point DR runbook you adapt ([setup/disaster-recovery.md](setup/disaster-recovery.md)). |
 | **Access control** | Sharing links and good intentions; no audit of who changed what. | Capability-based accounts, API keys, full audit log, soft-delete. |
-| **Data quality** | Whatever the typist entered. Errors found in the leadership meeting. | Server-side validation + cadence enforcement *before* data lands. |
+| **Data quality** | Whatever the typist entered. Errors found in the leadership meeting. | Server-side validation + cadence enforcement *before* data lands, plus **calculated values** so derived KPIs (rates, totals) are defined once on the schema instead of rebuilt in every report. |
 | **Integrations** | A human extracts a report and **re-types it** every period. | A script you write once (see [§ API integrations](#api-integrations-arent-free)). |
 | **Knowledge** | Tribal. The spreadsheet's logic lives in one head. | Written docs, in-repo, version-controlled. |
 

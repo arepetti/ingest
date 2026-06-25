@@ -116,6 +116,7 @@ Everything Ingest does, in one place:
 - **Seven cadences** — daily, weekly, fortnightly (Monday-anchored), monthly, quarterly, semi-annually, and yearly; values in the same schema can differ.
 - **Per-service visibility** — services only ever see the schemas they're entitled to submit against.
 - **Schema versioning** — track changes over time, with a "new value" indicator in the editor.
+- **Calculated values** — declare a value as derived from an NCalc expression over its siblings (e.g. `recycling_rate = recycling / total`); it's never submitted, computed server-side, and streams into OData, the scorecard, Explore and reports like any other value — with its own unit and RAG band. See [docs/admin-user-guide/validation.md § Calculated values](docs/admin-user-guide/validation.md#calculated-values).
 - **Target bands (RAG)** — optional Red/Amber/Green ranges per numeric value, drawn as shaded zones behind the Explore and historical charts. Reporting metadata only — never enforced.
 
 **Validation that runs before data lands**
@@ -137,7 +138,7 @@ Everything Ingest does, in one place:
 **Integration & reporting**
 
 - **Full REST API** — every console action is a documented HTTP endpoint, so a cron job, Azure Function, or integration platform can submit automatically.
-- **OData v4 feeds** — `/odata/samples` (raw data, carrying a `SubmittedAt` reporting-time column alongside the measurement timestamp), `/odata/scorecard` (the cross-schema RAG status board) and `/odata/schemas` (a filterable schema-metadata catalogue); Power BI talks to them out of the box, and the samples data is also reachable as paged JSON.
+- **OData v4 feeds** — `/odata/samples` (raw data, carrying a `SubmittedAt` reporting-time column alongside the measurement timestamp), `/odata/scorecard` (the cross-schema RAG status board) and `/odata/schemas` (a filterable schema-metadata catalogue); Power BI talks to them out of the box, and the samples data is also reachable as paged JSON. Every feed honours the reading credential's **service scope**, so the *same* report published with a department-scoped key only ever exposes that department's data — no per-audience copy needed.
 - **Outbound webhooks** — signed (HMAC-SHA256), durably queued, auto-retrying HTTP pushes on `submission.accepted` / `submission.warnings` / `window.upcoming` / `window.missed`, to wire into Teams, Power Automate, or your own service without polling.
 - **Microsoft Teams integration** — a bot that prompts a user or channel for the KPI values still outstanding, as an interactive Adaptive Card filled in and submitted straight from Teams. Daily or on demand, scoped to chosen services and schemas, hidden/disabled fields omitted and warnings surfaced. See [docs/setup/ms-teams.md](docs/setup/ms-teams.md).
 - **Email notifications** — upcoming-reminder, missed-alert, submission-warning, and draft-saved-nudge emails with editable Liquid templates and configurable recipients.
@@ -145,7 +146,7 @@ Everything Ingest does, in one place:
 **Security, governance & operations**
 
 - **API-key auth** with zero-downtime rotation and individual revocation; **capability-based authorisation** with roles (Service / Operator / Approver / Admin) as templates that seed per-account capabilities, plus an optional **per-account service scope** confining a back-office account to a subset of services.
-- **Optional approval workflow** — hold submissions for review before they go live, configured per schema, as a global default, or via cross-cutting **rules** that require sign-off for chosen services and schemas (either side can be "All"). An API-only rule can force manual intervention so a person reviews or completes a partially automated feed before it's published.
+- **Optional approval workflow** — hold submissions for review before they go live, configured per schema, as a global default, or via cross-cutting **rules** that require sign-off for chosen services and schemas (either side can be "All"). Approvers can be named accounts or the dynamic **service owner** — letting a service (or its manager, via a service-scoped Approver account) sign off on its own data before it's published. An API-only rule can force manual intervention so a person reviews or completes a partially automated feed before it's published.
 - **Optional SSO** (Microsoft / Google) layered on top of API keys.
 - **Full audit log** and **soft-delete** by default — nothing important is destroyed silently.
 - **GDPR built in** — right-to-erasure (anonymise or delete), per-subject data export, and configurable time-based retention.

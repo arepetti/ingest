@@ -18,7 +18,8 @@ import type {
   AdminSubmissionInput, SampleInput, Schema, Submission,
 } from '../api/types'
 import { AccountAvatar, SchemaAvatar } from '../components/Avatars'
-import { SchemaSampleFields, fromLocalInput, toLocalInput } from '../components/SchemaSampleFields'
+import { SchemaSampleFields } from '../components/SchemaSampleFields'
+import { fromLocalInput, toLocalInput } from '../utils/datetimeLocal'
 import { isFilled, useSampleRules, type ValueRow } from '../utils/sampleRules'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 

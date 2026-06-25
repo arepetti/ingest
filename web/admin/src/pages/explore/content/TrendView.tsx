@@ -1,6 +1,6 @@
 import { useMemo, type RefObject } from 'react'
 import {
-  Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, tokens,
+  Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Text, tokens,
 } from '@fluentui/react-components'
 import {
   CartesianGrid, Legend, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -9,16 +9,16 @@ import type { ExploreValueSeries, SchemaValue } from '../../../api/types'
 import { addCadence } from '../../../utils/cadence'
 import { formatPeriodLabel } from '../../../utils/periodFormat'
 import { ragBandRects } from '../../../utils/targetBand'
-import { cell, round, SERIES_COLORS, useExploreStyles, type ServiceRef } from '../shared'
+import { ANOMALY_COLORS, cell, fmt, round, SERIES_COLORS, useExploreStyles, type ServiceRef } from '../shared'
 
 // How many future periods the optional projection extends the trend chart by.
 const PROJECTION_PERIODS = 2
 
-type TrendRow = { period: string } & Record<string, number | string>
+type TrendRow = { period: string } & Record<string, number | string | boolean>
 type SeriesDef = { key: string; name: string; color: string }
 
 /** The Trend sub-view: a per-period line chart (with optional projection/compare/RAG band) or its table form. */
-export function TrendView({ series, services, combined, projecting, previous, previousLabel, band, asTable, chartRef }: {
+export function TrendView({ series, services, combined, projecting, previous, previousLabel, band, anomaly, asTable, chartRef }: {
   series: ExploreValueSeries
   services: ServiceRef[]
   combined: boolean
@@ -26,13 +26,25 @@ export function TrendView({ series, services, combined, projecting, previous, pr
   previous?: ExploreValueSeries
   previousLabel?: string
   band?: SchemaValue
+  anomaly: boolean
   asTable: boolean
   chartRef: RefObject<HTMLDivElement | null>
 }) {
   const styles = useExploreStyles()
-  if (asTable) return <TrendTable series={series} services={services} combined={combined} />
+  const anomalyCount = useMemo(
+    () => (anomaly ? countAnomalies(series, combined) : 0),
+    [anomaly, series, combined],
+  )
+  if (asTable) return <TrendTable series={series} services={services} combined={combined} anomaly={anomaly} />
   return (
     <div className={styles.chartWrap} ref={chartRef}>
+      {anomaly && (
+        <Text size={200} style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: 4 }}>
+          {anomalyCount === 0
+            ? 'No anomalies in the current selection.'
+            : `${anomalyCount} ${anomalyCount === 1 ? 'anomaly' : 'anomalies'} highlighted in the current selection.`}
+        </Text>
+      )}
       <TrendChart
         series={series}
         services={services}
@@ -41,9 +53,16 @@ export function TrendView({ series, services, combined, projecting, previous, pr
         previous={previous}
         previousLabel={previousLabel}
         band={band}
+        anomaly={anomaly}
       />
     </div>
   )
+}
+
+/** Count flagged points across the drawn lines (the overall line when combined, else per service). */
+function countAnomalies(series: ExploreValueSeries, combined: boolean): number {
+  if (combined) return series.buckets.filter(b => b.isAnomaly).length
+  return series.buckets.reduce((acc, b) => acc + b.services.filter(p => p.isAnomaly).length, 0)
 }
 
 function trendRows(series: ExploreValueSeries, combined: boolean): TrendRow[] {
@@ -84,6 +103,7 @@ function buildTrend(
   combined: boolean,
   projectPeriods: number,
   previous?: ExploreValueSeries,
+  anomaly: boolean = false,
 ): { rows: TrendRow[]; defs: SeriesDef[]; projected: boolean; overallTrend: boolean; compared: boolean } {
   const buckets = series.buckets
   const n = buckets.length
@@ -97,12 +117,23 @@ function buildTrend(
 
   const valueAt = (b: typeof buckets[number], key: string): number | undefined =>
     key === 'overall' ? b.value : b.services.find(p => p.serviceId === key)?.value
+  // Anomaly flag / score for a line at a bucket: the overall fields when combined, else the service point's.
+  const anomAt = (b: typeof buckets[number], key: string): { flag: boolean; z: number | null } => {
+    if (key === 'overall') return { flag: !!b.isAnomaly, z: b.z ?? null }
+    const p = b.services.find(sp => sp.serviceId === key)
+    return { flag: !!p?.isAnomaly, z: p?.z ?? null }
+  }
 
   const rows: TrendRow[] = buckets.map(b => {
     const row: TrendRow = { period: formatPeriodLabel(b.periodStart, series.cadence) }
     for (const def of defs) {
       const v = valueAt(b, def.key)
       if (v !== undefined) row[def.key] = round(v)
+      if (anomaly && v !== undefined) {
+        const a = anomAt(b, def.key)
+        row[`${def.key}__az`] = a.flag
+        if (a.z !== null) row[`${def.key}__z`] = round(a.z)
+      }
     }
     return row
   })
@@ -156,7 +187,7 @@ function buildTrend(
   return { rows, defs, projected: true, overallTrend, compared }
 }
 
-function TrendChart({ series, services, combined, projectPeriods, previous, previousLabel, band }: {
+function TrendChart({ series, services, combined, projectPeriods, previous, previousLabel, band, anomaly }: {
   series: ExploreValueSeries
   services: ServiceRef[]
   combined: boolean
@@ -164,11 +195,12 @@ function TrendChart({ series, services, combined, projectPeriods, previous, prev
   previous?: ExploreValueSeries
   previousLabel?: string
   band?: SchemaValue
+  anomaly: boolean
 }) {
   const bandRects = useMemo(() => (band ? ragBandRects(band) : []), [band])
   const { rows, defs, projected, overallTrend, compared } = useMemo(
-    () => buildTrend(series, services, combined, projectPeriods, previous),
-    [series, services, combined, projectPeriods, previous],
+    () => buildTrend(series, services, combined, projectPeriods, previous, anomaly),
+    [series, services, combined, projectPeriods, previous, anomaly],
   )
   const prevSuffix = previousLabel ? ` (${previousLabel} ago)` : ' (previous)'
   const showLegend = (!combined && defs.length > 1) || (projected && overallTrend) || compared
@@ -190,7 +222,7 @@ function TrendChart({ series, services, combined, projectPeriods, previous, prev
         ))}
         <XAxis dataKey="period" tick={{ fontSize: 11 }} interval="preserveStartEnd" angle={-30} textAnchor="end" height={56} />
         <YAxis tick={{ fontSize: 11 }} />
-        <Tooltip />
+        {anomaly ? <Tooltip content={<AnomalyTooltip defs={defs} />} /> : <Tooltip />}
         {showLegend && <Legend wrapperStyle={{ fontSize: 12 }} />}
         {defs.map(def => (
           <Line
@@ -200,7 +232,7 @@ function TrendChart({ series, services, combined, projectPeriods, previous, prev
             name={def.name}
             stroke={def.color}
             strokeWidth={2}
-            dot={{ r: 2 }}
+            dot={anomaly ? anomalyDot(def.key, def.color) : { r: 2 }}
             connectNulls
           />
         ))}
@@ -249,14 +281,79 @@ function TrendChart({ series, services, combined, projectPeriods, previous, prev
   )
 }
 
-function TrendTable({ series, services, combined }: {
+// A custom recharts dot factory: draws a hollow ring around flagged points and the usual small dot
+// otherwise. `key` selects which line's anomaly flag (overall vs a service) to read from the row.
+function anomalyDot(key: string, color: string) {
+  return function Dot(props: { cx?: number; cy?: number; payload?: TrendRow; index?: number }) {
+    const { cx, cy, payload, index } = props
+    const k = `dot-${key}-${index ?? 0}`
+    if (cx === undefined || cy === undefined || payload?.[key] === undefined) {
+      return <g key={k} />
+    }
+    if (payload[`${key}__az`] === true) {
+      return (
+        <g key={k}>
+          <circle cx={cx} cy={cy} r={6} fill="none" stroke={ANOMALY_COLORS.Anomaly} strokeWidth={2} />
+          <circle cx={cx} cy={cy} r={2.5} fill={color} />
+        </g>
+      )
+    }
+    return <circle key={k} cx={cx} cy={cy} r={2} fill={color} />
+  }
+}
+
+type TooltipEntry = { dataKey?: string | number; value?: number | string; color?: string; payload?: TrendRow }
+
+// Tooltip used when anomaly highlighting is on: lists each drawn line's value plus its z-score, and
+// marks flagged points. Skips the helper series (projection/compare/trend and the __az/__z fields).
+function AnomalyTooltip({ active, label, payload, defs }: {
+  active?: boolean
+  label?: string | number
+  payload?: TooltipEntry[]
+  defs: SeriesDef[]
+}) {
+  const styles = useExploreStyles()
+  if (!active || !payload || payload.length === 0) return null
+  const known = new Set(defs.map(d => d.key))
+  const row = payload[0]?.payload
+  const entries = payload.filter(e => typeof e.dataKey === 'string' && known.has(e.dataKey))
+  if (entries.length === 0) return null
+  return (
+    <div className={styles.tooltip}>
+      <div className={styles.tooltipTitle}>{label}</div>
+      {entries.map(e => {
+        const key = e.dataKey as string
+        const def = defs.find(d => d.key === key)
+        const flagged = row?.[`${key}__az`] === true
+        const z = row?.[`${key}__z`]
+        return (
+          <div key={key} className={styles.tooltipRow}>
+            <span className={styles.scDot} style={{ backgroundColor: e.color ?? def?.color }} />
+            <span>{def?.name ?? key}: <strong>{fmt(Number(e.value))}</strong></span>
+            {typeof z === 'number' && (
+              <span style={{ color: tokens.colorNeutralForeground3 }}>
+                {' '}· z={fmt(z)}{flagged ? ' ⚠' : ''}
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function TrendTable({ series, services, combined, anomaly }: {
   series: ExploreValueSeries
   services: ServiceRef[]
   combined: boolean
+  anomaly: boolean
 }) {
   const styles = useExploreStyles()
   const rows = trendRows(series, combined)
   const cols = combined ? [{ key: 'overall', name: 'All services' }] : services.map(s => ({ key: s.serviceId, name: s.serviceLabel || s.serviceName }))
+  // Extra z / anomaly columns are only unambiguous for the single overall line (combined mode).
+  const showAnomalyCols = anomaly && combined
+  const zByPeriod = new Map(series.buckets.map(b => [formatPeriodLabel(b.periodStart, series.cadence), b]))
   return (
     <div className={styles.tableScroll}>
       <Table size="small">
@@ -264,15 +361,22 @@ function TrendTable({ series, services, combined }: {
           <TableRow>
             <TableHeaderCell>Period</TableHeaderCell>
             {cols.map(c => <TableHeaderCell key={c.key}>{c.name}</TableHeaderCell>)}
+            {showAnomalyCols && <TableHeaderCell>z</TableHeaderCell>}
+            {showAnomalyCols && <TableHeaderCell>Anomaly</TableHeaderCell>}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map(r => (
-            <TableRow key={r.period}>
-              <TableCell>{r.period}</TableCell>
-              {cols.map(c => <TableCell key={c.key} className={styles.numCell}>{cell(r[c.key])}</TableCell>)}
-            </TableRow>
-          ))}
+          {rows.map(r => {
+            const b = zByPeriod.get(String(r.period))
+            return (
+              <TableRow key={String(r.period)}>
+                <TableCell>{r.period}</TableCell>
+                {cols.map(c => <TableCell key={c.key} className={styles.numCell}>{cell(r[c.key] as number | string | undefined)}</TableCell>)}
+                {showAnomalyCols && <TableCell className={styles.numCell}>{b?.z === null || b?.z === undefined ? '—' : fmt(b.z)}</TableCell>}
+                {showAnomalyCols && <TableCell>{b?.isAnomaly ? 'Yes' : ''}</TableCell>}
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
     </div>

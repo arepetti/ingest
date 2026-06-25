@@ -2,6 +2,7 @@ using Ingest.Api.Auth;
 using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Analytics;
 using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -33,6 +34,10 @@ public sealed class ExploreController(IExploreService explore) : ControllerBase
     /// <param name="from">Inclusive lower bound on the sample timestamp.</param>
     /// <param name="to">Exclusive upper bound on the sample timestamp.</param>
     /// <param name="agg">How each bucket reduces its samples; defaults to <see cref="ExploreAggregation.Average"/>.</param>
+    /// <param name="anomaly">When <c>true</c>, score each bucket against its preceding history and populate the anomaly fields.</param>
+    /// <param name="anomalyWindow">Rolling window (preceding buckets) the baseline uses; clamped server-side. Defaults to 12.</param>
+    /// <param name="anomalyThreshold">The <c>|z|</c> cutoff at or above which a bucket is flagged; clamped server-side. Defaults to 2.5.</param>
+    /// <param name="anomalyRobust">When <c>true</c>, use a median + MAD baseline instead of mean + standard deviation.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="200">The series. <see cref="ExploreSeriesResponse"/>.</response>
     /// <response code="404">No schema with that name.</response>
@@ -46,6 +51,10 @@ public sealed class ExploreController(IExploreService explore) : ControllerBase
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         [FromQuery] ExploreAggregation agg,
+        [FromQuery] bool anomaly,
+        [FromQuery] int? anomalyWindow,
+        [FromQuery] double? anomalyThreshold,
+        [FromQuery] bool anomalyRobust,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(schema))
@@ -57,9 +66,54 @@ public sealed class ExploreController(IExploreService explore) : ControllerBase
         if (empty)
             return Ok(new ExploreSeriesResponse(schema, null, agg, from, to, new(), new()));
 
-        var query = new ExploreSeriesQuery(schema, value, effective, from, to, agg);
+        var query = new ExploreSeriesQuery(
+            schema, value, effective, from, to, agg,
+            anomaly,
+            anomalyWindow ?? AnomalyDetector.DefaultWindow,
+            anomalyThreshold ?? AnomalyDetector.DefaultThreshold,
+            anomalyRobust);
         var result = await explore.GetSeriesAsync(query, ct);
         return result is null ? NotFound() : Ok(ExploreSeriesResponse.FromResult(result));
+    }
+
+    /// <summary>
+    /// Anomaly board for one period: each numeric value of the scanned schemas, with each applicable
+    /// service's value for the period classified normal / anomaly / missing against its own recent
+    /// history. Mirrors the scorecard's schema → value → per-service shape.
+    /// </summary>
+    /// <param name="schema">Restrict to these schemas (repeatable). Omit to scan every enabled schema.</param>
+    /// <param name="serviceIds">Restrict to these services (repeatable). Omit for every service.</param>
+    /// <param name="period">
+    /// Which period to test: <see cref="ScorecardPeriod.Current"/> (default, the open period) or
+    /// <see cref="ScorecardPeriod.LatestClosed"/> (the last elapsed period).
+    /// </param>
+    /// <param name="window">Rolling window (preceding periods) the baseline uses; clamped server-side. Defaults to 12.</param>
+    /// <param name="threshold">The <c>|z|</c> cutoff at or above which a value is flagged; clamped server-side. Defaults to 2.5.</param>
+    /// <param name="robust">When <c>true</c>, use a median + MAD baseline instead of mean + standard deviation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The anomaly board. <see cref="ExploreAnomalyResponse"/>.</response>
+    [HttpGet("anomalies")]
+    [ProducesResponseType(typeof(ExploreAnomalyResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAnomalies(
+        [FromQuery(Name = "schema")] List<string>? schema,
+        [FromQuery] List<Guid>? serviceIds,
+        [FromQuery] ScorecardPeriod period,
+        [FromQuery] int? window,
+        [FromQuery] double? threshold,
+        [FromQuery] bool robust,
+        CancellationToken ct)
+    {
+        var effective = User.ResolveServiceFilter(serviceIds, out var empty);
+        if (empty)
+            return Ok(new ExploreAnomalyResponse(new(), new()));
+
+        var query = new ExploreAnomalyQuery(
+            schema, effective, period,
+            window ?? AnomalyDetector.DefaultWindow,
+            threshold ?? AnomalyDetector.DefaultThreshold,
+            robust);
+        var result = await explore.GetAnomaliesAsync(query, ct);
+        return Ok(ExploreAnomalyResponse.FromResult(result));
     }
 
     /// <summary>

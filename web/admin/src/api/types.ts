@@ -753,6 +753,10 @@ export interface ExploreServicePoint {
   value: number
   /** Number of samples this service contributed to the bucket. */
   count: number
+  /** Anomaly score against this service's preceding history; null unless anomaly scoring was requested. */
+  z?: number | null
+  /** Whether `z` crossed the requested threshold. */
+  isAnomaly?: boolean
 }
 
 /** One cadence bucket of an Explore value series, with the overall and per-service reductions. */
@@ -764,6 +768,10 @@ export interface ExploreBucket {
   /** Total samples folded into the bucket. */
   count: number
   services: ExploreServicePoint[]
+  /** Anomaly score of the overall (combined) value against preceding buckets; null unless requested. */
+  z?: number | null
+  /** Whether the overall `z` crossed the requested threshold. */
+  isAnomaly?: boolean
 }
 
 /** A single value's bucketed Explore timeline. */
@@ -839,6 +847,48 @@ export interface ExploreSeries {
   to?: string | null
   services: ExploreServiceRef[]
   values: ExploreValueSeries[]
+}
+
+/** Whether a submitted value for the target period reads as a statistical anomaly. Mirrors the C# enum. */
+export type AnomalyState = 'Normal' | 'Anomaly'
+
+/**
+ * One service's anomaly result for a numeric value in the target period. A "missing" cell (the
+ * service didn't submit the period) has `state`, `value`, `z` and `submissionId` all null.
+ */
+export interface ExploreAnomalyCell {
+  serviceId: string
+  /** Submission the tested sample came from, so the card can deep-link to it; null when missing. */
+  submissionId: string | null
+  /** The value tested; null when missing. */
+  value: number | null
+  /** The standardised score; null when missing or with too little history. */
+  z: number | null
+  /** Anomaly classification; null when missing. */
+  state: AnomalyState | null
+  periodStart: string
+  periodEnd: string
+}
+
+/** A numeric value and every applicable service's anomaly result for the target period. */
+export interface ExploreAnomalyValue {
+  valueName: string
+  label?: string | null
+  unit?: string | null
+  cells: ExploreAnomalyCell[]
+}
+
+/** One scanned schema's numeric values for the anomaly board, grouped under the schema. */
+export interface ExploreAnomalySchema {
+  schemaName: string
+  schemaLabel?: string | null
+  values: ExploreAnomalyValue[]
+}
+
+/** Response shape of `GET /api/admin/explore/anomalies`: a per-period anomaly status board. */
+export interface ExploreAnomalies {
+  services: ExploreServiceRef[]
+  schemas: ExploreAnomalySchema[]
 }
 
 /**

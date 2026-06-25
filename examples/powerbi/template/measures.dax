@@ -1,0 +1,65 @@
+// Canonical, schema-agnostic measures for the template.
+// Create each one with Modeling > New measure on the Samples table.
+//
+// These aggregate whatever value(s) are in the current filter context, so put
+// SchemaName / ValueName / ServiceName on slicers, axes or a matrix. They're a
+// starting point — rename and specialise them per report (see waste-quickstart
+// for value-specific examples like [Recycling rate %]).
+
+// --- Core aggregations -------------------------------------------------------
+
+Value (sum) =
+SUM ( Samples[NumericValue] )
+
+Value (avg) =
+AVERAGE ( Samples[NumericValue] )
+
+Latest value =
+VAR LastTs = MAX ( Samples[Timestamp] )
+RETURN
+    CALCULATE ( SUM ( Samples[NumericValue] ), Samples[Timestamp] = LastTs )
+
+// --- Reporting punctuality ---------------------------------------------------
+// A submission is "on time" when it was reported (SubmittedAt) before its cadence
+// window closed (PeriodEnd, exclusive). Counts are at the submission grain.
+
+Submissions =
+DISTINCTCOUNT ( Samples[SubmissionId] )
+
+On-time submissions =
+CALCULATE (
+    DISTINCTCOUNT ( Samples[SubmissionId] ),
+    FILTER ( Samples, Samples[SubmittedAt] < Samples[PeriodEnd] )
+)
+
+On-time % =
+DIVIDE ( [On-time submissions], [Submissions] )
+
+Late submissions =
+[Submissions] - [On-time submissions]
+
+// --- Freshness ---------------------------------------------------------------
+
+Days since last reading =
+VAR LastTs = MAX ( Samples[Timestamp] )
+RETURN
+    IF ( ISBLANK ( LastTs ), BLANK (), DATEDIFF ( LastTs, TODAY (), DAY ) )
+
+Reporting services =
+DISTINCTCOUNT ( Samples[ServiceName] )
+
+// --- Time-intelligence (needs the Calendar table related to Samples[Timestamp]) ---
+
+Value (avg) YTD =
+CALCULATE ( [Value (avg)], DATESYTD ( Calendar[Date] ) )
+
+Value (avg) vs last year =
+VAR ThisYear = [Value (avg)]
+VAR LastYear = CALCULATE ( [Value (avg)], SAMEPERIODLASTYEAR ( Calendar[Date] ) )
+RETURN ThisYear - LastYear
+
+Value (avg) rolling 3 months =
+AVERAGEX (
+    DATESINPERIOD ( Calendar[Date], MAX ( Calendar[Date] ), -3, MONTH ),
+    [Value (avg)]
+)

@@ -5,7 +5,7 @@ import type {
   ErasureMode, ErasureResult,
   ApiKey, GeneratedApiKey,
   Cadence,
-  ExploreAggregation, ExploreSeries, ExploreScorecard, ScorecardMode, ScorecardPeriod,
+  ExploreAggregation, ExploreSeries, ExploreScorecard, ExploreAnomalies, ScorecardMode, ScorecardPeriod,
   Schema, SchemaHistory, SchemaVersionHistoryEntry, SchemaVersionSnapshot, UpsertSchemaRequest,
   Submission, AdminSubmissionInput, SampleInput, ServiceStatus, Me, Paged,
   SubmissionWriteResponse, SubmissionValidationResponse, BulkImportRequest, BulkImportResult, BackupImportResult, AccountsImportResult,
@@ -360,6 +360,11 @@ export interface ExploreSeriesParams {
   from?: string
   to?: string
   agg: ExploreAggregation
+  /** When true, ask the server to score each bucket for anomalies and populate `z` / `isAnomaly`. */
+  anomaly?: boolean
+  anomalyWindow?: number
+  anomalyThreshold?: number
+  anomalyRobust?: boolean
 }
 
 /**
@@ -375,10 +380,46 @@ export const useExploreSeries = (params: ExploreSeriesParams, enabled: boolean =
   for (const sid of params.serviceIds ?? []) search.append('serviceIds', sid)
   if (params.from) search.set('from', params.from)
   if (params.to)   search.set('to', params.to)
+  if (params.anomaly) {
+    search.set('anomaly', 'true')
+    if (params.anomalyWindow)    search.set('anomalyWindow', String(params.anomalyWindow))
+    if (params.anomalyThreshold) search.set('anomalyThreshold', String(params.anomalyThreshold))
+    if (params.anomalyRobust)    search.set('anomalyRobust', 'true')
+  }
   return useQuery({
     queryKey: ['explore-series', params],
     queryFn: () => api.get<ExploreSeries>(`/api/admin/explore/series?${search}`),
     enabled: enabled && !!params.schema,
+  })
+}
+
+/** Tuning for the anomaly board query. */
+export interface ExploreAnomaliesParams {
+  schemaNames?: string[]
+  serviceIds?: string[]
+  period?: ScorecardPeriod
+  window?: number
+  threshold?: number
+  robust?: boolean
+}
+
+/**
+ * Per-period anomaly board: every numeric value of the chosen schemas, with each applicable
+ * service's value for the target period classified normal / anomaly / missing against its own
+ * recent history. Powers the Explore page's Anomalies tab.
+ */
+export const useExploreAnomalies = (params: ExploreAnomaliesParams, enabled: boolean = true) => {
+  const search = new URLSearchParams()
+  for (const name of params.schemaNames ?? []) search.append('schema', name)
+  for (const sid of params.serviceIds ?? []) search.append('serviceIds', sid)
+  search.set('period', params.period ?? 'Current')
+  if (params.window)    search.set('window', String(params.window))
+  if (params.threshold) search.set('threshold', String(params.threshold))
+  if (params.robust)    search.set('robust', 'true')
+  return useQuery({
+    queryKey: ['explore-anomalies', params],
+    queryFn: () => api.get<ExploreAnomalies>(`/api/admin/explore/anomalies?${search}`),
+    enabled,
   })
 }
 

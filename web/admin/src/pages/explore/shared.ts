@@ -4,8 +4,8 @@ import type {
 } from '../../api/types'
 import { formatPeriodLabel } from '../../utils/periodFormat'
 
-/** The outer tab: the at-a-glance cross-schema scorecard vs. the detailed per-schema analysis. */
-export type OuterTab = 'scorecard' | 'analysis'
+/** The outer tab: the cross-schema scorecard, the detailed per-schema analysis, or the anomaly board. */
+export type OuterTab = 'scorecard' | 'analysis' | 'anomalies'
 
 /** The inner analysis view, nested under the "Analysis" outer tab. */
 export type ExploreView = 'trend' | 'compare' | 'snapshot'
@@ -26,6 +26,18 @@ export const RAG_LABELS: Record<RagStatus, string> = { Green: 'On target', Amber
 // explicit hex like the RAG colours so it reads as a true grey in both themes.
 export const MISSING_COLOR = '#9ca3af'
 export const MISSING_LABEL = 'No submission'
+
+// Anomaly board colours: green = within recent range, yellow/amber = statistical outlier. Missing
+// reuses MISSING_COLOR / "No submission". Explicit hex to read true in both themes (like RAG).
+export const ANOMALY_COLORS = { Normal: '#16a34a', Anomaly: '#d97706' } as const
+export const ANOMALY_LABELS = { Normal: 'No anomalies', Anomaly: 'Anomaly' } as const
+
+// Defaults and choices for the anomaly detector controls (shared by the Trend toggle and the
+// Anomalies tab). Mirror the server-side defaults in AnomalyDetector.
+export const ANOMALY_WINDOW_DEFAULT = 12
+export const ANOMALY_THRESHOLD_DEFAULT = 2.5
+export const ANOMALY_WINDOWS = [8, 12, 26] as const
+export const ANOMALY_THRESHOLDS = [2, 2.5, 3] as const
 
 export const AGGREGATIONS: ExploreAggregation[] = ['Average', 'Sum', 'Min', 'Max', 'Count']
 export const AGG_LABELS: Record<ExploreAggregation, string> = {
@@ -57,6 +69,7 @@ export const useExploreStyles = makeStyles({
   card: { padding: '16px' },
   cardHeader: { marginBottom: '8px' },
   cardHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' },
+  scSwitches: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
   cardSub: { color: tokens.colorNeutralForeground3, fontSize: '12px' },
   empty: { color: tokens.colorNeutralForeground3, padding: '32px 0', textAlign: 'center' },
   chartWrap: { width: '100%' },
@@ -64,6 +77,15 @@ export const useExploreStyles = makeStyles({
   numCell: { textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
   scSchema: { display: 'flex', flexDirection: 'column', gap: '12px' },
   scSchemaTitle: { display: 'flex', alignItems: 'baseline', gap: '8px' },
+  // Clickable header used to collapse/expand a schema's card on the anomaly board.
+  scCollapseHeader: {
+    display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+    backgroundColor: 'transparent', border: 'none', padding: 0, margin: 0,
+    cursor: 'pointer', textAlign: 'left', color: 'inherit',
+    ':hover': { color: tokens.colorNeutralForeground2 },
+    ':focus-visible': { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: '2px', borderRadius: '4px' },
+  },
+  scCollapseSummary: { color: tokens.colorNeutralForeground3, fontSize: '12px', fontWeight: 400 },
   scValueGroup: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' },
   scValueLabel: { fontSize: '13px', fontWeight: 600 },
   scGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' },
@@ -82,6 +104,16 @@ export const useExploreStyles = makeStyles({
   scValueNum: { fontVariantNumeric: 'tabular-nums', fontWeight: 600 },
   scLegend: { display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' },
   scLegendItem: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: tokens.colorNeutralForeground2 },
+  // Custom chart tooltip (anomaly mode): a small themed card listing each line's value and z-score.
+  tooltip: {
+    backgroundColor: tokens.colorNeutralBackground1, border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: '6px', padding: '8px 10px', boxShadow: tokens.shadow8, fontSize: '12px',
+    display: 'flex', flexDirection: 'column', gap: '2px',
+  },
+  tooltipTitle: { fontWeight: 600, marginBottom: '2px' },
+  tooltipRow: { display: 'flex', alignItems: 'center', gap: '6px' },
+  // Anomaly detector controls grouped in a popover (shared by the Trend toggle and Anomalies tab).
+  popover: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '12px', minWidth: '240px' },
 })
 
 export type ExploreStyles = ReturnType<typeof useExploreStyles>
@@ -131,6 +163,8 @@ export function buildExportRows(
   activeSeries: ExploreValueSeries | undefined,
   services: ServiceRef[],
   agg: ExploreAggregation,
+  anomaly: boolean = false,
+  combined: boolean = false,
 ): { headers: string[]; rows: (string | number)[][]; name: string } {
   if (view === 'snapshot') {
     const headers = ['Service', ...values.map(v => `${v.label || v.valueName}${v.unit ? ` (${v.unit})` : ''}`)]
@@ -152,7 +186,18 @@ export function buildExportRows(
     const rows = compareRows(activeSeries, services, agg).map(r => [r.name, r.value])
     return { headers, rows, name: `compare-${activeSeries.valueName}` }
   }
-  // trend
+  // trend — when anomaly highlighting is on in combined mode, the single overall line lets us add
+  // unambiguous z / anomaly columns. (Per-service anomalies stay on the chart markers/tooltips.)
+  if (anomaly && combined) {
+    const headers = ['Period', 'All services', 'z', 'Anomaly']
+    const rows = activeSeries.buckets.map(b => [
+      formatPeriodLabel(b.periodStart, activeSeries.cadence),
+      round(b.value),
+      b.z === null || b.z === undefined ? '' : round(b.z),
+      b.isAnomaly ? 'yes' : '',
+    ])
+    return { headers, rows, name: `trend-${activeSeries.valueName}` }
+  }
   const headers = ['Period', ...services.map(s => s.serviceLabel || s.serviceName)]
   const rows = activeSeries.buckets.map(b => {
     const byService = new Map(b.services.map(p => [p.serviceId, p.value]))

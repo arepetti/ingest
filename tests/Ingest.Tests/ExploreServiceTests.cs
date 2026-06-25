@@ -267,6 +267,153 @@ public class ExploreServiceTests
         Assert.Null(cell.Status);
     }
 
+    // ── Anomaly scoring (series) ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Series_anomaly_flags_a_spiking_bucket_and_leaves_a_steady_history_clean()
+    {
+        var schema = new Schema
+        {
+            Name = "m", Label = "Metric", IsGlobal = true, Enabled = true,
+            Values = new List<SchemaValue> { Number("v", null, null, null, null) },
+        };
+
+        // Six steady months then a sharp spike. The first MinHistory (4) buckets can't be scored.
+        var baseValues = new[] { 100d, 101d, 99d, 102d, 100d, 98d };
+        var samples = new List<SampleProjection>();
+        for (var i = 0; i < baseValues.Length; i++)
+            samples.Add(Row(ServiceA, "m", "v", baseValues[i], P1.AddMonths(i)));
+        var spikePeriod = P1.AddMonths(baseValues.Length);
+        samples.Add(Row(ServiceA, "m", "v", 5000d, spikePeriod));
+
+        var svc = new ExploreService(new FakeSchemaRepo(schema), new FakeSampleRepo(samples), new FakeAccountRepo());
+
+        var result = await svc.GetSeriesAsync(new ExploreSeriesQuery(
+            "m", null, null, null, null, ExploreAggregation.Average,
+            Anomaly: true, AnomalyWindow: 12, AnomalyThreshold: 2.5, AnomalyRobust: false));
+
+        Assert.NotNull(result);
+        var series = Assert.Single(result!.Values);
+
+        var spike = series.Buckets.Single(b => b.PeriodStart == spikePeriod);
+        Assert.True(spike.IsAnomaly);
+        Assert.NotNull(spike.Z);
+        var spikeService = Assert.Single(spike.Services);
+        Assert.True(spikeService.IsAnomaly);
+
+        // First bucket has no preceding history → no score, never flagged.
+        var first = series.Buckets.First();
+        Assert.Null(first.Z);
+        Assert.False(first.IsAnomaly);
+
+        // No steady bucket is flagged.
+        Assert.DoesNotContain(series.Buckets.Where(b => b.PeriodStart != spikePeriod), b => b.IsAnomaly);
+    }
+
+    [Fact]
+    public async Task Series_without_anomaly_flag_leaves_scores_unset()
+    {
+        var schema = new Schema
+        {
+            Name = "m", Label = "Metric", IsGlobal = true, Enabled = true,
+            Values = new List<SchemaValue> { Number("v", null, null, null, null) },
+        };
+        var samples = new List<SampleProjection>
+        {
+            Row(ServiceA, "m", "v", 100, P1),
+            Row(ServiceA, "m", "v", 5000, P2),
+        };
+
+        var svc = new ExploreService(new FakeSchemaRepo(schema), new FakeSampleRepo(samples), new FakeAccountRepo());
+
+        var result = await svc.GetSeriesAsync(new ExploreSeriesQuery(
+            "m", null, null, null, null, ExploreAggregation.Average));
+
+        var series = Assert.Single(result!.Values);
+        Assert.All(series.Buckets, b => Assert.Null(b.Z));
+        Assert.All(series.Buckets, b => Assert.False(b.IsAnomaly));
+    }
+
+    // ── Anomaly board ─────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Anomalies_classifies_spike_normal_and_missing_for_the_current_period()
+    {
+        var now = DateTime.UtcNow;
+        var (curStart, _) = CadenceCalculator.BucketFor(Cadence.Monthly, now);
+
+        var schema = new Schema
+        {
+            Name = "m", Label = "Metric", IsGlobal = true, Enabled = true,
+            Values = new List<SchemaValue> { Number("v", null, null, null, null) },
+        };
+
+        var samples = new List<SampleProjection>();
+        // ServiceA: five steady prior months, then a spike this period → Anomaly.
+        for (var k = 5; k >= 1; k--)
+            samples.Add(Row(ServiceA, "m", "v", 100 + k % 3, curStart.AddMonths(-k)));
+        samples.Add(Row(ServiceA, "m", "v", 5000, curStart));
+        // ServiceB: only this period, no history → Normal (not enough history to score).
+        samples.Add(Row(ServiceB, "m", "v", 100, curStart));
+        // ServiceC: nothing → missing.
+
+        var accounts = new FakeAccountRepo(ServiceA, ServiceB, ServiceC);
+        var svc = new ExploreService(new FakeSchemaRepo(schema), new FakeSampleRepo(samples), accounts);
+
+        var result = await svc.GetAnomaliesAsync(new ExploreAnomalyQuery(
+            null, null, ScorecardPeriod.Current, Window: 12, Threshold: 2.5, Robust: false));
+
+        var value = Assert.Single(Assert.Single(result.Schemas).Values);
+        Assert.Equal(3, value.Cells.Count);
+
+        var a = Assert.Single(value.Cells, c => c.ServiceId == ServiceA);
+        Assert.Equal(AnomalyState.Anomaly, a.State);
+        Assert.Equal(5000d, a.Value);
+        Assert.NotNull(a.Z);
+        Assert.NotNull(a.SubmissionId);
+
+        var b = Assert.Single(value.Cells, c => c.ServiceId == ServiceB);
+        Assert.Equal(AnomalyState.Normal, b.State);
+        Assert.Null(b.Z); // too little history to score, but it did submit
+
+        var c = Assert.Single(value.Cells, x => x.ServiceId == ServiceC);
+        Assert.Null(c.State);        // missing
+        Assert.Null(c.Value);
+        Assert.Null(c.SubmissionId);
+        Assert.Equal(curStart, c.PeriodStart);
+    }
+
+    [Fact]
+    public async Task Anomalies_respects_the_schema_filter()
+    {
+        var now = DateTime.UtcNow;
+        var (curStart, _) = CadenceCalculator.BucketFor(Cadence.Monthly, now);
+
+        var wanted = new Schema
+        {
+            Name = "wanted", Label = "Wanted", IsGlobal = true, Enabled = true,
+            Values = new List<SchemaValue> { Number("v", null, null, null, null) },
+        };
+        var other = new Schema
+        {
+            Name = "other", Label = "Other", IsGlobal = true, Enabled = true,
+            Values = new List<SchemaValue> { Number("w", null, null, null, null) },
+        };
+        var samples = new List<SampleProjection>
+        {
+            Row(ServiceA, "wanted", "v", 100, curStart),
+            Row(ServiceA, "other", "w", 100, curStart),
+        };
+
+        var svc = new ExploreService(new FakeSchemaRepo(wanted, other), new FakeSampleRepo(samples), new FakeAccountRepo());
+
+        var result = await svc.GetAnomaliesAsync(new ExploreAnomalyQuery(
+            new[] { "wanted" }, null, ScorecardPeriod.Current));
+
+        var schema = Assert.Single(result.Schemas);
+        Assert.Equal("wanted", schema.SchemaName);
+    }
+
     // ── Fakes ───────────────────────────────────────────────────────────────────────────────
 
     private sealed class FakeSchemaRepo(params Schema[] schemas) : ISchemaRepository

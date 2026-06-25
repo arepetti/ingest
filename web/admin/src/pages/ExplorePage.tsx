@@ -12,7 +12,7 @@ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { PeriodFilter } from '../components/PeriodFilter'
 import { ExplorePresets } from '../components/ExplorePresets'
 import { formatApiError } from '../api/client'
-import { useAccounts, useExploreScorecard, useExploreSeries, useSchemas } from '../api/hooks'
+import { useAccounts, useExploreAnomalies, useExploreScorecard, useExploreSeries, useSchemas } from '../api/hooks'
 import type { Account, ExploreAggregation, ExploreValueSeries, Schema, SchemaValue } from '../api/types'
 import { intervalRange, shiftIso, SHIFT_LABELS, type Interval, type ShiftKey } from '../utils/period'
 import type { PeriodFilterState } from '../utils/usePeriodFilter'
@@ -20,11 +20,14 @@ import { buildCsv } from '../utils/csv'
 import { downloadText } from '../utils/download'
 import { exportChartPng } from '../utils/chartExport'
 import {
-  AGG_LABELS, AGGREGATIONS, buildExportRows, label, useExploreStyles,
+  AGG_LABELS, AGGREGATIONS, ANOMALY_THRESHOLD_DEFAULT, ANOMALY_WINDOW_DEFAULT,
+  buildExportRows, label, useExploreStyles,
   type ExploreView, type OuterTab,
 } from './explore/shared'
+import { AnomalyFields } from './explore/AnomalySettings'
 import { ScorecardView } from './explore/scorecard/ScorecardView'
 import { ExploreContent } from './explore/content/ExploreContent'
+import { AnomaliesView } from './explore/anomalies/AnomaliesView'
 
 const SHIFTS: ShiftKey[] = ['1m', '6m', '1y']
 
@@ -72,8 +75,25 @@ export function ExplorePage() {
   const agg = (sp.get('agg') as ExploreAggregation) || 'Average'
   const tab = (sp.get('tab') as OuterTab) || 'analysis'
   const isScorecard = tab === 'scorecard'
+  const isAnomalies = tab === 'anomalies'
+  const isAnalysis = !isScorecard && !isAnomalies
   const view = (sp.get('view') as ExploreView) || 'trend'
   const onlyIssues = sp.get('attn') === '1'
+  const scHideMissing = sp.get('scmiss') === '1'
+
+  // Anomaly detection state (shared by the Trend "Highlight anomalies" toggle and the Anomalies tab).
+  const anomalyOn = sp.get('az') === '1'
+  const anomalyWindow = Number(sp.get('awin')) || ANOMALY_WINDOW_DEFAULT
+  const anomalyThreshold = Number(sp.get('athr')) || ANOMALY_THRESHOLD_DEFAULT
+  const anomalyRobust = sp.get('arob') === '1'
+  // Anomalies tab: which schemas to scan (empty = all), which period, and whether to hide normals.
+  const anomalySchemaNames = useMemo(
+    () => (sp.get('aschemas') ?? '').split(',').filter(Boolean),
+    [sp],
+  )
+  const anomalyPeriod = (sp.get('aperiod') as 'current' | 'closed') === 'closed' ? 'closed' : 'current'
+  const hideNormal = sp.get('aattn') === '1'
+  const anomalyHideMissing = sp.get('amiss') === '1'
   // Scorecard-only: which sample to show per service, and (for last-period) which period to read.
   const scMode = (sp.get('scmode') as 'latest' | 'period') === 'period' ? 'period' : 'latest'
   const scPeriod = (sp.get('scperiod') as 'current' | 'closed') === 'closed' ? 'closed' : 'current'
@@ -119,14 +139,24 @@ export function ExplorePage() {
     else set.add(id)
     update({ services: [...set].join(',') })
   }
+  const toggleAnomalySchema = (name: string) => {
+    const set = new Set(anomalySchemaNames)
+    if (set.has(name)) set.delete(name)
+    else set.add(name)
+    update({ aschemas: [...set].join(',') })
+  }
 
+  // Anomaly scoring on the Trend chart is opt-in and only applies to that view.
+  const seriesAnomaly = anomalyOn && view === 'trend' && isAnalysis
   const series = useExploreSeries(
     {
       schema: schemaName,
       serviceIds: selectedServiceIds.length ? selectedServiceIds : undefined,
       from, to, agg,
+      anomaly: seriesAnomaly || undefined,
+      anomalyWindow, anomalyThreshold, anomalyRobust,
     },
-    !!schemaName && !isScorecard,
+    !!schemaName && isAnalysis,
   )
 
   // Previous-period overlay: the same query shifted back by `shift`. Only fetched for the Trend
@@ -148,6 +178,18 @@ export function ExplorePage() {
     isScorecard,
   )
 
+  const anomalies = useExploreAnomalies(
+    {
+      schemaNames: anomalySchemaNames.length ? anomalySchemaNames : undefined,
+      serviceIds: selectedServiceIds.length ? selectedServiceIds : undefined,
+      period: anomalyPeriod === 'closed' ? 'LatestClosed' : 'Current',
+      window: anomalyWindow,
+      threshold: anomalyThreshold,
+      robust: anomalyRobust,
+    },
+    isAnomalies,
+  )
+
   const activeValue: SchemaValue | undefined =
     numericValues.find(v => v.name === activeValueName)
   const activeSeries: ExploreValueSeries | undefined =
@@ -162,7 +204,7 @@ export function ExplorePage() {
   const exportCsv = () => {
     try {
       if (!series.data) return
-      const { headers, rows, name } = buildExportRows(view, series.data.values, activeSeries, seriesServices, agg)
+      const { headers, rows, name } = buildExportRows(view, series.data.values, activeSeries, seriesServices, agg, seriesAnomaly, combined)
       if (rows.length === 0) { setExportError('Nothing to export for this view yet.'); return }
       downloadText(`explore-${schemaName}-${name}.csv`, buildCsv(headers, rows), 'text/csv;charset=utf-8')
     } catch (e) {
@@ -195,8 +237,8 @@ export function ExplorePage() {
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
-                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => (isScorecard ? scorecard.refetch() : series.refetch())}>Refresh</MenuItem>
-                {!isScorecard && (
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => (isScorecard ? scorecard.refetch() : isAnomalies ? anomalies.refetch() : series.refetch())}>Refresh</MenuItem>
+                {isAnalysis && (
                   <>
                     <MenuDivider />
                     <MenuItem icon={<ArrowDownload20Regular />} disabled={!series.data} onClick={exportCsv}>Export CSV (this view)</MenuItem>
@@ -214,11 +256,12 @@ export function ExplorePage() {
       <TabList selectedValue={tab} onTabSelect={(_, d) => update({ tab: d.value as string })}>
         <Tab value="scorecard">Scorecard</Tab>
         <Tab value="analysis">Analysis</Tab>
+        <Tab value="anomalies">Anomalies</Tab>
       </TabList>
 
-      {(schemas.error || (isScorecard ? scorecard.error : series.error)) && (
+      {(schemas.error || (isScorecard ? scorecard.error : isAnomalies ? anomalies.error : series.error)) && (
         <AutoScrollMessageBar intent="error">
-          <MessageBarBody>{formatApiError(schemas.error || (isScorecard ? scorecard.error : series.error))}</MessageBarBody>
+          <MessageBarBody>{formatApiError(schemas.error || (isScorecard ? scorecard.error : isAnomalies ? anomalies.error : series.error))}</MessageBarBody>
         </AutoScrollMessageBar>
       )}
       {exportError && (
@@ -226,7 +269,7 @@ export function ExplorePage() {
       )}
 
       <div className={s.filters}>
-        {!isScorecard && (
+        {isAnalysis && (
           <div className={s.field}>
             <span className={s.fieldLabel}>Schema</span>
             <Dropdown
@@ -241,7 +284,31 @@ export function ExplorePage() {
           </div>
         )}
 
-        {view !== 'snapshot' && !isScorecard && (
+        {isAnomalies && (
+          <div className={s.field}>
+            <span className={s.fieldLabel}>
+              Schemas
+              <FluentTooltip
+                relationship="description"
+                content="Which schemas to scan for anomalies. Leave empty to scan every schema with numeric values."
+              >
+                <Info16Regular className={s.infoIcon} tabIndex={0} aria-label="What does Schemas do?" />
+              </FluentTooltip>
+            </span>
+            <Dropdown
+              className={s.dropdown}
+              multiselect
+              selectedOptions={anomalySchemaNames}
+              value={anomalySchemaNames.length === 0 ? 'All schemas' : `${anomalySchemaNames.length} selected`}
+              placeholder="All schemas"
+              onOptionSelect={(_, d) => d.optionValue && toggleAnomalySchema(d.optionValue)}
+            >
+              {schemaList.map(x => <Option key={x.name} value={x.name}>{label(x)}</Option>)}
+            </Dropdown>
+          </div>
+        )}
+
+        {view !== 'snapshot' && isAnalysis && (
           <div className={s.field}>
             <span className={s.fieldLabel}>Value</span>
             <Dropdown
@@ -309,7 +376,7 @@ export function ExplorePage() {
           </div>
         )}
 
-        {!isScorecard && (
+        {isAnalysis && (
           <div className={s.field}>
             <span className={s.fieldLabel}>
               Aggregation
@@ -331,9 +398,37 @@ export function ExplorePage() {
           </div>
         )}
 
+        {isAnomalies && (
+          <div className={s.field}>
+            <span className={s.fieldLabel}>Period</span>
+            <Dropdown
+              className={s.dropdown}
+              selectedOptions={[anomalyPeriod]}
+              value={anomalyPeriod === 'closed' ? 'Latest closed' : 'Current'}
+              onOptionSelect={(_, d) => update({ aperiod: d.optionValue === 'closed' ? 'closed' : null })}
+            >
+              <Option value="current">Current</Option>
+              <Option value="closed">Latest closed</Option>
+            </Dropdown>
+          </div>
+        )}
+
       </div>
 
-      {!isScorecard && (
+      {isAnomalies && (
+        <div className={s.filters}>
+          <AnomalyFields
+            window={anomalyWindow}
+            threshold={anomalyThreshold}
+            robust={anomalyRobust}
+            onWindow={n => update({ awin: n === ANOMALY_WINDOW_DEFAULT ? null : String(n) })}
+            onThreshold={n => update({ athr: n === ANOMALY_THRESHOLD_DEFAULT ? null : String(n) })}
+            onRobust={b => update({ arob: b ? '1' : null })}
+          />
+        </div>
+      )}
+
+      {isAnalysis && (
         <div className={s.filters}>
           <PeriodFilter state={periodState} />
 
@@ -363,7 +458,7 @@ export function ExplorePage() {
         </div>
       )}
 
-      {!isScorecard && (
+      {isAnalysis && (
         <TabList
           appearance="subtle"
           size="small"
@@ -382,6 +477,21 @@ export function ExplorePage() {
           isLoading={scorecard.isLoading}
           onlyIssues={onlyIssues}
           onToggleOnlyIssues={v => update({ attn: v ? '1' : null })}
+          hideMissing={scHideMissing}
+          onToggleHideMissing={v => update({ scmiss: v ? '1' : null })}
+        />
+      ) : isAnomalies ? (
+        <AnomaliesView
+          data={anomalies.data}
+          isLoading={anomalies.isLoading}
+          hideNormal={hideNormal}
+          onToggleHideNormal={v => update({ aattn: v ? '1' : null })}
+          hideMissing={anomalyHideMissing}
+          onToggleHideMissing={v => update({ amiss: v ? '1' : null })}
+          period={anomalyPeriod}
+          window={anomalyWindow}
+          threshold={anomalyThreshold}
+          robust={anomalyRobust}
         />
       ) : (
         <ExploreContent
@@ -402,6 +512,16 @@ export function ExplorePage() {
           comparing={comparing}
           previousLabel={comparing ? SHIFT_LABELS[shift as ShiftKey] : undefined}
           chartRef={chartRef}
+          anomaly={{
+            on: seriesAnomaly,
+            window: anomalyWindow,
+            threshold: anomalyThreshold,
+            robust: anomalyRobust,
+            onToggle: v => update({ az: v ? '1' : null }),
+            onWindow: n => update({ awin: n === ANOMALY_WINDOW_DEFAULT ? null : String(n) }),
+            onThreshold: n => update({ athr: n === ANOMALY_THRESHOLD_DEFAULT ? null : String(n) }),
+            onRobust: b => update({ arob: b ? '1' : null }),
+          }}
           onToggleCombined={v => update({ combined: v ? '1' : null })}
           onToggleProjection={v => update({ proj: v ? '1' : null })}
           onToggleTable={v => update({ table: v ? '1' : null })}

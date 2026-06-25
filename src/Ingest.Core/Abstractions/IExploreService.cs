@@ -35,13 +35,21 @@ public enum ExploreAggregation
 /// <param name="From">Inclusive lower bound on the sample timestamp.</param>
 /// <param name="To">Exclusive upper bound on the sample timestamp.</param>
 /// <param name="Aggregation">How each cadence bucket reduces its samples.</param>
+/// <param name="Anomaly">When <c>true</c>, score each bucket against its preceding history and populate the anomaly fields.</param>
+/// <param name="AnomalyWindow">Rolling window (preceding buckets) the anomaly baseline uses; clamped to a supported range.</param>
+/// <param name="AnomalyThreshold">The <c>|z|</c> cutoff at or above which a bucket is flagged; clamped to a supported range.</param>
+/// <param name="AnomalyRobust">When <c>true</c>, the anomaly baseline uses median + MAD instead of mean + standard deviation.</param>
 public sealed record ExploreSeriesQuery(
     string SchemaName,
     IReadOnlyList<string>? ValueNames,
     IReadOnlyList<Guid>? ServiceIds,
     DateTime? From,
     DateTime? To,
-    ExploreAggregation Aggregation);
+    ExploreAggregation Aggregation,
+    bool Anomaly = false,
+    int AnomalyWindow = 12,
+    double AnomalyThreshold = 2.5,
+    bool AnomalyRobust = false);
 
 /// <summary>A service that appears in an explore result, with its friendly label resolved.</summary>
 /// <param name="ServiceId">Service account id.</param>
@@ -53,7 +61,9 @@ public sealed record ExploreServiceRef(Guid ServiceId, string ServiceName, strin
 /// <param name="ServiceId">Service account id (join key back to <see cref="ExploreServiceRef"/>).</param>
 /// <param name="Value">The bucket reduced by the query's <see cref="ExploreAggregation"/>.</param>
 /// <param name="Count">Number of samples this service contributed to the bucket.</param>
-public sealed record ExploreServicePoint(Guid ServiceId, double Value, int Count);
+/// <param name="Z">Anomaly score against this service's preceding history; <c>null</c> unless anomaly scoring was requested and there was enough history.</param>
+/// <param name="IsAnomaly">Whether <see cref="Z"/> crossed the requested threshold.</param>
+public sealed record ExploreServicePoint(Guid ServiceId, double Value, int Count, double? Z = null, bool IsAnomaly = false);
 
 /// <summary>One cadence bucket of a value's timeline, carrying the overall and per-service reductions.</summary>
 /// <param name="PeriodStart">Inclusive bucket start, aligned to the value's cadence.</param>
@@ -61,12 +71,16 @@ public sealed record ExploreServicePoint(Guid ServiceId, double Value, int Count
 /// <param name="Value">The bucket reduced across every in-scope service.</param>
 /// <param name="Count">Total samples folded into the bucket across every service.</param>
 /// <param name="Services">Per-service reductions, ordered by service name.</param>
+/// <param name="Z">Anomaly score of the overall (combined) value against preceding buckets; <c>null</c> unless anomaly scoring was requested and there was enough history.</param>
+/// <param name="IsAnomaly">Whether the overall <see cref="Z"/> crossed the requested threshold.</param>
 public sealed record ExploreBucket(
     DateTime PeriodStart,
     DateTime PeriodEnd,
     double Value,
     int Count,
-    IReadOnlyList<ExploreServicePoint> Services);
+    IReadOnlyList<ExploreServicePoint> Services,
+    double? Z = null,
+    bool IsAnomaly = false);
 
 /// <summary>A single value's bucketed timeline.</summary>
 /// <param name="ValueName">Machine-style value name.</param>
@@ -190,6 +204,81 @@ public sealed record ExploreScorecardResult(
     IReadOnlyList<ExploreServiceRef> Services,
     IReadOnlyList<ExploreScorecardSchema> Schemas);
 
+/// <summary>Whether a submitted value for the target period reads as a statistical anomaly.</summary>
+public enum AnomalyState
+{
+    /// <summary>Submitted and within the expected range of its recent history (or too little history to tell).</summary>
+    Normal = 0,
+
+    /// <summary>Submitted but the value deviates strongly from its recent history.</summary>
+    Anomaly = 1,
+}
+
+/// <summary>Filter + tuning options for an <see cref="IExploreService.GetAnomaliesAsync"/> call.</summary>
+/// <param name="SchemaNames">Schemas to scan. <c>null</c> or empty means "every enabled schema".</param>
+/// <param name="ServiceIds">Restrict to these services. <c>null</c> or empty means "every service".</param>
+/// <param name="Period">Which period to test: the open <see cref="ScorecardPeriod.Current"/> one or the <see cref="ScorecardPeriod.LatestClosed"/>.</param>
+/// <param name="Window">Rolling window (preceding periods) the baseline uses; clamped to a supported range.</param>
+/// <param name="Threshold">The <c>|z|</c> cutoff at or above which a value is flagged; clamped to a supported range.</param>
+/// <param name="Robust">When <c>true</c>, the baseline uses median + MAD instead of mean + standard deviation.</param>
+public sealed record ExploreAnomalyQuery(
+    IReadOnlyList<string>? SchemaNames,
+    IReadOnlyList<Guid>? ServiceIds,
+    ScorecardPeriod Period = ScorecardPeriod.Current,
+    int Window = 12,
+    double Threshold = 2.5,
+    bool Robust = false);
+
+/// <summary>
+/// One service's anomaly result for a numeric value in the target period. A "missing" cell (the
+/// service didn't submit the period) carries a <c>null</c> <see cref="State"/>, <see cref="Value"/>,
+/// <see cref="Z"/> and <see cref="SubmissionId"/>.
+/// </summary>
+/// <param name="ServiceId">Service account id (join key back to <see cref="ExploreAnomalyResult.Services"/>).</param>
+/// <param name="SubmissionId">Submission the tested sample came from, so the UI can deep-link; <c>null</c> when missing.</param>
+/// <param name="Value">The value tested; <c>null</c> when missing.</param>
+/// <param name="Z">The standardised score; <c>null</c> when missing or when there was too little history.</param>
+/// <param name="State">Anomaly classification; <c>null</c> when missing.</param>
+/// <param name="PeriodStart">Inclusive start of the period tested (or expected).</param>
+/// <param name="PeriodEnd">Exclusive end of that period.</param>
+public sealed record ExploreAnomalyCell(
+    Guid ServiceId,
+    Guid? SubmissionId,
+    double? Value,
+    double? Z,
+    AnomalyState? State,
+    DateTime PeriodStart,
+    DateTime PeriodEnd);
+
+/// <summary>A numeric value and every applicable service's anomaly result for the target period.</summary>
+/// <param name="ValueName">Machine-style value name.</param>
+/// <param name="Label">Friendly label, if one was set.</param>
+/// <param name="Unit">Unit of measure carried on the schema definition.</param>
+/// <param name="Cadence">Cadence the value is collected on (decides the target period).</param>
+/// <param name="Cells">One cell per service the schema applies to, ordered by service id.</param>
+public sealed record ExploreAnomalyValue(
+    string ValueName,
+    string? Label,
+    string? Unit,
+    Cadence Cadence,
+    IReadOnlyList<ExploreAnomalyCell> Cells);
+
+/// <summary>One enabled schema's numeric values for the anomaly board, grouped under the schema.</summary>
+/// <param name="SchemaName">Machine-style schema name.</param>
+/// <param name="SchemaLabel">Friendly schema label.</param>
+/// <param name="Values">Numeric values that apply to at least one service.</param>
+public sealed record ExploreAnomalySchema(
+    string SchemaName,
+    string? SchemaLabel,
+    IReadOnlyList<ExploreAnomalyValue> Values);
+
+/// <summary>The result of an <see cref="IExploreService.GetAnomaliesAsync"/> call.</summary>
+/// <param name="Services">Every service appearing in the result, with labels resolved.</param>
+/// <param name="Schemas">Scanned enabled schemas that have at least one numeric value applying to a service.</param>
+public sealed record ExploreAnomalyResult(
+    IReadOnlyList<ExploreServiceRef> Services,
+    IReadOnlyList<ExploreAnomalySchema> Schemas);
+
 /// <summary>
 /// Lightweight, in-app analytics over the denormalised sample projection: per-value, per-cadence
 /// buckets with a per-service breakdown, for the bundled "Explore" page. Deliberately small — it
@@ -216,4 +305,14 @@ public interface IExploreService
     /// <param name="query">Service filter.</param>
     /// <param name="ct">Cancellation token.</param>
     Task<ExploreScorecardResult> GetScorecardAsync(ExploreScorecardQuery query, CancellationToken ct = default);
+
+    /// <summary>
+    /// Build an anomaly board for one period: for each numeric value of the scanned schemas, test
+    /// each applicable service's value for that period against its own recent history. Mirrors the
+    /// scorecard shape (schema → value → per-service cells) but classifies each cell as normal,
+    /// anomalous, or missing rather than by a RAG band.
+    /// </summary>
+    /// <param name="query">Schema/service filter, target period and detector tuning.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<ExploreAnomalyResult> GetAnomaliesAsync(ExploreAnomalyQuery query, CancellationToken ct = default);
 }

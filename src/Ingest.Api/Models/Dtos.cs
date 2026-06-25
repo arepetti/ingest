@@ -1158,10 +1158,12 @@ public sealed record SchemaHistoryDto(
 /// <param name="ServiceId">Service account id (join key back to <see cref="ExploreSeriesResponse.Services"/>).</param>
 /// <param name="Value">The bucket reduced by the requested aggregation, for this service only.</param>
 /// <param name="Count">Number of samples this service contributed to the bucket.</param>
-public sealed record ExploreServicePointDto(Guid ServiceId, double Value, int Count)
+/// <param name="Z">Anomaly score against this service's preceding history; <c>null</c> unless anomaly scoring was requested.</param>
+/// <param name="IsAnomaly">Whether <paramref name="Z"/> crossed the requested threshold.</param>
+public sealed record ExploreServicePointDto(Guid ServiceId, double Value, int Count, double? Z, bool IsAnomaly)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
-    public static ExploreServicePointDto From(ExploreServicePoint p) => new(p.ServiceId, p.Value, p.Count);
+    public static ExploreServicePointDto From(ExploreServicePoint p) => new(p.ServiceId, p.Value, p.Count, p.Z, p.IsAnomaly);
 }
 
 /// <summary>One cadence bucket of an Explore value series, with the overall and per-service reductions.</summary>
@@ -1170,17 +1172,21 @@ public sealed record ExploreServicePointDto(Guid ServiceId, double Value, int Co
 /// <param name="Value">The bucket reduced across every in-scope service.</param>
 /// <param name="Count">Total samples folded into the bucket.</param>
 /// <param name="Services">Per-service reductions.</param>
+/// <param name="Z">Anomaly score of the overall (combined) value against preceding buckets; <c>null</c> unless anomaly scoring was requested.</param>
+/// <param name="IsAnomaly">Whether the overall <paramref name="Z"/> crossed the requested threshold.</param>
 public sealed record ExploreBucketDto(
     DateTime PeriodStart,
     DateTime PeriodEnd,
     double Value,
     int Count,
-    List<ExploreServicePointDto> Services)
+    List<ExploreServicePointDto> Services,
+    double? Z,
+    bool IsAnomaly)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static ExploreBucketDto From(ExploreBucket b) => new(
         b.PeriodStart, b.PeriodEnd, b.Value, b.Count,
-        b.Services.Select(ExploreServicePointDto.From).ToList());
+        b.Services.Select(ExploreServicePointDto.From).ToList(), b.Z, b.IsAnomaly);
 }
 
 /// <summary>A single value's bucketed Explore timeline.</summary>
@@ -1299,6 +1305,71 @@ public sealed record ExploreScorecardResponse(
     public static ExploreScorecardResponse FromResult(ExploreScorecardResult r) => new(
         r.Services.Select(ExploreServiceRefDto.From).ToList(),
         r.Schemas.Select(ExploreScorecardSchemaDto.From).ToList());
+}
+
+/// <summary>One service's anomaly result for a numeric value in the target period.</summary>
+/// <param name="ServiceId">Service account id (join key back to <see cref="ExploreAnomalyResponse.Services"/>).</param>
+/// <param name="SubmissionId">Submission the tested sample came from, so the UI can deep-link; <c>null</c> when missing.</param>
+/// <param name="Value">The value tested; <c>null</c> when missing.</param>
+/// <param name="Z">The standardised score; <c>null</c> when missing or with too little history.</param>
+/// <param name="State">Anomaly classification (<c>Normal</c>/<c>Anomaly</c>); <c>null</c> when missing.</param>
+/// <param name="PeriodStart">Inclusive start of the period tested (or expected).</param>
+/// <param name="PeriodEnd">Exclusive end of that period.</param>
+public sealed record ExploreAnomalyCellDto(
+    Guid ServiceId,
+    Guid? SubmissionId,
+    double? Value,
+    double? Z,
+    AnomalyState? State,
+    DateTime PeriodStart,
+    DateTime PeriodEnd)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreAnomalyCellDto From(ExploreAnomalyCell c) => new(
+        c.ServiceId, c.SubmissionId, c.Value, c.Z, c.State, c.PeriodStart, c.PeriodEnd);
+}
+
+/// <summary>A numeric value and every applicable service's anomaly result for the target period.</summary>
+/// <param name="ValueName">Machine-style value name.</param>
+/// <param name="Label">Friendly label.</param>
+/// <param name="Unit">Unit of measure.</param>
+/// <param name="Cells">One cell per applicable service.</param>
+public sealed record ExploreAnomalyValueDto(
+    string ValueName,
+    string? Label,
+    string? Unit,
+    List<ExploreAnomalyCellDto> Cells)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreAnomalyValueDto From(ExploreAnomalyValue v) => new(
+        v.ValueName, v.Label, v.Unit, v.Cells.Select(ExploreAnomalyCellDto.From).ToList());
+}
+
+/// <summary>One scanned schema's numeric values for the anomaly board, grouped under the schema.</summary>
+/// <param name="SchemaName">Machine-style schema name.</param>
+/// <param name="SchemaLabel">Friendly schema label.</param>
+/// <param name="Values">Numeric values that apply to at least one service.</param>
+public sealed record ExploreAnomalySchemaDto(
+    string SchemaName,
+    string? SchemaLabel,
+    List<ExploreAnomalyValueDto> Values)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static ExploreAnomalySchemaDto From(ExploreAnomalySchema s) => new(
+        s.SchemaName, s.SchemaLabel, s.Values.Select(ExploreAnomalyValueDto.From).ToList());
+}
+
+/// <summary>Wire shape of <c>GET /api/admin/explore/anomalies</c>: a per-period anomaly status board.</summary>
+/// <param name="Services">Every service appearing in the result, with labels resolved.</param>
+/// <param name="Schemas">Scanned schemas with at least one numeric value applying to a service.</param>
+public sealed record ExploreAnomalyResponse(
+    List<ExploreServiceRefDto> Services,
+    List<ExploreAnomalySchemaDto> Schemas)
+{
+    /// <summary>Project the domain result onto the wire shape.</summary>
+    public static ExploreAnomalyResponse FromResult(ExploreAnomalyResult r) => new(
+        r.Services.Select(ExploreServiceRefDto.From).ToList(),
+        r.Schemas.Select(ExploreAnomalySchemaDto.From).ToList());
 }
 
 /// <summary>Wire representation of a stored Liquid report.</summary>

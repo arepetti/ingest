@@ -18,14 +18,16 @@ never downloads raw samples — so it stays responsive at the reference data vol
 
 ## Layout: two levels of tabs
 
-Right below the page title sit two **outer tabs**:
+Right below the page title sit three **outer tabs**:
 
 - **Scorecard** — a cross-schema Red/Amber/Green status board (see [Scorecard](#scorecard)).
 - **Analysis** — the per-schema charts, with three **inner tabs**: **Trend**, **Compare services**
   and **Snapshot**.
+- **Anomalies** — a cross-schema board flagging values that deviate from their own recent history for
+  the current (or latest closed) period (see [Anomalies](#anomalies)).
 
-The filter bar and the inner tabs only appear under **Analysis**; the Scorecard keeps just the
-**Services** filter plus its own **Show** / **Period** options (see [Scorecard](#scorecard)).
+The Analysis filter bar and the inner tabs only appear under **Analysis**; the Scorecard and
+Anomalies tabs keep just the **Services** filter plus their own options.
 
 ## The filter bar
 
@@ -85,6 +87,29 @@ the schema), it's drawn behind the lines as a **green** ideal zone with **amber*
 see at a glance whether services are sitting where they should. Anything outside the amber range (the
 "red" zone) is left unshaded. The band is purely a visual reference; it's never enforced and doesn't
 affect any of the aggregated figures. It also appears on the historical-data view.
+
+#### Highlight anomalies
+
+The **Highlight anomalies** dropdown button (rightmost in the Trend toolbar) rings the points that
+deviate strongly from each line's own recent history. Each drawn line is scored independently: every
+bucket is compared against the values that **precede** it (so the marker answers "was this surprising
+*given what came before*?"). Flagged points get a hollow amber ring, the tooltip shows the **z-score**
+alongside the value, and a small counter above the chart tallies how many were highlighted.
+
+Open the dropdown to switch the highlight on/off and tune the detector:
+
+- **History window** — how many preceding periods form the baseline (8 / 12 / 26). Gaps don't count:
+  a period a service didn't report is simply absent from its history, never treated as a zero.
+- **Sensitivity (|z| threshold)** — how far from the baseline a value must sit to be flagged
+  (2 / 2.5 / 3). Lower flags more.
+- **Robust (median / MAD)** — switch the baseline from mean + standard deviation to median + median
+  absolute deviation, which resists a handful of past spikes inflating the baseline and hiding later
+  outliers.
+
+A point needs at least **four** preceding values before it can be scored, so the start of a short
+series is never flagged. This is a **view aid only** — it never rejects a submission and stores
+nothing. For hard, history-aware rejections use a schema [validation rule](validation.md) with
+`previous()` / `latest()`, which runs in the submission pipeline.
 
 ### Compare
 
@@ -149,6 +174,47 @@ period* mode the filter also narrows who is expected to report (disabled service
 The selected **Show** and **Period** options are part of the shareable URL and can be saved as a
 preset.
 
+### Anomalies
+
+A cross-schema **anomaly board**, on its own outer tab. It answers a different question from the
+Scorecard: not "is this value on target?" but "is this value **unusual for itself**?". For one period
+it scores every applicable service's value against that service's own recent history (the same z-score
+/ MAD detector as the Trend [Highlight anomalies](#highlight-anomalies) toggle), and lays the result
+out as a card board grouped by schema then value.
+
+Each card shows the service, its value (and z-score) and a coloured dot:
+
+- **Green — no anomalies:** the value submitted for the period is in line with its recent history (or
+  there wasn't enough history yet to judge — fewer than four preceding periods).
+- **Yellow — anomaly:** the value deviates strongly from its recent history.
+- **Grey — no submission:** the service was expected to report this period but didn't. Grey cards
+  aren't clickable.
+
+**Clicking a card jumps straight to the Analysis → Trend chart** for that schema, value and service,
+with **Highlight anomalies** already on and the same window / sensitivity / robust settings carried
+across — so you land on exactly the chart that flagged it.
+
+The board's filter bar offers:
+
+- **Schemas** — which schemas to scan (multi-select). Empty scans **every** schema with numeric
+  values. (Unlike the Scorecard, a value does **not** need a RAG band to appear here.)
+- **Services** — restrict to a team or directorate; this also narrows who is *expected* to report
+  (so the grey "no submission" cards reflect only the services you care about).
+- **Period** — **Current** (the open period) or **Latest closed** (the last fully-elapsed one). Each
+  value uses its own [cadence](schemas.md) to decide what "the period" is.
+
+The detector tuning (**History window**, **Sensitivity**, **Robust** — the same controls as the Trend
+view's Anomalies popover) sits inline in a row directly under those dropdowns.
+
+Each schema's card is **collapsible** (click the header). Cards start expanded, except ones where
+**every** cell is a grey "no submission" — those start collapsed, since there's nothing to act on
+yet; a one-line summary (e.g. *2 anomalies · 5 normal · 1 no submission*) shows on the collapsed
+header so you can still scan the board.
+
+Toggle **Hide normal** (top right) to drop the green cards and keep only anomalies and grey "no
+submission" cards. Everything — the schema selection, period and detector settings — is part of the
+shareable URL and can be saved as a preset.
+
 ## Stat cards
 
 Above the Trend and Compare charts a row of cards summarises the current selection: the overall
@@ -161,13 +227,16 @@ services are in scope.
   numbers in a grid — useful for copy-pasting or for screen-reader users.
 - **Export CSV (this view).** The **⋮** menu exports exactly what the active view shows
   (per-period per-service for Trend, per-service for Compare, the latest-value matrix for Snapshot).
+  With **Highlight anomalies** on in **Combine services** mode, the Trend export (and the table view)
+  gain **z** and **Anomaly** columns for the single overall line.
 - **Export chart (PNG).** Saves the current Trend or Compare chart as an image for a slide or email.
 
 ## Limits and caveats
 
 - **Numeric values only.** String, date and boolean values are skipped — there's nothing to chart.
-- **One schema at a time**, except the Scorecard view, which is cross-schema but shows only the RAG
-  status (latest available, or a single period) of values that carry a target band.
+- **One schema at a time**, except the Scorecard and Anomalies boards, which are cross-schema (the
+  Scorecard shows RAG status for banded values; Anomalies flags values that deviate from their own
+  recent history).
 - **Capped result set.** The query is bounded (well above the reference volume for one schema over a
   couple of years). If you somehow exceed it, narrow the period or the service list — or, better,
   use PowerBI for analysis at that scale.
@@ -176,7 +245,7 @@ services are in scope.
 
 ## API
 
-The page is backed by two read-only endpoints (operator/admin).
+The page is backed by three read-only endpoints (operator/admin).
 
 The Trend, Compare and Snapshot views use:
 
@@ -187,11 +256,16 @@ GET /api/admin/explore/series
     &serviceIds={guid}        # repeatable; omit for every service
     &from={iso}&to={iso}      # optional half-open window [from, to)
     &agg={Average|Sum|Min|Max|Count}   # defaults to Average
+    &anomaly=true             # opt-in: score each bucket for anomalies
+    &anomalyWindow={int}      # preceding periods in the baseline; defaults to 12 (clamped server-side)
+    &anomalyThreshold={num}   # |z| cutoff to flag; defaults to 2.5 (clamped server-side)
+    &anomalyRobust=true       # use median/MAD instead of mean/standard deviation
 ```
 
 It returns one timeline per in-scope numeric value, each as a list of cadence buckets carrying the
-overall reduced value plus a per-service breakdown, along with the resolved service list. A `404`
-means no schema with that name.
+overall reduced value plus a per-service breakdown, along with the resolved service list. When
+`anomaly=true`, each bucket and per-service point also carries a `z` score and an `isAnomaly` flag
+(both unset otherwise). A `404` means no schema with that name.
 
 The Scorecard view uses:
 
@@ -208,6 +282,24 @@ with data, and for each reporting service a cell with its value, period and a `s
 service the schema applies to: a classified cell if the service submitted the chosen period, or a
 **missing** cell (`status`, `value` and `submissionId` all `null`, with the period it was expected
 for) if it didn't — so schemas with no submissions at all still appear.
+
+The Anomalies board uses:
+
+```
+GET /api/admin/explore/anomalies
+    ?schema={name}            # repeatable; omit to scan every enabled schema
+    &serviceIds={guid}        # repeatable; omit for every service
+    &period={Current|LatestClosed}   # defaults to Current
+    &window={int}             # preceding periods in the baseline; defaults to 12 (clamped server-side)
+    &threshold={num}          # |z| cutoff to flag; defaults to 2.5 (clamped server-side)
+    &robust=true              # use median/MAD instead of mean/standard deviation
+```
+
+It returns, per scanned schema and numeric value, one cell for every service the schema applies to:
+a classified cell (`state` of `Normal` or `Anomaly`, plus `value`, `z` and `submissionId`) if the
+service submitted the target period, or a **missing** cell (`state`, `value`, `z` and `submissionId`
+all `null`) if it didn't. A submitted value with too little history to score is `Normal` with a `null`
+`z`.
 
 These are the same endpoints the SPA calls, so you can drive them from your own tooling if you'd
 rather not build against OData for a simple chart.

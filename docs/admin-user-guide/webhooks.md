@@ -114,6 +114,17 @@ Deliveries go through a durable **outbox** (the same pattern as outgoing email),
 
 Use **Send test** (row **⋮** menu) to enqueue a `webhook.test` delivery to that endpoint. It's signed and shaped exactly like a real event, so you can confirm the URL, signature verification, and your receiver's parsing end-to-end. Watch it land in **Audit → Webhook deliveries**.
 
+## Recipe: refresh a Power BI dataset on accept
+
+Power BI's REST API exposes [`POST /v1.0/myorg/groups/{groupId}/datasets/{datasetId}/refreshes`](https://learn.microsoft.com/rest/api/power-bi/datasets/refresh-dataset-in-group), which kicks an on-demand refresh. Pair it with a `submission.accepted` webhook so reports refresh as soon as new data lands, without waiting for a schedule:
+
+1. Register an Entra **service principal**, give it `Dataset.ReadWrite.All`, and add it as a **Member** of the target workspace (Power BI workspace → Access).
+2. Build a tiny receiver — a **Power Automate** flow (simplest) or an **Azure Function** — that subscribes to `submission.accepted`, [verifies the signature](#verifying-signatures), and calls the refresh endpoint.
+3. **Coalesce bursts.** Submissions arrive in clusters (overnight integrations, end-of-month rush), and Power BI caps refreshes (Pro: **8/dataset/day**, Premium/Fabric: **48**). Debounce — wait a few minutes after the last accept, then refresh once (a Durable Functions timer or a Logic App delay works).
+4. **Target the right dataset.** If you keep one dataset per schema, branch on `data.schemas[0]` in the [payload](#what-a-delivery-looks-like) before calling refresh.
+
+> Using the [approval workflow](approval-process.md)? Refresh on **`submission.approved`** instead — `Pending` submissions aren't in the OData feed yet, so refreshing on `submission.accepted` alone would miss data that's still awaiting sign-off.
+
 ## Operational notes
 
 - **Best-effort, never blocking.** Publishing a webhook can't fail a submission: the submission is persisted first, then events are enqueued. A webhook problem is logged, not surfaced to the submitting service.

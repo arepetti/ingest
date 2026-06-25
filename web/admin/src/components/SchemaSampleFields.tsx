@@ -6,7 +6,8 @@ import { Add20Regular } from '@fluentui/react-icons'
 import type { Schema, SchemaValue, SchemaValueType } from '../api/types'
 import { ValueLabel } from './ValueLabel'
 import { cadenceLabel } from '../utils/cadence'
-import { walkLayout } from '../utils/layout'
+import { walkLayout, type RenderItem } from '../utils/layout'
+import { fromLocalInput, toLocalInput } from '../utils/datetimeLocal'
 import type { RowState, ValueRow } from '../utils/sampleRules'
 
 const useStyles = makeStyles({
@@ -92,17 +93,16 @@ export function SchemaSampleFields({
     isValueVisible: (name) => !(statesByName.get(name)?.hidden ?? false),
   })
 
-  // Track the first visible value globally so its top border is suppressed; a fresh section
-  // start also suppresses the border on the first child for the same reason.
-  let visibleSoFar = 0
-  let suppressNextBorder = false
+  // Decide up-front which value rows should hide their top border (the first visible value, the
+  // first child after a section start, or any row carrying its own caption). Computed in a single
+  // pass outside the render closure so we don't reassign render-scope variables while mapping.
+  const borderlessByIndex = computeBorderless(items, rowsByName, statesByName)
 
   return (
     <>
       {items.map((item, idx) => {
         if (item.kind === 'section-end') return null
         if (item.kind === 'section-start') {
-          suppressNextBorder = true
           const HeadingTag = item.depth === 0 ? 'h2' : 'h3'
           const headingClass = item.depth === 0 ? s.sectionHeading : s.subsectionHeading
           return (
@@ -122,16 +122,12 @@ export function SchemaSampleFields({
         const state = statesByName.get(item.value.name)
         if (!row || !state) return null
         const caption = item.value.caption?.trim() || ''
-        const isFirstVisible = visibleSoFar === 0
-        const borderless = isFirstVisible || !!caption || suppressNextBorder
-        suppressNextBorder = false
-        visibleSoFar++
         return (
           <div key={item.value.name} style={item.depth > 0 ? { paddingLeft: `${item.depth * 8}px` } : undefined}>
             {caption && <h2 className={s.valueCaption}>{caption}</h2>}
             <SchemaValueRow
               row={row}
-              first={borderless}
+              first={borderlessByIndex.get(idx) ?? false}
               schemaEnabled={schema.enabled}
               schema={schema}
               state={state}
@@ -144,6 +140,33 @@ export function SchemaSampleFields({
       })}
     </>
   )
+}
+
+/**
+ * One pass over the laid-out items deciding which value rows hide their top border, keyed by the
+ * item's index. A row is borderless when it's the first visible value, the first child right after a
+ * section start, or it carries its own caption (the caption already provides visual separation).
+ */
+function computeBorderless(
+  items: RenderItem[],
+  rowsByName: Map<string, ValueRow>,
+  statesByName: Map<string, RowState>,
+): Map<number, boolean> {
+  const out = new Map<number, boolean>()
+  let visibleSoFar = 0
+  let suppressNextBorder = false
+  items.forEach((item, idx) => {
+    if (item.kind === 'section-end') return
+    if (item.kind === 'section-start') { suppressNextBorder = true; return }
+    const row = rowsByName.get(item.value.name)
+    const state = statesByName.get(item.value.name)
+    if (!row || !state) return
+    const caption = item.value.caption?.trim() || ''
+    out.set(idx, visibleSoFar === 0 || !!caption || suppressNextBorder)
+    suppressNextBorder = false
+    visibleSoFar++
+  })
+  return out
 }
 
 function SchemaValueRow({
@@ -357,19 +380,4 @@ function valueHint(v: SchemaValue): string {
     if (v.maxDate) bits.push(`to ${v.maxDate}`)
   }
   return bits.join(' · ')
-}
-
-// <input type="datetime-local"> wants 'YYYY-MM-DDTHH:mm' in local time; we round-trip via UTC ISO.
-export function toLocalInput(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => n.toString().padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-export function fromLocalInput(local: string): string {
-  if (!local) return ''
-  const d = new Date(local)
-  return d.toISOString()
 }

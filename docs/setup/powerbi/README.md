@@ -24,7 +24,7 @@ The **samples** and **scorecard** feeds are gated by the **`query:read`** capabi
 
 Issue a **dedicated Operator-kind credential** for each report or workspace — that way revoking or rotating it later doesn't affect anybody else. See the [accounts guide](../../admin-user-guide/accounts.md) for how to create one and copy its `X-Api-Key`.
 
-> If that Operator credential has a [service scope](../../admin-user-guide/accounts.md#service-scope-limiting-an-operator-to-a-subset-of-services), every feed it reads is automatically confined to its assigned services — a handy way to publish a report that only ever exposes one department's data. Leave the scope empty (the default) for a credential that sees every service.
+> **Per-department reports from one file.** If that Operator credential has a [service scope](../../admin-user-guide/accounts.md#service-scope-limiting-an-operator-to-a-subset-of-services), every feed it reads is automatically confined to its assigned services — server-side, before any data leaves Ingest. So you don't need a separate `.pbix` per audience: publish the *same* report once per directorate, each dataset carrying a key scoped to that directorate's services, and each viewer only ever sees their own data. Leave the scope empty (the default) for a credential that sees every service.
 
 ## Connecting Power BI Desktop
 
@@ -109,6 +109,8 @@ After publishing to the Power BI service:
 2. Set a **Refresh schedule** that fits your data cadence; even Daily is usually fine because each row is tiny.
 3. Behind a private network, install an **on-premises data gateway** and add the OData source to it.
 4. Keep the `ApiKey` (and `BaseUrl`) **parameter values** current in the dataset settings — that's where you update them after a key rotation.
+
+> **Want fresher-than-scheduled?** Trigger an on-demand refresh the moment new data lands by wiring a `submission.accepted` webhook to the Power BI refresh API — see [admin-user-guide/webhooks.md § Recipe: refresh a Power BI dataset on accept](../../admin-user-guide/webhooks.md#recipe-refresh-a-power-bi-dataset-on-accept).
 
 ## Troubleshooting
 
