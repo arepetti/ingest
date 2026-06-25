@@ -79,6 +79,17 @@ public sealed class Account : AuditedEntity
     /// </summary>
     public List<string> Capabilities { get; set; } = new();
 
+    /// <summary>
+    /// Optional per-service scope for back-office readers. When non-empty, every capability this
+    /// account holds is confined to data belonging to the listed service accounts: cross-service
+    /// reads (submissions, status, Explore, the OData/Power BI feed) are filtered to these ids and
+    /// any other service is invisible. When <b>empty</b> (the default) the account is unrestricted
+    /// and sees every service exactly as before — so existing accounts need no migration.
+    /// <see cref="AccountRole.Admin"/> ignores this and always sees every service. The ids are
+    /// expected to be <see cref="AccountRole.Service"/> accounts.
+    /// </summary>
+    public List<Guid> AssignedServiceIds { get; set; } = new();
+
     /// <summary>When false, every API key attached to this account is invalid for new requests.</summary>
     public bool Enabled { get; set; } = true;
 

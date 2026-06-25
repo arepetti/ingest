@@ -1,4 +1,5 @@
 using Ingest.Api.Auth;
+using Ingest.Api.Common;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -53,8 +54,11 @@ public sealed class ScorecardController : ODataController
             ? p
             : ScorecardPeriod.Current;
 
+        // A scoped caller only sees its assigned services; an unrestricted caller sees them all
+        // (and can still narrow via $filter, as before).
+        var scope = User.CurrentAssignedServiceIds();
         var result = await _explore.GetScorecardAsync(
-            new ExploreScorecardQuery(ServiceIds: null, scMode, scPeriod), ct);
+            new ExploreScorecardQuery(scope.Count > 0 ? scope : null, scMode, scPeriod), ct);
 
         return Ok(ScorecardCard.FromResult(result).AsQueryable());
     }

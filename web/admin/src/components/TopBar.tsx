@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Avatar, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem,
+  Avatar, Badge, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem,
   Button, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger,
   Text, Tooltip, makeStyles, tokens,
 } from '@fluentui/react-components'
@@ -227,6 +227,20 @@ export function TopBar({ me }: { me?: Me }) {
   const crumbs = buildBreadcrumbs(pathname, labels)
   const displayName = me?.label || me?.name || ''
 
+  // When the session is confined to a subset of services, surface a badge so the operator always
+  // knows they're seeing a limited view (and not mistake a partial dataset for the whole estate).
+  const scopeIds = me?.assignedServiceIds ?? []
+  const scoped = scopeIds.length > 0
+  const scopeNames = scopeIds
+    .map(id => {
+      const a = (accountsQuery.data?.items ?? []).find(x => x.id === id)
+      return a ? (a.label || a.name) : null
+    })
+    .filter((n): n is string => !!n)
+  const scopeTooltip = scopeNames.length > 0
+    ? `This session can only see: ${scopeNames.join(', ')}`
+    : `This session is limited to ${scopeIds.length} service${scopeIds.length === 1 ? '' : 's'}.`
+
   return (
     <header className={s.root}>
       <div className={s.crumbs}>
@@ -247,6 +261,13 @@ export function TopBar({ me }: { me?: Me }) {
       </div>
 
       <div className={s.account}>
+        {scoped && (
+          <Tooltip content={scopeTooltip} relationship="description" positioning="below">
+            <Badge appearance="tint" color="brand">
+              Limited view · {scopeIds.length} service{scopeIds.length === 1 ? '' : 's'}
+            </Badge>
+          </Tooltip>
+        )}
         <Menu>
           <MenuTrigger disableButtonEnhancement>
             {/* Tooltip carries the role: the visible bar mentions only label/name so it doesn't

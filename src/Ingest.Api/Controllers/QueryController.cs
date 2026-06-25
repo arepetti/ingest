@@ -31,8 +31,15 @@ public sealed class QueryController(ISampleRepository samples) : ControllerBase
     [ProducesResponseType(typeof(PagedResponse<SampleProjectionDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> QuerySamples([FromBody] QueryRequest req, CancellationToken ct)
     {
+        // Confine the query to the caller's assigned services (intersected with any explicit
+        // serviceIds filter). A scoped caller asking only for out-of-scope services gets an empty
+        // page rather than a leak.
+        var effective = User.ResolveServiceFilter(req.ServiceIds, out var empty);
+        if (empty)
+            return Ok(new PagedResponse<SampleProjectionDto>(Array.Empty<SampleProjectionDto>(), 0, req.Page, req.PageSize));
+
         var q = new SampleQuery(
-            req.ServiceIds,
+            effective,
             req.SchemaNames,
             req.From,
             req.To,

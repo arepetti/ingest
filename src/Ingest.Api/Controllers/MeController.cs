@@ -81,6 +81,10 @@ public sealed class MeController : ControllerBase
         // with per-account overrides; Admin implicitly holds all), so we just project the claims.
         var capabilities = User.FindAll(AuthConstants.CapabilityClaim).Select(c => c.Value).ToArray();
 
+        // Per-service scope (empty = unrestricted). Lets the SPA badge the active scope and hint to
+        // the operator that they only see a subset of services. Admins never carry these.
+        var assignedServiceIds = User.CurrentAssignedServiceIds().Select(id => id.ToString()).ToArray();
+
         return Ok(new
         {
             id = User.CurrentAccountId(),
@@ -89,6 +93,7 @@ public sealed class MeController : ControllerBase
             role = User.FindFirst(ClaimTypes.Role)?.Value,
             kind = User.FindFirst(AuthConstants.KindClaim)?.Value,
             capabilities,
+            assignedServiceIds,
             emailEnabled = _email.Enabled,
             webhooksEnabled = _webhooks.Enabled,
             integrationsEnabled = _integrations.Enabled,

@@ -33,11 +33,16 @@ public sealed class SubmissionRepository : RepositoryBase<Submission>, ISubmissi
         string? schemaName = null,
         ApprovalStatus? approvalStatus = null,
         bool? draft = null,
+        IReadOnlyCollection<Guid>? allowedServiceIds = null,
         CancellationToken ct = default)
     {
         var filter = ApplySoftDelete(Builders<Submission>.Filter.Empty, request.IncludeDeleted);
         if (serviceId is { } sid)
             filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.Eq(s => s.ServiceAccountId, sid));
+        // Security scope: confine the listing to the caller's assigned services. ANDed with any
+        // single-service filter above, so a request for one service outside the scope yields nothing.
+        if (allowedServiceIds is { Count: > 0 })
+            filter = Builders<Submission>.Filter.And(filter, Builders<Submission>.Filter.In(s => s.ServiceAccountId, allowedServiceIds));
         if (approvalStatus is { } status)
             filter = Builders<Submission>.Filter.And(filter, ApprovalStatusFilter(status));
         if (draft is { } isDraft)

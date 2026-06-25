@@ -141,8 +141,9 @@ public interface ISubmissionService
     /// <param name="schemaName">When non-null, restrict the listing to submissions for a single schema.</param>
     /// <param name="approvalStatus">When non-null, restrict the listing to a single approval state.</param>
     /// <param name="draft">When non-null, restrict to drafts (<c>true</c>) or non-drafts (<c>false</c>); <c>null</c> returns both.</param>
+    /// <param name="allowedServiceIds">Security scope: when non-null, only submissions owned by one of these service accounts are returned. <c>null</c> means no scope restriction.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, ApprovalStatus? approvalStatus = null, bool? draft = null, CancellationToken ct = default);
+    Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, ApprovalStatus? approvalStatus = null, bool? draft = null, IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default);
 
     /// <summary>Fetch any submission by id.</summary>
     /// <param name="submissionId">Submission id.</param>

@@ -30,11 +30,21 @@ public interface IApiKeyService
     /// <summary>Generate and persist a new key for the account, returning it together with its one-time plaintext.</summary>
     /// <param name="accountId">Account that will own the new key.</param>
     /// <param name="expiresAt">Optional absolute expiry. When supplied it must be in the future and no more than two years out; <c>null</c> means the key never expires.</param>
+    /// <param name="description">Optional free-form note describing who/what the key is for. Trimmed; blank is stored as none.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The new key paired with its plaintext.</returns>
     /// <exception cref="NotFoundException">No account with that id.</exception>
-    /// <exception cref="ValidationException">The supplied <paramref name="expiresAt"/> is in the past or more than two years in the future.</exception>
-    Task<RotatedApiKey> RotateAsync(Guid accountId, DateTime? expiresAt = null, CancellationToken ct = default);
+    /// <exception cref="ValidationException">The supplied <paramref name="expiresAt"/> is in the past or more than two years in the future, or <paramref name="description"/> is too long.</exception>
+    Task<RotatedApiKey> RotateAsync(Guid accountId, DateTime? expiresAt = null, string? description = null, CancellationToken ct = default);
+
+    /// <summary>Update a key's free-form description (the only mutable, non-lifecycle field).</summary>
+    /// <param name="accountId">Account that owns the key.</param>
+    /// <param name="keyId">Key to annotate.</param>
+    /// <param name="description">New description; trimmed, with blank stored as none.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The updated key, or <c>null</c> if no such key exists for the account.</returns>
+    /// <exception cref="ValidationException">The supplied <paramref name="description"/> is too long.</exception>
+    Task<ApiKey?> UpdateDescriptionAsync(Guid accountId, Guid keyId, string? description, CancellationToken ct = default);
 
     /// <summary>Mark a key revoked.</summary>
     /// <remarks>Calling revoke twice is safe; the returned entity simply carries the existing revocation timestamp.</remarks>

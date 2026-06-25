@@ -23,6 +23,8 @@ A `Pending` or `Rejected` submission is held out of the live projection, so Powe
 
 Approving or rejecting needs the **`submissions:approve`** capability (and `submissions:read` to see the queue). The **Approver** role is just the template that seeds exactly those two capabilities; an **Admin** holds every capability and can always approve. You can equally grant `submissions:approve` to any other non-admin account that should be able to review. See [accounts.md § Permissions (capabilities)](accounts.md#permissions-capabilities) and [architecture/authentication.md § Authorisation: capabilities](../architecture/authentication.md#authorisation-capabilities).
 
+> If a reviewer has a [service scope](accounts.md#service-scope-limiting-an-operator-to-a-subset-of-services), their review queue (and the dashboard pending count) only ever shows submissions from their assigned services — out-of-scope submissions are invisible to them, and they cannot approve or reject them.
+
 A policy names its approvers, each marked **Required** or **Optional**. An approver can be either:
 
 - a specific **approver account** (any account that holds `submissions:approve` — Approver- or Admin-role accounts by default), or

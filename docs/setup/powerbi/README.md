@@ -24,6 +24,8 @@ The **samples** and **scorecard** feeds are gated by the **`query:read`** capabi
 
 Issue a **dedicated Operator-kind credential** for each report or workspace — that way revoking or rotating it later doesn't affect anybody else. See the [accounts guide](../../admin-user-guide/accounts.md) for how to create one and copy its `X-Api-Key`.
 
+> If that Operator credential has a [service scope](../../admin-user-guide/accounts.md#service-scope-limiting-an-operator-to-a-subset-of-services), every feed it reads is automatically confined to its assigned services — a handy way to publish a report that only ever exposes one department's data. Leave the scope empty (the default) for a credential that sees every service.
+
 ## Connecting Power BI Desktop
 
 The OData connector in Power BI doesn't have a field for an API key, so we connect **Anonymously** and attach the key as a custom HTTP header inside the Power Query script. This is a one-time setup per query.

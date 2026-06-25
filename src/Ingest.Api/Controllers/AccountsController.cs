@@ -88,6 +88,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
             Enabled = req.Enabled,
             ExternalLogins = ToExternalLogins(req.ExternalLogins) ?? new(),
             Capabilities = req.Capabilities ?? new(),
+            AssignedServiceIds = req.AssignedServiceIds ?? new(),
         }, ct);
         return Created($"/api/admin/accounts/{created.Id}", AccountDto.From(created));
     }
@@ -109,7 +110,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateAccountRequest req, CancellationToken ct)
     {
-        var updated = await service.UpdateAsync(id, new AccountUpdate(req.Label, req.Description, req.Email, req.Role, req.Enabled, ToExternalLogins(req.ExternalLogins), req.Capabilities), ct);
+        var updated = await service.UpdateAsync(id, new AccountUpdate(req.Label, req.Description, req.Email, req.Role, req.Enabled, ToExternalLogins(req.ExternalLogins), req.Capabilities, req.AssignedServiceIds), ct);
         return updated is null ? NotFound() : Ok(AccountDto.From(updated));
     }
 

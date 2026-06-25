@@ -51,4 +51,13 @@ public static class AuthConstants
     /// used directly in <c>[Authorize(Policy = ...)]</c> attributes.
     /// </remarks>
     public const string CapabilityClaim = "ingest:cap";
+
+    /// <summary>
+    /// Custom claim type carrying a single assigned-service id (string Guid). The authentication
+    /// handlers emit one per service in the account's <see cref="Core.Entities.Account.AssignedServiceIds"/>
+    /// allowlist. When <b>no</b> such claim is present the caller is unrestricted (sees every
+    /// service); when one or more are present, every cross-service read is confined to that set.
+    /// <see cref="Core.Entities.AccountRole.Admin"/> never carries these (admins see everything).
+    /// </summary>
+    public const string AssignedServiceClaim = "ingest:svc";
 }

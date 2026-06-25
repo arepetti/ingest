@@ -44,8 +44,11 @@ public sealed class ApiKeyService : IApiKeyService
     /// <summary>Largest lifetime an API key may be given at creation time.</summary>
     public const int MaxLifetimeYears = 2;
 
+    /// <summary>Longest a key's free-form description may be.</summary>
+    public const int MaxDescriptionLength = 200;
+
     /// <inheritdoc />
-    public async Task<RotatedApiKey> RotateAsync(Guid accountId, DateTime? expiresAt = null, CancellationToken ct = default)
+    public async Task<RotatedApiKey> RotateAsync(Guid accountId, DateTime? expiresAt = null, string? description = null, CancellationToken ct = default)
     {
         var account = await _accounts.GetByIdAsync(accountId, ct: ct)
             ?? throw new NotFoundException($"Account '{accountId}'");
@@ -60,10 +63,41 @@ public sealed class ApiKeyService : IApiKeyService
             Hash = generated.Hash,
             Salt = generated.Salt,
             ExpiresAt = normalizedExpiry,
+            Description = NormalizeAndValidateDescription(description),
         };
         await _keys.AddAsync(entity, ct);
         await _auditLog.RecordAsync(AuditTargetType.ApiKey, AuditChangeType.Create, entity.Id, entity.KeyId, ct);
         return new RotatedApiKey(entity, generated.Plaintext);
+    }
+
+    /// <inheritdoc />
+    public async Task<ApiKey?> UpdateDescriptionAsync(Guid accountId, Guid keyId, string? description, CancellationToken ct = default)
+    {
+        // Same (account, key) pairing as revoke so a stray keyId from another account can't be touched.
+        var all = await _keys.ListByAccountAsync(accountId, ct);
+        var key = all.FirstOrDefault(k => k.Id == keyId);
+        if (key is null) return null;
+
+        var normalized = NormalizeAndValidateDescription(description);
+        if (key.Description != normalized)
+        {
+            key.Description = normalized;
+            await _keys.UpdateAsync(key, ct);
+            await _auditLog.RecordAsync(AuditTargetType.ApiKey, AuditChangeType.Edit, key.Id, key.KeyId, ct);
+        }
+        return key;
+    }
+
+    /// <summary>Trim a caller-supplied description, store blank as <c>null</c>, and cap its length.</summary>
+    private static string? NormalizeAndValidateDescription(string? description)
+    {
+        var trimmed = description?.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return null;
+
+        if (trimmed.Length > MaxDescriptionLength)
+            throw new ValidationException(new[] { $"API key description cannot be longer than {MaxDescriptionLength} characters." });
+
+        return trimmed;
     }
 
     /// <summary>

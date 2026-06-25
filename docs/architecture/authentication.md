@@ -89,6 +89,7 @@ Client                              Ingest API
   │                                   │        ingest:kind    = "User" | "Application"
   │                                   │        ingest:accountLabel = account.Label
   │                                   │        ingest:cap     = one claim per effective capability
+  │                                   │        ingest:svc     = one claim per assigned service (scoped accounts only)
   │
   │   200 OK / 401 / 403              │
   │  ◄─────────────────────────────────
@@ -172,6 +173,36 @@ public class AdminSchemasController : ControllerBase { … }
 
 Controllers attach the read capability at the class level; mutating actions override it with the corresponding `:manage` (or verb) capability. The `ServicePolicy` (authenticated, no capability) still guards the self-service `/api/me`, `/api/schemas` and `/api/submissions` endpoints that a `Service` account uses against its own data.
 
+## Authorisation: service scope
+
+Capabilities answer *what kinds of thing* a principal may do; the **service scope** answers *which services' data* it may do them to. It is a second, orthogonal axis layered on top of capabilities — a back-office account can hold `submissions:read` and still be confined to a subset of services.
+
+An account carries an optional `AssignedServiceIds` allowlist. The interpretation is deliberately backwards-compatible:
+
+- **Empty (the default)** → *unrestricted*: the account sees every service, exactly as before, so existing accounts need **no migration**.
+- **Non-empty** → *scoped*: every cross-service read is confined to those service ids, and write attempts naming a service outside the set are refused.
+
+`Admin` accounts ignore the allowlist entirely (always unrestricted, and any stored scope is normalised away on save), and the ids are validated to be real `Service` accounts when set (see `AccountService.NormalizeAndValidateAssignedServicesAsync`).
+
+### How it is carried
+
+`IngestClaims.Build` emits **one `ingest:svc` claim per assigned service id** for non-admin accounts (admins never carry them). The absence of any `ingest:svc` claim therefore means "unrestricted". `RequestHelpers` turns these claims back into a usable filter:
+
+- `CurrentAssignedServiceIds()` — the assigned ids (empty ⇒ unrestricted).
+- `CanAccessService(id)` — true when unrestricted, or the id is in scope; used to 404 single out-of-scope resources.
+- `ResolveServiceFilter(requested, out empty)` — intersects an explicit request with the scope into the effective filter a cross-service query runs with (and flags when a scoped caller asked only for out-of-scope services, so the controller can short-circuit to an empty result rather than treating an empty id list as "all").
+
+### Where it is enforced
+
+The scope is applied at every cross-service surface, as close to the data as practical so nothing leaks:
+
+- **Submissions** — the admin list, the review/approval queue and `pending-count` filter by the scope; single-submission lookup/history/replace/approve/reject/delete 404 out-of-scope ids; create/validate/import refuse an out-of-scope target with `403`.
+- **Status & Explore** — the per-service status endpoint 404s out-of-scope services; the missing-data reports and Explore series/scorecard intersect the scope.
+- **OData / Power BI feed** — the `IQueryable<SampleProjection>` is filtered by the scope before the OData query options run, and the scorecard function passes the scope through.
+- **Ad-hoc query** — `POST /api/admin/query` resolves the scope into its service filter.
+
+Because the rule lives in the claims and a handful of shared helpers, a scoped caller can never widen its own view by crafting a request: the worst it can do is ask for a service it can't see and get nothing back.
+
 ## Kind
 
 Orthogonal to role:
@@ -211,7 +242,7 @@ sequenceDiagram
 
 ### Claims parity
 
-A successful SSO sign-in **rebuilds** the principal with the *exact same* claim set the API-key handler emits — both call `IngestClaims.Build(account)`, which produces `NameIdentifier`, `Name`, `ingest:accountId`, `ingest:accountName`, `ingest:kind`, `Role`, the optional `ingest:accountLabel`, and one `ingest:cap` claim per effective capability. Because both schemes produce identical claims, every controller, capability policy, and the `HttpAuditContext` work unchanged regardless of which scheme authenticated the request.
+A successful SSO sign-in **rebuilds** the principal with the *exact same* claim set the API-key handler emits — both call `IngestClaims.Build(account)`, which produces `NameIdentifier`, `Name`, `ingest:accountId`, `ingest:accountName`, `ingest:kind`, `Role`, the optional `ingest:accountLabel`, one `ingest:cap` claim per effective capability, and (for scoped non-admin accounts) one `ingest:svc` claim per assigned service. Because both schemes produce identical claims, every controller, capability policy, the service-scope filter, and the `HttpAuditContext` work unchanged regardless of which scheme authenticated the request.
 
 ### Pre-provisioned linking (no auto-provisioning)
 

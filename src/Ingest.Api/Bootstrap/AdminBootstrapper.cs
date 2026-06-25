@@ -112,6 +112,7 @@ public sealed class AdminBootstrapper : IHostedService
                 KeyId = generated.KeyId,
                 Hash = generated.Hash,
                 Salt = generated.Salt,
+                Description = "Bootstrap admin key",
             };
             await keys.AddAsync(entity, cancellationToken);
 

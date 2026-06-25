@@ -109,6 +109,74 @@ public class ApiKeyServiceTests
         await Assert.ThrowsAsync<NotFoundException>(() => svc.RotateAsync(Guid.NewGuid(), Now.AddDays(10)));
     }
 
+    // ── Description ─────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Rotate_stores_a_trimmed_description()
+    {
+        var svc = NewService(out _, out var keys, out var account);
+
+        var result = await svc.RotateAsync(account.Id, description: "  holiday cover for Jane  ");
+
+        Assert.Equal("holiday cover for Jane", result.Entity.Description);
+        Assert.Equal("holiday cover for Jane", Assert.Single(keys.Added).Description);
+    }
+
+    [Fact]
+    public async Task Rotate_stores_a_blank_description_as_null()
+    {
+        var svc = NewService(out _, out _, out var account);
+
+        var result = await svc.RotateAsync(account.Id, description: "   ");
+
+        Assert.Null(result.Entity.Description);
+    }
+
+    [Fact]
+    public async Task Rotate_rejects_a_description_over_the_length_cap()
+    {
+        var svc = NewService(out _, out var keys, out var account);
+        var tooLong = new string('x', ApiKeyService.MaxDescriptionLength + 1);
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.RotateAsync(account.Id, description: tooLong));
+        Assert.Contains($"{ApiKeyService.MaxDescriptionLength} characters", ex.Message);
+        Assert.Empty(keys.Added);
+    }
+
+    [Fact]
+    public async Task UpdateDescription_changes_the_note_on_an_existing_key()
+    {
+        var svc = NewService(out _, out var keys, out var account);
+        var created = await svc.RotateAsync(account.Id, description: "temporary");
+
+        var updated = await svc.UpdateDescriptionAsync(account.Id, created.Entity.Id, "  permanent  ");
+
+        Assert.NotNull(updated);
+        Assert.Equal("permanent", updated!.Description);
+        Assert.Equal("permanent", keys.Added.Single().Description);
+    }
+
+    [Fact]
+    public async Task UpdateDescription_clears_the_note_when_blank()
+    {
+        var svc = NewService(out _, out _, out var account);
+        var created = await svc.RotateAsync(account.Id, description: "temporary");
+
+        var updated = await svc.UpdateDescriptionAsync(account.Id, created.Entity.Id, "");
+
+        Assert.Null(updated!.Description);
+    }
+
+    [Fact]
+    public async Task UpdateDescription_returns_null_for_an_unknown_key()
+    {
+        var svc = NewService(out _, out _, out var account);
+
+        var updated = await svc.UpdateDescriptionAsync(account.Id, Guid.NewGuid(), "note");
+
+        Assert.Null(updated);
+    }
+
     // ── ApiKey.IsActive (the auth-handler gate) ─────────────────────────────────────────────
 
     [Fact]

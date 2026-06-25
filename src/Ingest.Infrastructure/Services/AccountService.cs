@@ -62,6 +62,7 @@ public sealed class AccountService : IAccountService
         input.Email = NormalizeAndValidateEmail(input.Email);
         input.ExternalLogins = await NormalizeAndValidateLinksAsync(input.Id, input.Kind, input.ExternalLogins, preserveSubjectsFrom: null, ct);
         input.Capabilities = NormalizeAndValidateCapabilities(input.Role, input.Capabilities);
+        input.AssignedServiceIds = await NormalizeAndValidateAssignedServicesAsync(input.Role, input.AssignedServiceIds, ct);
 
         await _accounts.AddAsync(input, ct);
         await _audit.RecordAsync(TargetTypeFor(input), AuditChangeType.Create, input.Id, input.Name, ct);
@@ -92,6 +93,14 @@ public sealed class AccountService : IAccountService
             existing.Capabilities = NormalizeAndValidateCapabilities(existing.Role, update.Capabilities);
         else if (existing.Role == AccountRole.Admin)
             existing.Capabilities = new();
+
+        // Same null/empty contract as capabilities: null leaves the stored allowlist untouched, a
+        // (possibly empty) list replaces it. An Admin always sees every service, so the allowlist is
+        // normalised away for that role.
+        if (update.AssignedServiceIds is not null)
+            existing.AssignedServiceIds = await NormalizeAndValidateAssignedServicesAsync(existing.Role, update.AssignedServiceIds, ct);
+        else if (existing.Role == AccountRole.Admin)
+            existing.AssignedServiceIds = new();
 
         await _accounts.UpdateAsync(existing, ct);
         await _audit.RecordAsync(TargetTypeFor(existing), AuditChangeType.Edit, existing.Id, existing.Name, ct);
@@ -137,6 +146,43 @@ public sealed class AccountService : IAccountService
             throw new ValidationException(new[] { $"Unknown capabilities: {string.Join(", ", unknown)}." });
 
         return input.Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>
+    /// Validate and normalise an account's assigned-service allowlist. Admins always see every
+    /// service, so their allowlist is meaningless and normalised to empty. Otherwise the input is
+    /// de-duplicated and every id is checked to be an existing (live) <see cref="AccountRole.Service"/>
+    /// account — unknown or non-service ids are rejected so the scope can't silently drift. An empty
+    /// result simply means "unrestricted" (sees every service).
+    /// </summary>
+    /// <param name="role">The account's role (drives the Admin special-case).</param>
+    /// <param name="assignedServiceIds">The requested allowlist.</param>
+    /// <param name="ct">Cancellation token.</param>
+    private async Task<List<Guid>> NormalizeAndValidateAssignedServicesAsync(AccountRole role, IEnumerable<Guid>? assignedServiceIds, CancellationToken ct)
+    {
+        if (role == AccountRole.Admin) return new();
+
+        var input = (assignedServiceIds ?? Enumerable.Empty<Guid>())
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+        if (input.Count == 0) return new();
+
+        var unknown = new List<Guid>();
+        foreach (var id in input)
+        {
+            var account = await _accounts.GetByIdAsync(id, ct: ct);
+            if (account is null || account.Role != AccountRole.Service)
+                unknown.Add(id);
+        }
+
+        if (unknown.Count > 0)
+            throw new ValidationException(new[]
+            {
+                $"Assigned services must be existing service accounts. Unknown or non-service ids: {string.Join(", ", unknown)}.",
+            });
+
+        return input;
     }
 
     /// <summary>
@@ -228,7 +274,8 @@ public sealed class AccountService : IAccountService
             .Select(a => new AccountBackupEntry(
                 a.Name, a.Label, a.Description, a.Email, a.Kind, a.Role, a.Enabled,
                 a.Capabilities.ToList(),
-                a.ExternalLogins.Select(l => new AccountBackupLogin(l.Provider, l.Email)).ToList()))
+                a.ExternalLogins.Select(l => new AccountBackupLogin(l.Provider, l.Email)).ToList(),
+                a.AssignedServiceIds.ToList()))
             .ToList();
     }
 
@@ -261,7 +308,7 @@ public sealed class AccountService : IAccountService
                 {
                     await UpdateAsync(existing.Id, new AccountUpdate(
                         entry.Label, entry.Description, entry.Email, entry.Role, entry.Enabled,
-                        links, entry.Capabilities.ToList()), ct);
+                        links, entry.Capabilities.ToList(), entry.AssignedServiceIds.ToList()), ct);
                     updated++;
                 }
                 else
@@ -277,6 +324,7 @@ public sealed class AccountService : IAccountService
                         Enabled = entry.Enabled,
                         Capabilities = entry.Capabilities.ToList(),
                         ExternalLogins = links,
+                        AssignedServiceIds = entry.AssignedServiceIds.ToList(),
                     }, ct);
                     created++;
                 }

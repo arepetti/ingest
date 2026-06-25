@@ -91,8 +91,9 @@ public sealed class StatusService : IStatusService
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<MissingByCadence>> GetMissingAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<MissingByCadence>> GetMissingAsync(IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default)
     {
+        var scope = allowedServiceIds is { Count: > 0 } ? new HashSet<Guid>(allowedServiceIds) : null;
         var now = _audit.UtcNow;
         // Cadence windows are constant for the whole report — compute the current and the
         // previous window for every cadence once. Previous windows are contiguous with the
@@ -125,6 +126,8 @@ public sealed class StatusService : IStatusService
                 // Disabled service can't catch up, and including it in a "to-do" list would be
                 // misleading — the operator already knows it's off.
                 if (!account.Enabled) continue;
+                // Respect the caller's assigned-service scope (null = unrestricted).
+                if (scope is not null && !scope.Contains(account.Id)) continue;
 
                 var schemas = await _schemas.ListVisibleToAsync(account.Id, ct);
                 foreach (var schema in schemas)
@@ -222,15 +225,15 @@ public sealed class StatusService : IStatusService
     }
 
     /// <inheritdoc />
-    public async Task<MissingPeriodReport> GetMissingForPeriodAsync(Cadence cadence, int offset, CancellationToken ct = default)
+    public async Task<MissingPeriodReport> GetMissingForPeriodAsync(Cadence cadence, int offset, IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default)
     {
         var (start, end) = CadenceCalculator.BucketAtOffset(cadence, _audit.UtcNow, offset);
-        var entries = await ComputeMissingForWindowAsync(cadence, start, end, null, ct);
+        var entries = await ComputeMissingForWindowAsync(cadence, start, end, null, allowedServiceIds, ct);
         return new MissingPeriodReport(cadence, offset, start, end, SortEntries(entries));
     }
 
     /// <inheritdoc />
-    public async Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, Guid? serviceId = null, CancellationToken ct = default)
+    public async Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, Guid? serviceId = null, IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default)
     {
         periods = Math.Clamp(periods, 1, 52);
         var now = _audit.UtcNow;
@@ -240,7 +243,7 @@ public sealed class StatusService : IStatusService
         {
             var offset = -i;
             var (start, end) = CadenceCalculator.BucketAtOffset(cadence, now, offset);
-            var entries = await ComputeMissingForWindowAsync(cadence, start, end, serviceId, ct);
+            var entries = await ComputeMissingForWindowAsync(cadence, start, end, serviceId, allowedServiceIds, ct);
             points.Add(new MissingHistoryPoint(offset, start, end, entries.Sum(e => e.MissingRequiredCount)));
         }
         return new MissingHistory(cadence, points);
@@ -254,14 +257,16 @@ public sealed class StatusService : IStatusService
     /// walk is scoped to that single service instead of paging through every one.
     /// </summary>
     private async Task<List<MissingSubmissionEntry>> ComputeMissingForWindowAsync(
-        Cadence cadence, DateTime start, DateTime end, Guid? serviceId, CancellationToken ct)
+        Cadence cadence, DateTime start, DateTime end, Guid? serviceId, IReadOnlyCollection<Guid>? allowedServiceIds, CancellationToken ct)
     {
         var entries = new List<MissingSubmissionEntry>();
+        var scope = allowedServiceIds is { Count: > 0 } ? new HashSet<Guid>(allowedServiceIds) : null;
 
         // Scoped to a single service: resolve it directly and skip the registry-wide paging. A
-        // missing, deleted, non-service, or not-yet-existing account simply yields no entries.
+        // missing, deleted, non-service, not-yet-existing or out-of-scope account yields no entries.
         if (serviceId.HasValue)
         {
+            if (scope is not null && !scope.Contains(serviceId.Value)) return entries;
             var only = await _accounts.GetByIdAsync(serviceId.Value, ct: ct);
             if (only is { Role: AccountRole.Service })
                 await EvaluateAccountAsync(only, cadence, start, end, entries, ct);
@@ -279,7 +284,10 @@ public sealed class StatusService : IStatusService
             if (accounts.Items.Count == 0) break;
 
             foreach (var account in accounts.Items)
+            {
+                if (scope is not null && !scope.Contains(account.Id)) continue;
                 await EvaluateAccountAsync(account, cadence, start, end, entries, ct);
+            }
 
             if (accounts.Items.Count < pageSize) break;
             page++;

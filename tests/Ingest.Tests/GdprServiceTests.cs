@@ -321,7 +321,7 @@ public class GdprServiceTests
         public Task<long> PurgeSoftDeletedAsync(DateTime olderThanUtc, CancellationToken ct = default) =>
             Task.FromResult((long)Store.RemoveAll(s => s.IsDeleted && s.DeletedAt < olderThanUtc));
         public Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, ApprovalStatus? approvalStatus = null, bool? draft = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, ApprovalStatus? approvalStatus = null, bool? draft = null, IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<long> CountBySchemaAsync(string schemaName, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<long> CountByApprovalStatusAsync(ApprovalStatus status, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(Submission submission, CancellationToken ct = default) => throw new NotSupportedException();

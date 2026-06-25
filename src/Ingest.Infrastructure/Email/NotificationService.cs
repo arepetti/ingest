@@ -156,7 +156,7 @@ public sealed class NotificationService : INotificationService
         CancellationToken ct)
     {
         IReadOnlyList<MissingByCadence> missing;
-        try { missing = await _status.GetMissingAsync(ct); }
+        try { missing = await _status.GetMissingAsync(ct: ct); }
         catch (Exception ex) { _logger.LogWarning(ex, "Missed: missing report failed."); return 0; }
 
         // Accumulate per service across cadence buckets so a service gets one email listing everything.

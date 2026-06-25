@@ -35,6 +35,12 @@ public static class IngestClaims
         foreach (var capability in RoleCapabilities.Effective(account))
             claims.Add(new Claim(AuthConstants.CapabilityClaim, capability));
 
+        // Per-service scope (empty = unrestricted). Admins always see everything, so they never
+        // carry these even if an allowlist was somehow stored against the account.
+        if (account.Role != AccountRole.Admin)
+            foreach (var serviceId in account.AssignedServiceIds.Distinct())
+                claims.Add(new Claim(AuthConstants.AssignedServiceClaim, serviceId.ToString()));
+
         return claims;
     }
 }

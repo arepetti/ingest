@@ -2,6 +2,7 @@ using Ingest.Api.Auth;
 using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -49,8 +50,14 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
         [FromQuery] bool? draft,
         CancellationToken ct)
     {
+        var scope = User.CurrentAssignedServiceIds();
+        // A scoped caller filtering on a single out-of-scope service sees nothing.
+        if (scope.Count > 0 && serviceId is { } sid && !scope.Contains(sid))
+            return Ok(new PagedResponse<SubmissionDto>(Array.Empty<SubmissionDto>(), 0, page ?? 1, pageSize ?? 50));
+
         var result = await service.ListAsync(
-            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, schemaName, approvalStatus, draft, ct);
+            RequestHelpers.ToPageRequest(page, pageSize, sort, includeDeleted), serviceId, from, to, schemaName, approvalStatus, draft,
+            scope.Count > 0 ? scope : null, ct);
         return Ok(result.Map(SubmissionDto.From));
     }
 
@@ -66,7 +73,9 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted, CancellationToken ct)
     {
         var s = await service.GetAsync(id, includeDeleted ?? false, ct);
-        return s is null ? NotFound() : Ok(SubmissionDto.From(s));
+        // Hide the existence of out-of-scope submissions behind a 404 for scoped callers.
+        if (s is null || !User.CanAccessService(s.ServiceAccountId)) return NotFound();
+        return Ok(SubmissionDto.From(s));
     }
 
     /// <summary>Page through the change history (create/edit/delete) recorded for a single submission, newest first.</summary>
@@ -83,6 +92,10 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
         [FromQuery] int? pageSize,
         CancellationToken ct)
     {
+        // Scoped callers may only read the history of submissions they can see.
+        var s = await service.GetAsync(id, includeDeleted: true, ct);
+        if (s is null || !User.CanAccessService(s.ServiceAccountId)) return NotFound();
+
         var result = await auditLog.ListByTargetAsync(id, RequestHelpers.ToPageRequest(page, pageSize, null, false), ct);
         return Ok(result.Map(AuditLogDto.From));
     }
@@ -102,6 +115,11 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
+        // A scoped caller can only delete within its assigned services; out-of-scope ids 404 so the
+        // existence of other services' submissions stays hidden. (DeleteAsync is otherwise idempotent.)
+        var existing = await service.GetAsync(id, includeDeleted: true, ct);
+        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+
         await service.DeleteAsync(id, ct);
         return NoContent();
     }
@@ -128,6 +146,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create([FromBody] AdminSubmissionInput input, [FromQuery] bool draft, CancellationToken ct)
     {
+        EnsureServiceInScope(input.ServiceAccountId);
         var written = await service.AdminCreateAsync(input, Request.ResolveSource(), draft: draft, ct: ct);
         return Created($"/api/admin/submissions/{written.Submission.Id}",
             new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
@@ -157,6 +176,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Validate([FromBody] AdminSubmissionInput input, [FromQuery] bool draft, [FromQuery] string? omit, CancellationToken ct)
     {
+        EnsureServiceInScope(input.ServiceAccountId);
         var options = RequestHelpers.ParseValidationOptions(omit);
         var outcome = await service.AdminValidateAsync(input, Request.ResolveSource(), draft, options, ct);
         return Ok(SubmissionValidationResponse.From(outcome));
@@ -184,6 +204,7 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Import([FromBody] BulkImportRequest request, CancellationToken ct)
     {
+        EnsureServiceInScope(request.ServiceAccountId);
         var result = await bulkImport.ImportAsync(request.ServiceAccountId, request.Format, request.Content, ct);
         return Ok(result);
     }
@@ -211,6 +232,9 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Replace(Guid id, [FromBody] AdminSubmissionInput input, [FromQuery] bool draft, CancellationToken ct)
     {
+        var existing = await service.GetAsync(id, includeDeleted: true, ct);
+        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+
         var written = await service.AdminReplaceAsync(id, input, Request.ResolveSource(), draft: draft, ct: ct);
         return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
     }
@@ -223,6 +247,17 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> PendingCount(CancellationToken ct)
     {
+        var scope = User.CurrentAssignedServiceIds();
+        // Scoped callers only count the pending submissions they can actually see; the dashboard
+        // card then matches their (already-scoped) review queue. Unrestricted callers use the
+        // cheaper direct count.
+        if (scope.Count > 0)
+        {
+            var page = await service.ListAsync(
+                new Core.Common.PageRequest(1, 1), null, null, null, null, ApprovalStatus.Pending, draft: false, scope, ct);
+            return Ok(new { count = page.Total });
+        }
+
         var count = await service.CountPendingAsync(ct);
         return Ok(new { count });
     }
@@ -249,6 +284,9 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Approve(Guid id, [FromBody] ApprovalDecisionRequest? body, CancellationToken ct)
     {
+        var existing = await service.GetAsync(id, includeDeleted: true, ct);
+        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+
         var updated = await service.ApproveAsync(User.CurrentAccountId(), id, body?.Note, ct);
         return Ok(SubmissionDto.From(updated));
     }
@@ -273,7 +311,21 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Reject(Guid id, [FromBody] ApprovalDecisionRequest? body, CancellationToken ct)
     {
+        var existing = await service.GetAsync(id, includeDeleted: true, ct);
+        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+
         var updated = await service.RejectAsync(User.CurrentAccountId(), id, body?.Note, ct);
         return Ok(SubmissionDto.From(updated));
+    }
+
+    /// <summary>
+    /// Guard a service-targeting write (create/validate/import on behalf of a service) against the
+    /// caller's assigned-service scope. Unrestricted callers always pass; a scoped caller naming a
+    /// service outside its allowlist is refused with a 403.
+    /// </summary>
+    private void EnsureServiceInScope(Guid serviceId)
+    {
+        if (!User.CanAccessService(serviceId))
+            throw new ForbiddenException("This service is outside your assigned scope.");
     }
 }

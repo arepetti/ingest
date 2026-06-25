@@ -126,6 +126,11 @@ export interface Account {
   capabilities?: Capability[]
   /** Resolved capability set actually in force (read-only; set `capabilities` to change it). */
   effectiveCapabilities?: Capability[]
+  /**
+   * Per-service scope (allowlist of service-account ids). Empty means unrestricted — the account sees
+   * every service. Non-empty confines all cross-service reads to these ids. Ignored for Admins.
+   */
+  assignedServiceIds?: string[]
 }
 
 export interface CreateAccountRequest {
@@ -141,6 +146,8 @@ export interface CreateAccountRequest {
   externalLogins?: ExternalLogin[]
   /** Capability overrides. Omit/empty seeds the role default bundle; a non-empty list is stored verbatim. Ignored for Admins. */
   capabilities?: Capability[]
+  /** Per-service scope. Omit/empty leaves the account unrestricted; a non-empty list confines it to those service ids. Ignored for Admins. */
+  assignedServiceIds?: string[]
 }
 
 export interface UpdateAccountRequest {
@@ -154,6 +161,8 @@ export interface UpdateAccountRequest {
   externalLogins?: ExternalLogin[]
   /** Replacement capability override set. Omit to leave untouched; [] clears (reverts to role defaults). Ignored for Admins. */
   capabilities?: Capability[]
+  /** Replacement per-service scope. Omit to leave untouched; [] clears (unrestricted); non-empty confines to those service ids. Ignored for Admins. */
+  assignedServiceIds?: string[]
 }
 
 /**
@@ -188,6 +197,8 @@ export interface ApiKey {
   createdAt: string
   expiresAt?: string | null
   revokedAt?: string | null
+  /** Free-form note recording who/what the key is for (e.g. holiday cover). Empty when unset. */
+  description?: string | null
 }
 
 export interface GeneratedApiKey {
@@ -510,6 +521,12 @@ export interface Me {
   kind: AccountKind
   /** The effective capability set in force for this account; drives every capability gate in the UI. */
   capabilities?: Capability[]
+  /**
+   * Per-service scope (allowlist of service-account ids) in force for this session. Empty means
+   * unrestricted (every service visible). Non-empty means the UI should badge the active scope and
+   * the account only ever sees those services. Admins are always unrestricted.
+   */
+  assignedServiceIds?: string[]
   /** Whether the email + notification feature is enabled server-side. Drives whether the related UI shows at all. */
   emailEnabled?: boolean
   /** Whether outbound webhooks are enabled server-side. Drives whether the Webhooks settings section shows. */

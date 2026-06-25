@@ -35,7 +35,8 @@ public sealed class AdminStatusController(IStatusService statuses) : ControllerB
     [ProducesResponseType(typeof(List<MissingByCadenceDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMissing(CancellationToken ct)
     {
-        var report = await statuses.GetMissingAsync(ct);
+        var scope = User.CurrentAssignedServiceIds();
+        var report = await statuses.GetMissingAsync(scope.Count > 0 ? scope : null, ct);
         return Ok(StatusMapper.ToDto(report));
     }
 
@@ -52,7 +53,8 @@ public sealed class AdminStatusController(IStatusService statuses) : ControllerB
     [ProducesResponseType(typeof(MissingPeriodReportDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMissingPeriod([FromQuery] Cadence cadence, [FromQuery] int offset, CancellationToken ct)
     {
-        var report = await statuses.GetMissingForPeriodAsync(cadence, offset, ct);
+        var scope = User.CurrentAssignedServiceIds();
+        var report = await statuses.GetMissingForPeriodAsync(cadence, offset, scope.Count > 0 ? scope : null, ct);
         return Ok(StatusMapper.ToDto(report));
     }
 
@@ -71,7 +73,8 @@ public sealed class AdminStatusController(IStatusService statuses) : ControllerB
     [ProducesResponseType(typeof(MissingHistoryDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMissingHistory([FromQuery] Cadence cadence, [FromQuery] int periods, [FromQuery] Guid? serviceId, CancellationToken ct)
     {
-        var history = await statuses.GetMissingHistoryAsync(cadence, periods <= 0 ? 12 : periods, serviceId, ct);
+        var scope = User.CurrentAssignedServiceIds();
+        var history = await statuses.GetMissingHistoryAsync(cadence, periods <= 0 ? 12 : periods, serviceId, scope.Count > 0 ? scope : null, ct);
         return Ok(StatusMapper.ToDto(history));
     }
 }

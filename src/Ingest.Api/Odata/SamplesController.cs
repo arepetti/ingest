@@ -1,4 +1,5 @@
 using Ingest.Api.Auth;
+using Ingest.Api.Common;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
 using Ingest.Core.Security;
@@ -28,8 +29,25 @@ public sealed class SamplesController : ODataController
     }
 
     /// <summary>Return the queryable sample projection. OData translates the URL into the final filter.</summary>
+    /// <remarks>
+    /// A scoped caller (one carrying an assigned-service allowlist) has the feed pre-filtered to its
+    /// services <i>before</i> OData composes the client's <c>$filter</c>, so a Power BI report can
+    /// never read another service's rows regardless of the query it sends. Unrestricted callers see
+    /// the whole store as before.
+    /// </remarks>
     /// <returns>An <see cref="IQueryable{SampleProjection}"/> bound to the underlying store.</returns>
     [HttpGet("odata/samples")]
     [EnableQuery(PageSize = 500, MaxTop = 5000)]
-    public IQueryable<SampleProjection> Get() => _samples.AsQueryable();
+    public IQueryable<SampleProjection> Get()
+    {
+        var query = _samples.AsQueryable();
+        var scope = User.CurrentAssignedServiceIds();
+        if (scope.Count > 0)
+        {
+            // A List (rather than HashSet) keeps the MongoDB LINQ provider on its $in translation.
+            var allowed = scope.ToList();
+            query = query.Where(s => allowed.Contains(s.ServiceAccountId));
+        }
+        return query;
+    }
 }

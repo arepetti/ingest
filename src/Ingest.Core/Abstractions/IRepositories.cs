@@ -250,6 +250,7 @@ public interface ISubmissionRepository
     /// <param name="schemaName">Restrict to submissions containing at least one sample for this schema when non-null.</param>
     /// <param name="approvalStatus">Restrict to a single approval state when non-null.</param>
     /// <param name="draft">When non-null, restrict to drafts (<c>true</c>) or non-drafts (<c>false</c>); <c>null</c> returns both.</param>
+    /// <param name="allowedServiceIds">Security scope: when non-null, only submissions owned by one of these service accounts are returned (ANDed with <paramref name="serviceId"/>). <c>null</c> means no scope restriction.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A page of submissions with the total count.</returns>
     Task<PagedResult<Submission>> ListAsync(
@@ -260,6 +261,7 @@ public interface ISubmissionRepository
         string? schemaName = null,
         ApprovalStatus? approvalStatus = null,
         bool? draft = null,
+        IReadOnlyCollection<Guid>? allowedServiceIds = null,
         CancellationToken ct = default);
 
     /// <summary>

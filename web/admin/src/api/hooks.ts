@@ -197,8 +197,18 @@ export const useApiKeys = (accountId?: string) =>
 export const useRotateApiKey = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ accountId, expiresAt }: { accountId: string; expiresAt?: string | null }) =>
-      api.post<GeneratedApiKey>(`/api/admin/accounts/${accountId}/keys`, { expiresAt: expiresAt ?? null }),
+    mutationFn: ({ accountId, expiresAt, description }: { accountId: string; expiresAt?: string | null; description?: string | null }) =>
+      api.post<GeneratedApiKey>(`/api/admin/accounts/${accountId}/keys`, { expiresAt: expiresAt ?? null, description: description ?? null }),
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['keys', v.accountId] }),
+  })
+}
+
+/** Update an existing key's free-form description (its only mutable field). */
+export const useUpdateApiKey = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ accountId, keyId, description }: { accountId: string; keyId: string; description: string | null }) =>
+      api.put<ApiKey>(`/api/admin/accounts/${accountId}/keys/${keyId}`, { description }),
     onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['keys', v.accountId] }),
   })
 }

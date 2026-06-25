@@ -39,10 +39,10 @@ public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
     /// invalidate them.
     /// </remarks>
     /// <param name="accountId">Account to attach the new key to.</param>
-    /// <param name="request">Optional creation options. Supply <c>expiresAt</c> to set an absolute expiry (future-dated, at most two years out); omit the body for a key that never expires.</param>
+    /// <param name="request">Optional creation options. Supply <c>expiresAt</c> to set an absolute expiry (future-dated, at most two years out) and/or a <c>description</c> note; omit the body for a key that never expires.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <response code="201">Returns the key metadata and the one-time plaintext.</response>
-    /// <response code="400">The supplied expiry is in the past or more than two years in the future.</response>
+    /// <response code="400">The supplied expiry is in the past or more than two years in the future, or the description is too long.</response>
     /// <response code="404">No account with that id exists.</response>
     [HttpPost]
     [Authorize(Policy = Capabilities.ApiKeysManage)]
@@ -51,10 +51,30 @@ public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create(Guid accountId, [FromBody] GenerateApiKeyRequest? request, CancellationToken ct)
     {
-        var generated = await service.RotateAsync(accountId, request?.ExpiresAt, ct);
+        var generated = await service.RotateAsync(accountId, request?.ExpiresAt, request?.Description, ct);
         return Created(
             $"/api/admin/accounts/{accountId}/keys/{generated.Entity.Id}",
             new GeneratedApiKeyResponse(ApiKeyDto.From(generated.Entity), generated.Plaintext));
+    }
+
+    /// <summary>Update an existing key's free-form description.</summary>
+    /// <remarks>The description is purely informational and the only mutable field on a key; everything else (expiry, hash) is fixed at creation.</remarks>
+    /// <param name="accountId">Account that owns the key.</param>
+    /// <param name="keyId">Identifier of the key to annotate.</param>
+    /// <param name="request">The new description (trimmed; blank clears it; capped at 200 characters).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The updated key metadata.</response>
+    /// <response code="400">The supplied description is too long.</response>
+    /// <response code="404">No such key (or it belongs to a different account).</response>
+    [HttpPut("{keyId:guid}")]
+    [Authorize(Policy = Capabilities.ApiKeysManage)]
+    [ProducesResponseType(typeof(ApiKeyDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(Guid accountId, Guid keyId, [FromBody] UpdateApiKeyRequest request, CancellationToken ct)
+    {
+        var updated = await service.UpdateDescriptionAsync(accountId, keyId, request.Description, ct);
+        return updated is null ? NotFound() : Ok(ApiKeyDto.From(updated));
     }
 
     /// <summary>Revoke an existing API key.</summary>

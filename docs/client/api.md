@@ -83,11 +83,14 @@ X-Api-Key: abc12345.7N3pK0M9C0LSx0OqGZpY3vW0eFkdsbVz
   "label": "Roads & Highways team",
   "role":  "Service",
   "kind":  "Application",
-  "capabilities": []
+  "capabilities": [],
+  "assignedServiceIds": []
 }
 ```
 
 `capabilities` is the account's **effective** capability set — the fine-grained permissions that actually govern what it may do (see [architecture/authentication.md § Authorisation: capabilities](../architecture/authentication.md#authorisation-capabilities)). A pure `Service` account has none (it uses the self-service `/api/me*`, `/api/schemas*` and `/api/submissions*` endpoints, which don't require a capability); back-office accounts list strings such as `"submissions:read"` or `"schemas:manage"`. The SPA uses this array to decide which navigation and actions to render. The payload also carries feature flags (e.g. `approvalEnabled`, `emailEnabled`) used by the admin UI.
+
+`assignedServiceIds` is the account's **service scope** (see [architecture/authentication.md § Authorisation: service scope](../architecture/authentication.md#authorisation-service-scope)). An **empty** array means *unrestricted* — the account sees every service. A **non-empty** array confines every cross-service read (the submissions list, status/missing reports, Explore, the OData feed and the ad-hoc query) to those service ids; `Admin` accounts are always unrestricted and never carry a scope here.
 
 **Status codes**
 

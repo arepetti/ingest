@@ -1,4 +1,5 @@
 using Ingest.Api.Auth;
+using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Security;
@@ -50,7 +51,13 @@ public sealed class ExploreController(IExploreService explore) : ControllerBase
         if (string.IsNullOrWhiteSpace(schema))
             return BadRequest(new { error = "The 'schema' query parameter is required." });
 
-        var query = new ExploreSeriesQuery(schema, value, serviceIds, from, to, agg);
+        // Confine the request to the caller's assigned services. A scoped caller asking only for
+        // services outside its scope gets an empty (but well-formed) series rather than a leak.
+        var effective = User.ResolveServiceFilter(serviceIds, out var empty);
+        if (empty)
+            return Ok(new ExploreSeriesResponse(schema, null, agg, from, to, new(), new()));
+
+        var query = new ExploreSeriesQuery(schema, value, effective, from, to, agg);
         var result = await explore.GetSeriesAsync(query, ct);
         return result is null ? NotFound() : Ok(ExploreSeriesResponse.FromResult(result));
     }
@@ -79,7 +86,11 @@ public sealed class ExploreController(IExploreService explore) : ControllerBase
         [FromQuery] ScorecardPeriod period,
         CancellationToken ct)
     {
-        var result = await explore.GetScorecardAsync(new ExploreScorecardQuery(serviceIds, mode, period), ct);
+        var effective = User.ResolveServiceFilter(serviceIds, out var empty);
+        if (empty)
+            return Ok(new ExploreScorecardResponse(new(), new()));
+
+        var result = await explore.GetScorecardAsync(new ExploreScorecardQuery(effective, mode, period), ct);
         return Ok(ExploreScorecardResponse.FromResult(result));
     }
 }

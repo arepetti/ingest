@@ -188,8 +188,8 @@ public sealed class SubmissionService : ISubmissionService
     // ── Admin-facing ──
 
     /// <inheritdoc />
-    public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, ApprovalStatus? approvalStatus = null, bool? draft = null, CancellationToken ct = default) =>
-        _submissions.ListAsync(request, serviceId, from, to, schemaName, approvalStatus, draft, ct);
+    public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId, DateTime? from, DateTime? to, string? schemaName, ApprovalStatus? approvalStatus = null, bool? draft = null, IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default) =>
+        _submissions.ListAsync(request, serviceId, from, to, schemaName, approvalStatus, draft, allowedServiceIds, ct);
 
     /// <inheritdoc />
     public Task<Submission?> GetAsync(Guid submissionId, bool includeDeleted, CancellationToken ct = default) =>

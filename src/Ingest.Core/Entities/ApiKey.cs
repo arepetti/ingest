@@ -24,6 +24,14 @@ public sealed class ApiKey : AuditedEntity
     /// <summary>Hex-encoded per-key random salt mixed into the hash.</summary>
     public required string Salt { get; set; }
 
+    /// <summary>
+    /// Optional free-form note recording who or what the key is for (e.g. "holiday cover for Jane",
+    /// "Power BI prod refresh"). Purely informational — it has no bearing on authentication — but
+    /// makes the key list self-explanatory, especially when paired with <see cref="ExpiresAt"/> for
+    /// temporary credentials. <c>null</c>/empty when not supplied.
+    /// </summary>
+    public string? Description { get; set; }
+
     /// <summary>Optional absolute expiry. When non-null, the key stops authenticating once this timestamp is past.</summary>
     public DateTime? ExpiresAt { get; set; }
 

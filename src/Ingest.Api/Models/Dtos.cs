@@ -21,6 +21,7 @@ namespace Ingest.Api.Models;
 /// <param name="ExternalLogins">SSO identity links (provider + email). Only ever populated for <see cref="AccountKind.User"/> accounts; relevant only when SSO is enabled.</param>
 /// <param name="Capabilities">The account's stored capability overrides. Empty means "follow the role default bundle"; the admin UI pre-fills the picker from <paramref name="EffectiveCapabilities"/> in that case.</param>
 /// <param name="EffectiveCapabilities">The resolved capability set actually in force (role defaults when there are no overrides; the full catalogue for Admins). Read-only — set <paramref name="Capabilities"/> to change it.</param>
+/// <param name="AssignedServiceIds">Assigned-service allowlist. Empty means "unrestricted" (the account sees every service); a non-empty list confines every cross-service read to those services. Ignored for Admins.</param>
 public sealed record AccountDto(
     Guid Id,
     string Name,
@@ -37,7 +38,8 @@ public sealed record AccountDto(
     bool IsDeleted,
     List<ExternalLoginDto> ExternalLogins,
     List<string> Capabilities,
-    IReadOnlyCollection<string> EffectiveCapabilities)
+    IReadOnlyCollection<string> EffectiveCapabilities,
+    List<Guid> AssignedServiceIds)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static AccountDto From(Account a) => new(
@@ -45,7 +47,8 @@ public sealed record AccountDto(
         a.CreatedAt, a.CreatedBy, a.ModifiedAt, a.ModifiedBy, a.IsDeleted,
         a.ExternalLogins.Select(ExternalLoginDto.From).ToList(),
         a.Capabilities.ToList(),
-        RoleCapabilities.Effective(a).ToList());
+        RoleCapabilities.Effective(a).ToList(),
+        a.AssignedServiceIds.ToList());
 }
 
 /// <summary>Wire representation of an SSO identity link on an account. The provider's subject is intentionally not exposed.</summary>
@@ -67,7 +70,8 @@ public sealed record ExternalLoginDto(string Provider, string Email)
 /// <param name="Enabled">Initial enabled state; defaults to <c>true</c>.</param>
 /// <param name="ExternalLogins">Optional SSO identity links. Only valid for <see cref="AccountKind.User"/> accounts; each (provider, email) pair must be unique across accounts.</param>
 /// <param name="Capabilities">Optional capability overrides. <c>null</c>/empty seeds the account with the chosen role's default bundle (so it behaves exactly as before); a non-empty list is stored verbatim as the effective set. Ignored for Admins (who implicitly hold every capability).</param>
-public sealed record CreateAccountRequest(string Name, string? Label, string? Description, string? Email, AccountKind Kind, AccountRole Role, bool Enabled = true, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null);
+/// <param name="AssignedServiceIds">Optional assigned-service allowlist. <c>null</c>/empty leaves the account unrestricted (sees every service); a non-empty list confines every cross-service read to those services. Ignored for Admins.</param>
+public sealed record CreateAccountRequest(string Name, string? Label, string? Description, string? Email, AccountKind Kind, AccountRole Role, bool Enabled = true, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null, List<Guid>? AssignedServiceIds = null);
 
 /// <summary>Body for <c>PUT /api/admin/accounts/{id}</c>. Only the mutable fields are accepted.</summary>
 /// <param name="Label">New friendly label.</param>
@@ -77,7 +81,8 @@ public sealed record CreateAccountRequest(string Name, string? Label, string? De
 /// <param name="Enabled">New enabled state.</param>
 /// <param name="ExternalLogins">Replacement set of SSO identity links. <c>null</c> leaves the existing links untouched; an empty list clears them.</param>
 /// <param name="Capabilities">Replacement capability override set. <c>null</c> leaves the stored overrides untouched; an empty list clears them (reverting the account to its role default bundle); a non-empty list replaces them. Ignored for Admins.</param>
-public sealed record UpdateAccountRequest(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null);
+/// <param name="AssignedServiceIds">Replacement assigned-service allowlist. <c>null</c> leaves it untouched; an empty list clears it (unrestricted, sees every service); a non-empty list confines every cross-service read to those services. Ignored for Admins.</param>
+public sealed record UpdateAccountRequest(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null, List<Guid>? AssignedServiceIds = null);
 
 /// <summary>Wire representation of an API key. <b>Never</b> carries the plaintext secret.</summary>
 /// <param name="Id">Key id (primary key of the row).</param>
@@ -92,15 +97,21 @@ public sealed record ApiKeyDto(
     string KeyId,
     DateTime CreatedAt,
     DateTime? ExpiresAt,
-    DateTime? RevokedAt)
+    DateTime? RevokedAt,
+    string? Description)
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
-    public static ApiKeyDto From(ApiKey k) => new(k.Id, k.AccountId, k.KeyId, k.CreatedAt, k.ExpiresAt, k.RevokedAt);
+    public static ApiKeyDto From(ApiKey k) => new(k.Id, k.AccountId, k.KeyId, k.CreatedAt, k.ExpiresAt, k.RevokedAt, k.Description);
 }
 
 /// <summary>Optional request body when minting a new API key.</summary>
 /// <param name="ExpiresAt">Absolute expiry for the new key. <c>null</c> (or an omitted body) means the key never expires; when supplied it must be in the future and no more than two years out.</param>
-public sealed record GenerateApiKeyRequest(DateTime? ExpiresAt = null);
+/// <param name="Description">Optional free-form note recording who/what the key is for (e.g. holiday cover). Trimmed; blank is stored as none; capped at 200 characters.</param>
+public sealed record GenerateApiKeyRequest(DateTime? ExpiresAt = null, string? Description = null);
+
+/// <summary>Request body when updating a key's free-form description (its only mutable field).</summary>
+/// <param name="Description">New description; trimmed, blank clears it, capped at 200 characters.</param>
+public sealed record UpdateApiKeyRequest(string? Description);
 
 /// <summary>One account inside an accounts export/import file. Secret-free: no id, audit stamps or API keys.</summary>
 /// <param name="Name">Unique machine-style name; the match key on import.</param>
@@ -112,6 +123,7 @@ public sealed record GenerateApiKeyRequest(DateTime? ExpiresAt = null);
 /// <param name="Enabled">Whether the account is enabled.</param>
 /// <param name="Capabilities">Capability overrides (empty = follow the role default bundle).</param>
 /// <param name="ExternalLogins">SSO identity links (provider + email); only meaningful for User-kind accounts.</param>
+/// <param name="AssignedServiceIds">Assigned-service allowlist (empty = unrestricted). Ignored for Admins.</param>
 public sealed record AccountBackupEntryDto(
     string Name,
     string? Label,
@@ -121,19 +133,22 @@ public sealed record AccountBackupEntryDto(
     AccountRole Role,
     bool Enabled,
     List<string> Capabilities,
-    List<ExternalLoginDto> ExternalLogins)
+    List<ExternalLoginDto> ExternalLogins,
+    List<Guid>? AssignedServiceIds = null)
 {
     /// <summary>Project a domain backup entry onto the wire shape.</summary>
     public static AccountBackupEntryDto From(AccountBackupEntry e) => new(
         e.Name, e.Label, e.Description, e.Email, e.Kind, e.Role, e.Enabled,
         e.Capabilities.ToList(),
-        e.ExternalLogins.Select(l => new ExternalLoginDto(l.Provider, l.Email)).ToList());
+        e.ExternalLogins.Select(l => new ExternalLoginDto(l.Provider, l.Email)).ToList(),
+        e.AssignedServiceIds.ToList());
 
     /// <summary>Map back to the domain backup entry for import.</summary>
     public AccountBackupEntry ToEntry() => new(
         Name, Label, Description, Email, Kind, Role, Enabled,
         Capabilities ?? new(),
-        (ExternalLogins ?? new()).Select(l => new AccountBackupLogin(l.Provider, l.Email)).ToList());
+        (ExternalLogins ?? new()).Select(l => new AccountBackupLogin(l.Provider, l.Email)).ToList(),
+        AssignedServiceIds ?? new());
 }
 
 /// <summary>Wrapper for an accounts export file: a marker, version and the account list. API keys are never included.</summary>

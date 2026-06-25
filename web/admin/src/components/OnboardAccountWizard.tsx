@@ -5,7 +5,7 @@ import {
 } from '@fluentui/react-components'
 import { Copy20Regular } from '@fluentui/react-icons'
 import { Wizard, WizardResultHeader, type WizardStep } from './Wizard'
-import { useCreateAccount, useRotateApiKey } from '../api/hooks'
+import { useAccounts, useCreateAccount, useRotateApiKey } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import type { Account, AccountKind, AccountRole, CreateAccountRequest, GeneratedApiKey } from '../api/types'
 
@@ -74,6 +74,10 @@ export function OnboardAccountWizard({
   const s = useStyles()
   const create = useCreateAccount()
   const rotate = useRotateApiKey()
+  // Per-service scope only applies to back-office roles (Admins are always unrestricted; Service
+  // accounts only see their own data), so the roster + scope step are limited to those.
+  const scopeApplies = role !== 'Admin' && role !== 'Service'
+  const { data: serviceAccounts } = useAccounts({ role: 'Service' }, scopeApplies)
 
   const [name, setName] = useState('')
   const [label, setLabel] = useState('')
@@ -81,6 +85,8 @@ export function OnboardAccountWizard({
   const [kind, setKind] = useState<AccountKind>(defaultKind)
   const [generateKey, setGenerateKey] = useState(defaultGenerateKey)
   const [expiry, setExpiry] = useState('')
+  const [keyDescription, setKeyDescription] = useState('')
+  const [assignedServiceIds, setAssignedServiceIds] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<OnboardResult | null>(null)
   const [copied, setCopied] = useState(false)
@@ -96,7 +102,8 @@ export function OnboardAccountWizard({
   function handleClose() {
     onClose()
     setName(''); setLabel(''); setEmail('')
-    setKind(defaultKind); setGenerateKey(defaultGenerateKey); setExpiry('')
+    setKind(defaultKind); setGenerateKey(defaultGenerateKey); setExpiry(''); setKeyDescription('')
+    setAssignedServiceIds([])
     setError(null); setResult(null); setCopied(false)
   }
 
@@ -110,13 +117,16 @@ export function OnboardAccountWizard({
         kind,
         role,
         enabled: true,
+        // Empty = unrestricted; non-empty confines the account to those services. Only sent for
+        // back-office roles (ignored server-side for Admin/Service anyway).
+        ...(scopeApplies ? { assignedServiceIds } : {}),
       }
       const account = await create.mutateAsync(req)
 
       let plaintext: string | null = null
       if (generateKey) {
         const expiresAt = expiry ? new Date(`${expiry}T23:59:59.000Z`).toISOString() : null
-        const generated: GeneratedApiKey = await rotate.mutateAsync({ accountId: account.id, expiresAt })
+        const generated: GeneratedApiKey = await rotate.mutateAsync({ accountId: account.id, expiresAt, description: keyDescription.trim() || null })
         plaintext = generated.plaintext
       }
       setResult({ account, plaintext })
@@ -176,6 +186,38 @@ export function OnboardAccountWizard({
         </div>
       ),
     },
+    ...(scopeApplies ? [{
+      id: 'scope',
+      title: 'Service scope',
+      description: `Choose which services this ${role.toLowerCase()} can see. Leave empty for unrestricted access to every service.`,
+      content: (
+        <div className={s.form}>
+          <Field
+            label="Visible services"
+            hint="Leave empty for unrestricted access to every service; pick one or more to confine this account to just those."
+          >
+            <Dropdown
+              multiselect
+              placeholder="All services"
+              selectedOptions={assignedServiceIds}
+              value={
+                assignedServiceIds.length === 0
+                  ? 'All services'
+                  : (serviceAccounts?.items ?? [])
+                      .filter(a => assignedServiceIds.includes(a.id))
+                      .map(a => a.label || a.name)
+                      .join(', ')
+              }
+              onOptionSelect={(_, d) => setAssignedServiceIds(d.selectedOptions)}
+            >
+              {(serviceAccounts?.items ?? []).filter(a => a.enabled || assignedServiceIds.includes(a.id)).map(a => (
+                <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
+              ))}
+            </Dropdown>
+          </Field>
+        </div>
+      ),
+    } as WizardStep] : []),
     {
       id: 'key',
       title: 'API key',
@@ -196,14 +238,19 @@ export function OnboardAccountWizard({
             </MessageBar>
           )}
           {generateKey && (
-            <Field label="Key expiry (optional)" hint="Leave blank for a key that never expires. Maximum two years from today.">
-              <Input type="date" value={expiry} min={minExpiry} max={maxExpiry} onChange={(_, d) => setExpiry(d.value)} />
-            </Field>
+            <>
+              <Field label="Key description (optional)" hint="A note on who or why this key is for — handy for temporary or holiday-cover keys.">
+                <Input value={keyDescription} maxLength={200} placeholder="e.g. holiday cover for Jane (reviewer)" onChange={(_, d) => setKeyDescription(d.value)} />
+              </Field>
+              <Field label="Key expiry (optional)" hint="Leave blank for a key that never expires. Maximum two years from today.">
+                <Input type="date" value={expiry} min={minExpiry} max={maxExpiry} onChange={(_, d) => setExpiry(d.value)} />
+              </Field>
+            </>
           )}
         </div>
       ),
     },
-  ], [s, role, name, label, email, kind, generateKey, expiry, detailsValid, trimmedEmail, lockKind, minExpiry, maxExpiry])
+  ], [s, role, name, label, email, kind, generateKey, expiry, keyDescription, detailsValid, trimmedEmail, lockKind, minExpiry, maxExpiry, scopeApplies, assignedServiceIds, serviceAccounts])
 
   const busy = create.isPending || rotate.isPending
 
@@ -216,6 +263,17 @@ export function OnboardAccountWizard({
         <Body1><strong>Name:</strong> {result.account.name}</Body1>
         <Body1><strong>Kind:</strong> {result.account.kind} · <strong>Role:</strong> {result.account.role}</Body1>
         {result.account.email && <Body1><strong>Email:</strong> {result.account.email}</Body1>}
+        {scopeApplies && (
+          <Body1>
+            <strong>Service scope:</strong>{' '}
+            {assignedServiceIds.length === 0
+              ? 'All services (unrestricted)'
+              : (serviceAccounts?.items ?? [])
+                  .filter(a => assignedServiceIds.includes(a.id))
+                  .map(a => a.label || a.name)
+                  .join(', ')}
+          </Body1>
+        )}
       </div>
       {result.plaintext ? (
         <MessageBar intent="warning">

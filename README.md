@@ -65,6 +65,8 @@ Authentication is plain **API keys** carried in an HTTP header — no OAuth flow
 - **Approver** — reviewers for the optional submission-approval workflow (view + approve submissions).
 - **Admin** — every capability, non-reducible; full control including issuing keys, editing schemas, and correcting submissions retroactively.
 
+On top of capabilities, a back-office account can be given a **service scope** — an allowlist of services it is confined to. Leave it empty and the account sees every service (the default); set it and the account only ever sees those services' data, everywhere (submissions, reports, Explore, the OData feed). Admins are always unrestricted.
+
 Every change is **audited** (who did it, when) and **soft-deleted** by default — nothing important is destroyed unless an admin explicitly wipes it.
 
 ### One container, one database
@@ -142,7 +144,7 @@ Everything Ingest does, in one place:
 
 **Security, governance & operations**
 
-- **API-key auth** with zero-downtime rotation and individual revocation; **capability-based authorisation** with roles (Service / Operator / Approver / Admin) as templates that seed per-account capabilities.
+- **API-key auth** with zero-downtime rotation and individual revocation; **capability-based authorisation** with roles (Service / Operator / Approver / Admin) as templates that seed per-account capabilities, plus an optional **per-account service scope** confining a back-office account to a subset of services.
 - **Optional approval workflow** — hold submissions for review before they go live, configured per schema, as a global default, or via cross-cutting **rules** that require sign-off for chosen services and schemas (either side can be "All"). An API-only rule can force manual intervention so a person reviews or completes a partially automated feed before it's published.
 - **Optional SSO** (Microsoft / Google) layered on top of API keys.
 - **Full audit log** and **soft-delete** by default — nothing important is destroyed silently.

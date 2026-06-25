@@ -42,6 +42,9 @@ public sealed class ServicesStatusController(
             name,
             period ?? options.Value.DefaultStatusPeriod,
             ct);
+        // A scoped operator may only inspect services in its allowlist; everything else looks like
+        // it doesn't exist.
+        if (!User.CanAccessService(status.ServiceId)) return NotFound();
         return Ok(StatusMapper.ToDto(status));
     }
 }

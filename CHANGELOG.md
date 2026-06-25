@@ -6,6 +6,8 @@ Notable changes per release. Versions are newest-first. No breaking changes have
 
 ### Added
 
+- API keys can carry an optional **description** — a free-form note (who/why the key exists) set when generating a key and editable afterwards. Handy for temporary or holiday-cover credentials, especially paired with an expiry.
+- Per-operator service scope: a back-office account (Operator/Approver) can be confined to a chosen subset of services via an assigned-services allowlist on the account editor. A scoped account only sees those services' data across every cross-service surface (submissions, the approval queue, status/missing reports, Explore, the OData/Power BI feed and the ad-hoc query) and is refused writes for any other service. An empty allowlist keeps the account unrestricted, so existing accounts are unchanged. `/api/me` now reports `assignedServiceIds`, and the SPA shows a "Limited view" badge when a session is scoped.
 - Submission validate endpoints (`POST /api/submissions/validate` and `.../{id}/validate`): run the full submission pipeline — validation, cadence, approval preview — without saving anything, so API clients can dry-run a payload (e.g. in CI). Supports `?omit=cadence` to skip the one-per-period check. The schema preview gains a "Validate on server" action that uses it (pick a service and timestamp) for an authoritative check.
 - Validation rules can now compare a submission against the service's own history: `latest("value")` returns the most recent live value and `previous("value")` returns the value from the immediately preceding cadence period.
 - Microsoft Teams integration: a bot prompts a user or channel for outstanding required values.

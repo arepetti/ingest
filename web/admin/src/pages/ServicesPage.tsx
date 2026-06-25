@@ -4,16 +4,17 @@ import {
   Dropdown, Option, Field, Input, Textarea, Checkbox,
   Dialog, DialogSurface, DialogTitle, DialogBody, DialogContent, DialogActions, DialogTrigger,
   RadioGroup, Radio,
+  Tab, TabList,
   Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TableCellLayout,
   Title2, Tooltip, makeStyles, MessageBarBody, MessageBarTitle,
   Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger, SplitButton,
   Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, ArrowUpload20Regular, Delete20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, PersonAdd20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, ArrowUpload20Regular, Checkmark20Regular, Delete20Regular, Dismiss20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, PersonAdd20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { useNavigate } from 'react-router-dom'
-import { accountsBackupExportUrl, fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCapabilities, useCreateAccount, useDeleteAccount, useEraseAccount, useImportAccountsBackup, useRevokeApiKey, useRotateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
-import type { Account, AccountKind, AccountRole, AuthProvider, CreateAccountRequest, ErasureMode, ErasureResult, ExternalLogin, UpdateAccountRequest } from '../api/types'
+import { accountsBackupExportUrl, fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCapabilities, useCreateAccount, useDeleteAccount, useEraseAccount, useImportAccountsBackup, useRevokeApiKey, useRotateApiKey, useUpdateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
+import type { Account, AccountKind, AccountRole, ApiKey, AuthProvider, CreateAccountRequest, ErasureMode, ErasureResult, ExternalLogin, UpdateAccountRequest } from '../api/types'
 import { CAPABILITY_GROUPS, defaultCapabilitiesForRole, type Capability } from '../api/capabilities'
 import { downloadFromUrl, pickTextFile } from '../utils/download'
 import { formatApiError } from '../api/client'
@@ -33,6 +34,7 @@ const useStyles = makeStyles({
   toolbarActions: { display: 'flex', alignItems: 'center', gap: '16px' },
   drawer: { width: 'max(600px, 50vw)' },
   drawerForm: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' },
+  editorTabPanel: { display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' },
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
   hint: { color: tokens.colorNeutralForeground3, fontSize: '12px', marginBottom: '4px' },
   linkRow: { display: 'grid', gridTemplateColumns: '160px 1fr auto', gap: '8px', alignItems: 'end', marginBottom: '8px' },
@@ -44,6 +46,12 @@ const useStyles = makeStyles({
     marginTop: '12px',
   },
   rotated: { fontFamily: 'monospace', backgroundColor: tokens.colorNeutralBackground3, padding: '12px', borderRadius: '4px', wordBreak: 'break-all' },
+  // Keep the description column from pushing the others off-screen: cap it and ellipsise overflow.
+  // maxWidth:0 is the table-cell "take leftover width then clip" trick (see nameCell above).
+  keyDescCell: { maxWidth: 0, width: '40%' },
+  keyDescInner: { display: 'flex', gap: '4px', alignItems: 'center', minWidth: 0 },
+  keyDescText: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  keyDescInput: { flexGrow: 1, minWidth: 0 },
   row: { '& > td': { paddingTop: '10px', paddingBottom: '10px' } },
   // max-width:0 is the classic "don't request width, take whatever's left and clip" trick for HTML
   // table cells — combined with the inner truncate class below, long labels/descriptions ellipsize
@@ -143,8 +151,60 @@ function CapabilityPicker({
   )
 }
 
+/**
+ * Multi-select for an account's per-service scope (its assigned-service allowlist). An empty
+ * selection means "unrestricted" — the account sees every service; a non-empty selection confines
+ * every cross-service read to the chosen services. Only meaningful for back-office roles: Admins are
+ * always unrestricted and Service accounts only ever see their own data, so the caller hides it for
+ * those roles. The picker is driven off the live Service-account roster.
+ */
+function AssignedServicesPicker({
+  services,
+  selected,
+  onChange,
+}: {
+  services: Account[]
+  selected: string[]
+  onChange: (next: string[]) => void
+}) {
+  const set = new Set(selected)
+  // Only offer enabled services; keep any already-assigned id even if it's since been disabled so
+  // the existing scope isn't silently dropped on save.
+  const options = services.filter(a => a.enabled || set.has(a.id))
+  const summary = selected.length === 0
+    ? 'All services'
+    : options.filter(a => set.has(a.id)).map(a => a.label || a.name).join(', ')
+
+  return (
+    <Field
+      label="Service scope"
+      hint="Which services this account can see. Leave empty for unrestricted access to every service; pick one or more to confine it to just those."
+    >
+      <Dropdown
+        multiselect
+        placeholder="All services"
+        selectedOptions={selected}
+        value={summary}
+        onOptionSelect={(_, d) => onChange(d.selectedOptions)}
+      >
+        {options.map(a => (
+          <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
+        ))}
+      </Dropdown>
+    </Field>
+  )
+}
+
 const roles: AccountRole[] = ['Service', 'Operator', 'Approver', 'Admin']
 const kinds: AccountKind[] = ['User', 'Application']
+
+/** Tabs in the account editor drawer. */
+type EditorTab = 'general' | 'permissions' | 'scope'
+
+/** Per-service scope is only meaningful for back-office roles (not Admin — always unrestricted — nor a Service, which only ever sees its own data). */
+function roleSupportsScope(role: AccountRole): boolean {
+  return role !== 'Admin' && role !== 'Service'
+}
 
 // Drop blank rows and trim emails before sending. The server lower-cases and de-duplicates, so we
 // only need to filter out half-filled rows here.
@@ -178,6 +238,9 @@ export function ServicesPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const { data, isLoading, error, refetch } = useAccounts({ page, pageSize })
+  // Service-account roster that backs the per-account scope picker. Cheap and cached; only the
+  // editor drawer actually reads it.
+  const { data: serviceAccounts } = useAccounts({ role: 'Service' })
   const { data: providers } = useAuthProviders()
   const { me, has } = useCapabilities()
   const hasSso = (providers?.length ?? 0) > 0
@@ -250,16 +313,19 @@ export function ServicesPage() {
   // (e.g. expand the view to read a long description without losing the editor state).
   const [editorExpanded, setEditorExpanded] = useState(false)
   const [viewerExpanded, setViewerExpanded] = useState(false)
+  const [editorTab, setEditorTab] = useState<EditorTab>('general')
 
   function openCreate() {
-    setEditing({ kind: 'create', account: { name: '', label: '', description: '', email: '', kind: 'Application', role: 'Service', enabled: true, capabilities: defaultCapabilitiesForRole('Service') } })
+    setEditing({ kind: 'create', account: { name: '', label: '', description: '', email: '', kind: 'Application', role: 'Service', enabled: true, capabilities: defaultCapabilitiesForRole('Service'), assignedServiceIds: [] } })
     setSubmitError(null)
+    setEditorTab('general')
   }
   function openEdit(a: Account) {
     // The picker is driven off the *effective* set; on save we collapse it back to either the
     // role-default bundle (stored as no overrides) or an explicit override list.
-    setEditing({ kind: 'edit', account: { ...a, capabilities: a.effectiveCapabilities ?? defaultCapabilitiesForRole(a.role ?? 'Service') } })
+    setEditing({ kind: 'edit', account: { ...a, capabilities: a.effectiveCapabilities ?? defaultCapabilitiesForRole(a.role ?? 'Service'), assignedServiceIds: a.assignedServiceIds ?? [] } })
     setSubmitError(null)
+    setEditorTab('general')
   }
   function editFromView(a: Account) { setViewing(null); openEdit(a) }
   function keysFromView(a: Account) { setViewing(null); setKeyDialogFor(a) }
@@ -292,8 +358,8 @@ export function ServicesPage() {
     const email = (a.email ?? '').trim()
     // Email is required for new accounts; existing accounts may keep an empty email (legacy data),
     // so editing doesn't force one. A non-empty value must still look like an address.
-    if (editing.kind === 'create' && !email) { setSubmitError('Email is required.'); return }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setSubmitError('Enter a valid email address.'); return }
+    if (editing.kind === 'create' && !email) { setEditorTab('general'); setSubmitError('Email is required.'); return }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEditorTab('general'); setSubmitError('Enter a valid email address.'); return }
     // Only User-kind accounts can hold SSO links; never send them for Application accounts.
     const logins = a.kind === 'User' ? cleanLogins(a.externalLogins) : []
     const role = a.role ?? 'Service'
@@ -303,6 +369,10 @@ export function ServicesPage() {
     const desired = a.capabilities ?? []
     const capabilities: Capability[] =
       role === 'Admin' || sameCapabilitySet(desired, defaultCapabilitiesForRole(role)) ? [] : desired
+    // Per-service scope only applies to back-office roles. Admins are always unrestricted and Service
+    // accounts only ever see their own data, so we never persist a scope for them (send []).
+    const scopeApplies = role !== 'Admin' && role !== 'Service'
+    const assignedServiceIds: string[] = scopeApplies ? (a.assignedServiceIds ?? []) : []
     try {
       if (editing.kind === 'create') {
         const req: CreateAccountRequest = {
@@ -314,6 +384,7 @@ export function ServicesPage() {
           role,
           enabled: a.enabled ?? true,
           capabilities,
+          assignedServiceIds,
           // Only include when SSO is on so an API-key-only deployment never touches this field.
           ...(hasSso ? { externalLogins: logins } : {}),
         }
@@ -326,6 +397,7 @@ export function ServicesPage() {
           role,
           enabled: a.enabled ?? true,
           capabilities,
+          assignedServiceIds,
           // Omit entirely when SSO is off (undefined ⇒ "leave links untouched" server-side).
           ...(hasSso ? { externalLogins: logins } : {}),
         }
@@ -499,66 +571,96 @@ export function ServicesPage() {
           onToggleExpand={() => setEditorExpanded(e => !e)}
         />
         <DrawerBody>
-          {editing && (
+          {editing && (() => {
+            const role = editing.account.role ?? 'Service'
+            const scopeApplies = roleSupportsScope(role)
+            // Guard against the scope tab lingering after a role change makes it irrelevant.
+            const activeTab: EditorTab = editorTab === 'scope' && !scopeApplies ? 'permissions' : editorTab
+            return (
             <div className={s.drawerForm}>
-              <Field label="Name" required>
-                <Input
-                  value={editing.account.name ?? ''}
-                  disabled={editing.kind === 'edit'}
-                  onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, name: v.value } })}
-                />
-              </Field>
-              <Field label="Label">
-                <Input value={editing.account.label ?? ''} onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, label: v.value } })} />
-              </Field>
-              <Field label="Description">
-                <Textarea value={editing.account.description ?? ''} onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, description: v.value } })} />
-              </Field>
-              <Field label="Email" required={editing.kind === 'create'} hint="Used for email notifications and ad-hoc messages.">
-                <Input
-                  type="email"
-                  value={editing.account.email ?? ''}
-                  placeholder="user@example.com"
-                  onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, email: v.value } })}
-                />
-              </Field>
-              <Field label="Kind" hint={kindHints[(editing.account.kind ?? 'Application') as AccountKind]}>
-                <Dropdown
-                  selectedOptions={[editing.account.kind ?? 'Application']}
-                  value={editing.account.kind ?? 'Application'}
-                  disabled={editing.kind === 'edit'}
-                  onOptionSelect={(_, d) => setEditing({ ...editing, account: { ...editing.account, kind: d.optionValue as AccountKind } })}
-                >
-                  {kinds.map(k => <Option key={k} value={k}>{k}</Option>)}
-                </Dropdown>
-              </Field>
-              <Field label="Role" hint="A template that seeds the permissions below — adjust them freely afterwards.">
-                <Dropdown
-                  selectedOptions={[editing.account.role ?? 'Service']}
-                  value={editing.account.role ?? 'Service'}
-                  onOptionSelect={(_, d) => {
-                    const nextRole = d.optionValue as AccountRole
-                    // Re-seed the permissions picker from the new role's default bundle.
-                    setEditing({ ...editing, account: { ...editing.account, role: nextRole, capabilities: defaultCapabilitiesForRole(nextRole) } })
-                  }}
-                >
-                  {roles.map(r => <Option key={r} value={r}>{r}</Option>)}
-                </Dropdown>
-              </Field>
-              <Checkbox label="Enabled" checked={editing.account.enabled ?? true} onChange={(_, d) => setEditing({ ...editing, account: { ...editing.account, enabled: !!d.checked } })} />
+              <TabList selectedValue={activeTab} onTabSelect={(_, d) => setEditorTab(d.value as EditorTab)}>
+                <Tab value="general">General</Tab>
+                <Tab value="permissions">Role &amp; permissions</Tab>
+                {scopeApplies && <Tab value="scope">Service scope</Tab>}
+              </TabList>
 
-              <CapabilityPicker
-                role={editing.account.role ?? 'Service'}
-                selected={editing.account.capabilities ?? []}
-                onChange={(next) => setEditing({ ...editing, account: { ...editing.account, capabilities: next } })}
-              />
+              {activeTab === 'general' && (
+                <div className={s.editorTabPanel}>
+                  <Field label="Name" required>
+                    <Input
+                      value={editing.account.name ?? ''}
+                      disabled={editing.kind === 'edit'}
+                      onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, name: v.value } })}
+                    />
+                  </Field>
+                  <Field label="Label">
+                    <Input value={editing.account.label ?? ''} onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, label: v.value } })} />
+                  </Field>
+                  <Field label="Description">
+                    <Textarea value={editing.account.description ?? ''} onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, description: v.value } })} />
+                  </Field>
+                  <Field label="Email" required={editing.kind === 'create'} hint="Used for email notifications and ad-hoc messages.">
+                    <Input
+                      type="email"
+                      value={editing.account.email ?? ''}
+                      placeholder="user@example.com"
+                      onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, email: v.value } })}
+                    />
+                  </Field>
+                  <Field label="Kind" hint={kindHints[(editing.account.kind ?? 'Application') as AccountKind]}>
+                    <Dropdown
+                      selectedOptions={[editing.account.kind ?? 'Application']}
+                      value={editing.account.kind ?? 'Application'}
+                      disabled={editing.kind === 'edit'}
+                      onOptionSelect={(_, d) => setEditing({ ...editing, account: { ...editing.account, kind: d.optionValue as AccountKind } })}
+                    >
+                      {kinds.map(k => <Option key={k} value={k}>{k}</Option>)}
+                    </Dropdown>
+                  </Field>
+                  <Checkbox label="Enabled" checked={editing.account.enabled ?? true} onChange={(_, d) => setEditing({ ...editing, account: { ...editing.account, enabled: !!d.checked } })} />
 
-              {hasSso && (editing.account.kind ?? 'Application') === 'User' && (
-                <ExternalLoginsEditor
-                  providers={providers ?? []}
-                  links={editing.account.externalLogins ?? []}
-                  onChange={(next) => setEditing({ ...editing, account: { ...editing.account, externalLogins: next } })}
-                />
+                  {hasSso && (editing.account.kind ?? 'Application') === 'User' && (
+                    <ExternalLoginsEditor
+                      providers={providers ?? []}
+                      links={editing.account.externalLogins ?? []}
+                      onChange={(next) => setEditing({ ...editing, account: { ...editing.account, externalLogins: next } })}
+                    />
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'permissions' && (
+                <div className={s.editorTabPanel}>
+                  <Field label="Role" hint="A template that seeds the permissions below — adjust them freely afterwards.">
+                    <Dropdown
+                      selectedOptions={[role]}
+                      value={role}
+                      onOptionSelect={(_, d) => {
+                        const nextRole = d.optionValue as AccountRole
+                        // Re-seed the permissions picker from the new role's default bundle.
+                        setEditing({ ...editing, account: { ...editing.account, role: nextRole, capabilities: defaultCapabilitiesForRole(nextRole) } })
+                      }}
+                    >
+                      {roles.map(r => <Option key={r} value={r}>{r}</Option>)}
+                    </Dropdown>
+                  </Field>
+
+                  <CapabilityPicker
+                    role={role}
+                    selected={editing.account.capabilities ?? []}
+                    onChange={(next) => setEditing({ ...editing, account: { ...editing.account, capabilities: next } })}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'scope' && scopeApplies && (
+                <div className={s.editorTabPanel}>
+                  <AssignedServicesPicker
+                    services={serviceAccounts?.items ?? []}
+                    selected={editing.account.assignedServiceIds ?? []}
+                    onChange={(next) => setEditing({ ...editing, account: { ...editing.account, assignedServiceIds: next } })}
+                  />
+                </div>
               )}
 
               {submitError && (
@@ -572,7 +674,8 @@ export function ServicesPage() {
                 <Button appearance="primary" onClick={onSave}>Save</Button>
               </div>
             </div>
-          )}
+            )
+          })()}
         </DrawerBody>
       </Drawer>
 
@@ -640,7 +743,7 @@ export function ServicesPage() {
           </Toolbar>
         )}
         <DrawerBody>
-          {viewing && <AccountViewBody account={viewing} />}
+          {viewing && <AccountViewBody account={viewing} services={serviceAccounts?.items ?? []} />}
         </DrawerBody>
       </Drawer>
 
@@ -864,9 +967,16 @@ function ExternalLoginsEditor({
   )
 }
 
-function AccountViewBody({ account }: { account: Account }) {
+function AccountViewBody({ account, services }: { account: Account; services: Account[] }) {
   const s = useStyles()
   const links = account.externalLogins ?? []
+  // Per-service scope is only meaningful for back-office roles; Admins/Services are always unrestricted.
+  const scopeApplies = account.role !== 'Admin' && account.role !== 'Service'
+  const scopeIds = account.assignedServiceIds ?? []
+  const scopeNames = scopeIds.map(id => {
+    const svc = services.find(a => a.id === id)
+    return svc ? (svc.label || svc.name) : id
+  })
   return (
     <div className={s.drawerForm}>
       <div className={s.twoCol}>
@@ -882,6 +992,20 @@ function AccountViewBody({ account }: { account: Account }) {
         <Field label="Role"><Body1>{account.role}</Body1></Field>
       </div>
       <Field label="Enabled"><Body1>{account.enabled ? 'Yes' : 'No'}</Body1></Field>
+
+      {scopeApplies && (
+        <Field label="Service scope" hint="Which services this account can see.">
+          {scopeIds.length === 0 ? (
+            <Body1>All services (unrestricted)</Body1>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {scopeNames.map((n, i) => (
+                <Badge key={scopeIds[i]} appearance="outline">{n}</Badge>
+              ))}
+            </div>
+          )}
+        </Field>
+      )}
 
       {links.length > 0 && (
         <Field label="SSO sign-in">
@@ -933,7 +1057,12 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
   const keys = useApiKeys(account?.id)
   const rotate = useRotateApiKey()
   const revoke = useRevokeApiKey()
+  const update = useUpdateApiKey()
   const [expiry, setExpiry] = useState('')
+  const [description, setDescription] = useState('')
+  // Which key's description is being edited inline, and its working text.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
 
   // The server caps a new key's lifetime at two years; mirror that on the input.
   const minExpiry = dateInputOffset(0, 1)
@@ -943,9 +1072,21 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
     if (!account) return
     // Treat the chosen day as expiring at end of day (UTC) so picking today still lands in the future.
     const expiresAt = expiry ? new Date(`${expiry}T23:59:59.000Z`).toISOString() : null
-    const generated = await rotate.mutateAsync({ accountId: account.id, expiresAt })
+    const generated = await rotate.mutateAsync({ accountId: account.id, expiresAt, description: description.trim() || null })
     setExpiry('')
+    setDescription('')
     onRotated(generated.plaintext)
+  }
+
+  function startEdit(k: ApiKey) {
+    setEditingId(k.id)
+    setEditText(k.description ?? '')
+  }
+
+  async function saveEdit(k: ApiKey) {
+    await update.mutateAsync({ accountId: k.accountId, keyId: k.id, description: editText.trim() || null })
+    setEditingId(null)
+    setEditText('')
   }
 
   function keyStatus(k: { revokedAt?: string | null; expiresAt?: string | null }) {
@@ -956,7 +1097,7 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
 
   return (
     <Dialog open={!!account} onOpenChange={(_, d) => !d.open && onClose()}>
-      <DialogSurface style={{ minWidth: 560 }}>
+      <DialogSurface style={{ minWidth: 'min(900px, 92vw)' }}>
         <DialogBody>
           <DialogTitle>API keys for {account?.label || account?.name}</DialogTitle>
           <DialogContent>
@@ -973,6 +1114,7 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                 <TableHeader>
                   <TableRow>
                     <TableHeaderCell>Key ID</TableHeaderCell>
+                    <TableHeaderCell>Description</TableHeaderCell>
                     <TableHeaderCell>Created</TableHeaderCell>
                     <TableHeaderCell>Expires</TableHeaderCell>
                     <TableHeaderCell>Status</TableHeaderCell>
@@ -983,8 +1125,42 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                   {(keys.data ?? []).map(k => (
                     <TableRow key={k.id}>
                       <TableCell><code>{k.keyId}</code></TableCell>
-                      <TableCell>{new Date(k.createdAt).toLocaleString()}</TableCell>
-                      <TableCell>{k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : 'Never'}</TableCell>
+                      <TableCell className={s.keyDescCell}>
+                        {editingId === k.id ? (
+                          <div className={s.keyDescInner}>
+                            <Input
+                              className={s.keyDescInput}
+                              size="small"
+                              value={editText}
+                              maxLength={200}
+                              placeholder="e.g. holiday cover for Jane"
+                              onChange={(_, d) => setEditText(d.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(k); if (e.key === 'Escape') setEditingId(null) }}
+                            />
+                            <Tooltip content="Save" relationship="label">
+                              <Button size="small" appearance="subtle" icon={<Checkmark20Regular />} onClick={() => saveEdit(k)} aria-label="Save description" />
+                            </Tooltip>
+                            <Tooltip content="Cancel" relationship="label">
+                              <Button size="small" appearance="subtle" icon={<Dismiss20Regular />} onClick={() => setEditingId(null)} aria-label="Cancel" />
+                            </Tooltip>
+                          </div>
+                        ) : (
+                          <div className={s.keyDescInner}>
+                            {k.description ? (
+                              <Tooltip content={k.description} relationship="label">
+                                <span className={s.keyDescText}>{k.description}</span>
+                              </Tooltip>
+                            ) : (
+                              <span className={s.keyDescText} style={{ color: tokens.colorNeutralForeground3 }}>—</span>
+                            )}
+                            <Tooltip content="Edit description" relationship="label">
+                              <Button size="small" appearance="subtle" icon={<Edit20Regular />} onClick={() => startEdit(k)} aria-label="Edit description" />
+                            </Tooltip>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell style={{ whiteSpace: 'nowrap' }}>{new Date(k.createdAt).toLocaleString()}</TableCell>
+                      <TableCell style={{ whiteSpace: 'nowrap' }}>{k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : 'Never'}</TableCell>
                       <TableCell>{keyStatus(k)}</TableCell>
                       <TableCell>
                         {!k.revokedAt && (
@@ -995,6 +1171,9 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                   ))}
                 </TableBody>
               </Table>
+              <Field label="Description for the next key (optional)" hint="A note on who or why this key is for — handy for temporary or holiday-cover keys, especially with an expiry.">
+                <Input value={description} maxLength={200} placeholder="e.g. holiday cover for Jane (reviewer)" onChange={(_, d) => setDescription(d.value)} />
+              </Field>
               <Field label="Expiry for the next key (optional)" hint="Leave blank for a key that never expires. Maximum two years from today.">
                 <Input type="date" value={expiry} min={minExpiry} max={maxExpiry} onChange={(_, d) => setExpiry(d.value)} />
               </Field>

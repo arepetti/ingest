@@ -52,6 +52,29 @@ public abstract class IntegrationTestBase
         return (account.Id, key.Plaintext, name);
     }
 
+    /// <summary>
+    /// Create an enabled Operator (back-office reader) account and mint an API key for it. When
+    /// <paramref name="assignedServiceIds"/> is supplied and non-empty the operator is confined to
+    /// those services; otherwise it is unrestricted (sees every service).
+    /// </summary>
+    protected async Task<(Guid AccountId, string ApiKey, string Name)> CreateOperatorAsync(IEnumerable<Guid>? assignedServiceIds = null)
+    {
+        var name = $"op-{Unique()}";
+        var account = await (await Admin.PostJsonAsync("/api/admin/accounts", new
+        {
+            name,
+            label = name,
+            email = $"{name}@example.com",
+            kind = "User",
+            role = "Operator",
+            enabled = true,
+            assignedServiceIds = (assignedServiceIds ?? Array.Empty<Guid>()).ToArray(),
+        })).ReadAsync<AccountDto>();
+
+        var key = await (await Admin.PostJsonAsync($"/api/admin/accounts/{account.Id}/keys", new { })).ReadAsync<GeneratedApiKeyResponse>();
+        return (account.Id, key.Plaintext, name);
+    }
+
     /// <summary>Create a global, enabled schema with one numeric monthly value and optional RAG bands / approval.</summary>
     protected async Task<SchemaDto> CreateSchemaAsync(
         bool withBands = false,

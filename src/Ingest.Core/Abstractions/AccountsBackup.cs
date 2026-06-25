@@ -17,6 +17,7 @@ namespace Ingest.Core.Abstractions;
 /// <param name="Enabled">Whether the account is enabled.</param>
 /// <param name="Capabilities">Capability overrides (empty = follow the role default bundle).</param>
 /// <param name="ExternalLogins">SSO identity links (provider + email); only meaningful for User-kind accounts.</param>
+/// <param name="AssignedServiceIds">Assigned-service allowlist (empty = unrestricted, sees every service). Ignored for Admins.</param>
 public sealed record AccountBackupEntry(
     string Name,
     string? Label,
@@ -26,7 +27,8 @@ public sealed record AccountBackupEntry(
     AccountRole Role,
     bool Enabled,
     IReadOnlyList<string> Capabilities,
-    IReadOnlyList<AccountBackupLogin> ExternalLogins);
+    IReadOnlyList<AccountBackupLogin> ExternalLogins,
+    IReadOnlyList<Guid> AssignedServiceIds);
 
 /// <summary>A single SSO identity link carried in an accounts export (provider + email; no subject).</summary>
 /// <param name="Provider">Provider id (e.g. <c>"Microsoft"</c>).</param>

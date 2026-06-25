@@ -266,7 +266,7 @@ public class SubmissionDraftTests
 
         public Task<Submission?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) =>
             Task.FromResult(Store.FirstOrDefault(s => s.Id == id && (includeDeleted || !s.IsDeleted)));
-        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, ApprovalStatus? approvalStatus = null, bool? draft = null, CancellationToken ct = default)
+        public Task<PagedResult<Submission>> ListAsync(PageRequest request, Guid? serviceId = null, DateTime? from = null, DateTime? to = null, string? schemaName = null, ApprovalStatus? approvalStatus = null, bool? draft = null, IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default)
         {
             LastDraftFilter = draft;
             return Task.FromResult(new PagedResult<Submission>(Store.ToList(), Store.Count, request.Page, request.PageSize));

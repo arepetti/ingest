@@ -177,9 +177,10 @@ public interface IStatusService
     /// O(services × schemas × required values); fine for the working-set of a council-sized
     /// registry, would want pre-aggregation in Mongo for anything larger.
     /// </remarks>
+    /// <param name="allowedServiceIds">Security scope: when non-null, only these service accounts are evaluated. <c>null</c> means every service.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Current-window buckets (ordered by cadence) followed by previous-window buckets, each with at least one missing entry.</returns>
-    Task<IReadOnlyList<MissingByCadence>> GetMissingAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<MissingByCadence>> GetMissingAsync(IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default);
 
     /// <summary>
     /// Detailed missing-submissions report for a single cadence and a single window addressed by
@@ -192,9 +193,10 @@ public interface IStatusService
     /// </remarks>
     /// <param name="cadence">Cadence to evaluate.</param>
     /// <param name="offset">Signed bucket offset from "now" (0 = current, negative = past).</param>
+    /// <param name="allowedServiceIds">Security scope: when non-null, only these service accounts are evaluated. <c>null</c> means every service.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The window bounds and one entry per (service, schema) tuple short at least one required value.</returns>
-    Task<MissingPeriodReport> GetMissingForPeriodAsync(Cadence cadence, int offset, CancellationToken ct = default);
+    Task<MissingPeriodReport> GetMissingForPeriodAsync(Cadence cadence, int offset, IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default);
 
     /// <summary>
     /// Build the "missing submissions over time" trend for a single cadence: the total count of
@@ -204,7 +206,8 @@ public interface IStatusService
     /// <param name="cadence">Cadence to evaluate.</param>
     /// <param name="periods">Number of windows to include (clamped to a sane range).</param>
     /// <param name="serviceId">Optional service to scope the trend to. When null the trend covers every service (the global view).</param>
+    /// <param name="allowedServiceIds">Security scope: when non-null, only these service accounts are evaluated. <c>null</c> means every service.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>One point per window, ordered oldest → current.</returns>
-    Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, Guid? serviceId = null, CancellationToken ct = default);
+    Task<MissingHistory> GetMissingHistoryAsync(Cadence cadence, int periods, Guid? serviceId = null, IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default);
 }

@@ -41,6 +41,24 @@ Below the role selector the editor shows a **Permissions** panel — a grouped c
 
 Capabilities take effect the next time the account authenticates (a fresh API request, or the next page load for a signed-in SPA user). In the SPA, the sidebar, dashboard cards and action buttons a user sees are driven entirely by their effective capabilities — someone without `schemas:manage` simply won't see the schema-editing controls.
 
+## Service scope (limiting an operator to a subset of services)
+
+Capabilities decide *what kinds of thing* an account can do; the **Service scope** decides *which services' data* it can do them to. By default a back-office account (an `Operator` or `Approver`) is **unrestricted** — it sees every service, exactly as before. You can instead confine it to a chosen subset.
+
+In the account editor, back-office roles show a **Service scope** picker below the Permissions panel:
+
+- **Leave it empty** for the default, unrestricted access — the account sees every service.
+- **Pick one or more services** to confine the account to just those. Every cross-service read it makes — the submissions list, single-submission lookup, the review/approval queue, Explore, the status and missing-data reports, the OData/Power BI feed and the ad-hoc query — is filtered to the chosen services, and any other service is invisible (out-of-scope submissions read back as *not found*). Attempting to *write* on behalf of an out-of-scope service (e.g. creating or importing a submission for it) is refused.
+
+Notes and rules:
+
+- **The picker only appears for `Operator` and `Approver` accounts.** `Service` accounts only ever see their own data, and `Admin` accounts are deliberately exempt — an admin always sees every service, even if a scope was somehow stored against the account.
+- **Assigned services must be real `Service` accounts.** The editor only lists services; the server rejects an attempt to assign a non-service id.
+- **A scoped person sees a "Limited view" badge** in the top bar of the SPA, with the assigned services on hover, so they always know they're looking at a subset rather than the whole estate.
+- Like capabilities, a scope change takes effect the next time the account authenticates (a fresh API request, or the next SPA page load).
+
+This is how you stand up, say, a regional operator who can review and approve only their own department's submissions without ever seeing another department's data. See [architecture/authentication.md § Authorisation: capabilities](../architecture/authentication.md#authorisation-capabilities) for how the scope is carried on the wire.
+
 ## Linking an SSO identity (only when SSO is enabled)
 
 > This section applies **only when single sign-on is enabled** for the deployment (`Sso:EnableSso=true` with at least one configured provider — see [architecture/authentication.md § Single sign-on](../architecture/authentication.md#single-sign-on-optional-second-scheme)). **When SSO is disabled (the default), the SSO sign-in field below does not appear** in the account editor and there is nothing to configure here.
@@ -72,10 +90,15 @@ The row menu (and the detail-drawer toolbar) has a **Send email** action — ava
 
 ## Issuing and rotating keys
 
-Row menu → **Manage keys**. The drawer lists every key attached to the account (including revoked ones — they're shown grayed out).
+Row menu → **Manage keys**. The drawer lists every key attached to the account (including revoked ones — they're shown grayed out), with a **Description** column for the free-form note described below.
 
-- **Generate key** — issues a new key and shows the plaintext **once** in a modal dialog. Copy it now; there is no way to retrieve it later. You can optionally set an **expiry** before generating: pick a date (up to two years from today) in the *Expiry for the next key* field, or leave it blank for a key that never expires. Expired keys stop authenticating automatically — no revoke needed — and show as **Expired** in the list.
+- **Generate key** — issues a new key and shows the plaintext **once** in a modal dialog. Copy it now; there is no way to retrieve it later. Before generating you can optionally set:
+  - a **description** — a short free-form note (up to 200 characters) recording *who or why* the key exists, and
+  - an **expiry** — a date up to two years from today, or blank for a key that never expires. Expired keys stop authenticating automatically — no revoke needed — and show as **Expired** in the list.
+- **Edit a description** — click the pencil next to any key's description to annotate it later (handy for keys created before you started recording this). The note is purely informational and never affects authentication.
 - **Revoke** (in the row menu of an individual key) — marks the key revoked. Idempotent; safe to click twice.
+
+> **Tip — temporary / cover keys.** The description and expiry pair up nicely for short-lived access. When someone needs the keys to a service or a reviewer account for a fixed window (covering annual leave, a contractor engagement, an incident), generate a **separate** key with a description like *"holiday cover for Jane — reviewer"* and an **expiry** on their last day. You then have an at-a-glance record of why each key exists and who it's for, and the temporary one disappears on its own when the cover ends — no diary reminder to revoke it. Keep the permanent and temporary keys distinct so revoking or expiring one never disrupts the other.
 
 You can have any number of active keys per account. The pattern for a zero-downtime rotation is:
 
@@ -100,7 +123,7 @@ Both old and new keys authenticate during the overlap; the consumer never sees a
 The **⋮** (More actions) menu at the top of the grid offers three ways to get accounts in and out in bulk:
 
 - **Export this list (CSV)** — a human-readable spreadsheet of the *currently listed* accounts (name, label, kind, role, status, email, created). Good for sharing or reporting; not meant for re-import.
-- **Export accounts (JSON)** — downloads `ingest-accounts-<timestamp>.json`: a portable, re-importable file with every account's name, label, description, email, kind, role, permissions, SSO links and enabled state. Needs `accounts:read`.
+- **Export accounts (JSON)** — downloads `ingest-accounts-<timestamp>.json`: a portable, re-importable file with every account's name, label, description, email, kind, role, permissions, service scope, SSO links and enabled state. Needs `accounts:read`.
 - **Import accounts (JSON)…** — pick an accounts JSON to create and update accounts in bulk. Needs `accounts:manage`.
 
 Import matches each entry on its **name**: an existing account is updated in place, an unknown name is created. It's **non-destructive** — accounts missing from the file are left alone — and entries are applied independently, so one invalid account (say, an unknown capability) is skipped and reported without blocking the rest.
