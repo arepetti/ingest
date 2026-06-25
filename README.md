@@ -158,6 +158,7 @@ Ingest is an open-source project maintained by **a single developer in their spa
 - **Security issues** — please report **privately**, never in a public issue: [SECURITY.md](SECURITY.md).
 - **How the project is run** (and how to become a co-maintainer — they're welcome) — [GOVERNANCE.md](GOVERNANCE.md).
 - **Relying on it in production?** Go ahead — but plan to self-support: the code is small and layered, every public type is documented, and [docs/](docs/README.md) covers deployment, configuration, and disaster recovery. The MIT licence means you can always fork and maintain your own copy.
+- **What does owning it actually cost?** [docs/ownership.md](docs/ownership.md) is an honest, manager-facing breakdown of the *effort* (not money) involved — what's mandatory vs optional, what runs where, and how it compares to the hand-made Excel/SharePoint setups it replaces.
 
 ## License
 
