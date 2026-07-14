@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ingest.Core\Ingest.Core.csproj" />
+    <ProjectReference Include="..\..\src\Ingest.Export\Ingest.Export.csproj" />
     <ProjectReference Include="..\..\src\Ingest.Infrastructure\Ingest.Infrastructure.csproj" />
     <!-- Referenced for the SSO sign-in eligibility rule (SsoSignIn). The SPA build target on
          Ingest.Api only runs on publish, so a plain test build/run never invokes npm. -->

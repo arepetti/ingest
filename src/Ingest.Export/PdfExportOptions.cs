@@ -1,4 +1,4 @@
-namespace Ingest.Infrastructure.Export;
+namespace Ingest.Export;
 
 /// <summary>
 /// Configuration for the PDF export feature. Bound from the <c>Pdf</c> configuration section.

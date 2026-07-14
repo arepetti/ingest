@@ -1,8 +1,8 @@
 using Ingest.Core.Abstractions;
 using Ingest.Infrastructure.Approvals;
 using Ingest.Infrastructure.Email;
+using Ingest.Export;
 using Ingest.Infrastructure.Events;
-using Ingest.Infrastructure.Export;
 using Ingest.Infrastructure.Integrations;
 using Ingest.Infrastructure.Mongo;
 using Ingest.Infrastructure.Reports;
@@ -12,7 +12,6 @@ using Ingest.Infrastructure.Validation;
 using Ingest.Infrastructure.Webhooks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 namespace Ingest.Infrastructure;
@@ -98,15 +97,9 @@ public static class DependencyInjection
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
 
-        // PDF export: an HTML template rendered by Fluid, converted to PDF by a Gotenberg sidecar
-        // over a typed HttpClient. The client picks up the Aspire resilience handlers from
-        // ServiceDefaults; its overall timeout is driven by Pdf:RequestTimeoutSeconds.
-        services.AddHttpClient<IPdfConverter, GotenbergPdfConverter>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<IOptions<PdfExportOptions>>().Value;
-            client.Timeout = TimeSpan.FromSeconds(Math.Clamp(opts.RequestTimeoutSeconds, 5, 600));
-        });
-        services.AddScoped<IPdfExportService, PdfExportService>();
+        // Export services (PDF now, XLSX later) live in the Ingest.Export project. The Pdf options
+        // are bound above; AddIngestExport wires the Gotenberg typed HttpClient and the services.
+        services.AddIngestExport();
         services.AddScoped<IExploreService, ExploreService>();
         services.AddScoped<IApprovalSettingsService, ApprovalSettingsService>();
         services.AddScoped<IApprovalRulesService, ApprovalRulesService>();

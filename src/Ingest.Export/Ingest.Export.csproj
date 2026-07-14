@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ingest.Core\Ingest.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ingest.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- PDF export Liquid template(s) are loaded from the assembly manifest at runtime. -->
+    <EmbeddedResource Include="Templates\*.liquid" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Used only to register the typed HttpClient for the Gotenberg PDF converter; also brings
+         Microsoft.Extensions.Options (IOptions) transitively. The XLSX writer is dependency-free. -->
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+</Project>

@@ -1,7 +1,7 @@
 using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
-using Ingest.Infrastructure.Export;
+using Ingest.Export;
 using Ingest.Infrastructure.Reports;
 using Ingest.Infrastructure.Validation;
 

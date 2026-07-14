@@ -4,7 +4,7 @@ using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
 
-namespace Ingest.Infrastructure.Export;
+namespace Ingest.Export;
 
 /// <summary>
 /// Default <see cref="IPdfExportService"/>. Builds a Liquid data envelope that mirrors the

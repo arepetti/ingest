@@ -3,6 +3,7 @@
     <Project Path="src/Ingest.Api/Ingest.Api.csproj" />
     <Project Path="src/Ingest.AppHost/Ingest.AppHost.csproj" />
     <Project Path="src/Ingest.Core/Ingest.Core.csproj" />
+    <Project Path="src/Ingest.Export/Ingest.Export.csproj" />
     <Project Path="src/Ingest.Infrastructure/Ingest.Infrastructure.csproj" />
     <Project Path="src/Ingest.ServiceDefaults/Ingest.ServiceDefaults.csproj" />
   </Folder>

@@ -3,7 +3,7 @@ using System.Text;
 using Ingest.Core.Abstractions;
 using Microsoft.Extensions.Options;
 
-namespace Ingest.Infrastructure.Export;
+namespace Ingest.Export;
 
 /// <summary>
 /// <see cref="IPdfConverter"/> backed by a Gotenberg sidecar. Posts the HTML to Gotenberg's

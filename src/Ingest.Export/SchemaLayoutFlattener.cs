@@ -1,6 +1,6 @@
 using Ingest.Core.Entities;
 
-namespace Ingest.Infrastructure.Export;
+namespace Ingest.Export;
 
 /// <summary>
 /// Server-side mirror of the SPA's <c>walkLayout</c> (<c>web/admin/src/utils/layout.ts</c>).
