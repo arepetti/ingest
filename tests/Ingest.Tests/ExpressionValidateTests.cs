@@ -3,7 +3,7 @@ using Ingest.Infrastructure.Validation;
 namespace Ingest.Tests;
 
 /// <summary>
-/// Syntax-only validation tests for <see cref="NCalcToJavaScriptTranslator.ValidateSyntax"/>.
+/// Syntax-only validation tests for <see cref="NCalcTranslator.ValidateSyntax"/>.
 /// These deliberately do <em>not</em> probe unknown identifiers — that's a runtime concern, full
 /// schema validation runs at save-time.
 /// </summary>
@@ -12,7 +12,7 @@ public class ExpressionValidateTests
     [Fact]
     public void Valid_expression_returns_ok()
     {
-        var t = new NCalcToJavaScriptTranslator();
+        var t = new NCalcTranslator();
         var r = t.ValidateSyntax("value > 0 and value < 100");
         Assert.True(r.Ok);
         Assert.Null(r.Error);
@@ -21,7 +21,7 @@ public class ExpressionValidateTests
     [Fact]
     public void Broken_expression_returns_not_ok_with_error_message()
     {
-        var t = new NCalcToJavaScriptTranslator();
+        var t = new NCalcTranslator();
         var r = t.ValidateSyntax("1 + ");
         Assert.False(r.Ok);
         Assert.False(string.IsNullOrWhiteSpace(r.Error));
@@ -32,7 +32,7 @@ public class ExpressionValidateTests
     {
         // The whole point of the endpoint: "syntax only" means unresolved names sail through.
         // Full validation (and any "did you mean…?" reporting) happens server-side on save.
-        var t = new NCalcToJavaScriptTranslator();
+        var t = new NCalcTranslator();
         var r = t.ValidateSyntax("foo + bar * baz");
         Assert.True(r.Ok);
     }
@@ -42,7 +42,7 @@ public class ExpressionValidateTests
     {
         // Multi-line authoring is the whole reason the textarea exists; the parser is fed a
         // single-line normalised form just like the translator.
-        var t = new NCalcToJavaScriptTranslator();
+        var t = new NCalcTranslator();
         var r = t.ValidateSyntax("value > 0\n  and\n  value < 100");
         Assert.True(r.Ok);
     }
@@ -50,7 +50,7 @@ public class ExpressionValidateTests
     [Fact]
     public void Empty_input_throws_argument_exception()
     {
-        var t = new NCalcToJavaScriptTranslator();
+        var t = new NCalcTranslator();
         Assert.Throws<ArgumentException>(() => t.ValidateSyntax("   "));
     }
 }

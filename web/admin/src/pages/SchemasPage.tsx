@@ -9,13 +9,13 @@ import {
 } from '@fluentui/react-components'
 import {
   Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, ChartMultiple20Regular,
-  CloudCheckmark20Regular, Copy20Regular, Delete20Regular, Edit20Regular, History20Regular, MoreHorizontal20Regular,
+  CloudCheckmark20Regular, Copy20Regular, Delete20Regular, DocumentPdf20Regular, Edit20Regular, History20Regular, MoreHorizontal20Regular,
   ShieldCheckmark16Regular,
 } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import type { Account, Schema, UpsertSchemaRequest } from '../api/types'
 import {
-  fetchAllSchemas, fetchSchemaExample, useAccounts, useCloneSchema,
+  fetchAllSchemas, fetchSchemaExample, schemaPdfExportUrl, useAccounts, useCloneSchema,
   useCapabilities, useDeleteSchema, useSchemas,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
@@ -32,7 +32,7 @@ import { cadenceLabel } from '../utils/cadence'
 import { confirmDelete } from '../utils/confirm'
 import { formatDate, formatDateTime } from '../utils/format'
 import { clickableRowProps } from '../utils/a11y'
-import { downloadJson, pickJsonFile } from '../utils/download'
+import { downloadFromUrl, downloadJson, pickJsonFile } from '../utils/download'
 import { emptySchema, toRequest } from '../utils/schema'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 
@@ -208,6 +208,14 @@ export function SchemasPage() {
     try {
       const example = await fetchSchemaExample(sc.name)
       downloadJson(`${sc.name}.example.json`, example)
+    } catch (e) {
+      setActionError(formatApiError(e))
+    }
+  }
+
+  async function onExportSchemaPdf(sc: Schema) {
+    try {
+      await downloadFromUrl(schemaPdfExportUrl(sc.name), `${sc.name}.pdf`)
     } catch (e) {
       setActionError(formatApiError(e))
     }
@@ -416,6 +424,9 @@ export function SchemasPage() {
                   </MenuItem>
                   <MenuItem icon={<ArrowDownload20Regular />} onClick={() => onDownloadExample(viewing)}>
                     Example submission (JSON)
+                  </MenuItem>
+                  <MenuItem icon={<DocumentPdf20Regular />} onClick={() => onExportSchemaPdf(viewing)}>
+                    Schema as PDF
                   </MenuItem>
                 </MenuList>
               </MenuPopover>

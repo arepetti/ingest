@@ -7,7 +7,7 @@ namespace Ingest.Infrastructure.Services;
 /// <summary>Extract identifier references from NCalc expressions for schema validation and dependency ordering.</summary>
 internal static class ExpressionReferences
 {
-    private static readonly NCalcToJavaScriptTranslator DefaultTranslator = new();
+    private static readonly NCalcTranslator DefaultTranslator = new();
 
     /// <summary>Identifiers referenced by a calculated-value expression that point at other calculated values.</summary>
     internal static IReadOnlyList<string> ForCalculatedDependencies(

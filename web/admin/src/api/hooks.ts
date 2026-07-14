@@ -299,6 +299,10 @@ export const useCloneSchema = () => {
 export const fetchSchemaExample = (name: string) =>
   api.get<{ samples: SampleInput[] }>(`/api/schemas/${encodeURIComponent(name)}/example`)
 
+/** Relative URL for the schema PDF spec-sheet download (authenticated via downloadFromUrl). */
+export const schemaPdfExportUrl = (name: string) =>
+  `/api/admin/schemas/${encodeURIComponent(name)}/export.pdf`
+
 export const useSchemaHistory = (name?: string) =>
   useQuery({
     queryKey: ['schema-history', name],
@@ -617,6 +621,10 @@ export const useSubmission = (id?: string, enabled: boolean = true) =>
     queryFn: () => api.get<Submission>(`/api/admin/submissions/${id}`),
     enabled: !!id && enabled,
   })
+
+/** Relative URL for the submission PDF download (authenticated via downloadFromUrl). */
+export const submissionPdfExportUrl = (id: string) =>
+  `/api/admin/submissions/${encodeURIComponent(id)}/export.pdf`
 
 export const useAdminCreateSubmission = () => {
   const qc = useQueryClient()

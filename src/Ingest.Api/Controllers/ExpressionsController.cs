@@ -38,6 +38,9 @@ public sealed class ExpressionsController : ControllerBase
     /// <summary>Legacy media type for JavaScript responses still in wide use.</summary>
     public const string JavaScriptMediaTypeLegacy = "application/javascript";
 
+    /// <summary>Media type for the human-readable (plain-English) explanation of a rule.</summary>
+    public const string PlainTextMediaType = "text/plain";
+
     private readonly IExpressionTranslator _translator;
     private readonly ILogger<ExpressionsController> _logger;
 
@@ -55,8 +58,9 @@ public sealed class ExpressionsController : ControllerBase
     /// The target language is selected through standard HTTP content negotiation:
     /// <list type="bullet">
     ///   <item><description><c>text/javascript</c> or <c>application/javascript</c> — returns a JavaScript expression (no statements, no surrounding function) ready to be wrapped in <c>new Function("V", "H", "return (...)")</c> on the client.</description></item>
+    ///   <item><description><c>text/plain</c> — returns a human-readable (plain-English) explanation of the rule.</description></item>
     ///   <item><description>Missing <c>Accept</c>, <c>*/*</c>, <c>application/*</c> or <c>text/*</c> — defaults to JavaScript (RFC 9110 semantics).</description></item>
-    ///   <item><description>Any other media type (e.g. <c>text/plain</c>, <c>application/json</c>) — <c>406 Not Acceptable</c>. A future <c>text/plain</c> target is reserved for human-readable explanations of the rule but is not implemented yet.</description></item>
+    ///   <item><description>Any other media type (e.g. <c>application/json</c>) — <c>406 Not Acceptable</c>.</description></item>
     /// </list>
     /// Translation is deterministic, so clients can cache the response keyed by the source expression.
     /// </remarks>
@@ -67,7 +71,7 @@ public sealed class ExpressionsController : ControllerBase
     /// <response code="406">No supported target language matched the <c>Accept</c> header.</response>
     [HttpPost("translate")]
     [Consumes("application/json")]
-    [Produces(JavaScriptMediaType, JavaScriptMediaTypeLegacy)]
+    [Produces(JavaScriptMediaType, JavaScriptMediaTypeLegacy, PlainTextMediaType)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status406NotAcceptable)]
@@ -92,7 +96,7 @@ public sealed class ExpressionsController : ControllerBase
             return new ObjectResult(new ProblemDetails
             {
                 Title = "Unsupported target language.",
-                Detail = $"This endpoint only produces {JavaScriptMediaType} (or {JavaScriptMediaTypeLegacy}). Set the Accept header accordingly.",
+                Detail = $"This endpoint produces {JavaScriptMediaType} (or {JavaScriptMediaTypeLegacy}) and {PlainTextMediaType}. Set the Accept header accordingly.",
                 Status = StatusCodes.Status406NotAcceptable,
             })
             {
@@ -102,6 +106,9 @@ public sealed class ExpressionsController : ControllerBase
 
         try
         {
+            if (string.Equals(target, PlainTextMediaType, StringComparison.OrdinalIgnoreCase))
+                return Content(_translator.TranslateToEnglish(request.Expression), PlainTextMediaType);
+
             var translation = _translator.TranslateToJavaScript(request.Expression);
             return Content(translation.Js, target);
         }
@@ -178,6 +185,7 @@ public sealed class ExpressionsController : ControllerBase
         {
             if (string.Equals(entry, JavaScriptMediaType, StringComparison.OrdinalIgnoreCase)) return JavaScriptMediaType;
             if (string.Equals(entry, JavaScriptMediaTypeLegacy, StringComparison.OrdinalIgnoreCase)) return JavaScriptMediaTypeLegacy;
+            if (string.Equals(entry, PlainTextMediaType, StringComparison.OrdinalIgnoreCase)) return PlainTextMediaType;
             if (entry == "*/*") return JavaScriptMediaType;
             if (string.Equals(entry, "application/*", StringComparison.OrdinalIgnoreCase)) return JavaScriptMediaTypeLegacy;
             if (string.Equals(entry, "text/*", StringComparison.OrdinalIgnoreCase)) return JavaScriptMediaType;

@@ -37,6 +37,24 @@ public interface IExpressionTranslator
     /// <returns>The validation outcome: <see cref="ExpressionSyntaxResult.Ok"/> set to <c>true</c> when the parser accepted the input.</returns>
     /// <exception cref="System.ArgumentException">The expression is null/empty/whitespace — distinct from a syntax error, this is a caller bug.</exception>
     ExpressionSyntaxResult ValidateSyntax(string expression);
+
+    /// <summary>
+    /// Parse <paramref name="expression"/> with the same engine used by the validator and render
+    /// it as a plain-English sentence. Uses the same AST walk as
+    /// <see cref="TranslateToJavaScript"/>, so the two stay in lock-step. Backs the human-readable
+    /// rule explanations in the schema PDF export (and the reserved <c>text/plain</c> target of the
+    /// translate endpoint).
+    /// </summary>
+    /// <param name="expression">The validation expression source.</param>
+    /// <param name="valueLabels">
+    /// Optional map from a value's machine name to its friendly label. When supplied, identifiers
+    /// (and their <c>[name.minimum]</c> / <c>[name.maximum]</c> bound keys) are rendered using the
+    /// label instead of the raw name. Case-insensitive lookups are expected.
+    /// </param>
+    /// <returns>A human-readable description of the rule.</returns>
+    /// <exception cref="System.ArgumentException">The expression is null/empty/whitespace.</exception>
+    /// <exception cref="System.Exception">The expression failed to parse — propagates the underlying NCalc parser exception.</exception>
+    string TranslateToEnglish(string expression, IReadOnlyDictionary<string, string>? valueLabels = null);
 }
 
 /// <summary>Outcome of a syntax-only check via <see cref="IExpressionTranslator.ValidateSyntax"/>.</summary>

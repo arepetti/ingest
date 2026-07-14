@@ -20,7 +20,11 @@ namespace Ingest.Api.Controllers;
 [ApiController]
 [Route("api/admin/submissions")]
 [Authorize(Policy = Capabilities.SubmissionsRead)]
-public sealed class AdminSubmissionsController(ISubmissionService service, IAuditLogService auditLog, IBulkImportService bulkImport) : ControllerBase
+public sealed class AdminSubmissionsController(
+    ISubmissionService service,
+    IAuditLogService auditLog,
+    IBulkImportService bulkImport,
+    IPdfExportService pdfExport) : ControllerBase
 {
     /// <summary>List submissions across all services, optionally filtered by service and/or date range.</summary>
     /// <param name="page">1-based page number; defaults to 1.</param>
@@ -98,6 +102,30 @@ public sealed class AdminSubmissionsController(ISubmissionService service, IAudi
 
         var result = await auditLog.ListByTargetAsync(id, RequestHelpers.ToPageRequest(page, pageSize, null, false), ct);
         return Ok(result.Map(AuditLogDto.From));
+    }
+
+    /// <summary>Export a single submission's data as a PDF.</summary>
+    /// <remarks>
+    /// Lays the submitted data out in its schema's structure (the same layout as the read-only
+    /// submission view), one value per row with its note where present. Blank rows are shown for
+    /// schema fields the submission didn't fill in.
+    /// </remarks>
+    /// <param name="id">Submission id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The rendered PDF.</response>
+    /// <response code="404">No submission with that id (or it is outside the caller's scope).</response>
+    [HttpGet("{id:guid}/export.pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportPdf(Guid id, CancellationToken ct)
+    {
+        // Respect the caller's service scope: out-of-scope submissions 404 just like GetById.
+        var existing = await service.GetAsync(id, includeDeleted: false, ct);
+        if (existing is null || !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+
+        var doc = await pdfExport.ExportSubmissionAsync(id, ct);
+        return doc is null ? NotFound() : File(doc.Content, "application/pdf", doc.FileName);
     }
 
     /// <summary>Soft-delete a submission.</summary>

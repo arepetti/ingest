@@ -16,7 +16,7 @@ namespace Ingest.Infrastructure.Validation;
 /// small helper namespace (<c>H</c>) so the runtime can encode the same null-handling rules
 /// the .NET evaluator uses.
 /// </summary>
-public sealed class NCalcToJavaScriptTranslator : IExpressionTranslator
+public sealed class NCalcTranslator : IExpressionTranslator
 {
     private readonly ILogicalExpressionFactory _factory = LogicalExpressionFactory.GetInstance();
 
@@ -58,8 +58,48 @@ public sealed class NCalcToJavaScriptTranslator : IExpressionTranslator
         }
     }
 
+    /// <inheritdoc />
+    public string TranslateToEnglish(string expression, IReadOnlyDictionary<string, string>? valueLabels = null)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+            throw new ArgumentException("Expression must not be empty.", nameof(expression));
+
+        var normalised = Normalise(expression);
+        var tree = _factory.Create(normalised, NCalc.ExpressionOptions.IgnoreCaseAtBuiltInFunctions, CancellationToken.None);
+        var visitor = new EnglishEmittingVisitor(valueLabels);
+        var english = tree.Accept(visitor, CancellationToken.None);
+        return StripOuterParens(english).Trim();
+    }
+
     private static string Normalise(string expression) =>
         expression.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ');
+
+    /// <summary>
+    /// Drop one or more fully-enclosing parenthesis pairs the English visitor adds around compound
+    /// expressions, so the top-level sentence doesn't read as "(… and …)". Only strips a pair when
+    /// it genuinely wraps the whole string (balanced from first char to last).
+    /// </summary>
+    private static string StripOuterParens(string value)
+    {
+        var s = value.Trim();
+        while (s.Length >= 2 && s[0] == '(' && s[^1] == ')')
+        {
+            var depth = 0;
+            var wraps = true;
+            for (var i = 0; i < s.Length; i++)
+            {
+                if (s[i] == '(') depth++;
+                else if (s[i] == ')')
+                {
+                    depth--;
+                    if (depth == 0 && i != s.Length - 1) { wraps = false; break; }
+                }
+            }
+            if (!wraps) break;
+            s = s[1..^1].Trim();
+        }
+        return s;
+    }
 
     private sealed class JsEmittingVisitor : ILogicalExpressionVisitor<string>
     {
@@ -235,5 +275,166 @@ public sealed class NCalcToJavaScriptTranslator : IExpressionTranslator
             if (double.IsNegativeInfinity(d)) return "(-1/0)";
             return d.ToString("R", CultureInfo.InvariantCulture);
         }
+    }
+
+    /// <summary>
+    /// Walks the same NCalc AST as <see cref="JsEmittingVisitor"/> but emits a plain-English
+    /// sentence instead of JavaScript. Compound nodes (binary/ternary/if) are wrapped in
+    /// parentheses to keep grouping unambiguous; the caller strips the outermost pair. Identifiers
+    /// are rendered with their friendly label when a lookup map is supplied.
+    /// </summary>
+    private sealed class EnglishEmittingVisitor : ILogicalExpressionVisitor<string>
+    {
+        private readonly IReadOnlyDictionary<string, string>? _labels;
+
+        public EnglishEmittingVisitor(IReadOnlyDictionary<string, string>? labels)
+        {
+            _labels = labels;
+        }
+
+        public string Visit(TernaryExpression expression, CancellationToken ct)
+        {
+            var c = expression.LeftExpression.Accept(this, ct);
+            var a = expression.MiddleExpression.Accept(this, ct);
+            var b = expression.RightExpression.Accept(this, ct);
+            return $"(if {c}, then {a}, otherwise {b})";
+        }
+
+        public string Visit(BinaryExpression expression, CancellationToken ct)
+        {
+            if (expression.Type == BinaryExpressionType.In || expression.Type == BinaryExpressionType.NotIn)
+            {
+                var v = expression.LeftExpression.Accept(this, ct);
+                var items = expression.RightExpression switch
+                {
+                    LogicalExpressionList list => string.Join(", ", list.Select(item => item.Accept(this, ct))),
+                    _ => expression.RightExpression.Accept(this, ct),
+                };
+                var verb = expression.Type == BinaryExpressionType.NotIn ? "is not one of" : "is one of";
+                return $"({v} {verb} {items})";
+            }
+
+            var left = expression.LeftExpression.Accept(this, ct);
+            var right = expression.RightExpression.Accept(this, ct);
+            var phrase = BinaryPhrase(expression.Type);
+            return $"({left} {phrase} {right})";
+        }
+
+        public string Visit(UnaryExpression expression, CancellationToken ct)
+        {
+            var inner = expression.Expression.Accept(this, ct);
+            return expression.Type switch
+            {
+                UnaryExpressionType.Not => $"(not {inner})",
+                UnaryExpressionType.Negate => $"(negative {inner})",
+                UnaryExpressionType.Positive => inner,
+                UnaryExpressionType.BitwiseNot => $"(bitwise-not {inner})",
+                UnaryExpressionType.Factorial => $"({inner} factorial)",
+                _ => inner,
+            };
+        }
+
+        public string Visit(ValueExpression expression, CancellationToken ct)
+        {
+            return expression.Value switch
+            {
+                null => "nothing",
+                bool b => b ? "true" : "false",
+                string s => $"\"{s}\"",
+                DateTime dt => dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                double d => d.ToString("R", CultureInfo.InvariantCulture),
+                float f => f.ToString("R", CultureInfo.InvariantCulture),
+                decimal m => m.ToString(CultureInfo.InvariantCulture),
+                IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
+                _ => expression.Value.ToString() ?? "nothing",
+            };
+        }
+
+        public string Visit(Function expression, CancellationToken ct)
+        {
+            var name = expression.Identifier.Name;
+            var lower = name.ToLowerInvariant();
+            var args = expression.Parameters.Select(p => p.Accept(this, ct)).ToList();
+
+            switch (lower)
+            {
+                case "if" when args.Count == 3:
+                    return $"(if {args[0]}, then {args[1]}, otherwise {args[2]})";
+                case "isnull" when args.Count == 1:
+                    return $"({args[0]} is empty)";
+                case "len" when args.Count == 1:
+                    return $"the length of {args[0]}";
+                case "coalesce" when args.Count > 0:
+                    return $"the first non-empty of ({string.Join(", ", args)})";
+                case "average" when args.Count > 0:
+                    return $"the average of ({string.Join(", ", args)})";
+                case "now":
+                    return "the current date and time";
+                case "today":
+                    return "today";
+                case "latest" when args.Count == 1:
+                    return $"the latest value of {args[0]}";
+                case "previous" when args.Count == 1:
+                    return $"the previous value of {args[0]}";
+                case "servicename":
+                    return "the service name";
+                default:
+                    return args.Count == 0 ? name : $"{name}({string.Join(", ", args)})";
+            }
+        }
+
+        public string Visit(Identifier expression, CancellationToken ct)
+        {
+            if (string.Equals(expression.Name, "null", StringComparison.OrdinalIgnoreCase))
+                return "nothing";
+            return Resolve(expression.Name);
+        }
+
+        public string Visit(LogicalExpressionList expression, CancellationToken ct) =>
+            string.Join(", ", expression.Select(e => e.Accept(this, ct)));
+
+        /// <summary>Render an identifier, expanding <c>name.minimum</c> / <c>name.maximum</c> bound keys.</summary>
+        private string Resolve(string name)
+        {
+            var dot = name.LastIndexOf('.');
+            if (dot > 0)
+            {
+                var suffix = name[(dot + 1)..].ToLowerInvariant();
+                if (suffix is "minimum" or "maximum")
+                    return $"the {suffix} of {Label(name[..dot])}";
+            }
+            return Label(name);
+        }
+
+        private string Label(string name) =>
+            _labels is not null && _labels.TryGetValue(name, out var label) && !string.IsNullOrWhiteSpace(label)
+                ? label
+                : name;
+
+        private static string BinaryPhrase(BinaryExpressionType type) => type switch
+        {
+            BinaryExpressionType.And => "and",
+            BinaryExpressionType.Or => "or",
+            BinaryExpressionType.Plus => "plus",
+            BinaryExpressionType.Minus => "minus",
+            BinaryExpressionType.Times => "times",
+            BinaryExpressionType.Div => "divided by",
+            BinaryExpressionType.Modulo => "modulo",
+            BinaryExpressionType.Equal => "is equal to",
+            BinaryExpressionType.NotEqual => "is not equal to",
+            BinaryExpressionType.Greater => "is greater than",
+            BinaryExpressionType.GreaterOrEqual => "is greater than or equal to",
+            BinaryExpressionType.Lesser => "is less than",
+            BinaryExpressionType.LesserOrEqual => "is less than or equal to",
+            BinaryExpressionType.Exponentiation => "to the power of",
+            BinaryExpressionType.Like => "matches pattern",
+            BinaryExpressionType.NotLike => "does not match pattern",
+            BinaryExpressionType.BitwiseAnd => "bitwise-and",
+            BinaryExpressionType.BitwiseOr => "bitwise-or",
+            BinaryExpressionType.BitwiseXOr => "bitwise-xor",
+            BinaryExpressionType.LeftShift => "shifted left by",
+            BinaryExpressionType.RightShift => "shifted right by",
+            _ => throw new NotSupportedException($"Unsupported binary operator '{type}'."),
+        };
     }
 }

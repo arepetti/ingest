@@ -5,7 +5,7 @@ namespace Ingest.Tests;
 public class NCalcToJavaScriptTranslatorTests
 {
     private static string Translate(string expr) =>
-        new NCalcToJavaScriptTranslator().TranslateToJavaScript(expr).Js;
+        new NCalcTranslator().TranslateToJavaScript(expr).Js;
 
     [Fact]
     public void Comparison_routes_through_helper()
@@ -70,7 +70,7 @@ public class NCalcToJavaScriptTranslatorTests
     [Fact]
     public void Tracks_identifiers_and_functions()
     {
-        var t = new NCalcToJavaScriptTranslator()
+        var t = new NCalcTranslator()
             .TranslateToJavaScript("if(not isNull(other), other + value, 0)");
         Assert.Contains("other", t.Identifiers);
         Assert.Contains("value", t.Identifiers);
@@ -83,7 +83,7 @@ public class NCalcToJavaScriptTranslatorTests
         // The bound-namespace keys (`[name.minimum]` / `[name.maximum]`) survive translation
         // as plain runtime lookups — `H.var` does a case-insensitive scan of the variables
         // bag so the dotted key matches the parameter we register on both sides.
-        var t = new NCalcToJavaScriptTranslator()
+        var t = new NCalcTranslator()
             .TranslateToJavaScript("[tonnes_collected.maximum] - tonnes_collected");
         Assert.Contains("H.var(V, \"tonnes_collected.maximum\")", t.Js);
         Assert.Contains("tonnes_collected.maximum", t.Identifiers);

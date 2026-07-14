@@ -6,9 +6,16 @@ var mongo = builder.AddMongoDB("mongo")
 
 var ingestDb = mongo.AddDatabase("ingest");
 
+// Headless-Chromium HTML->PDF sidecar used by the schema/submission PDF export. Runs as its own
+// container so the API image stays slim; the API only talks to it over HTTP.
+var gotenberg = builder.AddContainer("gotenberg", "gotenberg/gotenberg", "8")
+    .WithHttpEndpoint(targetPort: 3000);
+
 var api = builder.AddProject<Projects.Ingest_Api>("api")
     .WithReference(ingestDb)
     .WaitFor(ingestDb)
+    .WithEnvironment("Pdf__GotenbergUrl", gotenberg.GetEndpoint("http"))
+    .WaitFor(gotenberg)
     .WithExternalHttpEndpoints();
 
 // SSO secret wiring (opt-in). Kept inert unless `Sso:EnableSso` is set in the AppHost's own

@@ -18,7 +18,7 @@ public class SchemaServiceTests
         repo = new FakeSchemaRepo();
         return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService(),
             new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock(),
-            new NCalcToJavaScriptTranslator());
+            new NCalcTranslator());
     }
 
     private static SchemaService NewService(out FakeSchemaRepo repo, out FakeEmptySampleRepo samples)
@@ -27,7 +27,7 @@ public class SchemaServiceTests
         samples = new FakeEmptySampleRepo();
         return new SchemaService(repo, samples, new NoopAuditLogService(),
             new FakeVersionHistoryRepo(), new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock(),
-            new NCalcToJavaScriptTranslator());
+            new NCalcTranslator());
     }
 
     private static SchemaService NewServiceWithVersions(out FakeSchemaRepo repo, out FakeVersionHistoryRepo versions)
@@ -36,7 +36,7 @@ public class SchemaServiceTests
         versions = new FakeVersionHistoryRepo();
         return new SchemaService(repo, new FakeEmptySampleRepo(), new NoopAuditLogService(),
             versions, new FakeSubmissionCountRepo(), new StubAccountRepo(), new ImmediateClock(),
-            new NCalcToJavaScriptTranslator());
+            new NCalcTranslator());
     }
 
     /// <summary>
@@ -835,12 +835,15 @@ public class SchemaServiceTests
     /// <summary>Simulates an expression that parses but cannot be translated to JavaScript.</summary>
     private sealed class FailTranslateTranslator : IExpressionTranslator
     {
-        private readonly NCalcToJavaScriptTranslator _inner = new();
+        private readonly NCalcTranslator _inner = new();
 
         public JsExpressionTranslation TranslateToJavaScript(string expression) =>
             throw new NotSupportedException("simulated translation failure");
 
         public ExpressionSyntaxResult ValidateSyntax(string expression) => _inner.ValidateSyntax(expression);
+
+        public string TranslateToEnglish(string expression, IReadOnlyDictionary<string, string>? valueLabels = null) =>
+            _inner.TranslateToEnglish(expression, valueLabels);
     }
 
     // ── In-memory repositories (just enough surface) ────────────────────────────────────────

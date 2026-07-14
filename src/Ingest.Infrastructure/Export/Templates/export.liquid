@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>{{ title | escape }}</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1c2128;
+    font-size: 12px;
+    line-height: 1.45;
+    margin: 0;
+  }
+  .doc-header { border-bottom: 2px solid #1c2128; padding-bottom: 10px; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0 0 2px; }
+  .subtitle { color: #57606a; font-size: 13px; }
+  .meta { margin-top: 8px; color: #57606a; font-size: 11px; }
+  .meta-item { margin-right: 14px; white-space: nowrap; }
+  .meta-label { font-weight: 600; color: #424a53; }
+  .doc-desc { margin: 10px 0 0; color: #424a53; }
+
+  h2.section {
+    font-size: 15px; margin: 20px 0 8px; padding: 4px 8px;
+    background: #f0f3f6; border-left: 3px solid #57606a; border-radius: 2px;
+  }
+  h3.subsection { font-size: 13px; margin: 14px 0 6px; color: #424a53; }
+  .section-desc { margin: -2px 0 8px; color: #57606a; font-style: italic; }
+  h3.value-caption { font-size: 13px; margin: 14px 0 4px; }
+
+  .value {
+    border: 1px solid #d0d7de; border-radius: 4px; padding: 8px 10px; margin: 6px 0;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .value-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .value-label { font-weight: 600; font-size: 13px; }
+  .req { color: #cf222e; font-weight: 700; }
+  .badges { text-align: right; }
+  .badge {
+    display: inline-block; font-size: 10px; line-height: 1.6; padding: 0 6px; margin-left: 4px;
+    border-radius: 10px; background: #eaeef2; color: #424a53; white-space: nowrap;
+  }
+  .badge-muted { background: #f6f8fa; color: #6e7781; }
+  .badge-calc { background: #ddf4ff; color: #0969da; }
+  .badge-off { background: #ffebe9; color: #cf222e; }
+  .badge-unit { background: #fff8c5; color: #7d4e00; }
+  .value-desc { margin-top: 4px; color: #424a53; }
+  .constraints { margin-top: 4px; }
+  .hint { display: inline-block; font-size: 11px; color: #57606a; margin-right: 10px; }
+  .rag { margin-top: 4px; font-size: 11px; color: #57606a; }
+  .rules { margin: 6px 0 0; padding-left: 18px; }
+  .rules li { margin: 1px 0; }
+  .rule-label { font-weight: 600; color: #424a53; }
+  .value-notes { margin-top: 4px; color: #57606a; }
+
+  .data { margin-top: 8px; padding-top: 6px; border-top: 1px dashed #d0d7de; }
+  .data-label { font-weight: 600; color: #424a53; }
+  .data-value { font-size: 13px; }
+  .data-note { margin-top: 2px; color: #57606a; }
+  .empty { color: #8c959f; }
+
+  .schema-rules { margin-top: 20px; }
+  .doc-footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #d0d7de; color: #8c959f; font-size: 10px; }
+</style>
+</head>
+<body>
+  <header class="doc-header">
+    <h1>{{ title | escape }}</h1>
+    {% if subtitle %}<div class="subtitle">{{ subtitle | escape }}</div>{% endif %}
+    {% if meta.size > 0 %}
+    <div class="meta">
+      {% for m in meta %}<span class="meta-item"><span class="meta-label">{{ m.label | escape }}:</span> {{ m.value | escape }}</span>{% endfor %}
+    </div>
+    {% endif %}
+    {% if description %}<p class="doc-desc">{{ description | escape }}</p>{% endif %}
+  </header>
+
+  {% for item in items %}
+    {% if item.kind == "section" %}
+      {% if item.depth == 0 %}
+        <h2 class="section" style="margin-left:{{ item.indent }}px">{{ item.caption | escape }}</h2>
+      {% else %}
+        <h3 class="subsection" style="margin-left:{{ item.indent }}px">{{ item.caption | escape }}</h3>
+      {% endif %}
+      {% if item.description %}<p class="section-desc" style="margin-left:{{ item.indent }}px">{{ item.description | escape }}</p>{% endif %}
+    {% else %}
+      {% if item.caption %}<h3 class="value-caption" style="margin-left:{{ item.indent }}px">{{ item.caption | escape }}</h3>{% endif %}
+      <div class="value" style="margin-left:{{ item.indent }}px">
+        <div class="value-head">
+          <span class="value-label">{{ item.label | escape }}{% if item.required %} <span class="req">*</span>{% endif %}</span>
+          <span class="badges">
+            <span class="badge">{{ item.typeLabel | escape }}</span>
+            <span class="badge">{{ item.cadenceLabel | escape }}</span>
+            {% if item.calculated %}<span class="badge badge-calc">Calculated</span>{% elsif item.required %}<span class="badge">Required</span>{% else %}<span class="badge badge-muted">Optional</span>{% endif %}
+            {% if item.disabled %}<span class="badge badge-off">Disabled</span>{% endif %}
+            {% if item.unit %}<span class="badge badge-unit">{{ item.unit | escape }}</span>{% endif %}
+          </span>
+        </div>
+        {% if item.description %}<div class="value-desc">{{ item.description | escape }}</div>{% endif %}
+        {% if item.constraints.size > 0 %}<div class="constraints">{% for c in item.constraints %}<span class="hint">{{ c | escape }}</span>{% endfor %}</div>{% endif %}
+        {% if item.rag %}<div class="rag">{{ item.rag | escape }}</div>{% endif %}
+        {% if item.rules.size > 0 %}
+        <ul class="rules">
+          {% for r in item.rules %}<li><span class="rule-label">{{ r.label | escape }}:</span> {{ r.text | escape }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% if item.notes %}<div class="value-notes"><span class="rule-label">Notes:</span> {{ item.notes | escape }}</div>{% endif %}
+        {% if showData %}
+        <div class="data">
+          <div class="data-value"><span class="data-label">Value{% if item.unit %} ({{ item.unit | escape }}){% endif %}:</span> {% if item.hasValue %}{{ item.valueText | escape }}{% else %}<span class="empty">&mdash;</span>{% endif %}</div>
+          {% if item.note %}<div class="data-note"><span class="data-label">Note:</span> {{ item.note | escape }}</div>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% endfor %}
+
+  {% if submissionValidations.size > 0 %}
+  <section class="schema-rules">
+    <h2 class="section">Submission validation rules</h2>
+    <ul class="rules">
+      {% for r in submissionValidations %}<li>{{ r | escape }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <footer class="doc-footer">Generated {{ generatedAt | escape }}</footer>
+</body>
+</html>

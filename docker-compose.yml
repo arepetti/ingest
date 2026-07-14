@@ -29,6 +29,12 @@ services:
       retries: 5
       start_period: 20s
 
+  # Headless-Chromium HTML->PDF service. The app posts a fully self-contained HTML document and
+  # gets back a PDF; keeping it as a separate container keeps the app image slim (no browser).
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+
   ingest:
     build:
       context: .
@@ -38,10 +44,14 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+      gotenberg:
+        condition: service_started
     ports:
       - "8080:8080"
     environment:
       ConnectionStrings__ingest: "mongodb://mongo:27017/ingest"
+      # Where the PDF-export feature sends HTML for rendering (see the gotenberg service above).
+      Pdf__GotenbergUrl: "http://gotenberg:3000"
       # Hardens stored key hashes. Any value works locally; change it for anything real.
       ApiKey__Pepper: "local-dev-pepper-change-me"
       # Known bootstrap admin key so you can log in immediately without scraping the logs.

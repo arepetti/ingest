@@ -16,7 +16,7 @@ namespace Ingest.Api.Controllers;
 [ApiController]
 [Route("api/admin/schemas")]
 [Authorize(Policy = Capabilities.SchemasRead)]
-public sealed class AdminSchemasController(ISchemaService service) : ControllerBase
+public sealed class AdminSchemasController(ISchemaService service, IPdfExportService pdfExport) : ControllerBase
 {
     /// <summary>List schemas in paged form.</summary>
     /// <param name="page">1-based page number; defaults to 1.</param>
@@ -155,6 +155,26 @@ public sealed class AdminSchemasController(ISchemaService service) : ControllerB
     {
         var history = await service.GetHistoryAsync(name, ct);
         return history is null ? NotFound() : Ok(SchemaHistoryMapper.ToDto(history));
+    }
+
+    /// <summary>Export a schema's full field specification as a PDF.</summary>
+    /// <remarks>
+    /// The document lists every field the schema defines — regardless of <c>visibleIf</c> /
+    /// <c>enabledIf</c> gating — laid out in the same structure as the read-only submission view,
+    /// but with no data. Validation/calculation rules are rendered in plain English.
+    /// </remarks>
+    /// <param name="name">Schema name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The rendered PDF.</response>
+    /// <response code="404">No schema with that name.</response>
+    [HttpGet("{name}/export.pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportPdf(string name, CancellationToken ct)
+    {
+        var doc = await pdfExport.ExportSchemaAsync(name, ct);
+        return doc is null ? NotFound() : File(doc.Content, "application/pdf", doc.FileName);
     }
 
     /// <summary>Page through a schema's saved version snapshots, newest change first.</summary>

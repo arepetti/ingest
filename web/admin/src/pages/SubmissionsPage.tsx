@@ -6,11 +6,12 @@ import {
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow, Text, Textarea,
   Title2, Tooltip, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Checkmark20Regular, Copy20Regular, Delete20Regular, Dismiss20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Checkmark20Regular, Copy20Regular, Delete20Regular, Dismiss20Regular, DocumentPdf20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { BulkImportDialog } from '../components/BulkImportDialog'
 import { formatApiError } from '../api/client'
-import { fetchAllMySubmissions, fetchAllSubmissions, useAccounts, useApproveSubmission, useCapabilities, useDeleteSubmission, useMySchemas, useMySubmissions, useRejectSubmission, useSchemas, useSubmissions } from '../api/hooks'
+import { fetchAllMySubmissions, fetchAllSubmissions, submissionPdfExportUrl, useAccounts, useApproveSubmission, useCapabilities, useDeleteSubmission, useMySchemas, useMySubmissions, useRejectSubmission, useSchemas, useSubmissions } from '../api/hooks'
+import { downloadFromUrl } from '../utils/download'
 import { RowActions } from '../components/RowActions'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import { SubmissionAvatar } from '../components/Avatars'
@@ -304,6 +305,15 @@ export function SubmissionsPage() {
       onError: e => setActionError(formatApiError(e)),
       onSuccess: () => { if (viewing?.id === sub.id) setViewing(null) },
     })
+  }
+
+  async function onExportSubmissionPdf(sub: Submission) {
+    setActionError(null)
+    try {
+      await downloadFromUrl(submissionPdfExportUrl(sub.id), `submission-${sub.id}.pdf`)
+    } catch (e) {
+      setActionError(formatApiError(e))
+    }
   }
 
   function submitReject() {
@@ -648,6 +658,9 @@ export function SubmissionsPage() {
                   </MenuItem>
                   <MenuItem icon={<Open20Regular />} onClick={() => { const id = viewing.id; setViewing(null); nav(`/submissions/${id}`) }}>
                     View details
+                  </MenuItem>
+                  <MenuItem icon={<DocumentPdf20Regular />} onClick={() => onExportSubmissionPdf(viewing)}>
+                    Export as PDF
                   </MenuItem>
                 </MenuList>
               </MenuPopover>
