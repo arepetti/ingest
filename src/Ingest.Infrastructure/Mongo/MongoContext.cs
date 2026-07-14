@@ -43,6 +43,9 @@ public sealed class MongoContext
     /// <summary><c>approvalRules</c> collection — cross-cutting per-service/per-schema approval rules.</summary>
     public IMongoCollection<ApprovalRule> ApprovalRules => Database.GetCollection<ApprovalRule>("approvalRules");
 
+    /// <summary><c>events</c> collection — admin-recorded timeline events, optionally scoped to a set of services.</summary>
+    public IMongoCollection<Event> Events => Database.GetCollection<Event>("events");
+
     /// <summary><c>emailSettings</c> collection — singleton SMTP configuration.</summary>
     public IMongoCollection<EmailSettings> EmailSettings => Database.GetCollection<EmailSettings>("emailSettings");
 

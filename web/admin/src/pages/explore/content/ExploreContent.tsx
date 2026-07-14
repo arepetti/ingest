@@ -2,10 +2,10 @@ import { type RefObject } from 'react'
 import {
   Card, CardHeader, MessageBar, MessageBarBody, Switch, Text,
 } from '@fluentui/react-components'
-import type { ExploreAggregation, ExploreValueSeries, SchemaValue } from '../../../api/types'
+import type { ExploreAggregation, ExploreValueSeries, IngestEvent, SchemaValue } from '../../../api/types'
 import { cadenceLabel } from '../../../utils/cadence'
 import {
-  AGG_LABELS, fmt, rollup, useExploreStyles, valueTitle, type ExploreView, type ServiceRef,
+  AGG_LABELS, eventsForServices, fmt, rollup, useExploreStyles, valueTitle, type ExploreView, type ServiceRef,
 } from '../shared'
 import { AnomalySettings } from '../AnomalySettings'
 import { TrendView } from './TrendView'
@@ -34,6 +34,7 @@ export function ExploreContent({
   values, services, agg,
   activeSeries, prevActiveSeries, activeValue, activeValueName,
   combined, asTable, projecting, comparing, previousLabel, chartRef, anomaly,
+  events, canShowEvents, eventsOn, onToggleEvents,
   onToggleCombined, onToggleProjection, onToggleTable,
 }: {
   view: ExploreView
@@ -54,6 +55,12 @@ export function ExploreContent({
   previousLabel?: string
   chartRef: RefObject<HTMLDivElement | null>
   anomaly: AnomalyControls
+  /** Live events (unfiltered by service scope) fetched for the current period window; empty when the caller can't read events. */
+  events: IngestEvent[]
+  /** Whether the caller holds `events:read` — gates the "Show events" toggle and any overlay rendering. */
+  canShowEvents: boolean
+  eventsOn: boolean
+  onToggleEvents: (v: boolean) => void
   onToggleCombined: (v: boolean) => void
   onToggleProjection: (v: boolean) => void
   onToggleTable: (v: boolean) => void
@@ -102,6 +109,9 @@ export function ExploreContent({
               <Switch label="Projection" checked={projecting} onChange={(_, d) => onToggleProjection(!!d.checked)} />
             )}
             <Switch label="View as table" checked={asTable} onChange={(_, d) => onToggleTable(!!d.checked)} />
+            {view === 'trend' && !asTable && canShowEvents && (
+              <Switch label="Show events" checked={eventsOn} onChange={(_, d) => onToggleEvents(!!d.checked)} />
+            )}
             {view === 'trend' && (
               <AnomalySettings
                 enabled={anomaly.on}
@@ -131,6 +141,8 @@ export function ExploreContent({
             anomaly={anomaly.on}
             asTable={asTable}
             chartRef={chartRef}
+            events={canShowEvents ? eventsForServices(events, services) : []}
+            showEvents={canShowEvents && eventsOn}
           />
         ) : (
           <CompareView

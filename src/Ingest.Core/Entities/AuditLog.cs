@@ -67,6 +67,9 @@ public enum AuditTargetType
 
     /// <summary>A backup restore (either the data backup or the configuration backup).</summary>
     Backup = 9,
+
+    /// <summary>An admin-recorded timeline event.</summary>
+    Event = 10,
 }
 
 /// <summary>

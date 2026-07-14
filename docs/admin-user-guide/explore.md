@@ -88,6 +88,37 @@ see at a glance whether services are sitting where they should. Anything outside
 "red" zone) is left unshaded. The band is purely a visual reference; it's never enforced and doesn't
 affect any of the aggregated figures. It also appears on the historical-data view.
 
+#### Event overlay
+
+When you hold the `events:read` capability, the Trend chart also overlays the [Events
+timeline](events.md) on top of your data, so you can eyeball "did that dip line up with the
+maintenance window?" without leaving the chart:
+
+- **Point in time** events draw as a **solid vertical bar** at the bucket their timestamp falls
+  in, labelled with the event's title.
+- **From now on** events draw as a **thicker vertical bar** topped with a small
+  right-pointing arrowhead, signalling they run on indefinitely rather than stopping at a known
+  point.
+- **Interval** events draw as a full-height **shaded band** (top to bottom of the chart) spanning
+  every bucket the event's `[start, start + duration]` window overlaps.
+
+Each kind keeps the same colour it has on the [Events page](events.md#the-three-kinds) (avatar
+colours), and a small legend above the chart lists only the kinds actually present in the current
+view. The **Show events** switch (next to **View as table**) turns the overlay off if it's getting
+in the way; it's on by default.
+
+An event only appears if it applies to at least one currently in-scope service (or has no service
+scope at all, i.e. "all services") **and** its span overlaps the chart's plotted period — an event
+entirely before or after the visible range, or affecting only services you've filtered out, is
+simply omitted. The overlay has no effect on any exported/aggregated figure; it's a purely visual
+annotation, same as the RAG target band described above. It only appears on the Trend chart in the
+default (non-table) view — the **Compare** and **Snapshot** views, and **View as table**, don't
+chart a time axis so there's nowhere to anchor it.
+
+> Events shown here are capped at the first 500 matching the current period filter — comfortably
+> above the reference volume for an admin-curated annotation timeline. For anything larger, or to
+> build your own overlay, pull the [`events` OData feed](../setup/powerbi/events.md) instead.
+
 #### Highlight anomalies
 
 The **Highlight anomalies** dropdown button (rightmost in the Trend toolbar) rings the points that
@@ -307,3 +338,7 @@ rather not build against OData for a simple chart.
 For BI tools, the same scorecard is also published as a flat OData function at
 `/odata/scorecard(mode,period)` — one row per (schema, value, service) cell, including the target
 band edges. See [PowerBI integration → Scorecard feed](../setup/powerbi/scorecard.md).
+
+The Trend chart's [event overlay](#event-overlay) reuses the existing `GET /api/admin/events`
+endpoint (see [Events → API](events.md#api)) rather than a dedicated Explore endpoint; BI tools get
+the same data from the [`events` OData feed](../setup/powerbi/events.md).

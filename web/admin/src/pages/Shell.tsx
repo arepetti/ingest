@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { Board24Regular, ChartMultiple24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Toolbox24Regular, Warning24Regular } from '@fluentui/react-icons'
+import { Board24Regular, CalendarLtr24Regular, ChartMultiple24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Toolbox24Regular, Warning24Regular } from '@fluentui/react-icons'
 import { useCapabilities } from '../api/hooks'
 import { TopBar } from '../components/TopBar'
 import type { ReactNode } from 'react'
@@ -117,6 +117,7 @@ export function Shell() {
     // is "Accounts" because the page lists every account (any kind, any role), not only services.
     { to: '/services',    label: 'Accounts',    icon: <PeopleTeam24Regular />,         show: has('accounts:read') },
     { to: '/schemas',     label: 'Schemas',     icon: <DataTreemap24Regular />,        show: has('schemas:read') },
+    { to: '/events',      label: 'Events',      icon: <CalendarLtr24Regular />,        show: has('events:read') },
     { to: '/audit',       label: 'Audit',       icon: <History24Regular />,            show: has('audit:read') },
     // Operational utilities (backup/restore today). Pinned to the bottom, directly above Settings.
     // `marginTop: auto` on the first bottom entry pushes the whole bottom group down.

@@ -1,6 +1,8 @@
+import type { ReactElement } from 'react'
 import { Avatar, type AvatarProps } from '@fluentui/react-components'
-import { DocumentBulletList20Regular } from '@fluentui/react-icons'
-import type { Account, AccountRole, ApprovalStatus, AuditChangeType, AuditTargetType, Schema, SchemaValueType } from '../api/types'
+import { ArrowRight20Regular, DocumentBulletList20Regular, Record20Regular, Resize20Regular } from '@fluentui/react-icons'
+import type { Account, AccountRole, ApprovalStatus, AuditChangeType, AuditTargetType, EventKind, Schema, SchemaValueType } from '../api/types'
+import { eventKindLabel } from '../utils/eventKind'
 
 type AvatarColor = AvatarProps['color']
 type AvatarSize = AvatarProps['size']
@@ -43,6 +45,32 @@ export function SchemaAvatar({ schema, size = 32 }: { schema: Schema; size?: Ava
       size={size}
       badge={active ? undefined : { status: 'offline' }}
       aria-label={active ? 'Schema' : 'Schema (disabled)'}
+    />
+  )
+}
+
+// Each event kind gets its own icon + colour so the leftmost column reads as "what shape of time
+// span is this" at a glance: a dot for an instant, a span glyph for a bounded interval, and a
+// forward arrow for an open-ended "from now on" event.
+const EVENT_KIND_ICONS: Record<EventKind, ReactElement> = {
+  PointInTime: <Record20Regular />,
+  Interval: <Resize20Regular />,
+  FromNowOn: <ArrowRight20Regular />,
+}
+
+const EVENT_KIND_COLORS: Record<EventKind, AvatarColor> = {
+  PointInTime: 'cornflower',
+  Interval: 'forest',
+  FromNowOn: 'marigold',
+}
+
+export function EventKindAvatar({ kind, size = 32 }: { kind: EventKind; size?: AvatarSize }) {
+  return (
+    <Avatar
+      icon={EVENT_KIND_ICONS[kind]}
+      color={EVENT_KIND_COLORS[kind]}
+      size={size}
+      aria-label={eventKindLabel(kind)}
     />
   )
 }

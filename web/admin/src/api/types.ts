@@ -77,6 +77,42 @@ export interface UpsertApprovalRuleRequest {
   policy: ApprovalPolicy
 }
 
+/**
+ * How an event relates to time: a single instant, a bounded span with a known duration, or an
+ * open-ended span that starts at its timestamp and runs indefinitely.
+ */
+export type EventKind = 'PointInTime' | 'Interval' | 'FromNowOn'
+
+/**
+ * An admin-recorded timeline event (e.g. a maintenance window, an incident, a deployment),
+ * optionally scoped to the services it affects (empty = all services). Named `IngestEvent` to
+ * avoid colliding with the DOM's built-in `Event`.
+ */
+export interface IngestEvent {
+  id: string
+  timestamp: string
+  label: string
+  description?: string | null
+  kind: EventKind
+  /** Duration in whole minutes; only set (and only meaningful) when `kind` is `Interval`. */
+  durationMinutes?: number | null
+  serviceIds: string[]
+  createdAt: string
+  createdBy?: string | null
+  modifiedAt: string
+  modifiedBy?: string | null
+}
+
+/** Body for creating/updating an event. */
+export interface UpsertEventRequest {
+  timestamp: string
+  label: string
+  description?: string | null
+  kind: EventKind
+  durationMinutes?: number | null
+  serviceIds: string[]
+}
+
 /** One recorded approval/rejection decision on a submission. */
 export interface SubmissionApproval {
   approverAccountId: string

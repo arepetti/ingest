@@ -75,6 +75,10 @@ public static class Capabilities
     public const string SettingsRead = "settings:read";
     /// <summary>Change global settings (e.g. the default approval policy).</summary>
     public const string SettingsManage = "settings:manage";
+    /// <summary>View the events timeline.</summary>
+    public const string EventsRead = "events:read";
+    /// <summary>Create, edit and delete events.</summary>
+    public const string EventsManage = "events:manage";
 
     /// <summary>Every capability in the catalogue, in display order (grouped data/content then administration).</summary>
     public static readonly IReadOnlyList<string> All = new[]
@@ -92,6 +96,7 @@ public static class Capabilities
         PrivacyRead, PrivacyManage,
         BackupRead, BackupManage,
         SettingsRead, SettingsManage,
+        EventsRead, EventsManage,
     };
 
     private static readonly HashSet<string> KnownSet = new(All, StringComparer.Ordinal);

@@ -21,6 +21,7 @@ import type {
   WebhookEndpointCreatedResponse, WebhookSecretResponse,
   WebhookDelivery, WebhookDeliveryStatus, WebhookDrainResult,
   ApprovalStatus, ApprovalPolicy, ApprovalRule, UpsertApprovalRuleRequest,
+  IngestEvent, UpsertEventRequest,
   Integration, IntegrationRequest, IntegrationRunResult,
   TeamsConnection, UpdateTeamsConnectionRequest, TeamsConnectionTestResult,
 } from './types'
@@ -86,6 +87,13 @@ export const fetchAllSchemas = (params?: { includeDeleted?: boolean }) => {
   const search = new URLSearchParams()
   if (params?.includeDeleted) search.set('includeDeleted', 'true')
   return fetchAllPaged<Schema>('/api/admin/schemas', search)
+}
+
+export const fetchAllEvents = (params?: { from?: string; to?: string }) => {
+  const search = new URLSearchParams()
+  if (params?.from) search.set('from', params.from)
+  if (params?.to) search.set('to', params.to)
+  return fetchAllPaged<IngestEvent>('/api/admin/events', search)
 }
 
 export const fetchAllSubmissions = (params?: { serviceId?: string; schemaName?: string; from?: string; to?: string; approvalStatus?: ApprovalStatus }) => {
@@ -557,6 +565,49 @@ export const useDeleteApprovalRule = () => {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/api/admin/approval/rules/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['approval-rules'] }),
+  })
+}
+
+// --- Events timeline (admin) --------------------------------------------------------------
+
+export const useEvents = (
+  params?: { page?: number; pageSize?: number; from?: string; to?: string },
+  enabled: boolean = true,
+) => {
+  const search = new URLSearchParams()
+  if (params?.page) search.set('page', String(params.page))
+  search.set('pageSize', String(params?.pageSize ?? 50))
+  if (params?.from) search.set('from', params.from)
+  if (params?.to) search.set('to', params.to)
+  return useQuery({
+    queryKey: ['events', params],
+    queryFn: () => api.get<Paged<IngestEvent>>(`/api/admin/events?${search}`),
+    enabled,
+  })
+}
+
+export const useCreateEvent = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: UpsertEventRequest) => api.post<IngestEvent>('/api/admin/events', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
+  })
+}
+
+export const useUpdateEvent = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, req }: { id: string; req: UpsertEventRequest }) =>
+      api.put<IngestEvent>(`/api/admin/events/${id}`, req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
+  })
+}
+
+export const useDeleteEvent = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/api/admin/events/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
   })
 }
 

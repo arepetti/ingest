@@ -2,6 +2,17 @@
 
 Notable changes per release. Versions are newest-first. No breaking changes have been released so far.
 
+## 0.5.1
+
+### Added
+
+- Support for events: an admin-recorded timeline (point-in-time, interval, or open-ended "from now on" kinds), optionally scoped to one or more affected services.
+
+### Documentation
+
+- Admin guide: new [events.md](admin-user-guide/events.md) page.
+- Power BI: new [events feed reference](setup/powerbi/events.md), and the feed added to the [hub page](setup/powerbi/README.md).
+
 ## 0.5.0
 
 ### Added

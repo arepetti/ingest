@@ -12,7 +12,7 @@ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { PeriodFilter } from '../components/PeriodFilter'
 import { ExplorePresets } from '../components/ExplorePresets'
 import { formatApiError } from '../api/client'
-import { useAccounts, useExploreAnomalies, useExploreScorecard, useExploreSeries, useSchemas } from '../api/hooks'
+import { useAccounts, useCapabilities, useEvents, useExploreAnomalies, useExploreScorecard, useExploreSeries, useSchemas } from '../api/hooks'
 import type { Account, ExploreAggregation, ExploreValueSeries, Schema, SchemaValue } from '../api/types'
 import { intervalRange, shiftIso, SHIFT_LABELS, type Interval, type ShiftKey } from '../utils/period'
 import type { PeriodFilterState } from '../utils/usePeriodFilter'
@@ -100,6 +100,10 @@ export function ExplorePage() {
   const combined = sp.get('combined') === '1'
   const asTable = sp.get('table') === '1'
   const projecting = sp.get('proj') === '1'
+  // Trend-chart event overlay: on by default (once the caller can read events), off via `evts=0`.
+  const { has } = useCapabilities()
+  const canShowEvents = has('events:read')
+  const eventsOn = sp.get('evts') !== '0'
   // A single "Compare with previous" dropdown: empty/absent means off, otherwise it's the shift.
   const shift = (sp.get('shift') ?? '') as ShiftKey | ''
   const comparing = shift !== ''
@@ -171,6 +175,12 @@ export function ExplorePage() {
     !!schemaName && compareEnabled,
   )
 
+  // Events overlaid on the Trend chart, bounded by the same period window as the series query
+  // (unbounded — i.e. every live event — for "All time"). Capped at 500; events are a small,
+  // admin-curated annotation set so this comfortably covers a real deployment's history.
+  const eventsEnabled = canShowEvents && isAnalysis && view === 'trend'
+  const events = useEvents({ pageSize: 500, from, to }, eventsEnabled)
+
   const scorecard = useExploreScorecard(
     selectedServiceIds.length ? selectedServiceIds : undefined,
     scMode === 'period' ? 'LastPeriod' : 'LatestAvailable',
@@ -237,7 +247,7 @@ export function ExplorePage() {
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
-                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => (isScorecard ? scorecard.refetch() : isAnomalies ? anomalies.refetch() : series.refetch())}>Refresh</MenuItem>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => { if (isScorecard) scorecard.refetch(); else if (isAnomalies) anomalies.refetch(); else { series.refetch(); if (eventsEnabled) events.refetch() } }}>Refresh</MenuItem>
                 {isAnalysis && (
                   <>
                     <MenuDivider />
@@ -512,6 +522,10 @@ export function ExplorePage() {
           comparing={comparing}
           previousLabel={comparing ? SHIFT_LABELS[shift as ShiftKey] : undefined}
           chartRef={chartRef}
+          events={events.data?.items ?? []}
+          canShowEvents={canShowEvents}
+          eventsOn={eventsOn}
+          onToggleEvents={v => update({ evts: v ? null : '0' })}
           anomaly={{
             on: seriesAnomaly,
             window: anomalyWindow,

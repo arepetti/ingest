@@ -1,6 +1,7 @@
 import { makeStyles, tokens } from '@fluentui/react-components'
 import type {
-  ExploreAggregation, ExploreServicePoint, ExploreServiceRef, ExploreValueSeries, RagStatus,
+  Cadence, EventKind, ExploreAggregation, ExploreBucket, ExploreServicePoint, ExploreServiceRef,
+  ExploreValueSeries, IngestEvent, RagStatus,
 } from '../../api/types'
 import { formatPeriodLabel } from '../../utils/periodFormat'
 
@@ -38,6 +39,14 @@ export const ANOMALY_WINDOW_DEFAULT = 12
 export const ANOMALY_THRESHOLD_DEFAULT = 2.5
 export const ANOMALY_WINDOWS = [8, 12, 26] as const
 export const ANOMALY_THRESHOLDS = [2, 2.5, 3] as const
+
+// Trend-chart event overlay colours — literal hex (SVG fill/stroke, not a Fluent token) chosen to
+// echo the same three hues as EVENT_KIND_COLORS in components/Avatars.tsx (cornflower/forest/marigold).
+export const EVENT_KIND_CHART_COLORS: Record<EventKind, string> = {
+  PointInTime: '#2563eb',
+  Interval: '#059669',
+  FromNowOn: '#d97706',
+}
 
 export const AGGREGATIONS: ExploreAggregation[] = ['Average', 'Sum', 'Min', 'Max', 'Count']
 export const AGG_LABELS: Record<ExploreAggregation, string> = {
@@ -154,6 +163,62 @@ export function compareRows(
       return { name: svc.serviceLabel || svc.serviceName, value: round(rollup(agg, points)) }
     })
     .sort((a, b) => b.value - a.value)
+}
+
+/** Only events with no service scope ("all services") or that affect at least one currently in-scope service. */
+export function eventsForServices(events: IngestEvent[], services: ServiceRef[]): IngestEvent[] {
+  const ids = new Set(services.map(s => s.serviceId))
+  return events.filter(ev => ev.serviceIds.length === 0 || ev.serviceIds.some(id => ids.has(id)))
+}
+
+/** A single event mapped onto the Trend chart's categorical period axis — a point (`x`) or a band (`x1`/`x2`). */
+export interface EventMarker {
+  id: string
+  label: string
+  kind: EventKind
+  x?: string
+  x1?: string
+  x2?: string
+}
+
+/**
+ * Map events onto the Trend chart's period buckets. `PointInTime`/`FromNowOn` events become a
+ * single vertical marker at the bucket containing their instant; `Interval` events become a band
+ * spanning every bucket their `[start, end]` span overlaps (clipped to the chart's edge buckets on
+ * a partial overlap). Events whose span doesn't overlap the plotted range at all are dropped.
+ */
+export function buildEventMarkers(events: IngestEvent[], buckets: ExploreBucket[], cadence: Cadence): EventMarker[] {
+  if (buckets.length === 0) return []
+  const starts = buckets.map(b => new Date(b.periodStart).getTime())
+  const rangeStart = starts[0]
+  const rangeEnd = new Date(buckets[buckets.length - 1].periodEnd).getTime()
+  const labels = buckets.map(b => formatPeriodLabel(b.periodStart, cadence))
+
+  const bucketIndexFor = (t: number): number => {
+    let idx = 0
+    for (let i = 0; i < starts.length; i++) {
+      if (starts[i] <= t) idx = i
+      else break
+    }
+    return idx
+  }
+
+  const markers: EventMarker[] = []
+  for (const ev of events) {
+    const t0 = new Date(ev.timestamp).getTime()
+    if (Number.isNaN(t0)) continue
+    if (ev.kind === 'Interval') {
+      const t1 = t0 + (ev.durationMinutes ?? 0) * 60_000
+      if (t1 < rangeStart || t0 >= rangeEnd) continue
+      const startIdx = t0 < rangeStart ? 0 : bucketIndexFor(t0)
+      const endIdx = t1 >= rangeEnd ? labels.length - 1 : bucketIndexFor(t1)
+      markers.push({ id: ev.id, label: ev.label, kind: ev.kind, x1: labels[startIdx], x2: labels[endIdx] })
+    } else {
+      if (t0 < rangeStart || t0 >= rangeEnd) continue
+      markers.push({ id: ev.id, label: ev.label, kind: ev.kind, x: labels[bucketIndexFor(t0)] })
+    }
+  }
+  return markers
 }
 
 /** Build the header + rows for a CSV export of the currently active (non-scorecard) view. */

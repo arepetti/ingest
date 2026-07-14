@@ -35,6 +35,8 @@ export const CAPABILITIES = {
   backupManage: 'backup:manage',
   settingsRead: 'settings:read',
   settingsManage: 'settings:manage',
+  eventsRead: 'events:read',
+  eventsManage: 'events:manage',
 } as const
 
 export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES]
@@ -128,6 +130,13 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     items: [
       { id: CAPABILITIES.settingsRead, label: 'View settings', description: 'Read global settings (e.g. the default approval policy).' },
       { id: CAPABILITIES.settingsManage, label: 'Manage settings', description: 'Change global settings (e.g. the default approval policy).' },
+    ],
+  },
+  {
+    group: 'Events',
+    items: [
+      { id: CAPABILITIES.eventsRead, label: 'View events', description: 'Browse the events timeline.' },
+      { id: CAPABILITIES.eventsManage, label: 'Manage events', description: 'Create, edit and delete events.' },
     ],
   },
 ]

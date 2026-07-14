@@ -7,7 +7,8 @@ namespace Ingest.Api.Odata;
 /// <summary>
 /// Builds the EDM model exposed at <c>/odata</c>. It surfaces the denormalised
 /// <see cref="SampleProjection"/> entity (as the <c>samples</c> entity set), a simplified
-/// <see cref="SchemaSummary"/> catalogue (as the <c>schemas</c> entity set), plus an unbound
+/// <see cref="SchemaSummary"/> catalogue (as the <c>schemas</c> entity set), the admin-recorded
+/// <see cref="EventFeedItem"/> timeline (as the <c>events</c> entity set), plus an unbound
 /// <c>scorecard(mode,period)</c> function that returns a flat, banded RAG status board
 /// (<see cref="ScorecardCard"/>) — the shapes PowerBI is expected to consume directly.
 /// </summary>
@@ -23,6 +24,9 @@ public static class EdmModelBuilderExtensions
         // Simplified schema catalogue. SchemaSummary has no Id, so key off the unique machine name;
         // SchemaValueSummary stays keyless and is inferred as a nested complex type.
         builder.EntitySet<SchemaSummary>("schemas").EntityType.HasKey(s => s.Name);
+
+        // Admin-recorded events timeline. EventFeedItem.Id is auto-detected as the key by convention.
+        builder.EntitySet<EventFeedItem>("events");
 
         // Flat scorecard cards. The entity set has no GET handler of its own (the data is computed,
         // not stored); it exists so the function below can return from it and so $select/$filter/

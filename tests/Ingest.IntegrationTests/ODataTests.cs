@@ -57,4 +57,78 @@ public sealed class ODataTests : IntegrationTestBase
         var cards = await ODataValuesAsync("/odata/scorecard(mode='LatestAvailable',period='Current')");
         Assert.Contains(cards.EnumerateArray(), c => c.GetProperty("SchemaName").GetString() == schema.Name);
     }
+
+    [Fact]
+    public async Task Events_feed_exposes_kind_and_effective_end()
+    {
+        var label = $"evt-{Unique()}";
+        var start = new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc);
+        await Admin.PostJsonAsync("/api/admin/events", new
+        {
+            timestamp = start,
+            label,
+            kind = "Interval",
+            durationMinutes = 120,
+            serviceIds = Array.Empty<Guid>(),
+        });
+
+        var values = await ODataValuesAsync($"/odata/events?$filter=Label eq '{label}'");
+        Assert.Equal(1, values.GetArrayLength());
+        var row = values[0];
+        Assert.Equal("Interval", row.GetProperty("Kind").GetString());
+        Assert.Equal(120, row.GetProperty("DurationMinutes").GetInt32());
+        // Compare as DateTimeOffset (instant-equal) rather than DateTime: OData may render the UTC
+        // instant with a non-"Z" numeric offset, which is an equivalent instant, not a different one.
+        Assert.Equal(new DateTimeOffset(start.AddHours(2), TimeSpan.Zero), row.GetProperty("EffectiveEnd").GetDateTimeOffset());
+    }
+
+    [Fact]
+    public async Task Events_feed_lets_a_client_query_an_open_ended_event_by_interval()
+    {
+        // A FromNowOn event has a null EffectiveEnd, so "does this overlap window X" is expressed as
+        // Timestamp le <windowEnd> and (EffectiveEnd eq null or EffectiveEnd ge <windowStart>).
+        var label = $"evt-{Unique()}";
+        var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        await Admin.PostJsonAsync("/api/admin/events", new
+        {
+            timestamp = start,
+            label,
+            kind = "FromNowOn",
+            serviceIds = Array.Empty<Guid>(),
+        });
+
+        var filter = $"$filter=Label eq '{label}' and Timestamp le 2026-06-01T00:00:00Z and (EffectiveEnd eq null or EffectiveEnd ge 2026-05-01T00:00:00Z)";
+        var values = await ODataValuesAsync($"/odata/events?{filter}");
+        Assert.Equal(1, values.GetArrayLength());
+        Assert.True(values[0].GetProperty("EffectiveEnd").ValueKind == System.Text.Json.JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Events_feed_supports_filtering_by_service_scope()
+    {
+        var (serviceId, _, _) = await CreateServiceAccountAsync();
+        var scopedLabel = $"evt-{Unique()}";
+        var globalLabel = $"evt-{Unique()}";
+        await Admin.PostJsonAsync("/api/admin/events", new
+        {
+            timestamp = DateTime.UtcNow,
+            label = scopedLabel,
+            kind = "PointInTime",
+            serviceIds = new[] { serviceId },
+        });
+        await Admin.PostJsonAsync("/api/admin/events", new
+        {
+            timestamp = DateTime.UtcNow,
+            label = globalLabel,
+            kind = "PointInTime",
+            serviceIds = Array.Empty<Guid>(),
+        });
+
+        var scoped = await ODataValuesAsync($"/odata/events?$filter=ServiceIds/any(s: s eq {serviceId})");
+        Assert.Contains(scoped.EnumerateArray(), e => e.GetProperty("Label").GetString() == scopedLabel);
+        Assert.DoesNotContain(scoped.EnumerateArray(), e => e.GetProperty("Label").GetString() == globalLabel);
+
+        var global = await ODataValuesAsync($"/odata/events?$filter=ServiceIds/$count eq 0 and Label eq '{globalLabel}'");
+        Assert.Equal(1, global.GetArrayLength());
+    }
 }

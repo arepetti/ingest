@@ -3,13 +3,17 @@ import {
   Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Text, tokens,
 } from '@fluentui/react-components'
 import {
-  CartesianGrid, Legend, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  CartesianGrid, Legend, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import type { ExploreValueSeries, SchemaValue } from '../../../api/types'
+import type { EventKind, ExploreValueSeries, IngestEvent, SchemaValue } from '../../../api/types'
 import { addCadence } from '../../../utils/cadence'
+import { eventKindLabel } from '../../../utils/eventKind'
 import { formatPeriodLabel } from '../../../utils/periodFormat'
 import { ragBandRects } from '../../../utils/targetBand'
-import { ANOMALY_COLORS, cell, fmt, round, SERIES_COLORS, useExploreStyles, type ServiceRef } from '../shared'
+import {
+  ANOMALY_COLORS, buildEventMarkers, cell, EVENT_KIND_CHART_COLORS, fmt, round, SERIES_COLORS,
+  useExploreStyles, type EventMarker, type ServiceRef,
+} from '../shared'
 
 // How many future periods the optional projection extends the trend chart by.
 const PROJECTION_PERIODS = 2
@@ -18,7 +22,10 @@ type TrendRow = { period: string } & Record<string, number | string | boolean>
 type SeriesDef = { key: string; name: string; color: string }
 
 /** The Trend sub-view: a per-period line chart (with optional projection/compare/RAG band) or its table form. */
-export function TrendView({ series, services, combined, projecting, previous, previousLabel, band, anomaly, asTable, chartRef }: {
+export function TrendView({
+  series, services, combined, projecting, previous, previousLabel, band, anomaly, asTable, chartRef,
+  events, showEvents,
+}: {
   series: ExploreValueSeries
   services: ServiceRef[]
   combined: boolean
@@ -29,11 +36,17 @@ export function TrendView({ series, services, combined, projecting, previous, pr
   anomaly: boolean
   asTable: boolean
   chartRef: RefObject<HTMLDivElement | null>
+  events: IngestEvent[]
+  showEvents: boolean
 }) {
   const styles = useExploreStyles()
   const anomalyCount = useMemo(
     () => (anomaly ? countAnomalies(series, combined) : 0),
     [anomaly, series, combined],
+  )
+  const markers = useMemo(
+    () => (showEvents ? buildEventMarkers(events, series.buckets, series.cadence) : []),
+    [showEvents, events, series],
   )
   if (asTable) return <TrendTable series={series} services={services} combined={combined} anomaly={anomaly} />
   return (
@@ -45,6 +58,7 @@ export function TrendView({ series, services, combined, projecting, previous, pr
             : `${anomalyCount} ${anomalyCount === 1 ? 'anomaly' : 'anomalies'} highlighted in the current selection.`}
         </Text>
       )}
+      {showEvents && markers.length > 0 && <EventsLegend markers={markers} />}
       <TrendChart
         series={series}
         services={services}
@@ -54,8 +68,45 @@ export function TrendView({ series, services, combined, projecting, previous, pr
         previousLabel={previousLabel}
         band={band}
         anomaly={anomaly}
+        markers={markers}
       />
     </div>
+  )
+}
+
+/** Small legend above the chart naming each event kind actually present in the current markers. */
+function EventsLegend({ markers }: { markers: EventMarker[] }) {
+  const styles = useExploreStyles()
+  const kinds = useMemo(() => {
+    const seen = new Set<EventKind>()
+    for (const m of markers) seen.add(m.kind)
+    return (['PointInTime', 'Interval', 'FromNowOn'] as EventKind[]).filter(k => seen.has(k))
+  }, [markers])
+  return (
+    <div className={styles.scLegend} style={{ marginBottom: 4 }}>
+      {kinds.map(k => (
+        <span key={k} className={styles.scLegendItem}>
+          <span className={styles.scDot} style={{ backgroundColor: EVENT_KIND_CHART_COLORS[k], width: 10, height: 10 }} />
+          {eventKindLabel(k)}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// The "from now on" event marker draws as a thick bar topped with a small right-pointing
+// arrowhead, signalling it runs off the chart's right edge indefinitely (there's no known end).
+function fromNowOnLineShape(props: { x1?: number; y1?: number; x2?: number; y2?: number; stroke?: string }) {
+  const { x1, y1, x2, y2, stroke } = props
+  if (x1 == null || y1 == null || x2 == null || y2 == null) return <g />
+  const top = Math.min(y1, y2)
+  const bottom = Math.max(y1, y2)
+  const arrow = 7
+  return (
+    <g>
+      <line x1={x1} y1={bottom} x2={x1} y2={top} stroke={stroke} strokeWidth={5} strokeLinecap="round" />
+      <polygon points={`${x1},${top - 1} ${x1 + arrow},${top + arrow / 2} ${x1},${top + arrow + 1}`} fill={stroke} />
+    </g>
   )
 }
 
@@ -187,7 +238,7 @@ function buildTrend(
   return { rows, defs, projected: true, overallTrend, compared }
 }
 
-function TrendChart({ series, services, combined, projectPeriods, previous, previousLabel, band, anomaly }: {
+function TrendChart({ series, services, combined, projectPeriods, previous, previousLabel, band, anomaly, markers }: {
   series: ExploreValueSeries
   services: ServiceRef[]
   combined: boolean
@@ -196,6 +247,7 @@ function TrendChart({ series, services, combined, projectPeriods, previous, prev
   previousLabel?: string
   band?: SchemaValue
   anomaly: boolean
+  markers: EventMarker[]
 }) {
   const bandRects = useMemo(() => (band ? ragBandRects(band) : []), [band])
   const { rows, defs, projected, overallTrend, compared } = useMemo(
@@ -218,6 +270,33 @@ function TrendChart({ series, services, combined, projectPeriods, previous, prev
             fill={r.tone === 'green' ? tokens.colorPaletteGreenBackground2 : tokens.colorPaletteYellowBackground2}
             fillOpacity={0.3}
             strokeOpacity={0}
+          />
+        ))}
+        {markers.filter(m => m.x1 !== undefined).map(m => (
+          // Interval events: a solid-bordered band spanning the full chart height (no y1/y2 given)
+          // over every bucket the event's span overlaps.
+          <ReferenceArea
+            key={m.id}
+            x1={m.x1}
+            x2={m.x2}
+            fill={EVENT_KIND_CHART_COLORS[m.kind]}
+            fillOpacity={0.15}
+            stroke={EVENT_KIND_CHART_COLORS[m.kind]}
+            strokeOpacity={0.6}
+            label={{ value: m.label, position: 'insideTopLeft', fontSize: 10, fill: EVENT_KIND_CHART_COLORS[m.kind] }}
+          />
+        ))}
+        {markers.filter(m => m.x !== undefined).map(m => (
+          // Point-in-time events draw as a solid vertical bar. "From now on" events draw thicker,
+          // with a right-pointing arrowhead at the top (see fromNowOnLineShape), signalling they
+          // extend indefinitely rather than stopping at a known point.
+          <ReferenceLine
+            key={m.id}
+            x={m.x}
+            stroke={EVENT_KIND_CHART_COLORS[m.kind]}
+            strokeWidth={m.kind === 'FromNowOn' ? 5 : 3}
+            shape={m.kind === 'FromNowOn' ? fromNowOnLineShape : undefined}
+            label={{ value: m.label, position: 'insideTopRight', fontSize: 10, fill: EVENT_KIND_CHART_COLORS[m.kind], angle: -90 }}
           />
         ))}
         <XAxis dataKey="period" tick={{ fontSize: 11 }} interval="preserveStartEnd" angle={-30} textAnchor="end" height={56} />

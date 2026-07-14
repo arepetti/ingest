@@ -12,6 +12,7 @@ The guide is split into focused pages — pick whichever matches the task at han
 | [approval-process.md](approval-process.md)    | The optional submission approval workflow: per-schema/global source-aware policies, the `submissions:approve` capability, the review queue, and the replace-and-reset rule. |
 | [reports.md](reports.md)                      | Uploading HTML+Liquid report templates, what data they receive, the viewer's filter bar. |
 | [explore.md](explore.md)                      | Lightweight in-app analytics: charting numeric KPIs by period and service (Trend / Compare / Snapshot). A convenience for deployments without a BI tool — PowerBI is still the primary analytics surface. |
+| [events.md](events.md)                        | The admin-recorded events timeline (maintenance windows, incidents, deployments): kinds (point in time / interval / from now on), service scoping, and how they show up on the Explore chart and the OData feed. |
 | [settings.md](settings.md)                    | Settings hub (gated per-section by `settings:*`/`notifications:*`/`webhooks:*` capabilities): email (SMTP) settings, editable notification templates, notification triggers & recipients, ad-hoc email send, and retention policy. |
 | [webhooks.md](webhooks.md)                    | Outbound webhooks: registering signed endpoints, subscribing to submission/window events, signature verification, retries and the delivery log. |
 | [integrations.md](integrations.md)            | Microsoft Teams integration: configuring the bot connection, creating integrations scoped to services/schemas, schedules, targets (user/channel), running on demand and test sends. |
@@ -37,7 +38,7 @@ If your deployment has [SSO](../architecture/authentication.md#single-sign-on-op
 
 Once logged in:
 
-- The left sidebar is **driven by your capabilities**: each entry (**Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Missing**, **Explore**, **Reports**, **Audit**, **Tools**, **Settings**) appears only when you hold the matching read capability. An admin holds them all; a custom non-admin sees exactly the subset you granted.
+- The left sidebar is **driven by your capabilities**: each entry (**Dashboard**, **Schemas**, **Accounts**, **Submissions**, **Missing**, **Explore**, **Events**, **Reports**, **Audit**, **Tools**, **Settings**) appears only when you hold the matching read capability. An admin holds them all; a custom non-admin sees exactly the subset you granted.
 - An account with no back-office capabilities (a typical **Service**) sees a stripped-down sidebar (Dashboard + Submissions only).
 - Your friendly **label** (or **name** as a fallback) and role show at the bottom.
 - **Sign out** is the icon next to your name.

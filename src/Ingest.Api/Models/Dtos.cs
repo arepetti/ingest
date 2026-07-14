@@ -670,6 +670,66 @@ public sealed record UpsertApprovalRuleRequest(
     };
 }
 
+/// <summary>Wire shape of an admin-recorded timeline event.</summary>
+/// <param name="Id">Stable identifier.</param>
+/// <param name="Timestamp">UTC instant the event occurred (or is scheduled for).</param>
+/// <param name="Label">Required short title.</param>
+/// <param name="Description">Optional longer free-text description.</param>
+/// <param name="Kind">How the event relates to time: a single instant, a bounded interval, or an open-ended span.</param>
+/// <param name="DurationMinutes">Duration in whole minutes; only set (and only meaningful) when <paramref name="Kind"/> is <c>Interval</c>.</param>
+/// <param name="ServiceIds">Services the event affects; empty means all services.</param>
+/// <param name="CreatedAt">Creation timestamp (UTC).</param>
+/// <param name="CreatedBy">Name of the creator.</param>
+/// <param name="ModifiedAt">Last update timestamp (UTC).</param>
+/// <param name="ModifiedBy">Name of the last modifier.</param>
+public sealed record EventDto(
+    Guid Id,
+    DateTime Timestamp,
+    string Label,
+    string? Description,
+    EventKind Kind,
+    int? DurationMinutes,
+    List<Guid> ServiceIds,
+    DateTime CreatedAt,
+    string? CreatedBy,
+    DateTime ModifiedAt,
+    string? ModifiedBy)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static EventDto From(Event e) => new(
+        e.Id, e.Timestamp, e.Label, e.Description, e.Kind, ToMinutes(e.Duration), e.ServiceIds,
+        e.CreatedAt, e.CreatedBy, e.ModifiedAt, e.ModifiedBy);
+
+    private static int? ToMinutes(TimeSpan? d) => d is null ? null : (int)Math.Round(d.Value.TotalMinutes);
+}
+
+/// <summary>Body for <c>POST</c> and <c>PUT</c> on the admin events endpoint.</summary>
+/// <param name="Timestamp">UTC instant the event occurred (or is scheduled for).</param>
+/// <param name="Label">Required short title.</param>
+/// <param name="Description">Optional longer free-text description.</param>
+/// <param name="Kind">How the event relates to time: a single instant, a bounded interval, or an open-ended span.</param>
+/// <param name="DurationMinutes">Duration in whole minutes; required when <paramref name="Kind"/> is <c>Interval</c>, ignored otherwise.</param>
+/// <param name="ServiceIds">Services the event affects; null/empty means all services.</param>
+public sealed record UpsertEventRequest(
+    DateTime Timestamp,
+    string Label,
+    string? Description,
+    EventKind Kind,
+    int? DurationMinutes,
+    List<Guid>? ServiceIds)
+{
+    /// <summary>Convert the wire DTO into a domain entity.</summary>
+    public Event ToEntity() => new()
+    {
+        Timestamp = Timestamp,
+        Label = Label,
+        Description = Description,
+        Kind = Kind,
+        Duration = DurationMinutes is null ? null : TimeSpan.FromMinutes(DurationMinutes.Value),
+        ServiceIds = ServiceIds ?? new(),
+    };
+}
+
 /// <summary>Wire shape of one recorded approval/rejection decision on a submission.</summary>
 /// <param name="ApproverAccountId">Account that recorded the decision.</param>
 /// <param name="ApproverName">Machine-name snapshot of the approver.</param>

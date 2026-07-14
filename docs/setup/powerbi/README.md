@@ -8,19 +8,20 @@ Ingest publishes its data as **OData v4 feeds** under `/odata`. Any OData v4 cli
 
 ## OData endpoints
 
-There are three feeds today. Pick by what you want to do — most reports use **samples**; reach for **scorecard** when you only need the at-a-glance status, and **schemas** for the value labels/units/bands to dress up the others.
+There are four feeds today. Pick by what you want to do — most reports use **samples**; reach for **scorecard** when you only need the at-a-glance status, **schemas** for the value labels/units/bands to dress up the others, and **events** to annotate any of them with maintenance windows, incidents or deployments.
 
 | Feed | URL | One row per | Reach for it when… | Reference |
 |------|-----|-------------|--------------------|-----------|
 | **Samples** (raw data) | `/odata/samples` | sample (one value reading) | you want trends, history, comparisons, or any custom analysis | **[samples.md](samples.md)** |
 | **Scorecard** (RAG board) | `/odata/scorecard(mode='…',period='…')` | schema × value × service cell | you want an at-a-glance "who is green / amber / red" against targets, without re-deriving the bands | **[scorecard.md](scorecard.md)** |
 | **Schemas** (metadata) | `/odata/schemas` | schema (values nested) | you want labels, units, types, cadences or band edges to join onto the samples rows | **[schemas.md](schemas.md)** |
+| **Events** (annotations) | `/odata/events` | event (point, interval, or open-ended) | you want to overlay maintenance windows, incidents or deployments on your charts | **[events.md](events.md)** |
 
 Everything that is **common to all feeds** — authentication, the custom-header recipe, query options, the API-key parameter, scheduled refresh and connection troubleshooting — is documented **once on this page**. The per-feed pages cover only what's specific to them (columns, parameters, worked examples).
 
 ## Required role
 
-The **samples** and **scorecard** feeds are gated by the **`query:read`** capability; the **schemas** metadata feed is gated by **`schemas:read`**. In practice both gates are satisfied by an account whose role is **Operator** or **Admin** (they carry `query:read` *and* `schemas:read` by default), so one dedicated Operator credential reads every feed; a **Service**-role key cannot read any of them. If you use [custom capabilities](../../admin-user-guide/accounts.md), the exact gates are the `query:read` / `schemas:read` capabilities rather than the role name.
+The **samples** and **scorecard** feeds are gated by the **`query:read`** capability; the **schemas** metadata feed is gated by **`schemas:read`**; the **events** feed is gated by **`events:read`**. In practice the `query:read`/`schemas:read` gates are satisfied by an account whose role is **Operator** or **Admin** (they carry both by default), so one dedicated Operator credential reads samples/scorecard/schemas. `events:read` is different: only **Admin** carries it by default — an **Operator** needs it added as a [custom capability](../../admin-user-guide/accounts.md) before their key can read the events feed. A **Service**-role key cannot read any of the four feeds.
 
 Issue a **dedicated Operator-kind credential** for each report or workspace — that way revoking or rotating it later doesn't affect anybody else. See the [accounts guide](../../admin-user-guide/accounts.md) for how to create one and copy its `X-Api-Key`.
 
@@ -135,6 +136,7 @@ Feed-specific gotchas (null columns, schema-metadata joins, the `Missing` status
 - **[samples.md](samples.md)** — the raw data feed: full column reference, pre-filtering, data-model tips, and the JSON alternative.
 - **[scorecard.md](scorecard.md)** — the RAG status board: function parameters, columns, and worked slices.
 - **[schemas.md](schemas.md)** — the schema-metadata catalogue: labels, units, types, cadences and band edges to join onto `samples`.
+- **[events.md](events.md)** — the annotations timeline: columns, the open/closed-interval query pattern, and overlaying them on a chart.
 - [`examples/powerbi/`](../../../examples/powerbi/README.md) — ready-made starter projects.
 - [Excel integration](../excel.md) — the same feeds from Excel.
 - [Explore page](../../admin-user-guide/explore.md) — the lightweight in-app charts (not a replacement for Power BI).

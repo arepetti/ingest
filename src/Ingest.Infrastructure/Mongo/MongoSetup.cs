@@ -173,6 +173,13 @@ public static class MongoSetup
                 new CreateIndexOptions { Name = "by_status_created" }),
         }, cancellationToken: ct);
 
+        await ctx.Events.Indexes.CreateOneAsync(
+            new CreateIndexModel<Event>(
+                // The events page browses newest-first.
+                Builders<Event>.IndexKeys.Descending(e => e.Timestamp),
+                new CreateIndexOptions { Name = "by_timestamp" }),
+            cancellationToken: ct);
+
         await ctx.Samples.Indexes.CreateManyAsync(new[]
         {
             new CreateIndexModel<SampleProjection>(

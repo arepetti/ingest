@@ -16,6 +16,7 @@ import { SubmissionEditPage } from './pages/SubmissionEditPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { ReportViewPage } from './pages/ReportViewPage'
 import { AuditPage } from './pages/AuditPage'
+import { EventsPage } from './pages/EventsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { ToolsPage } from './pages/ToolsPage'
 import { RequireAuth } from './pages/RequireAuth'
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/reports/:name" element={<ReportViewPage />} />
         <Route path="/audit" element={<AuditPage />} />
+        <Route path="/events" element={<EventsPage />} />
         <Route path="/tools" element={<ToolsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
