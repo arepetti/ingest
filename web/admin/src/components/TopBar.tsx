@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Avatar, Badge, Breadcrumb, BreadcrumbButton, BreadcrumbDivider, BreadcrumbItem,
   Button, Menu, MenuItem, MenuList, MenuPopover, MenuTrigger,
-  Text, Tooltip, makeStyles, tokens,
+  SearchBox, Text, Tooltip, makeStyles, tokens,
 } from '@fluentui/react-components'
 import { ChevronDown16Regular, SignOut20Regular } from '@fluentui/react-icons'
 import { api, setApiKey } from '../api/client'
@@ -34,6 +34,8 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: '8px',
   },
+  // Global search box, sitting just left of the account menu. Submit on Enter.
+  searchBox: { width: '220px', maxWidth: '32vw' },
   // Avatar + name + chevron as a single subtle button. Padding kept tight so the bar reads as a
   // header strip rather than a toolbar.
   accountButton: {
@@ -189,6 +191,27 @@ export function TopBar({ me }: { me?: Me }) {
   const nav = useNavigate()
   const { pathname } = useLocation()
 
+  // Global search: submitting (Enter or the search button) navigates to the results page and empties
+  // the box, so it's always a fresh entry point rather than lingering with the last query. Ctrl/Cmd+K
+  // focuses it from anywhere in the console.
+  const [term, setTerm] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  function submitSearch() {
+    const query = term.trim()
+    nav(`/search${query ? `?q=${encodeURIComponent(query)}` : ''}`)
+    setTerm('')
+  }
+
   // Gate each breadcrumb-label lookup by the capability backing its listing so we don't spam 403s
   // for callers who can't read that entity (their breadcrumbs never feature those routes anyway).
   const caps = new Set(me?.capabilities ?? [])
@@ -261,6 +284,15 @@ export function TopBar({ me }: { me?: Me }) {
       </div>
 
       <div className={s.account}>
+        <SearchBox
+          ref={searchRef}
+          className={s.searchBox}
+          placeholder="Search…"
+          aria-label="Search (Ctrl+K)"
+          value={term}
+          onChange={(_, d) => setTerm(d.value)}
+          onKeyDown={e => { if (e.key === 'Enter') submitSearch() }}
+        />
         {scoped && (
           <Tooltip content={scopeTooltip} relationship="description" positioning="below">
             <Badge appearance="tint" color="brand">

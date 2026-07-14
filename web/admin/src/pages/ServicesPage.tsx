@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Badge, Body1, Button, Drawer, DrawerBody,
   Dropdown, Option, Field, Input, Textarea, Checkbox,
@@ -12,7 +12,7 @@ import {
 } from '@fluentui/react-components'
 import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowRotateClockwise20Regular, ArrowUpload20Regular, Checkmark20Regular, Delete20Regular, Dismiss20Regular, Edit20Regular, Key20Regular, Mail20Regular, MoreHorizontal20Regular, PersonAdd20Regular, ShieldPerson20Regular, Status20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { accountsBackupExportUrl, fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCapabilities, useCreateAccount, useDeleteAccount, useDeleteApiKey, useEraseAccount, useImportAccountsBackup, useRevokeApiKey, useRotateApiKey, useUpdateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
 import type { Account, AccountKind, AccountRole, ApiKey, AuthProvider, CreateAccountRequest, ErasureMode, ErasureResult, ExternalLogin, UpdateAccountRequest } from '../api/types'
 import { CAPABILITY_GROUPS, defaultCapabilitiesForRole, type Capability } from '../api/capabilities'
@@ -236,6 +236,7 @@ const ACCOUNT_EXPORT_COLUMNS: ExportColumn<Account>[] = [
 export function ServicesPage() {
   const s = useStyles()
   const nav = useNavigate()
+  const [sp, setSp] = useSearchParams()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const { data, isLoading, error, refetch } = useAccounts({ page, pageSize })
@@ -321,6 +322,21 @@ export function ServicesPage() {
     setSubmitError(null)
     setEditorTab('general')
   }
+
+  // Deep link: /services?new=1 opens the create drawer immediately (used by the global search
+  // "Add user / Add service" actions). Guarded so it fires once, after capabilities are known; the
+  // param is stripped afterwards so a refresh/back is clean.
+  const openedFromUrl = useRef(false)
+  useEffect(() => {
+    if (openedFromUrl.current) return
+    if (sp.get('new') === null || !canManageAccounts) return
+    openedFromUrl.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot deep-link open, gated on async capabilities
+    openCreate()
+    const next = new URLSearchParams(sp)
+    next.delete('new')
+    setSp(next, { replace: true })
+  }, [sp, canManageAccounts, setSp])
   function openEdit(a: Account) {
     // The picker is driven off the *effective* set; on save we collapse it back to either the
     // role-default bundle (stored as no overrides) or an explicit override list.

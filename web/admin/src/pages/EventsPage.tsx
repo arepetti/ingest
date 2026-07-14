@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Badge, Body1, Button, Checkbox, Drawer, DrawerBody,
   Dropdown, Field, Input, Option, Textarea,
@@ -121,6 +122,7 @@ function emptyDraft(): EventDraft {
  */
 export function EventsPage() {
   const s = useStyles()
+  const [sp, setSp] = useSearchParams()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const { data, isLoading, error, refetch } = useEvents({ page, pageSize })
@@ -169,6 +171,21 @@ export function EventsPage() {
     setEditing(emptyDraft())
     setSubmitError(null)
   }
+
+  // Deep link: /events?new=1 opens the create drawer immediately (used by the global search
+  // "Add event" action). Guarded so it fires once, after capabilities are known; the param is
+  // stripped afterwards so a refresh/back is clean.
+  const openedFromUrl = useRef(false)
+  useEffect(() => {
+    if (openedFromUrl.current) return
+    if (sp.get('new') === null || !canManage) return
+    openedFromUrl.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot deep-link open, gated on async capabilities
+    openCreate()
+    const next = new URLSearchParams(sp)
+    next.delete('new')
+    setSp(next, { replace: true })
+  }, [sp, canManage, setSp])
   function openEdit(ev: IngestEvent) {
     setEditing(toDraft(ev))
     setSubmitError(null)

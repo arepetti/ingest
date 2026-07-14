@@ -19,6 +19,7 @@ import { AuditPage } from './pages/AuditPage'
 import { EventsPage } from './pages/EventsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { ToolsPage } from './pages/ToolsPage'
+import { SearchPage } from './pages/SearchPage'
 import { RequireAuth } from './pages/RequireAuth'
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="/events" element={<EventsPage />} />
         <Route path="/tools" element={<ToolsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/search" element={<SearchPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
