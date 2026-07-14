@@ -21,6 +21,7 @@ import type {
   WebhookEndpointCreatedResponse, WebhookSecretResponse,
   WebhookDelivery, WebhookDeliveryStatus, WebhookDrainResult,
   ApprovalStatus, ApprovalPolicy, ApprovalRule, UpsertApprovalRuleRequest,
+  AreasConfiguration,
   IngestEvent, UpsertEventRequest,
   Integration, IntegrationRequest, IntegrationRunResult,
   TeamsConnection, UpdateTeamsConnectionRequest, TeamsConnectionTestResult,
@@ -520,6 +521,22 @@ export const useRejectSubmission = () => {
       qc.invalidateQueries({ queryKey: ['submission', v.id] })
       qc.invalidateQueries({ queryKey: ['pending-approval-count'] })
     },
+  })
+}
+
+/** The configurable list of selectable areas (settings:read). */
+export const useAreasConfiguration = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['areas-configuration'],
+    queryFn: () => api.get<AreasConfiguration>('/api/admin/configuration/areas'),
+    enabled,
+  })
+
+export const useUpdateAreasConfiguration = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: AreasConfiguration) => api.put<AreasConfiguration>('/api/admin/configuration/areas', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['areas-configuration'] }),
   })
 }
 

@@ -24,6 +24,9 @@ public static class AuditTargets
     /// <summary>The Microsoft Teams bot connection.</summary>
     public static readonly Guid TeamsConnection = new("a0d17e00-0000-0000-0000-000000000004");
 
+    /// <summary>The miscellaneous application configuration (currently the areas list).</summary>
+    public static readonly Guid AppConfiguration = new("a0d17e00-0000-0000-0000-000000000005");
+
     /// <summary>A restore of the data backup (the registry).</summary>
     public static readonly Guid DataBackup = new("b0d17e00-0000-0000-0000-000000000001");
 

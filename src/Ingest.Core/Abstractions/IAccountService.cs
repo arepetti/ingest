@@ -15,7 +15,8 @@ namespace Ingest.Core.Abstractions;
 /// <param name="ExternalLogins">Replacement set of SSO identity links, or <c>null</c> to leave the existing links untouched. An empty list clears them. Subjects already bound to surviving links are preserved by the service.</param>
 /// <param name="Capabilities">Replacement capability override set, or <c>null</c> to leave the stored overrides untouched. An empty list clears them (the account reverts to its role default bundle); a non-empty list replaces them. Validated (unknown names rejected) and ignored for Admins.</param>
 /// <param name="AssignedServiceIds">Replacement assigned-service allowlist, or <c>null</c> to leave it untouched. An empty list clears it (the account becomes unrestricted, seeing every service); a non-empty list confines every cross-service read to those services. Ignored for Admins.</param>
-public sealed record AccountUpdate(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, IReadOnlyList<ExternalLogin>? ExternalLogins = null, IReadOnlyList<string>? Capabilities = null, IReadOnlyList<Guid>? AssignedServiceIds = null);
+/// <param name="Area">New informative-only area tag; blank/null clears it. Only normalised (trimmed) — never validated against the configured list.</param>
+public sealed record AccountUpdate(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, IReadOnlyList<ExternalLogin>? ExternalLogins = null, IReadOnlyList<string>? Capabilities = null, IReadOnlyList<Guid>? AssignedServiceIds = null, string? Area = null);
 
 /// <summary>
 /// Domain service that owns the lifecycle rules for <see cref="Account"/> aggregates: enforces the

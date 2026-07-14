@@ -1,5 +1,6 @@
 using Ingest.Core.Abstractions;
 using Ingest.Infrastructure.Approvals;
+using Ingest.Infrastructure.Configuration;
 using Ingest.Infrastructure.Email;
 using Ingest.Export;
 using Ingest.Infrastructure.Events;
@@ -102,6 +103,7 @@ public static class DependencyInjection
         services.AddIngestExport();
         services.AddScoped<IExploreService, ExploreService>();
         services.AddScoped<IApprovalSettingsService, ApprovalSettingsService>();
+        services.AddScoped<IAppConfigurationService, AppConfigurationService>();
         services.AddScoped<IApprovalRulesService, ApprovalRulesService>();
         services.AddScoped<IEventsService, EventsService>();
 

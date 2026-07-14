@@ -32,7 +32,7 @@ public static class ConfigBackupFormat
     /// <summary>The configuration collections included in a backup, in a stable order.</summary>
     public static readonly IReadOnlyList<string> Collections = new[]
     {
-        "approvalSettings", "approvalRules", "emailSettings", "emailTemplates",
+        "appConfiguration", "approvalSettings", "approvalRules", "emailSettings", "emailTemplates",
         "notificationSettings", "webhookEndpoints", "integrations", "teamsConnectionSettings",
     };
 

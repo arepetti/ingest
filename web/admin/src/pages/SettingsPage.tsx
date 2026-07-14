@@ -7,8 +7,10 @@ import {
   MessageBarBody, makeStyles, tokens,
 } from '@fluentui/react-components'
 import {
-  Alert24Regular, CheckmarkCircle24Regular, ClipboardTaskListLtr24Regular, DocumentText24Regular,
+  Add20Regular, Alert24Regular, ArrowDown20Regular, ArrowUp20Regular, CheckmarkCircle24Regular,
+  ClipboardTaskListLtr24Regular, Delete20Regular, DocumentText24Regular,
   Key24Regular, Mail24Regular, PeopleTeam24Regular, PlugConnected24Regular, Settings24Regular,
+  Tag24Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
@@ -24,6 +26,7 @@ import {
   useEmailTemplates, useUpdateEmailTemplate,
   useNotificationSettings, useUpdateNotificationSettings, useRunNotifications,
   useApprovalSettings, useUpdateApprovalSettings,
+  useAreasConfiguration, useUpdateAreasConfiguration,
 } from '../api/hooks'
 import { accountHasCapability } from '../api/capabilities'
 import { formatApiError } from '../api/client'
@@ -67,6 +70,14 @@ const useStyles = makeStyles({
     padding: '6px 10px', borderRadius: '6px', backgroundColor: tokens.colorNeutralBackground2,
   },
   approverName: { fontWeight: tokens.fontWeightSemibold },
+  areaList: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  areaRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+    padding: '4px 6px 4px 12px', borderRadius: '6px', backgroundColor: tokens.colorNeutralBackground2,
+  },
+  areaName: { fontWeight: tokens.fontWeightSemibold },
+  areaActions: { display: 'flex', gap: '2px' },
+  addButtonWrap: { display: 'flex', alignItems: 'flex-end' },
 })
 
 // --- Approval (global default policy) ------------------------------------------------------
@@ -228,6 +239,9 @@ export function SettingsPage() {
 
   const sections: LayoutSection[] = [
     { id: 'general', label: 'General', group: 'General', icon: <Settings24Regular />, render: () => <GeneralSettingsSection /> },
+    ...(canConfigureSettings ? [
+      { id: 'areas', label: 'Areas', group: 'Configuration', icon: <Tag24Regular />, render: () => <AreasSettingsSection /> },
+    ] as LayoutSection[] : []),
     ...(approvalEnabled && canConfigureSettings ? [
       { id: 'approval', label: 'Approval', group: 'Approvals', icon: <CheckmarkCircle24Regular />, render: () => <ApprovalSettingsSection /> },
       { id: 'rules', label: 'Rules', group: 'Approvals', icon: <ClipboardTaskListLtr24Regular />, render: () => <ApprovalRulesSection /> },
@@ -300,6 +314,117 @@ function GeneralSettingsSection() {
           <Option value="light">Light</Option>
         </Dropdown>
       </Field>
+    </Card>
+  )
+}
+
+// --- Areas (configurable grouping tags) ---------------------------------------------------
+
+function AreasSettingsSection() {
+  const { data, isLoading } = useAreasConfiguration()
+  if (isLoading || !data) return <Spinner label="Loading…" />
+  return <AreasSettingsForm initial={data.areas} key={data.areas.join('|')} />
+}
+
+function AreasSettingsForm({ initial }: { initial: string[] }) {
+  const s = useStyles()
+  const { has } = useCapabilities()
+  const canManage = has('settings:manage')
+  const update = useUpdateAreasConfiguration()
+  const [items, setItems] = useState<string[]>(initial)
+  const [draft, setDraft] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  function addDraft() {
+    const value = draft.trim()
+    if (!value) return
+    // De-dupe case-insensitively, matching the server-side normalisation.
+    if (!items.some(i => i.toLowerCase() === value.toLowerCase())) setItems([...items, value])
+    setDraft('')
+  }
+  function remove(index: number) { setItems(items.filter((_, i) => i !== index)) }
+  function move(index: number, dir: -1 | 1) {
+    const target = index + dir
+    if (target < 0 || target >= items.length) return
+    const next = [...items]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setItems(next)
+  }
+
+  async function onSave() {
+    setError(null); setSaved(false)
+    try {
+      await update.mutateAsync({ areas: items })
+      setSaved(true)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  return (
+    <Card className={s.card}>
+      <div>
+        <Title3 className={s.sectionTitle}>Areas</Title3>
+        <Body1 className={s.help}>
+          Optional grouping tags offered when editing an account. With one or more areas defined the
+          account editor shows a dropdown; leave the list empty to let editors type a free-text area.
+          Areas are informative only — changing them never affects existing accounts.
+        </Body1>
+      </div>
+
+      {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Areas saved.</MessageBarBody></AutoScrollMessageBar>}
+
+      {items.length === 0 ? (
+        <Body1 className={s.help}>No areas defined — the account editor uses a free-text field.</Body1>
+      ) : (
+        <div className={s.areaList}>
+          {items.map((item, index) => (
+            <div key={`${item}-${index}`} className={s.areaRow}>
+              <span className={s.areaName}>{item}</span>
+              <div className={s.areaActions}>
+                <Button
+                  size="small" appearance="subtle" icon={<ArrowUp20Regular />} aria-label={`Move ${item} up`}
+                  disabled={!canManage || index === 0} onClick={() => move(index, -1)}
+                />
+                <Button
+                  size="small" appearance="subtle" icon={<ArrowDown20Regular />} aria-label={`Move ${item} down`}
+                  disabled={!canManage || index === items.length - 1} onClick={() => move(index, 1)}
+                />
+                <Button
+                  size="small" appearance="subtle" icon={<Delete20Regular />} aria-label={`Remove ${item}`}
+                  disabled={!canManage} onClick={() => remove(index)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {canManage && (
+        <>
+          <div className={s.row}>
+            <Field label="Add an area" className={s.grow}>
+              <Input
+                value={draft}
+                onChange={(_, d) => setDraft(d.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDraft() } }}
+                placeholder="e.g. North region"
+              />
+            </Field>
+            <div className={s.addButtonWrap}>
+              <Button icon={<Add20Regular />} onClick={addDraft} disabled={!draft.trim()}>Add</Button>
+            </div>
+          </div>
+
+          <div className={s.actions}>
+            <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
+              {update.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        </>
+      )}
     </Card>
   )
 }

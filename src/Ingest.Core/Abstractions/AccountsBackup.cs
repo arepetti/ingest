@@ -12,6 +12,7 @@ namespace Ingest.Core.Abstractions;
 /// <param name="Label">Friendly label.</param>
 /// <param name="Description">Free-form description.</param>
 /// <param name="Email">Contact email (may be null).</param>
+/// <param name="Area">Informative-only area tag (may be null).</param>
 /// <param name="Kind">UI-capable (User) vs API-only (Application).</param>
 /// <param name="Role">Authorisation tier.</param>
 /// <param name="Enabled">Whether the account is enabled.</param>
@@ -23,6 +24,7 @@ public sealed record AccountBackupEntry(
     string? Label,
     string? Description,
     string? Email,
+    string? Area,
     AccountKind Kind,
     AccountRole Role,
     bool Enabled,

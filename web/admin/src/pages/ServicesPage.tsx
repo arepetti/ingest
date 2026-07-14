@@ -229,6 +229,7 @@ const ACCOUNT_EXPORT_COLUMNS: ExportColumn<Account>[] = [
   { header: 'Role', value: a => a.role },
   { header: 'Status', value: a => (a.enabled ? 'Enabled' : 'Disabled') },
   { header: 'Email', value: a => a.email ?? '' },
+  { header: 'Area', value: a => a.area ?? '' },
   { header: 'Created', value: a => a.createdAt },
   { header: 'Created by', value: a => a.createdBy ?? '' },
 ]
@@ -318,7 +319,7 @@ export function ServicesPage() {
   const [editorTab, setEditorTab] = useState<EditorTab>('general')
 
   function openCreate() {
-    setEditing({ kind: 'create', account: { name: '', label: '', description: '', email: '', kind: 'Application', role: 'Service', enabled: true, capabilities: defaultCapabilitiesForRole('Service'), assignedServiceIds: [] } })
+    setEditing({ kind: 'create', account: { name: '', label: '', description: '', email: '', area: '', kind: 'Application', role: 'Service', enabled: true, capabilities: defaultCapabilitiesForRole('Service'), assignedServiceIds: [] } })
     setSubmitError(null)
     setEditorTab('general')
   }
@@ -373,6 +374,8 @@ export function ServicesPage() {
     setSubmitError(null)
     const a = editing.account
     const email = (a.email ?? '').trim()
+    // Informative-only tag: blank normalises to null (clears it). Never validated here.
+    const area = (a.area ?? '').trim() || null
     // Email is required for new accounts; existing accounts may keep an empty email (legacy data),
     // so editing doesn't force one. A non-empty value must still look like an address.
     if (editing.kind === 'create' && !email) { setEditorTab('general'); setSubmitError('Email is required.'); return }
@@ -397,6 +400,7 @@ export function ServicesPage() {
           label: a.label,
           description: a.description,
           email,
+          area,
           kind: a.kind ?? 'Application',
           role,
           enabled: a.enabled ?? true,
@@ -411,6 +415,7 @@ export function ServicesPage() {
           label: a.label,
           description: a.description,
           email,
+          area,
           role,
           enabled: a.enabled ?? true,
           capabilities,
@@ -591,6 +596,14 @@ export function ServicesPage() {
           {editing && (() => {
             const role = editing.account.role ?? 'Service'
             const scopeApplies = roleSupportsScope(role)
+            // Area is informative-only and always optional. A configured list turns it into a
+            // dropdown; an empty list falls back to free text. Keep an out-of-list current value
+            // (the configured list may have changed since the account was tagged).
+            const configuredAreas = me?.areas ?? []
+            const currentArea = editing.account.area ?? ''
+            const areaOptions = currentArea && !configuredAreas.includes(currentArea)
+              ? [...configuredAreas, currentArea]
+              : configuredAreas
             // Guard against the scope tab lingering after a role change makes it irrelevant.
             const activeTab: EditorTab = editorTab === 'scope' && !scopeApplies ? 'permissions' : editorTab
             return (
@@ -623,6 +636,24 @@ export function ServicesPage() {
                       placeholder="user@example.com"
                       onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, email: v.value } })}
                     />
+                  </Field>
+                  <Field label="Area" hint="Optional grouping tag.">
+                    {areaOptions.length > 0 ? (
+                      <Dropdown
+                        selectedOptions={[currentArea]}
+                        value={currentArea || 'None'}
+                        onOptionSelect={(_, d) => setEditing({ ...editing, account: { ...editing.account, area: d.optionValue ?? '' } })}
+                      >
+                        <Option value="">None</Option>
+                        {areaOptions.map(ar => <Option key={ar} value={ar}>{ar}</Option>)}
+                      </Dropdown>
+                    ) : (
+                      <Input
+                        value={editing.account.area ?? ''}
+                        placeholder="e.g. North region"
+                        onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, area: v.value } })}
+                      />
+                    )}
                   </Field>
                   <Field label="Kind" hint={kindHints[(editing.account.kind ?? 'Application') as AccountKind]}>
                     <Dropdown
@@ -1002,7 +1033,10 @@ function AccountViewBody({ account, services }: { account: Account; services: Ac
       </div>
       {account.description && <Field label="Description"><Body1>{account.description}</Body1></Field>}
 
-      <Field label="Email"><Body1>{account.email || '—'}</Body1></Field>
+      <div className={s.twoCol}>
+        <Field label="Email"><Body1>{account.email || '—'}</Body1></Field>
+        <Field label="Area"><Body1>{account.area || '—'}</Body1></Field>
+      </div>
 
       <div className={s.twoCol}>
         <Field label="Kind"><Body1>{account.kind}</Body1></Field>

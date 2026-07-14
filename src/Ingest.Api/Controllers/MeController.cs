@@ -36,6 +36,7 @@ public sealed class MeController : ControllerBase
     private readonly IntegrationOptions _integrations;
     private readonly ApprovalOptions _approval;
     private readonly IApprovalSettingsService _approvalSettings;
+    private readonly IAppConfigurationService _appConfig;
 
     /// <summary>Create a new <see cref="MeController"/>.</summary>
     /// <param name="email">Bound email options (only the master switch is read, to expose it to the SPA).</param>
@@ -43,13 +44,15 @@ public sealed class MeController : ControllerBase
     /// <param name="integrations">Bound integration options (only the master switch is read, to expose it to the SPA).</param>
     /// <param name="approval">Bound approval options (only the master switch is read, to expose it to the SPA).</param>
     /// <param name="approvalSettings">Global default approval policy provider; used to expose whether the default gates submissions.</param>
-    public MeController(IOptions<EmailOptions> email, IOptions<WebhookOptions> webhooks, IOptions<IntegrationOptions> integrations, IOptions<ApprovalOptions> approval, IApprovalSettingsService approvalSettings)
+    /// <param name="appConfig">Application configuration provider; used to expose the configured areas to the account editor.</param>
+    public MeController(IOptions<EmailOptions> email, IOptions<WebhookOptions> webhooks, IOptions<IntegrationOptions> integrations, IOptions<ApprovalOptions> approval, IApprovalSettingsService approvalSettings, IAppConfigurationService appConfig)
     {
         _email = email.Value;
         _webhooks = webhooks.Value;
         _integrations = integrations.Value;
         _approval = approval.Value;
         _approvalSettings = approvalSettings;
+        _appConfig = appConfig;
     }
 
     /// <summary>
@@ -85,6 +88,10 @@ public sealed class MeController : ControllerBase
         // the operator that they only see a subset of services. Admins never carry these.
         var assignedServiceIds = User.CurrentAssignedServiceIds().Select(id => id.ToString()).ToArray();
 
+        // The configured areas drive the account editor's Area control (dropdown when non-empty,
+        // free text otherwise). Exposed here so managing accounts doesn't require settings:read.
+        var areas = await _appConfig.GetAreasAsync(ct);
+
         return Ok(new
         {
             id = User.CurrentAccountId(),
@@ -94,6 +101,7 @@ public sealed class MeController : ControllerBase
             kind = User.FindFirst(AuthConstants.KindClaim)?.Value,
             capabilities,
             assignedServiceIds,
+            areas,
             emailEnabled = _email.Enabled,
             webhooksEnabled = _webhooks.Enabled,
             integrationsEnabled = _integrations.Enabled,

@@ -71,6 +71,7 @@ public sealed class ErasureService : IErasureService
             account.Label = null;
             account.Description = null;
             account.Email = null;
+            account.Area = null;
             account.Enabled = false;
             account.ExternalLogins = new();
             await _accounts.UpdateAsync(account, ct);

@@ -10,6 +10,7 @@ namespace Ingest.Api.Models;
 /// <param name="Label">Friendly UI label (may be null).</param>
 /// <param name="Description">Free-form description.</param>
 /// <param name="Email">Contact email used by the email/notification features. May be null for legacy accounts.</param>
+/// <param name="Area">Informative-only area tag (may be null).</param>
 /// <param name="Kind">UI-capable (<see cref="AccountKind.User"/>) vs API-only (<see cref="AccountKind.Application"/>).</param>
 /// <param name="Role">Authorisation tier.</param>
 /// <param name="Enabled">Whether the account currently authenticates.</param>
@@ -28,6 +29,7 @@ public sealed record AccountDto(
     string? Label,
     string? Description,
     string? Email,
+    string? Area,
     AccountKind Kind,
     AccountRole Role,
     bool Enabled,
@@ -43,7 +45,7 @@ public sealed record AccountDto(
 {
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static AccountDto From(Account a) => new(
-        a.Id, a.Name, a.Label, a.Description, a.Email, a.Kind, a.Role, a.Enabled,
+        a.Id, a.Name, a.Label, a.Description, a.Email, a.Area, a.Kind, a.Role, a.Enabled,
         a.CreatedAt, a.CreatedBy, a.ModifiedAt, a.ModifiedBy, a.IsDeleted,
         a.ExternalLogins.Select(ExternalLoginDto.From).ToList(),
         a.Capabilities.ToList(),
@@ -65,24 +67,26 @@ public sealed record ExternalLoginDto(string Provider, string Email)
 /// <param name="Label">Friendly label.</param>
 /// <param name="Description">Free-form description.</param>
 /// <param name="Email">Contact email for the email/notification features. Optional server-side (blank accepted); the admin UI asks for it.</param>
+/// <param name="Area">Optional, informative-only area tag. Blank accepted; only normalised (trimmed), never validated against the configured list.</param>
 /// <param name="Kind">UI-capable vs API-only.</param>
 /// <param name="Role">Authorisation tier.</param>
 /// <param name="Enabled">Initial enabled state; defaults to <c>true</c>.</param>
 /// <param name="ExternalLogins">Optional SSO identity links. Only valid for <see cref="AccountKind.User"/> accounts; each (provider, email) pair must be unique across accounts.</param>
 /// <param name="Capabilities">Optional capability overrides. <c>null</c>/empty seeds the account with the chosen role's default bundle (so it behaves exactly as before); a non-empty list is stored verbatim as the effective set. Ignored for Admins (who implicitly hold every capability).</param>
 /// <param name="AssignedServiceIds">Optional assigned-service allowlist. <c>null</c>/empty leaves the account unrestricted (sees every service); a non-empty list confines every cross-service read to those services. Ignored for Admins.</param>
-public sealed record CreateAccountRequest(string Name, string? Label, string? Description, string? Email, AccountKind Kind, AccountRole Role, bool Enabled = true, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null, List<Guid>? AssignedServiceIds = null);
+public sealed record CreateAccountRequest(string Name, string? Label, string? Description, string? Email, string? Area, AccountKind Kind, AccountRole Role, bool Enabled = true, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null, List<Guid>? AssignedServiceIds = null);
 
 /// <summary>Body for <c>PUT /api/admin/accounts/{id}</c>. Only the mutable fields are accepted.</summary>
 /// <param name="Label">New friendly label.</param>
 /// <param name="Description">New description.</param>
 /// <param name="Email">New contact email (blank accepted to clear it).</param>
+/// <param name="Area">New informative-only area tag (blank accepted to clear it). Only normalised (trimmed), never validated against the configured list.</param>
 /// <param name="Role">New authorisation tier.</param>
 /// <param name="Enabled">New enabled state.</param>
 /// <param name="ExternalLogins">Replacement set of SSO identity links. <c>null</c> leaves the existing links untouched; an empty list clears them.</param>
 /// <param name="Capabilities">Replacement capability override set. <c>null</c> leaves the stored overrides untouched; an empty list clears them (reverting the account to its role default bundle); a non-empty list replaces them. Ignored for Admins.</param>
 /// <param name="AssignedServiceIds">Replacement assigned-service allowlist. <c>null</c> leaves it untouched; an empty list clears it (unrestricted, sees every service); a non-empty list confines every cross-service read to those services. Ignored for Admins.</param>
-public sealed record UpdateAccountRequest(string? Label, string? Description, string? Email, AccountRole Role, bool Enabled, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null, List<Guid>? AssignedServiceIds = null);
+public sealed record UpdateAccountRequest(string? Label, string? Description, string? Email, string? Area, AccountRole Role, bool Enabled, List<ExternalLoginDto>? ExternalLogins = null, List<string>? Capabilities = null, List<Guid>? AssignedServiceIds = null);
 
 /// <summary>Wire representation of an API key. <b>Never</b> carries the plaintext secret.</summary>
 /// <param name="Id">Key id (primary key of the row).</param>
@@ -118,6 +122,7 @@ public sealed record UpdateApiKeyRequest(string? Description);
 /// <param name="Label">Friendly label.</param>
 /// <param name="Description">Free-form description.</param>
 /// <param name="Email">Contact email (may be null).</param>
+/// <param name="Area">Informative-only area tag (may be null).</param>
 /// <param name="Kind">UI-capable (User) vs API-only (Application).</param>
 /// <param name="Role">Authorisation tier.</param>
 /// <param name="Enabled">Whether the account is enabled.</param>
@@ -129,6 +134,7 @@ public sealed record AccountBackupEntryDto(
     string? Label,
     string? Description,
     string? Email,
+    string? Area,
     AccountKind Kind,
     AccountRole Role,
     bool Enabled,
@@ -138,14 +144,14 @@ public sealed record AccountBackupEntryDto(
 {
     /// <summary>Project a domain backup entry onto the wire shape.</summary>
     public static AccountBackupEntryDto From(AccountBackupEntry e) => new(
-        e.Name, e.Label, e.Description, e.Email, e.Kind, e.Role, e.Enabled,
+        e.Name, e.Label, e.Description, e.Email, e.Area, e.Kind, e.Role, e.Enabled,
         e.Capabilities.ToList(),
         e.ExternalLogins.Select(l => new ExternalLoginDto(l.Provider, l.Email)).ToList(),
         e.AssignedServiceIds.ToList());
 
     /// <summary>Map back to the domain backup entry for import.</summary>
     public AccountBackupEntry ToEntry() => new(
-        Name, Label, Description, Email, Kind, Role, Enabled,
+        Name, Label, Description, Email, Area, Kind, Role, Enabled,
         Capabilities ?? new(),
         (ExternalLogins ?? new()).Select(l => new AccountBackupLogin(l.Provider, l.Email)).ToList(),
         AssignedServiceIds ?? new());
@@ -593,6 +599,10 @@ public sealed record ApproverSpecDto(Guid AccountId, ApproverRequirement Require
     /// <summary>Convert the wire DTO back into a domain entity.</summary>
     public ApproverSpec ToEntity() => new() { AccountId = AccountId, Requirement = Requirement, Kind = Kind };
 }
+
+/// <summary>Wire shape for the configurable list of selectable areas.</summary>
+/// <param name="Areas">Area names in display order. Empty means the account editor uses a free-text area field.</param>
+public sealed record AreasConfigurationDto(List<string> Areas);
 
 /// <summary>Wire shape of an approval policy (per-schema or the global default).</summary>
 /// <param name="Mode">Whether (and how) approval is required (<c>None</c> / <c>UseGlobalDefault</c> / <c>Required</c>).</param>

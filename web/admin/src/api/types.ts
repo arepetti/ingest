@@ -151,6 +151,8 @@ export interface Account {
   description?: string | null
   /** Contact email used by the email/notification features. May be empty for legacy accounts. */
   email?: string | null
+  /** Informative-only area tag. May be empty. */
+  area?: string | null
   kind: AccountKind
   role: AccountRole
   enabled: boolean
@@ -178,6 +180,8 @@ export interface CreateAccountRequest {
   description?: string | null
   /** Contact email. Asked for in the UI; the server accepts blank for backwards compatibility. */
   email?: string | null
+  /** Informative-only area tag. Optional; blank accepted. */
+  area?: string | null
   kind: AccountKind
   role: AccountRole
   enabled?: boolean
@@ -194,6 +198,8 @@ export interface UpdateAccountRequest {
   description?: string | null
   /** Contact email. Blank clears it. */
   email?: string | null
+  /** Informative-only area tag. Blank clears it. */
+  area?: string | null
   role: AccountRole
   enabled: boolean
   /** Replacement set of SSO identity links. Omit to leave links untouched; pass [] to clear. */
@@ -202,6 +208,11 @@ export interface UpdateAccountRequest {
   capabilities?: Capability[]
   /** Replacement per-service scope. Omit to leave untouched; [] clears (unrestricted); non-empty confines to those service ids. Ignored for Admins. */
   assignedServiceIds?: string[]
+}
+
+/** The configurable list of selectable areas. Empty ⇒ the account editor uses a free-text area field. */
+export interface AreasConfiguration {
+  areas: string[]
 }
 
 /**
@@ -570,6 +581,8 @@ export interface Me {
    * the account only ever sees those services. Admins are always unrestricted.
    */
   assignedServiceIds?: string[]
+  /** Configured selectable areas (display order). Empty ⇒ the account editor uses a free-text area field. */
+  areas?: string[]
   /** Whether the email + notification feature is enabled server-side. Drives whether the related UI shows at all. */
   emailEnabled?: boolean
   /** Whether outbound webhooks are enabled server-side. Drives whether the Webhooks settings section shows. */

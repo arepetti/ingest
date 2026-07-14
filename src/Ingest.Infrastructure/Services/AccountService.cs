@@ -60,6 +60,7 @@ public sealed class AccountService : IAccountService
         }
 
         input.Email = NormalizeAndValidateEmail(input.Email);
+        input.Area = NormalizeArea(input.Area);
         input.ExternalLogins = await NormalizeAndValidateLinksAsync(input.Id, input.Kind, input.ExternalLogins, preserveSubjectsFrom: null, ct);
         input.Capabilities = NormalizeAndValidateCapabilities(input.Role, input.Capabilities);
         input.AssignedServiceIds = await NormalizeAndValidateAssignedServicesAsync(input.Role, input.AssignedServiceIds, ct);
@@ -78,6 +79,7 @@ public sealed class AccountService : IAccountService
         existing.Label = update.Label;
         existing.Description = update.Description;
         existing.Email = NormalizeAndValidateEmail(update.Email);
+        existing.Area = NormalizeArea(update.Area);
         existing.Role = update.Role;
         existing.Enabled = update.Enabled;
 
@@ -121,6 +123,17 @@ public sealed class AccountService : IAccountService
             throw new ValidationException(new[] { $"'{trimmed}' is not a valid email address." });
 
         return trimmed.ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Normalise the informative-only area tag: trim, and treat blank as unset. Deliberately does
+    /// <em>not</em> validate against the configured areas list — the field is always optional and a
+    /// later change to that list must never invalidate existing accounts.
+    /// </summary>
+    private static string? NormalizeArea(string? area)
+    {
+        var trimmed = area?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 
     /// <summary>
@@ -272,7 +285,7 @@ public sealed class AccountService : IAccountService
         return page.Items
             .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
             .Select(a => new AccountBackupEntry(
-                a.Name, a.Label, a.Description, a.Email, a.Kind, a.Role, a.Enabled,
+                a.Name, a.Label, a.Description, a.Email, a.Area, a.Kind, a.Role, a.Enabled,
                 a.Capabilities.ToList(),
                 a.ExternalLogins.Select(l => new AccountBackupLogin(l.Provider, l.Email)).ToList(),
                 a.AssignedServiceIds.ToList()))
@@ -308,7 +321,7 @@ public sealed class AccountService : IAccountService
                 {
                     await UpdateAsync(existing.Id, new AccountUpdate(
                         entry.Label, entry.Description, entry.Email, entry.Role, entry.Enabled,
-                        links, entry.Capabilities.ToList(), entry.AssignedServiceIds.ToList()), ct);
+                        links, entry.Capabilities.ToList(), entry.AssignedServiceIds.ToList(), entry.Area), ct);
                     updated++;
                 }
                 else
@@ -319,6 +332,7 @@ public sealed class AccountService : IAccountService
                         Label = entry.Label,
                         Description = entry.Description,
                         Email = entry.Email,
+                        Area = entry.Area,
                         Kind = entry.Kind,
                         Role = entry.Role,
                         Enabled = entry.Enabled,

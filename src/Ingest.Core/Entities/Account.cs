@@ -63,6 +63,14 @@ public sealed class Account : AuditedEntity
     /// </summary>
     public string? Email { get; set; }
 
+    /// <summary>
+    /// Optional, informative-only grouping tag (e.g. a geographic or organisational area). When a
+    /// configured list of areas exists the admin UI offers it as a dropdown, otherwise as free text.
+    /// Always optional and never validated against the configured list server-side, so a later change
+    /// to that list cannot invalidate existing accounts. Trimmed; <c>null</c> when unset.
+    /// </summary>
+    public string? Area { get; set; }
+
     /// <summary>Distinguishes UI-capable accounts from API-only ones.</summary>
     public AccountKind Kind { get; set; } = AccountKind.Application;
 
