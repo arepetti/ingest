@@ -75,7 +75,7 @@ public class ExploreServiceTests
         var svc = new ExploreService(
             new FakeSchemaRepo(waste, disabled),
             new FakeSampleRepo(samples),
-            new FakeAccountRepo());
+            new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetScorecardAsync(new ExploreScorecardQuery(null));
 
@@ -115,7 +115,7 @@ public class ExploreServiceTests
             Row(ServiceB, "waste", "recycling", 95, P2),
         };
 
-        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(samples), new FakeAccountRepo());
+        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(samples), new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetScorecardAsync(new ExploreScorecardQuery(new[] { ServiceA }));
 
@@ -132,7 +132,7 @@ public class ExploreServiceTests
             Name = "plain", Label = "Plain", IsGlobal = true, Enabled = true,
             Values = new List<SchemaValue> { Number("n", null, null, null, null) },
         };
-        var svc = new ExploreService(new FakeSchemaRepo(plain), new FakeSampleRepo(new()), new FakeAccountRepo());
+        var svc = new ExploreService(new FakeSchemaRepo(plain), new FakeSampleRepo(new()), new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetScorecardAsync(new ExploreScorecardQuery(null));
 
@@ -160,7 +160,7 @@ public class ExploreServiceTests
             Row(ServiceB, "waste", "recycling", 95, prevStart), // B only ever reported the previous period
         };
 
-        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(samples), new FakeAccountRepo());
+        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(samples), new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetScorecardAsync(
             new ExploreScorecardQuery(null, ScorecardMode.LastPeriod, ScorecardPeriod.Current));
@@ -201,7 +201,7 @@ public class ExploreServiceTests
             Row(ServiceB, "waste", "recycling", 95, prevStart), // closed period → Amber
         };
 
-        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(samples), new FakeAccountRepo());
+        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(samples), new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetScorecardAsync(
             new ExploreScorecardQuery(null, ScorecardMode.LastPeriod, ScorecardPeriod.LatestClosed));
@@ -228,7 +228,7 @@ public class ExploreServiceTests
             Values = new List<SchemaValue> { Number("recycling", 0, 50, 80, 100) },
         };
         // No samples at all — latest-available would hide the whole schema; last-period must not.
-        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(new()), new FakeAccountRepo());
+        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(new()), new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetScorecardAsync(
             new ExploreScorecardQuery(null, ScorecardMode.LastPeriod, ScorecardPeriod.Current));
@@ -256,7 +256,7 @@ public class ExploreServiceTests
             Row(ServiceB, "waste", "recycling", 60, curStart), // not in the audience → excluded
         };
 
-        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(samples), new FakeAccountRepo());
+        var svc = new ExploreService(new FakeSchemaRepo(waste), new FakeSampleRepo(samples), new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetScorecardAsync(
             new ExploreScorecardQuery(null, ScorecardMode.LastPeriod, ScorecardPeriod.Current));
@@ -286,7 +286,7 @@ public class ExploreServiceTests
         var spikePeriod = P1.AddMonths(baseValues.Length);
         samples.Add(Row(ServiceA, "m", "v", 5000d, spikePeriod));
 
-        var svc = new ExploreService(new FakeSchemaRepo(schema), new FakeSampleRepo(samples), new FakeAccountRepo());
+        var svc = new ExploreService(new FakeSchemaRepo(schema), new FakeSampleRepo(samples), new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetSeriesAsync(new ExploreSeriesQuery(
             "m", null, null, null, null, ExploreAggregation.Average,
@@ -324,7 +324,7 @@ public class ExploreServiceTests
             Row(ServiceA, "m", "v", 5000, P2),
         };
 
-        var svc = new ExploreService(new FakeSchemaRepo(schema), new FakeSampleRepo(samples), new FakeAccountRepo());
+        var svc = new ExploreService(new FakeSchemaRepo(schema), new FakeSampleRepo(samples), new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetSeriesAsync(new ExploreSeriesQuery(
             "m", null, null, null, null, ExploreAggregation.Average));
@@ -358,7 +358,7 @@ public class ExploreServiceTests
         // ServiceC: nothing → missing.
 
         var accounts = new FakeAccountRepo(ServiceA, ServiceB, ServiceC);
-        var svc = new ExploreService(new FakeSchemaRepo(schema), new FakeSampleRepo(samples), accounts);
+        var svc = new ExploreService(new FakeSchemaRepo(schema), new FakeSampleRepo(samples), accounts, new FakeAppConfigurationService());
 
         var result = await svc.GetAnomaliesAsync(new ExploreAnomalyQuery(
             null, null, ScorecardPeriod.Current, Window: 12, Threshold: 2.5, Robust: false));
@@ -405,7 +405,7 @@ public class ExploreServiceTests
             Row(ServiceA, "other", "w", 100, curStart),
         };
 
-        var svc = new ExploreService(new FakeSchemaRepo(wanted, other), new FakeSampleRepo(samples), new FakeAccountRepo());
+        var svc = new ExploreService(new FakeSchemaRepo(wanted, other), new FakeSampleRepo(samples), new FakeAccountRepo(), new FakeAppConfigurationService());
 
         var result = await svc.GetAnomaliesAsync(new ExploreAnomalyQuery(
             new[] { "wanted" }, null, ScorecardPeriod.Current));

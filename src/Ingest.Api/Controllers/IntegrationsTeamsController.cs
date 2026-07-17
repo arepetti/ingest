@@ -36,6 +36,7 @@ public sealed class IntegrationsTeamsController : ControllerBase
     private readonly TeamsBotAuthenticator _auth;
     private readonly MongoContext _ctx;
     private readonly IAuditContext _audit;
+    private readonly IAppConfigurationService _appConfig;
     private readonly bool _enabled;
     private readonly ILogger<IntegrationsTeamsController> _logger;
 
@@ -48,6 +49,7 @@ public sealed class IntegrationsTeamsController : ControllerBase
         TeamsBotAuthenticator auth,
         MongoContext ctx,
         IAuditContext audit,
+        IAppConfigurationService appConfig,
         IOptions<IntegrationOptions> options,
         ILogger<IntegrationsTeamsController> logger)
     {
@@ -58,6 +60,7 @@ public sealed class IntegrationsTeamsController : ControllerBase
         _auth = auth;
         _ctx = ctx;
         _audit = audit;
+        _appConfig = appConfig;
         _enabled = options.Value.Enabled;
         _logger = logger;
     }
@@ -132,6 +135,16 @@ public sealed class IntegrationsTeamsController : ControllerBase
         var samples = _cards.BuildSamples(schema, coerced, _audit.UtcNow);
         if (samples.Count == 0)
             return CardResponse(_cards.BuildResultCard("Nothing to submit", new[] { "No active values were provided." }, true));
+
+        // Teams submissions go through AdminCreateAsync — the same path the admin UI uses for
+        // remediation — so the kill switch can't be enforced there without also blocking admins.
+        // Gate here instead, at this service-facing entry point.
+        var ingestion = await _appConfig.GetIngestionStatusAsync(ct);
+        if (ingestion.Closed)
+        {
+            var message = string.IsNullOrWhiteSpace(ingestion.Message) ? "Submissions are temporarily closed." : ingestion.Message!;
+            return CardResponse(_cards.BuildResultCard("Submissions closed", new[] { message }, true));
+        }
 
         try
         {

@@ -25,11 +25,13 @@ public static class SampleProjectionBuilder
     /// rows (<see cref="SampleProjection.IsDerived"/> = <c>true</c>). When <c>null</c>, derived
     /// rows are skipped (useful in unit tests that only care about submitted samples).
     /// </param>
+    /// <param name="anchors">Cadence bucket alignment to use; <c>null</c> = the historical calendar defaults.</param>
     /// <returns>One row per (resolvable) sample, in submission order, plus derived rows per schema.</returns>
     public static IEnumerable<SampleProjection> Build(
         Submission submission,
         IReadOnlyDictionary<string, Schema> schemasByName,
-        IExpressionEvaluator? evaluator = null)
+        IExpressionEvaluator? evaluator = null,
+        CadenceAnchors? anchors = null)
     {
         foreach (var s in submission.Samples)
         {
@@ -38,7 +40,7 @@ public static class SampleProjectionBuilder
                 string.Equals(v.Name, s.ValueName, StringComparison.OrdinalIgnoreCase));
             if (def is null || def.IsCalculated) continue;
 
-            yield return ToProjection(submission, s, def);
+            yield return ToProjection(submission, s, def, anchors);
         }
 
         if (evaluator is null) yield break;
@@ -68,14 +70,14 @@ public static class SampleProjectionBuilder
             foreach (var def in schema.Values.Where(v => v.IsCalculated))
             {
                 if (!context.TryGetValue(def.Name, out var value) || value is null) continue;
-                yield return ToDerivedProjection(submission, schemaName, def, value, timestamp);
+                yield return ToDerivedProjection(submission, schemaName, def, value, timestamp, anchors);
             }
         }
     }
 
-    private static SampleProjection ToProjection(Submission submission, Sample s, SchemaValue def)
+    private static SampleProjection ToProjection(Submission submission, Sample s, SchemaValue def, CadenceAnchors? anchors)
     {
-        var (start, end) = CadenceCalculator.BucketFor(def.Cadence, s.Timestamp);
+        var (start, end) = CadenceCalculator.BucketFor(def.Cadence, s.Timestamp, anchors);
 
         var p = new SampleProjection
         {
@@ -103,10 +105,11 @@ public static class SampleProjectionBuilder
         string schemaName,
         SchemaValue def,
         object value,
-        DateTime timestamp)
+        DateTime timestamp,
+        CadenceAnchors? anchors)
     {
         var ts = DateTime.SpecifyKind(timestamp, DateTimeKind.Utc);
-        var (start, end) = CadenceCalculator.BucketFor(def.Cadence, ts);
+        var (start, end) = CadenceCalculator.BucketFor(def.Cadence, ts, anchors);
 
         var p = new SampleProjection
         {

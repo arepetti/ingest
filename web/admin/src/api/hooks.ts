@@ -21,7 +21,7 @@ import type {
   WebhookEndpointCreatedResponse, WebhookSecretResponse,
   WebhookDelivery, WebhookDeliveryStatus, WebhookDrainResult,
   ApprovalStatus, ApprovalPolicy, ApprovalRule, UpsertApprovalRuleRequest,
-  AreasConfiguration,
+  AreasConfiguration, SubmissionWindowConfig, IngestionStatus, CadenceWindows, CadencePreviewEntry,
   IngestEvent, UpsertEventRequest,
   Integration, IntegrationRequest, IntegrationRunResult,
   TeamsConnection, UpdateTeamsConnectionRequest, TeamsConnectionTestResult,
@@ -539,6 +539,69 @@ export const useUpdateAreasConfiguration = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['areas-configuration'] }),
   })
 }
+
+/** The configurable cadence bucket alignment points (settings:read). */
+export const useSubmissionWindow = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['submission-window'],
+    queryFn: () => api.get<SubmissionWindowConfig>('/api/admin/configuration/submission-window'),
+    enabled,
+  })
+
+export const useUpdateSubmissionWindow = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: SubmissionWindowConfig) => api.put<SubmissionWindowConfig>('/api/admin/configuration/submission-window', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['submission-window'] }),
+  })
+}
+
+/** The global ingestion kill-switch state (settings:read). */
+export const useIngestionStatus = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['ingestion-status'],
+    queryFn: () => api.get<IngestionStatus>('/api/admin/configuration/ingestion'),
+    enabled,
+  })
+
+export const useUpdateIngestionStatus = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: IngestionStatus) => api.put<IngestionStatus>('/api/admin/configuration/ingestion', req),
+    // The site-wide banner reads `me.submissionsClosed`, so refresh that alongside the settings form.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ingestion-status'] })
+      qc.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+}
+
+/** Per-cadence submission-window offsets (open offset / grace, in hours; settings:read). */
+export const useCadenceWindows = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['cadence-windows'],
+    queryFn: () => api.get<CadenceWindows>('/api/admin/configuration/cadence-windows'),
+    enabled,
+  })
+
+export const useUpdateCadenceWindows = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: CadenceWindows) => api.put<CadenceWindows>('/api/admin/configuration/cadence-windows', req),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cadence-windows'] }),
+  })
+}
+
+/**
+ * Live preview of every cadence's current bucket and resolved submission window (settings:read).
+ * A "now" snapshot rather than something to poll — callers refetch manually (e.g. a refresh button).
+ */
+export const useCadencePreview = (enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['cadence-preview'],
+    queryFn: () => api.get<CadencePreviewEntry[]>('/api/admin/configuration/cadence-preview'),
+    enabled,
+  })
 
 /** The server-wide default approval policy schemas can defer to. 404s when the workflow is disabled. */
 export const useApprovalSettings = (enabled: boolean = true) =>

@@ -26,6 +26,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
     private readonly MongoContext _ctx;
     private readonly IExpressionEvaluator _evaluator;
     private readonly IAuditContext _audit;
+    private readonly IAppConfigurationService _appConfig;
     private readonly bool _approvalEnabled;
 
     /// <summary>Marker embedded in the "already submitted for this period" cadence error.</summary>
@@ -49,18 +50,21 @@ public sealed class SubmissionValidator : ISubmissionValidator
     /// <param name="ctx">Mongo context, used directly for the cadence lookup so it doesn't go through the generic repo.</param>
     /// <param name="evaluator">Expression evaluator for the user-provided validation rules.</param>
     /// <param name="audit">Audit context; not used today but injected to make per-rule logging trivial to add.</param>
+    /// <param name="appConfig">Application configuration provider; supplies the cadence anchors used to bucket the duplicate-period and history checks.</param>
     /// <param name="approvalOptions">Approval master switch; when on, the cadence check also considers pending (not-yet-approved) submissions so a window can't hold two.</param>
     public SubmissionValidator(
         ISchemaRepository schemas,
         MongoContext ctx,
         IExpressionEvaluator evaluator,
         IAuditContext audit,
+        IAppConfigurationService appConfig,
         IOptions<ApprovalOptions> approvalOptions)
     {
         _schemas = schemas;
         _ctx = ctx;
         _evaluator = evaluator;
         _audit = audit;
+        _appConfig = appConfig;
         _approvalEnabled = approvalOptions.Value.Enabled;
     }
 
@@ -80,6 +84,10 @@ public sealed class SubmissionValidator : ISubmissionValidator
         var discarded = new HashSet<SampleRef>();
         var visible = (await _schemas.ListVisibleToAsync(service.Id, ct))
             .ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
+        // Fetched once per validation run and threaded into every cadence bucket lookup below
+        // (duplicate-period check + latest()/previous() history) so they all agree on the same
+        // configured alignment.
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
 
         // Build the per-schema value context up-front. EnabledIf/VisibleIf evaluation needs
         // it before any sample is processed (a rule can reference any sibling value), and the
@@ -106,7 +114,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
             if (historyCache.TryGetValue(schema.Name, out var cached)) return cached;
             var history = SchemaUsesHistory(schema)
                 ? await BuildSchemaHistoryAsync(
-                    service.Id, schema, samplesBySchema.GetValueOrDefault(schema.Name) ?? new(), existing, ct)
+                    service.Id, schema, samplesBySchema.GetValueOrDefault(schema.Name) ?? new(), existing, anchors, ct)
                 : SchemaHistory.Empty;
             historyCache[schema.Name] = history;
             return history;
@@ -201,7 +209,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
             // Cadence is a context-dependent check (depends on this service's live/pending history in
             // the sample's window); validate-only callers can opt out of it (e.g. CI shape checks).
             if (!skipCadence)
-                await CheckCadenceAsync(service.Id, schema, value, sample, isReplacement, existing, errors, ct);
+                await CheckCadenceAsync(service.Id, schema, value, sample, isReplacement, existing, anchors, errors, ct);
 
             var modifiable = schema.Modifiable && value.Modifiable;
             if (isReplacement && !modifiable)
@@ -616,6 +624,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         Schema schema,
         IReadOnlyList<(Sample sample, SchemaValue? def)> schemaSamples,
         Submission? existing,
+        CadenceAnchors anchors,
         CancellationToken ct)
     {
         var latest = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
@@ -647,7 +656,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
                 .FirstOrDefault(t => t.def is not null &&
                     string.Equals(t.def.Name, v.Name, StringComparison.OrdinalIgnoreCase))
                 .sample?.Timestamp ?? fallbackTs;
-            var (pStart, pEnd) = CadenceCalculator.PreviousBucketFor(v.Cadence, refTs);
+            var (pStart, pEnd) = CadenceCalculator.PreviousBucketFor(v.Cadence, refTs, anchors);
             var prevFilter = Builders<SampleProjection>.Filter.And(baseFilter,
                 Builders<SampleProjection>.Filter.Gte(s => s.Timestamp, pStart),
                 Builders<SampleProjection>.Filter.Lt(s => s.Timestamp, pEnd));
@@ -690,10 +699,11 @@ public sealed class SubmissionValidator : ISubmissionValidator
         Sample sample,
         bool isReplacement,
         Submission? existing,
+        CadenceAnchors anchors,
         List<string> errors,
         CancellationToken ct)
     {
-        var (start, end) = CadenceCalculator.BucketFor(def.Cadence, sample.Timestamp);
+        var (start, end) = CadenceCalculator.BucketFor(def.Cadence, sample.Timestamp, anchors);
 
         var filter = Builders<SampleProjection>.Filter.And(
             Builders<SampleProjection>.Filter.Eq(s => s.IsDeleted, false),

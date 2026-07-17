@@ -1,6 +1,7 @@
 using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
+using Ingest.Core.Validation;
 using Ingest.Infrastructure.Services;
 
 namespace Ingest.Tests;
@@ -195,6 +196,83 @@ public class StatusServiceMissingTests
     }
 
     [Fact]
+    public async Task Report_suppresses_the_previous_period_while_its_grace_is_still_open()
+    {
+        // Same fixture as Report_flags_previous_period_for_pre_existing_schema_and_service, but a
+        // configured Weekly grace big enough to still be open at FixedNow (previous window ends
+        // Mon 2026-05-25; +10 days extends it well past FixedNow of 2026-05-28) withholds the
+        // previous bucket entirely rather than showing it as overdue.
+        var old = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var appConfig = new FakeAppConfigurationService { Windows = CadenceWindows.Default with { Weekly = new CadenceWindow(0, 24 * 10) } };
+        var svc = BuildService(
+            accounts: new[] { Service("alpha", "Alpha", enabled: true, createdAt: old) },
+            schemas: new[]
+            {
+                Schema("kpi", values: new[]
+                {
+                    new SchemaValue { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Required = true },
+                }, createdAt: old),
+            },
+            samples: Array.Empty<SampleProjection>(),
+            appConfig: appConfig);
+
+        var report = await svc.GetMissingAsync();
+
+        Assert.Single(report, b => b.Period == MissingPeriodKind.Current);
+        Assert.DoesNotContain(report, b => b.Period == MissingPeriodKind.Previous);
+    }
+
+    [Fact]
+    public async Task Report_shows_the_previous_period_once_its_grace_has_elapsed()
+    {
+        // Previous window ends Mon 2026-05-25 00:00; a 72h grace pushes the deadline to
+        // 2026-05-28 00:00, which is before FixedNow (2026-05-28 10:00) — grace has elapsed, so
+        // the previous bucket is reported as overdue same as the zero-grace case.
+        var old = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var appConfig = new FakeAppConfigurationService { Windows = CadenceWindows.Default with { Weekly = new CadenceWindow(0, 72) } };
+        var svc = BuildService(
+            accounts: new[] { Service("alpha", "Alpha", enabled: true, createdAt: old) },
+            schemas: new[]
+            {
+                Schema("kpi", values: new[]
+                {
+                    new SchemaValue { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Required = true },
+                }, createdAt: old),
+            },
+            samples: Array.Empty<SampleProjection>(),
+            appConfig: appConfig);
+
+        var report = await svc.GetMissingAsync();
+
+        Assert.Single(report, b => b.Period == MissingPeriodKind.Current);
+        Assert.Single(report, b => b.Period == MissingPeriodKind.Previous);
+    }
+
+    [Fact]
+    public async Task GetMissingHistoryAsync_is_unaffected_by_grace()
+    {
+        // GetMissingHistoryAsync is an explicit historical-by-offset audit view, not a live
+        // "is it too late" signal — it must keep reporting a closed offset -1 window as missing
+        // even with a large grace configured for the cadence.
+        var old = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var appConfig = new FakeAppConfigurationService { Windows = CadenceWindows.Default with { Weekly = new CadenceWindow(0, 24 * 10) } };
+        var svc = BuildService(
+            accounts: new[] { Service("alpha", "Alpha", enabled: true, createdAt: old) },
+            schemas: new[]
+            {
+                Schema("kpi", values: new[]
+                {
+                    new SchemaValue { Name = "a", Type = SchemaValueType.Number, Cadence = Cadence.Weekly, Required = true },
+                }, createdAt: old),
+            },
+            samples: Array.Empty<SampleProjection>(),
+            appConfig: appConfig);
+
+        var report = await svc.GetMissingForPeriodAsync(Cadence.Weekly, -1);
+        Assert.Equal(1, Assert.Single(report.Entries).MissingRequiredCount);
+    }
+
+    [Fact]
     public async Task Report_omits_previous_period_for_freshly_created_schema()
     {
         // The schema was created inside the current week, so it never existed during the previous
@@ -294,8 +372,9 @@ public class StatusServiceMissingTests
     private static StatusService BuildService(
         IEnumerable<Account> accounts,
         IEnumerable<Schema> schemas,
-        IEnumerable<SampleProjection> samples) =>
-        new(new FakeSchemaRepo(schemas), new FakeSampleRepo(samples), new FakeAccountRepo(accounts), new FixedClock(FixedNow));
+        IEnumerable<SampleProjection> samples,
+        FakeAppConfigurationService? appConfig = null) =>
+        new(new FakeSchemaRepo(schemas), new FakeSampleRepo(samples), new FakeAccountRepo(accounts), new FixedClock(FixedNow), appConfig ?? new FakeAppConfigurationService());
 
     // CreatedAt defaults to "now" so these fixtures are treated as brand-new: the previous-period
     // guard (CreatedAt < previousPeriodEnd) excludes them, leaving GetMissingAsync to report only

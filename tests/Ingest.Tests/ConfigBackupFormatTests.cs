@@ -39,6 +39,41 @@ public class ConfigBackupFormatTests
     }
 
     [Fact]
+    public void Write_then_Read_round_trips_the_cadence_anchor_and_kill_switch_fields()
+    {
+        // AppConfiguration is exported/restored as a raw BsonDocument (no typed mapping), so any
+        // field added to the entity round-trips automatically. This pins that for the fields added
+        // alongside the configurable cadence anchors and ingestion kill switch.
+        var doc = new BsonDocument
+        {
+            { "_id", new BsonBinaryData(Guid.NewGuid(), GuidRepresentation.Standard) },
+            { "areas", new BsonArray(new[] { "North", "South" }) },
+            { "fiscalYearStartMonth", new BsonInt32(4) },
+            { "weekStartDay", new BsonInt32((int)DayOfWeek.Sunday) },
+            { "monthStartDay", new BsonInt32(15) },
+            { "fortnightAnchor", new BsonDateTime(new DateTime(2020, 6, 6, 0, 0, 0, DateTimeKind.Utc)) },
+            { "submissionsClosed", BsonBoolean.True },
+            { "submissionsClosedMessage", "Maintenance in progress" },
+        };
+        var data = new Dictionary<string, IReadOnlyList<BsonDocument>>
+        {
+            ["appConfiguration"] = new[] { doc },
+        };
+
+        var json = ConfigBackupFormat.Write(data, DateTime.UtcNow);
+        var read = ConfigBackupFormat.Read(json);
+
+        var restored = Assert.Single(read["appConfiguration"]);
+        Assert.Equal(new[] { "North", "South" }, restored["areas"].AsBsonArray.Select(v => v.AsString));
+        Assert.Equal(4, restored["fiscalYearStartMonth"].AsInt32);
+        Assert.Equal((int)DayOfWeek.Sunday, restored["weekStartDay"].AsInt32);
+        Assert.Equal(15, restored["monthStartDay"].AsInt32);
+        Assert.Equal(new DateTime(2020, 6, 6, 0, 0, 0, DateTimeKind.Utc), restored["fortnightAnchor"].ToUniversalTime());
+        Assert.True(restored["submissionsClosed"].AsBoolean);
+        Assert.Equal("Maintenance in progress", restored["submissionsClosedMessage"].AsString);
+    }
+
+    [Fact]
     public void Write_includes_every_known_collection_even_when_empty()
     {
         var json = ConfigBackupFormat.Write(new Dictionary<string, IReadOnlyList<BsonDocument>>(), DateTime.UtcNow);

@@ -1,6 +1,7 @@
 using Ingest.Core.Abstractions;
 using Ingest.Core.Entities;
 using Ingest.Core.Security;
+using Ingest.Core.Validation;
 
 namespace Ingest.Api.Models;
 
@@ -603,6 +604,73 @@ public sealed record ApproverSpecDto(Guid AccountId, ApproverRequirement Require
 /// <summary>Wire shape for the configurable list of selectable areas.</summary>
 /// <param name="Areas">Area names in display order. Empty means the account editor uses a free-text area field.</param>
 public sealed record AreasConfigurationDto(List<string> Areas);
+
+/// <summary>Wire shape for the configurable cadence bucket alignment points.</summary>
+/// <param name="FiscalYearStartMonth">Month (1-12) the fiscal year begins on; also anchors Quarterly/SemiAnnually.</param>
+/// <param name="WeekStartDay">Day of week a Weekly bucket begins on.</param>
+/// <param name="MonthStartDay">Day of month (1-28) a Monthly bucket begins on.</param>
+/// <param name="FortnightAnchor">A UTC date a Fortnightly bucket boundary is aligned to.</param>
+public sealed record SubmissionWindowDto(int FiscalYearStartMonth, DayOfWeek WeekStartDay, int MonthStartDay, DateTime FortnightAnchor)
+{
+    /// <summary>Build the wire DTO from the resolved domain anchors.</summary>
+    public static SubmissionWindowDto From(CadenceAnchors a) =>
+        new(a.FiscalYearStartMonth, a.WeekStartDay, a.MonthStartDay, a.FortnightAnchor);
+
+    /// <summary>Map back to the domain record for the update call.</summary>
+    public CadenceAnchors ToAnchors() =>
+        new(FiscalYearStartMonth, WeekStartDay, MonthStartDay, FortnightAnchor);
+}
+
+/// <summary>Wire shape for the global "close all submissions" ingestion kill switch.</summary>
+/// <param name="Closed">When true, service-facing ingestion (create/replace, bulk import, Teams inbound) is blocked.</param>
+/// <param name="Message">Optional operator-facing message shown in the site banner and the 503 body.</param>
+public sealed record IngestionStatusDto(bool Closed, string? Message);
+
+/// <summary>Wire shape for one cadence's submission-window offsets.</summary>
+/// <param name="OpenOffsetHours">Hours after the bucket's start before the window opens.</param>
+/// <param name="GraceHours">Hours after the bucket's end during which the window stays open.</param>
+public sealed record CadenceWindowDto(double OpenOffsetHours, double GraceHours)
+{
+    /// <summary>Build the wire DTO from the resolved domain window.</summary>
+    public static CadenceWindowDto From(CadenceWindow w) => new(w.OpenOffsetHours, w.GraceHours);
+
+    /// <summary>Map back to the domain record.</summary>
+    public CadenceWindow ToDomain() => new(OpenOffsetHours, GraceHours);
+}
+
+/// <summary>Wire shape for the per-cadence submission-window configuration (all 7 cadences).</summary>
+public sealed record CadenceWindowsDto(
+    CadenceWindowDto Daily,
+    CadenceWindowDto Weekly,
+    CadenceWindowDto Fortnightly,
+    CadenceWindowDto Monthly,
+    CadenceWindowDto Quarterly,
+    CadenceWindowDto SemiAnnually,
+    CadenceWindowDto Yearly)
+{
+    /// <summary>Build the wire DTO from the resolved domain windows.</summary>
+    public static CadenceWindowsDto From(CadenceWindows w) => new(
+        CadenceWindowDto.From(w.Daily), CadenceWindowDto.From(w.Weekly), CadenceWindowDto.From(w.Fortnightly),
+        CadenceWindowDto.From(w.Monthly), CadenceWindowDto.From(w.Quarterly), CadenceWindowDto.From(w.SemiAnnually),
+        CadenceWindowDto.From(w.Yearly));
+
+    /// <summary>Map back to the domain record for the update call.</summary>
+    public CadenceWindows ToDomain() => new(
+        Daily.ToDomain(), Weekly.ToDomain(), Fortnightly.ToDomain(),
+        Monthly.ToDomain(), Quarterly.ToDomain(), SemiAnnually.ToDomain(), Yearly.ToDomain());
+}
+
+/// <summary>
+/// A single cadence's live-computed period (the bucket containing "now") and submission window
+/// (the bucket extended by the resolved open offset/grace), as returned by the cadence-preview
+/// endpoint. Purely informational — computed on demand from the current anchors/windows, never stored.
+/// </summary>
+/// <param name="Cadence">Cadence this entry describes.</param>
+/// <param name="PeriodStart">Inclusive start of the current bucket.</param>
+/// <param name="PeriodEnd">Exclusive end of the current bucket.</param>
+/// <param name="WindowStart">Inclusive start of the submission window (bucket start + open offset).</param>
+/// <param name="WindowEnd">Exclusive end of the submission window (bucket end + grace).</param>
+public sealed record CadencePreviewEntryDto(Cadence Cadence, DateTime PeriodStart, DateTime PeriodEnd, DateTime WindowStart, DateTime WindowEnd);
 
 /// <summary>Wire shape of an approval policy (per-schema or the global default).</summary>
 /// <param name="Mode">Whether (and how) approval is required (<c>None</c> / <c>UseGlobalDefault</c> / <c>Required</c>).</param>

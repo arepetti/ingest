@@ -7,9 +7,10 @@ import {
   MessageBarBody, makeStyles, tokens,
 } from '@fluentui/react-components'
 import {
-  Add20Regular, Alert24Regular, ArrowDown20Regular, ArrowUp20Regular, CheckmarkCircle24Regular,
+  Add20Regular, Alert24Regular, ArrowClockwise20Regular, ArrowDown20Regular, ArrowUp20Regular,
+  CalendarLtr24Regular, CheckmarkCircle24Regular,
   ClipboardTaskListLtr24Regular, Delete20Regular, DocumentText24Regular,
-  Key24Regular, Mail24Regular, PeopleTeam24Regular, PlugConnected24Regular, Settings24Regular,
+  Key24Regular, Mail24Regular, PauseCircle24Regular, PeopleTeam24Regular, PlugConnected24Regular, Settings24Regular,
   Tag24Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
@@ -27,13 +28,20 @@ import {
   useNotificationSettings, useUpdateNotificationSettings, useRunNotifications,
   useApprovalSettings, useUpdateApprovalSettings,
   useAreasConfiguration, useUpdateAreasConfiguration,
+  useSubmissionWindow, useUpdateSubmissionWindow,
+  useIngestionStatus, useUpdateIngestionStatus,
+  useCadenceWindows, useUpdateCadenceWindows, useCadencePreview,
 } from '../api/hooks'
 import { accountHasCapability } from '../api/capabilities'
 import { formatApiError } from '../api/client'
 import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY, SERVICE_OWNER_LABEL } from '../utils/approvers'
+import { cadenceLabel } from '../utils/cadence'
+import { formatDateTime } from '../utils/format'
 import type {
   Account, ApprovalMode, ApprovalPolicy, ApprovalSourceScope, ApproverRequirement,
+  Cadence, CadenceWindow, CadenceWindows, CadencePreviewEntry,
   EmailSettings, EmailTemplate, NotificationSettings, NotificationRule,
+  SubmissionWindowConfig, WeekDay,
 } from '../api/types'
 
 const useStyles = makeStyles({
@@ -44,6 +52,13 @@ const useStyles = makeStyles({
   help: { color: tokens.colorNeutralForeground3 },
   actions: { display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' },
   row: { display: 'flex', gap: '12px', flexWrap: 'wrap' },
+  // Like `row`, but top-aligned instead of the flexbox default (stretch). Fluent `Field`s render
+  // as a grid with rows sized to their tallest sibling, so pairing a `Field` that has a `hint`
+  // (label/control/hint = 3 rows) with one that doesn't (2 rows) otherwise stretches the shorter
+  // Field's grid to match — reading as "middle-aligned" next to the sibling whose hint fills that
+  // same space at the bottom. Scoped narrowly (submission periods / cadence windows forms) rather
+  // than changed on `row` itself, which other layouts (e.g. the "Add an area" row) rely on stretching.
+  rowTop: { display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start' },
   grow: { flex: 1, minWidth: '220px' },
   ruleBlock: {
     display: 'flex', flexDirection: 'column', gap: '6px',
@@ -78,6 +93,7 @@ const useStyles = makeStyles({
   areaName: { fontWeight: tokens.fontWeightSemibold },
   areaActions: { display: 'flex', gap: '2px' },
   addButtonWrap: { display: 'flex', alignItems: 'flex-end' },
+  sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' },
 })
 
 // --- Approval (global default policy) ------------------------------------------------------
@@ -241,6 +257,8 @@ export function SettingsPage() {
     { id: 'general', label: 'General', group: 'General', icon: <Settings24Regular />, render: () => <GeneralSettingsSection /> },
     ...(canConfigureSettings ? [
       { id: 'areas', label: 'Areas', group: 'Configuration', icon: <Tag24Regular />, render: () => <AreasSettingsSection /> },
+      { id: 'submission-periods', label: 'Submission periods', group: 'Configuration', icon: <CalendarLtr24Regular />, render: () => <SubmissionPeriodsSection /> },
+      { id: 'ingestion', label: 'Ingestion', group: 'Configuration', icon: <PauseCircle24Regular />, render: () => <IngestionSection /> },
     ] as LayoutSection[] : []),
     ...(approvalEnabled && canConfigureSettings ? [
       { id: 'approval', label: 'Approval', group: 'Approvals', icon: <CheckmarkCircle24Regular />, render: () => <ApprovalSettingsSection /> },
@@ -424,6 +442,347 @@ function AreasSettingsForm({ initial }: { initial: string[] }) {
             </Button>
           </div>
         </>
+      )}
+    </Card>
+  )
+}
+
+// --- Submission periods (cadence bucket alignment) ----------------------------------------
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+const WEEK_DAYS: WeekDay[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+/** `2026-05-15T00:00:00Z` → `2026-05-15` for the date input; the server only cares about the date. */
+const toDateInput = (iso: string) => iso.slice(0, 10)
+const fromDateInput = (value: string) => `${value}T00:00:00Z`
+
+function SubmissionPeriodsSection() {
+  const s = useStyles()
+  return (
+    <div className={s.root}>
+      <SubmissionPeriodsAnchorsSection />
+      <CadenceWindowsSection />
+      <CadencePreviewSection />
+    </div>
+  )
+}
+
+function SubmissionPeriodsAnchorsSection() {
+  const { data, isLoading } = useSubmissionWindow()
+  if (isLoading || !data) return <Spinner label="Loading…" />
+  return <SubmissionPeriodsForm initial={data} key={JSON.stringify(data)} />
+}
+
+function SubmissionPeriodsForm({ initial }: { initial: SubmissionWindowConfig }) {
+  const s = useStyles()
+  const { has } = useCapabilities()
+  const canManage = has('settings:manage')
+  const update = useUpdateSubmissionWindow()
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(initial.fiscalYearStartMonth)
+  const [weekStartDay, setWeekStartDay] = useState<WeekDay>(initial.weekStartDay)
+  const [monthStartDay, setMonthStartDay] = useState(initial.monthStartDay)
+  const [fortnightAnchor, setFortnightAnchor] = useState(toDateInput(initial.fortnightAnchor))
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  async function onSave() {
+    setError(null); setSaved(false)
+    try {
+      await update.mutateAsync({
+        fiscalYearStartMonth, weekStartDay, monthStartDay,
+        fortnightAnchor: fromDateInput(fortnightAnchor),
+      })
+      setSaved(true)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  return (
+    <Card className={s.card}>
+      <div>
+        <Title3 className={s.sectionTitle}>Submission periods</Title3>
+        <Body1 className={s.help}>
+          Where each reporting period starts and ends. Changing these takes effect immediately for
+          new submissions and open-period checks; periods already recorded keep the boundaries they
+          were written with.
+        </Body1>
+      </div>
+
+      {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Submission periods saved.</MessageBarBody></AutoScrollMessageBar>}
+
+      <div className={s.rowTop}>
+        <Field label="Fiscal year starts in" hint="Also anchors quarterly and half-yearly periods." className={s.grow}>
+          <Dropdown
+            disabled={!canManage}
+            value={MONTH_NAMES[fiscalYearStartMonth - 1]}
+            selectedOptions={[String(fiscalYearStartMonth)]}
+            onOptionSelect={(_, d) => setFiscalYearStartMonth(Number(d.optionValue))}
+          >
+            {MONTH_NAMES.map((m, i) => <Option key={m} value={String(i + 1)}>{m}</Option>)}
+          </Dropdown>
+        </Field>
+
+        <Field label="Week starts on" className={s.grow}>
+          <Dropdown
+            disabled={!canManage}
+            value={weekStartDay}
+            selectedOptions={[weekStartDay]}
+            onOptionSelect={(_, d) => setWeekStartDay(d.optionValue as WeekDay)}
+          >
+            {WEEK_DAYS.map(d => <Option key={d} value={d}>{d}</Option>)}
+          </Dropdown>
+        </Field>
+      </div>
+
+      <div className={s.rowTop}>
+        <Field label="Month starts on day" hint="1-28." className={s.grow}>
+          <Input
+            type="number" min={1} max={28} disabled={!canManage}
+            value={String(monthStartDay)}
+            onChange={(_, d) => setMonthStartDay(Math.min(28, Math.max(1, Number(d.value) || 1)))}
+          />
+        </Field>
+
+        <Field label="Fortnight anchor" hint="Any date on a fortnight boundary; only the date matters." className={s.grow}>
+          <Input type="date" disabled={!canManage} value={fortnightAnchor} onChange={(_, d) => setFortnightAnchor(d.value)} />
+        </Field>
+      </div>
+
+      {canManage && (
+        <div className={s.actions}>
+          <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
+            {update.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+// --- Submission windows (per-cadence open offset / grace) ---------------------------------
+
+const ALL_CADENCES: Cadence[] = ['Daily', 'Weekly', 'Fortnightly', 'Monthly', 'Quarterly', 'SemiAnnually', 'Yearly']
+
+/** Maps a `Cadence` to its property name on the `CadenceWindows` wire shape. */
+const CADENCE_WINDOW_KEYS: Record<Cadence, keyof CadenceWindows> = {
+  Daily: 'daily', Weekly: 'weekly', Fortnightly: 'fortnightly', Monthly: 'monthly',
+  Quarterly: 'quarterly', SemiAnnually: 'semiAnnually', Yearly: 'yearly',
+}
+
+function CadenceWindowsSection() {
+  const { data, isLoading } = useCadenceWindows()
+  if (isLoading || !data) return <Spinner label="Loading…" />
+  return <CadenceWindowsForm initial={data} key={JSON.stringify(data)} />
+}
+
+function CadenceWindowsForm({ initial }: { initial: CadenceWindows }) {
+  const s = useStyles()
+  const { has } = useCapabilities()
+  const canManage = has('settings:manage')
+  const update = useUpdateCadenceWindows()
+  const [windows, setWindows] = useState<CadenceWindows>(initial)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  function setField(cadence: Cadence, field: keyof CadenceWindow, value: number) {
+    const key = CADENCE_WINDOW_KEYS[cadence]
+    setSaved(false)
+    setWindows(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }))
+  }
+
+  async function onSave() {
+    setError(null); setSaved(false)
+    try {
+      await update.mutateAsync(windows)
+      setSaved(true)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  return (
+    <Card className={s.card}>
+      <div>
+        <Title3 className={s.sectionTitle}>Submission windows</Title3>
+        <Body1 className={s.help}>
+          How long before/after each cadence's period a service may actually create or edit a
+          submission for it. <strong>Open offset</strong> delays when the window opens after the
+          period starts; <strong>Grace period</strong> extends how long it stays open after the
+          period ends. Both default to 0 hours — the window is exactly the period — until set here.
+          "Missed submission" reporting and reminders also wait for the grace period to elapse.
+        </Body1>
+      </div>
+
+      {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Submission windows saved.</MessageBarBody></AutoScrollMessageBar>}
+
+      <Table className={s.table}>
+        <TableHeader>
+          <TableRow>
+            <TableHeaderCell>Cadence</TableHeaderCell>
+            <TableHeaderCell>Open offset (hours)</TableHeaderCell>
+            <TableHeaderCell>Grace period (hours)</TableHeaderCell>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {ALL_CADENCES.map(cadence => {
+            const w = windows[CADENCE_WINDOW_KEYS[cadence]]
+            return (
+              <TableRow key={cadence}>
+                <TableCell>{cadenceLabel(cadence)}</TableCell>
+                <TableCell>
+                  <Input
+                    type="number" min={0} disabled={!canManage}
+                    value={String(w.openOffsetHours)}
+                    onChange={(_, d) => setField(cadence, 'openOffsetHours', Math.max(0, Number(d.value) || 0))}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="number" min={0} disabled={!canManage}
+                    value={String(w.graceHours)}
+                    onChange={(_, d) => setField(cadence, 'graceHours', Math.max(0, Number(d.value) || 0))}
+                  />
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
+
+      {canManage && (
+        <div className={s.actions}>
+          <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
+            {update.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+/** Read-only, live "now" snapshot of every cadence's resolved period and submission window. */
+function CadencePreviewSection() {
+  const s = useStyles()
+  const { data, isLoading, isFetching, refetch } = useCadencePreview()
+
+  return (
+    <Card className={s.card}>
+      <div className={s.sectionHeader}>
+        <div>
+          <Title3 className={s.sectionTitle}>Current periods</Title3>
+          <Body1 className={s.help}>
+            What the settings above resolve to right now — a live snapshot, not something that updates on its own.
+          </Body1>
+        </div>
+        <Button
+          icon={<ArrowClockwise20Regular />}
+          appearance="subtle"
+          disabled={isFetching}
+          onClick={() => refetch()}
+        >
+          Refresh
+        </Button>
+      </div>
+
+      {isLoading || !data ? <Spinner label="Loading…" /> : (
+        <Table className={s.table}>
+          <TableHeader>
+            <TableRow>
+              <TableHeaderCell>Cadence</TableHeaderCell>
+              <TableHeaderCell>Period</TableHeaderCell>
+              <TableHeaderCell>Window</TableHeaderCell>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((entry: CadencePreviewEntry) => (
+              <TableRow key={entry.cadence}>
+                <TableCell>{cadenceLabel(entry.cadence)}</TableCell>
+                <TableCell>{formatDateTime(entry.periodStart)} – {formatDateTime(entry.periodEnd)}</TableCell>
+                <TableCell>{formatDateTime(entry.windowStart)} – {formatDateTime(entry.windowEnd)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Card>
+  )
+}
+
+// --- Ingestion (global kill switch) --------------------------------------------------------
+
+function IngestionSection() {
+  const { data, isLoading } = useIngestionStatus()
+  if (isLoading || !data) return <Spinner label="Loading…" />
+  return <IngestionForm initial={data} key={`${data.closed}|${data.message ?? ''}`} />
+}
+
+function IngestionForm({ initial }: { initial: { closed: boolean; message?: string | null } }) {
+  const s = useStyles()
+  const { has } = useCapabilities()
+  const canManage = has('settings:manage')
+  const update = useUpdateIngestionStatus()
+  const [closed, setClosed] = useState(initial.closed)
+  const [message, setMessage] = useState(initial.message ?? '')
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  async function onSave() {
+    setError(null); setSaved(false)
+    try {
+      await update.mutateAsync({ closed, message: message.trim() || null })
+      setSaved(true)
+    } catch (e) {
+      setError(formatApiError(e))
+    }
+  }
+
+  return (
+    <Card className={s.card}>
+      <div>
+        <Title3 className={s.sectionTitle}>Ingestion</Title3>
+        <Body1 className={s.help}>
+          A global kill switch for disaster recovery. Closing submissions blocks service-facing
+          ingestion — service accounts, bulk import and the Teams integration — while everything
+          else (reads, OData, admin create/edit for remediation, schemas, settings) stays available.
+          A banner with the message below is shown to everyone while closed.
+        </Body1>
+      </div>
+
+      {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Ingestion status saved.</MessageBarBody></AutoScrollMessageBar>}
+
+      <Field>
+        <Switch
+          disabled={!canManage}
+          checked={closed}
+          onChange={(_, d) => setClosed(d.checked)}
+          label="Close all submissions"
+        />
+      </Field>
+
+      <Field label="Banner message (optional)" hint="Shown to everyone while submissions are closed.">
+        <Textarea
+          disabled={!canManage}
+          value={message}
+          maxLength={500}
+          rows={3}
+          onChange={(_, d) => setMessage(d.value)}
+          placeholder="e.g. Submissions are paused while we investigate a data issue. Expected back up by 5pm UTC."
+        />
+      </Field>
+
+      {canManage && (
+        <div className={s.actions}>
+          <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
+            {update.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       )}
     </Card>
   )

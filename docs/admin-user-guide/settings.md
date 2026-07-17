@@ -88,6 +88,46 @@ Operators and admins can send a one-off plain-text email to any account that has
 
 Backup & restore has moved to the **Tools** page (sidebar, directly above Settings) — it's an operational utility rather than a configuration screen. See [tools.md](tools.md).
 
+## Submission periods
+
+The **Submission periods** section (gated by `settings:read` / `settings:manage`) controls two related but distinct things for each of the 7 cadences: where its **period** (bucket) boundaries fall, and how wide its **submission window** is around that period. A live "Current periods" table at the bottom of the section shows exactly what both resolve to right now, for every cadence.
+
+### Period alignment
+
+By default every cadence follows the plain calendar (fiscal year = calendar year, weeks start Monday, months start on the 1st, fortnights anchored to 2001-01-01) — the top form lets you shift those alignments to match your organisation's actual reporting calendar without changing any code:
+
+- **Fiscal year starts in** — the month (1–12) the fiscal year begins on. This also anchors **Quarterly** and **SemiAnnually** cadences, which are computed as sub-periods of the fiscal year (e.g. a July-start fiscal year makes Q1 = Jul–Sep).
+- **Week starts on** — the day a **Weekly** bucket begins.
+- **Month starts on day** — the day-of-month (1–28) a **Monthly** bucket begins; a submission before that day falls into the previous month's bucket.
+- **Fortnight anchor** — a reference date a **Fortnightly** bucket boundary is aligned to; every 14-day window is computed relative to it.
+
+Changing an anchor takes effect immediately for **new** submissions, live "current period" checks, and Explore/scorecard math. It does **not** retroactively re-bucket samples already projected under the old alignment — those keep the `PeriodStart`/`PeriodEnd` they were written with. Plan changes for a period boundary (e.g. right after a fiscal year closes) to avoid confusing in-flight cadences.
+
+### Submission windows
+
+A period's boundaries and the actual window during which a service may act on it are two different things. The **Submission windows** table lets you set, per cadence:
+
+- **Open offset (hours)** — how long *after* the period starts before a service may create a submission for it. `0` (the default) means the window opens exactly when the period does.
+- **Grace period (hours)** — how long *after* the period ends a service may still create or edit a submission for it. `0` (the default) means the window closes exactly when the period does — the historical behaviour.
+
+With everything at the default of 0, a service can only create/edit a submission whose sample falls in the cadence's *current* period — this is unchanged from before this feature existed. A non-zero open offset delays that window's start; a non-zero grace extends how long a period stays editable after it closes (handy for a Monthly report that's due a few days into the following month, or a Yearly one with a month of slack). Outside the window, service create/replace is rejected with a 403 explaining whether the period "doesn't open until…" or "closed on…"; **drafts are exempt** (a draft is never live, so it carries no deadline), and **admins are always exempt** (admin create/replace remain the remediation path for backdating or correcting a submission after the window has closed). "Missed submission" reporting and reminder emails also wait for the configured grace to elapse before flagging a period as overdue.
+
+Like the anchors above, window changes apply going forward only and take effect immediately.
+
+## Ingestion
+
+The **Ingestion** section (gated by `settings:read` / `settings:manage`) is the "stop the bleeding" kill switch for a bad deployment, corrupt feed, or other incident where you need to halt incoming data without taking the whole application down.
+
+Turning **Close all submissions** on immediately rejects (HTTP 503) any *service-facing* write:
+
+- Service accounts calling `POST /api/submissions` / `PUT /api/submissions/{id}` (including draft saves).
+- Bulk import (`Tools → Bulk import`).
+- Inbound Microsoft Teams submissions.
+
+Everything else keeps working: reads, OData/Power BI feeds, admin-driven create/replace (for remediation), schema and settings management, and login. The optional **Message** is shown in a warning banner across the top of the app for every signed-in user, and in the body of the 503 response and Teams card that services/integrations see, so people know why writes are failing without having to ask.
+
+Remember to turn it back off once the incident is resolved — it has no automatic expiry.
+
 ## Retention
 
 Retention is the time-based clean-up that enforces GDPR storage limitation — it hard-deletes data once it has outlived its configured window. It is **configuration-driven, not a Settings-page screen**, because it's a deployment policy rather than day-to-day data. Set it in `appsettings.json` (or environment variables) under the `Retention` section:

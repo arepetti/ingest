@@ -1,6 +1,7 @@
 using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
+using Ingest.Core.Validation;
 using Ingest.Infrastructure.Mongo;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
@@ -30,6 +31,7 @@ public sealed class NotificationService : INotificationService
     private readonly INotificationSettingsService _settingsService;
     private readonly IWebhookPublisher _webhooks;
     private readonly IAuditContext _audit;
+    private readonly IAppConfigurationService _appConfig;
     private readonly ILogger<NotificationService> _logger;
 
     /// <summary>Create a new <see cref="NotificationService"/>.</summary>
@@ -42,6 +44,7 @@ public sealed class NotificationService : INotificationService
         INotificationSettingsService settingsService,
         IWebhookPublisher webhooks,
         IAuditContext audit,
+        IAppConfigurationService appConfig,
         ILogger<NotificationService> logger)
     {
         _ctx = ctx;
@@ -52,6 +55,7 @@ public sealed class NotificationService : INotificationService
         _settingsService = settingsService;
         _webhooks = webhooks;
         _audit = audit;
+        _appConfig = appConfig;
         _logger = logger;
     }
 
@@ -97,6 +101,13 @@ public sealed class NotificationService : INotificationService
         var deadline = now.AddHours(settings.UpcomingLeadHours);
         var queued = 0;
 
+        // The real deadline for a value is its submission window's (grace-extended) end, not the
+        // raw bucket end that GetStatusAsync reports — otherwise a reminder could fire, or a value
+        // could drop off the "upcoming" list, before the service has actually lost the ability to
+        // submit for it.
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
+        var windows = await _appConfig.GetCadenceWindowsAsync(ct);
+
         foreach (var service in services)
         {
             if (!service.Enabled) continue;
@@ -111,7 +122,8 @@ public sealed class NotificationService : INotificationService
             foreach (var value in schema.Values)
             {
                 if (!value.Enabled || !value.Required || value.Satisfied) continue;
-                if (value.PeriodEnd <= now || value.PeriodEnd > deadline) continue;
+                var deadlineEnd = CadenceCalculator.WindowFor(value.Cadence, value.PeriodStart, anchors, windows).End;
+                if (deadlineEnd <= now || deadlineEnd > deadline) continue;
 
                 var key = $"upcoming:{service.Id}:{schema.SchemaName}:{value.ValueName}:{value.PeriodStart:O}";
                 if (!await ReserveAsync(key, NotificationKind.Upcoming, ct)) continue;
@@ -126,7 +138,7 @@ public sealed class NotificationService : INotificationService
                         valueLabel = value.Label ?? value.ValueName,
                         cadence = value.Cadence.ToString(),
                         periodStart = value.PeriodStart,
-                        periodEnd = value.PeriodEnd,
+                        periodEnd = deadlineEnd,
                     }, service.Id, ct);
 
                 if (!settings.Upcoming.Enabled) continue;
@@ -135,7 +147,7 @@ public sealed class NotificationService : INotificationService
                     schema = schema.SchemaName,
                     value = value.Label ?? value.ValueName,
                     cadence = value.Cadence.ToString(),
-                    periodEnd = Fmt(value.PeriodEnd),
+                    periodEnd = Fmt(deadlineEnd),
                 });
             }
 

@@ -215,6 +215,67 @@ export interface AreasConfiguration {
   areas: string[]
 }
 
+/** Day-of-week name as serialised by the API (System.Text.Json string enum converter). */
+export type WeekDay =
+  | 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday'
+
+/**
+ * Configurable cadence bucket alignment points. Drives when a Weekly/Monthly/Fortnightly/
+ * Yearly/Quarterly/SemiAnnually reporting period is considered to start and end; unset on the
+ * server reads back as the historical calendar defaults (fiscal year = calendar year, week
+ * starts Monday, month starts on the 1st, fortnights anchored to 2001-01-01).
+ */
+export interface SubmissionWindowConfig {
+  /** Month (1-12) the fiscal year begins on; also anchors Quarterly/SemiAnnually. */
+  fiscalYearStartMonth: number
+  /** Day of week a Weekly bucket begins on. */
+  weekStartDay: WeekDay
+  /** Day of month (1-28) a Monthly bucket begins on. */
+  monthStartDay: number
+  /** A date (ISO instant) a Fortnightly bucket boundary is aligned to; only the date matters. */
+  fortnightAnchor: string
+}
+
+/** The global "close all submissions" ingestion kill switch. */
+export interface IngestionStatus {
+  /** When true, service-facing ingestion (create/replace, bulk import, Teams inbound) is blocked. */
+  closed: boolean
+  /** Optional operator-facing message shown in the site banner and the 503 body. */
+  message?: string | null
+}
+
+/** One cadence's submission-window offsets, in hours. Both default to 0 (window == bucket). */
+export interface CadenceWindow {
+  /** Hours after the bucket's start before the window opens. */
+  openOffsetHours: number
+  /** Hours after the bucket's end during which the window stays open. */
+  graceHours: number
+}
+
+/** Per-cadence submission-window configuration (all 7 cadences). */
+export interface CadenceWindows {
+  daily: CadenceWindow
+  weekly: CadenceWindow
+  fortnightly: CadenceWindow
+  monthly: CadenceWindow
+  quarterly: CadenceWindow
+  semiAnnually: CadenceWindow
+  yearly: CadenceWindow
+}
+
+/** A cadence's live-computed period (bucket) and resolved submission window, as of "now". */
+export interface CadencePreviewEntry {
+  cadence: Cadence
+  /** Inclusive start of the current bucket. */
+  periodStart: string
+  /** Exclusive end of the current bucket. */
+  periodEnd: string
+  /** Inclusive start of the submission window (bucket start + open offset). */
+  windowStart: string
+  /** Exclusive end of the submission window (bucket end + grace). */
+  windowEnd: string
+}
+
 /**
  * GDPR right-to-erasure mode. 'Anonymise' keeps the statistical KPI values but strips identity;
  * 'Delete' removes the account and everything tied to it.
@@ -593,6 +654,10 @@ export interface Me {
   approvalEnabled?: boolean
   /** Whether the global default approval policy currently requires approval (so schemas deferring to it are gated). */
   approvalDefaultRequired?: boolean
+  /** Whether the ingestion kill switch is on. Drives the site-wide "submissions closed" banner. */
+  submissionsClosed?: boolean
+  /** Optional operator-facing message shown alongside the closed banner. */
+  submissionsClosedMessage?: string | null
   /** Server application version (from Directory.Build.props), shown in the dashboard footer. */
   version?: string
 }

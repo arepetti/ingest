@@ -5,6 +5,190 @@ namespace Ingest.Tests;
 
 public class CadenceCalculatorTests
 {
+    // ── Configurable anchors ────────────────────────────────────────────────────────────────
+    // These pin the non-default behaviour introduced by CadenceAnchors; every test above this
+    // region already proves the *default* (null anchors / CadenceAnchors.Default) behaviour is
+    // unchanged.
+
+    [Fact]
+    public void Weekly_honours_a_non_monday_week_start()
+    {
+        // 2026-05-15 is a Friday. With Sunday as the week start, the bucket begins on the
+        // preceding Sunday (2026-05-10).
+        var anchors = CadenceAnchors.Default with { WeekStartDay = DayOfWeek.Sunday };
+        var t = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
+        var (s, e) = CadenceCalculator.BucketFor(Cadence.Weekly, t, anchors);
+        Assert.Equal(new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc), s);
+        Assert.Equal(new DateTime(2026, 5, 17, 0, 0, 0, DateTimeKind.Utc), e);
+    }
+
+    [Fact]
+    public void Monthly_honours_a_non_first_start_day()
+    {
+        // With month-start day 15, a timestamp on the 10th falls in the bucket that started on
+        // the 15th of the *previous* month.
+        var anchors = CadenceAnchors.Default with { MonthStartDay = 15 };
+        var t = new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+        var (s, e) = CadenceCalculator.BucketFor(Cadence.Monthly, t, anchors);
+        Assert.Equal(new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc), s);
+        Assert.Equal(new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc), e);
+    }
+
+    [Fact]
+    public void Monthly_start_day_is_clamped_to_28()
+    {
+        // 30/31 would misbehave in February; the configured value is clamped to 28 so every
+        // month has a bucket boundary.
+        var anchors = CadenceAnchors.Default with { MonthStartDay = 31 };
+        var t = new DateTime(2026, 5, 29, 0, 0, 0, DateTimeKind.Utc);
+        var (s, e) = CadenceCalculator.BucketFor(Cadence.Monthly, t, anchors);
+        Assert.Equal(new DateTime(2026, 5, 28, 0, 0, 0, DateTimeKind.Utc), s);
+        Assert.Equal(new DateTime(2026, 6, 28, 0, 0, 0, DateTimeKind.Utc), e);
+    }
+
+    [Fact]
+    public void Fortnightly_honours_a_custom_anchor()
+    {
+        // Anchor shifted a week later than the default (2001-01-08 instead of 2001-01-01).
+        var anchors = CadenceAnchors.Default with { FortnightAnchor = new DateTime(2001, 1, 8, 0, 0, 0, DateTimeKind.Utc) };
+        var t = new DateTime(2026, 5, 15, 13, 30, 0, DateTimeKind.Utc); // was 2026-05-04..18 by default
+        var (s, e) = CadenceCalculator.BucketFor(Cadence.Fortnightly, t, anchors);
+        Assert.Equal(new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc), s);
+        Assert.Equal(new DateTime(2026, 5, 25, 0, 0, 0, DateTimeKind.Utc), e);
+    }
+
+    [Fact]
+    public void Quarterly_honours_a_non_january_fiscal_year_start_before_the_new_fiscal_year()
+    {
+        // Fiscal year starts in July. A May 2026 timestamp is still inside the fiscal year that
+        // started July 2025 → its Q4, i.e. Apr-Jun 2026.
+        var anchors = CadenceAnchors.Default with { FiscalYearStartMonth = 7 };
+        var t = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
+        var (s, e) = CadenceCalculator.BucketFor(Cadence.Quarterly, t, anchors);
+        Assert.Equal(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc), s);
+        Assert.Equal(new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc), e);
+    }
+
+    [Fact]
+    public void Quarterly_honours_a_non_january_fiscal_year_start_after_the_new_fiscal_year()
+    {
+        // Same July fiscal start; an August 2026 timestamp is in the new fiscal year's Q1 (Jul-Sep).
+        var anchors = CadenceAnchors.Default with { FiscalYearStartMonth = 7 };
+        var t = new DateTime(2026, 8, 15, 0, 0, 0, DateTimeKind.Utc);
+        var (s, e) = CadenceCalculator.BucketFor(Cadence.Quarterly, t, anchors);
+        Assert.Equal(new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc), s);
+        Assert.Equal(new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc), e);
+    }
+
+    [Fact]
+    public void Yearly_honours_a_non_january_fiscal_year_start()
+    {
+        // Fiscal year starts in July: a May 2026 timestamp is still in the fiscal year that
+        // started July 2025.
+        var anchors = CadenceAnchors.Default with { FiscalYearStartMonth = 7 };
+        var t = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
+        var (s, e) = CadenceCalculator.BucketFor(Cadence.Yearly, t, anchors);
+        Assert.Equal(new DateTime(2025, 7, 1, 0, 0, 0, DateTimeKind.Utc), s);
+        Assert.Equal(new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc), e);
+    }
+
+    [Fact]
+    public void SemiAnnually_honours_a_non_january_fiscal_year_start()
+    {
+        var anchors = CadenceAnchors.Default with { FiscalYearStartMonth = 4 }; // April fiscal start
+        var t = new DateTime(2026, 2, 15, 0, 0, 0, DateTimeKind.Utc); // in the second half (Oct-Mar)
+        var (s, e) = CadenceCalculator.BucketFor(Cadence.SemiAnnually, t, anchors);
+        Assert.Equal(new DateTime(2025, 10, 1, 0, 0, 0, DateTimeKind.Utc), s);
+        Assert.Equal(new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc), e);
+    }
+
+    [Fact]
+    public void Daily_ignores_anchors()
+    {
+        // Daily has no anchor point at all; a non-default CadenceAnchors must not change it.
+        var anchors = new CadenceAnchors(FiscalYearStartMonth: 4, WeekStartDay: DayOfWeek.Wednesday,
+            MonthStartDay: 10, FortnightAnchor: new DateTime(2020, 6, 6, 0, 0, 0, DateTimeKind.Utc));
+        var t = new DateTime(2026, 5, 15, 13, 45, 0, DateTimeKind.Utc);
+        Assert.Equal(CadenceCalculator.BucketFor(Cadence.Daily, t), CadenceCalculator.BucketFor(Cadence.Daily, t, anchors));
+    }
+
+    [Fact]
+    public void Null_anchors_is_equivalent_to_the_explicit_default()
+    {
+        var t = new DateTime(2026, 5, 15, 13, 45, 0, DateTimeKind.Utc);
+        foreach (var cadence in Enum.GetValues<Cadence>())
+            Assert.Equal(CadenceCalculator.BucketFor(cadence, t), CadenceCalculator.BucketFor(cadence, t, CadenceAnchors.Default));
+    }
+
+    // ── WindowFor (submission window: bucket extended by open offset / grace) ─────────────────
+
+    [Fact]
+    public void WindowFor_with_null_windows_is_exactly_the_bucket()
+    {
+        var t = new DateTime(2026, 5, 15, 13, 45, 0, DateTimeKind.Utc);
+        foreach (var cadence in Enum.GetValues<Cadence>())
+        {
+            var bucket = CadenceCalculator.BucketFor(cadence, t);
+            Assert.Equal(bucket, CadenceCalculator.WindowFor(cadence, t));
+        }
+    }
+
+    [Fact]
+    public void WindowFor_with_default_windows_is_exactly_the_bucket()
+    {
+        var t = new DateTime(2026, 5, 15, 13, 45, 0, DateTimeKind.Utc);
+        foreach (var cadence in Enum.GetValues<Cadence>())
+        {
+            var bucket = CadenceCalculator.BucketFor(cadence, t);
+            Assert.Equal(bucket, CadenceCalculator.WindowFor(cadence, t, anchors: null, windows: CadenceWindows.Default));
+        }
+    }
+
+    [Fact]
+    public void WindowFor_open_offset_delays_the_start_only()
+    {
+        var t = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc); // Friday, inside Weekly bucket [5-11, 5-18)
+        var windows = CadenceWindows.Default with { Weekly = new CadenceWindow(OpenOffsetHours: 24, GraceHours: 0) };
+        var (start, end) = CadenceCalculator.WindowFor(Cadence.Weekly, t, anchors: null, windows: windows);
+        Assert.Equal(new DateTime(2026, 5, 12, 0, 0, 0, DateTimeKind.Utc), start); // bucket start + 24h
+        Assert.Equal(new DateTime(2026, 5, 18, 0, 0, 0, DateTimeKind.Utc), end);   // bucket end, unchanged
+    }
+
+    [Fact]
+    public void WindowFor_grace_extends_the_end_only()
+    {
+        var t = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
+        var windows = CadenceWindows.Default with { Weekly = new CadenceWindow(OpenOffsetHours: 0, GraceHours: 48) };
+        var (start, end) = CadenceCalculator.WindowFor(Cadence.Weekly, t, anchors: null, windows: windows);
+        Assert.Equal(new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc), start); // bucket start, unchanged
+        Assert.Equal(new DateTime(2026, 5, 20, 0, 0, 0, DateTimeKind.Utc), end);   // bucket end + 48h
+    }
+
+    [Fact]
+    public void WindowFor_only_applies_the_configured_cadences_window_not_others()
+    {
+        var t = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
+        var windows = CadenceWindows.Default with { Weekly = new CadenceWindow(24, 48) };
+        // Monthly's window for the same instant must be unaffected by the Weekly override.
+        Assert.Equal(
+            CadenceCalculator.BucketFor(Cadence.Monthly, t),
+            CadenceCalculator.WindowFor(Cadence.Monthly, t, anchors: null, windows: windows));
+    }
+
+    [Fact]
+    public void WindowFor_composes_with_custom_anchors()
+    {
+        // Non-default week start (Sunday) combined with a non-zero open offset/grace: the bucket
+        // math and the window offset each apply independently.
+        var anchors = CadenceAnchors.Default with { WeekStartDay = DayOfWeek.Sunday };
+        var windows = CadenceWindows.Default with { Weekly = new CadenceWindow(OpenOffsetHours: 12, GraceHours: 6) };
+        var t = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc); // Friday
+        var (bucketStart, bucketEnd) = CadenceCalculator.BucketFor(Cadence.Weekly, t, anchors);
+        var (windowStart, windowEnd) = CadenceCalculator.WindowFor(Cadence.Weekly, t, anchors, windows);
+        Assert.Equal(bucketStart.AddHours(12), windowStart);
+        Assert.Equal(bucketEnd.AddHours(6), windowEnd);
+    }
+
     [Fact]
     public void Daily_buckets_one_day()
     {

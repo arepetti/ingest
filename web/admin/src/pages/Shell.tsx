@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
-import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
+import { MessageBar, MessageBarBody, MessageBarTitle, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { Board24Regular, CalendarLtr24Regular, ChartMultiple24Regular, DataTreemap24Regular, DocumentText24Regular, PeopleTeam24Regular, DocumentBulletList24Regular, History24Regular, Settings24Regular, Toolbox24Regular, Warning24Regular } from '@fluentui/react-icons'
 import { useCapabilities } from '../api/hooks'
 import { TopBar } from '../components/TopBar'
@@ -84,6 +84,12 @@ const useStyles = makeStyles({
     overflow: 'auto',
     padding: '24px 32px',
   },
+  // Full-width, non-scrolling — sits between the TopBar and the (independently scrolling) body
+  // so it stays visible no matter where the page is scrolled.
+  closedBanner: {
+    flexShrink: 0,
+    borderRadius: 0,
+  },
 })
 
 interface NavEntry {
@@ -155,6 +161,14 @@ export function Shell() {
       </aside>
       <div className={s.mainColumn}>
         <TopBar me={me} />
+        {me?.submissionsClosed && (
+          <MessageBar intent="warning" className={s.closedBanner}>
+            <MessageBarBody>
+              <MessageBarTitle>Submissions are closed</MessageBarTitle>
+              {me.submissionsClosedMessage || 'New submissions and edits from service accounts are temporarily paused.'}
+            </MessageBarBody>
+          </MessageBar>
+        )}
         <main id="main-content" className={s.body} tabIndex={-1}>
           <Outlet />
         </main>

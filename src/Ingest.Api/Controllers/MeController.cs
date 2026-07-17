@@ -92,6 +92,11 @@ public sealed class MeController : ControllerBase
         // free text otherwise). Exposed here so managing accounts doesn't require settings:read.
         var areas = await _appConfig.GetAreasAsync(ct);
 
+        // The ingestion kill switch drives the site-wide "submissions closed" banner shown to every
+        // signed-in user (including plain service accounts), so it's exposed unconditionally here
+        // rather than gated behind settings:read.
+        var ingestion = await _appConfig.GetIngestionStatusAsync(ct);
+
         return Ok(new
         {
             id = User.CurrentAccountId(),
@@ -107,6 +112,8 @@ public sealed class MeController : ControllerBase
             integrationsEnabled = _integrations.Enabled,
             approvalEnabled = _approval.Enabled,
             approvalDefaultRequired,
+            submissionsClosed = ingestion.Closed,
+            submissionsClosedMessage = ingestion.Message,
             version = AppVersion,
         });
     }

@@ -29,6 +29,7 @@ public sealed class ProblemDetailsExceptionHandler : IExceptionHandler
             NotFoundException nf => new ProblemDetails { Status = StatusCodes.Status404NotFound, Title = "Not found", Detail = nf.Message },
             ConflictException cx => new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Conflict", Detail = cx.Message },
             ForbiddenException fx => new ProblemDetails { Status = StatusCodes.Status403Forbidden, Title = "Forbidden", Detail = fx.Message },
+            ServiceUnavailableException su => new ProblemDetails { Status = StatusCodes.Status503ServiceUnavailable, Title = "Submissions closed", Detail = su.Message },
             ValidationException vx => BuildValidationProblem(vx),
             UnauthorizedAccessException => new ProblemDetails { Status = StatusCodes.Status401Unauthorized, Title = "Unauthorized" },
             _ => new ProblemDetails { Status = StatusCodes.Status500InternalServerError, Title = "Internal error" },

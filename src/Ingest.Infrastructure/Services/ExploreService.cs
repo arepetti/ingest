@@ -17,16 +17,19 @@ public sealed class ExploreService : IExploreService
     private readonly ISchemaRepository _schemas;
     private readonly ISampleRepository _samples;
     private readonly IAccountRepository _accounts;
+    private readonly IAppConfigurationService _appConfig;
 
     /// <summary>Create a new <see cref="ExploreService"/>.</summary>
     /// <param name="schemas">Schema repository — resolves the value definitions (type, cadence, unit, label).</param>
     /// <param name="samples">Sample projection repository — supplies the rows to aggregate.</param>
     /// <param name="accounts">Account repository — resolves friendly service labels for the breakdown.</param>
-    public ExploreService(ISchemaRepository schemas, ISampleRepository samples, IAccountRepository accounts)
+    /// <param name="appConfig">Application configuration provider; supplies the cadence anchors used by the anomaly and scorecard "current/last period" lookups.</param>
+    public ExploreService(ISchemaRepository schemas, ISampleRepository samples, IAccountRepository accounts, IAppConfigurationService appConfig)
     {
         _schemas = schemas;
         _samples = samples;
         _accounts = accounts;
+        _appConfig = appConfig;
     }
 
     /// <inheritdoc />
@@ -175,6 +178,7 @@ public sealed class ExploreService : IExploreService
         }
 
         var nowUtc = DateTime.UtcNow;
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
         // The board shows every service a schema applies to (so non-reporters surface as "missing"),
         // using the same audience rule as the missing-submissions dashboard and the scorecard.
         var expectedBySchema = await BuildExpectedServicesAsync(query.ServiceIds, ct);
@@ -204,8 +208,8 @@ public sealed class ExploreService : IExploreService
             foreach (var v in numeric)
             {
                 var (start, end) = query.Period == ScorecardPeriod.LatestClosed
-                    ? CadenceCalculator.PreviousBucketFor(v.Cadence, nowUtc)
-                    : CadenceCalculator.BucketFor(v.Cadence, nowUtc);
+                    ? CadenceCalculator.PreviousBucketFor(v.Cadence, nowUtc, anchors)
+                    : CadenceCalculator.BucketFor(v.Cadence, nowUtc, anchors);
 
                 // Collapse to one value per (service, period): newest measurement wins, matching the
                 // scorecard. Then each service has a clean chronological series to score against.
@@ -265,6 +269,7 @@ public sealed class ExploreService : IExploreService
         }
 
         var nowUtc = DateTime.UtcNow;
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
         var scorecardSchemas = new List<ExploreScorecardSchema>();
         // One shared map so a service's label is resolved once even if it reports across schemas.
         var serviceNameById = new Dictionary<Guid, string>();
@@ -303,7 +308,7 @@ public sealed class ExploreService : IExploreService
             foreach (var v in banded)
             {
                 var cells = query.Mode == ScorecardMode.LastPeriod
-                    ? LastPeriodCells(rowsByValue[v.Name], expectedIds, v, query.Period, nowUtc)
+                    ? LastPeriodCells(rowsByValue[v.Name], expectedIds, v, query.Period, nowUtc, anchors)
                     : LatestAvailableCells(rowsByValue[v.Name], v);
 
                 if (cells.Count == 0) continue;
@@ -357,11 +362,11 @@ public sealed class ExploreService : IExploreService
     /// </summary>
     private static List<ExploreScorecardCell> LastPeriodCells(
         IEnumerable<SampleProjection> rows, IEnumerable<Guid> expectedServiceIds,
-        SchemaValue v, ScorecardPeriod period, DateTime nowUtc)
+        SchemaValue v, ScorecardPeriod period, DateTime nowUtc, CadenceAnchors anchors)
     {
         var (start, end) = period == ScorecardPeriod.LatestClosed
-            ? CadenceCalculator.PreviousBucketFor(v.Cadence, nowUtc)
-            : CadenceCalculator.BucketFor(v.Cadence, nowUtc);
+            ? CadenceCalculator.PreviousBucketFor(v.Cadence, nowUtc, anchors)
+            : CadenceCalculator.BucketFor(v.Cadence, nowUtc, anchors);
 
         var rowsByService = rows
             .Where(r => r.PeriodStart == start)

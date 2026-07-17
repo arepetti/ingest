@@ -31,6 +31,7 @@ public sealed class SubmissionService : ISubmissionService
     private readonly IApprovalRulesService _approvalRules;
     private readonly IApprovalNotificationService _approvalNotifier;
     private readonly IDraftNotificationService _draftNotifier;
+    private readonly IAppConfigurationService _appConfig;
     private readonly bool _webhooksEnabled;
     private readonly bool _approvalEnabled;
     private readonly ILogger<SubmissionService> _logger;
@@ -51,6 +52,7 @@ public sealed class SubmissionService : ISubmissionService
     /// <param name="approvalOptions">Bound approval options (the master switch gating the whole workflow).</param>
     /// <param name="approvalNotifier">Sends the approval-lifecycle emails (pending/approved/rejected); self-gates on the email switch.</param>
     /// <param name="draftNotifier">Sends the draft-saved nudge on every draft save; self-gates on the email switch and its rule.</param>
+    /// <param name="appConfig">Application configuration provider; supplies the cadence anchors and the ingestion kill switch.</param>
     /// <param name="logger">Logger; webhook publishing failures are logged but never fail an accepted write.</param>
     public SubmissionService(
         ISubmissionRepository submissions,
@@ -68,6 +70,7 @@ public sealed class SubmissionService : ISubmissionService
         IOptions<ApprovalOptions> approvalOptions,
         IApprovalNotificationService approvalNotifier,
         IDraftNotificationService draftNotifier,
+        IAppConfigurationService appConfig,
         ILogger<SubmissionService> logger)
     {
         _submissions = submissions;
@@ -83,6 +86,7 @@ public sealed class SubmissionService : ISubmissionService
         _approvalRules = approvalRules;
         _approvalNotifier = approvalNotifier;
         _draftNotifier = draftNotifier;
+        _appConfig = appConfig;
         _webhooksEnabled = webhookOptions.Value.Enabled;
         _approvalEnabled = approvalOptions.Value.Enabled;
         _logger = logger;
@@ -93,12 +97,22 @@ public sealed class SubmissionService : ISubmissionService
     /// <inheritdoc />
     public async Task<SubmissionWriteResult> CreateMineAsync(Guid callerAccountId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, CancellationToken ct = default)
     {
+        await EnsureIngestionOpenAsync(ct);
+
         var account = await _accounts.GetByIdAsync(callerAccountId, ct: ct)
             ?? throw new NotFoundException("Account");
         var visible = await LoadVisibleAsync(account.Id, ct);
 
         var submission = MapInput(account, input, visible, source);
         submission.IsDraft = draft;
+
+        // Submission window: a service can only create a sample once its cadence period's window
+        // has opened (OpenOffsetHours) and before it has closed (GraceHours past the bucket's end).
+        // Drafts are exempt — nothing is live yet, and window uniqueness is (re-)enforced by the
+        // validator when they're published. Admins wanting to back-fill go through AdminCreateAsync.
+        if (!draft && await WindowNotOpenError(submission.Samples, visible, ct) is { } windowError)
+            throw new ForbiddenException(windowError);
+
         var validation = await ValidateOrThrow(account, submission, isReplacement: false, existing: null, draft, ct);
 
         // Strip samples the validator told us to drop (EnabledIf/VisibleIf == false). The
@@ -115,6 +129,8 @@ public sealed class SubmissionService : ISubmissionService
     /// <inheritdoc />
     public async Task<SubmissionWriteResult> ReplaceMineAsync(Guid callerAccountId, Guid submissionId, SubmissionInput input, SubmissionSource source = SubmissionSource.Api, bool draft = false, CancellationToken ct = default)
     {
+        await EnsureIngestionOpenAsync(ct);
+
         var existing = await _submissions.GetByIdAsync(submissionId, ct: ct)
             ?? throw new NotFoundException($"Submission '{submissionId}'");
         if (existing.ServiceAccountId != callerAccountId)
@@ -130,7 +146,7 @@ public sealed class SubmissionService : ISubmissionService
         // timestamp) so that backdating new samples can't be used to circumvent the limit. Admins
         // wanting to override go through AdminReplaceAsync instead. Drafts are exempt — nothing is
         // live yet, and window uniqueness is (re-)enforced by the validator when they're published.
-        if (!existing.IsDraft && ClosedCadenceError(existing, visible) is { } cadenceError)
+        if (!existing.IsDraft && await ClosedCadenceError(existing, visible, ct) is { } cadenceError)
             throw new ForbiddenException(cadenceError);
 
         var replacement = MapInput(account, input, visible, source);
@@ -165,7 +181,17 @@ public sealed class SubmissionService : ISubmissionService
     {
         var account = await _accounts.GetByIdAsync(callerAccountId, ct: ct)
             ?? throw new NotFoundException("Account");
-        return await DryRunAsync(account, input, source, draft, isReplacement: false, existing: null, options, ct);
+        var visible = await LoadVisibleAsync(account.Id, ct);
+
+        // Mirror CreateMineAsync's window guard so the dry-run verdict matches a real create.
+        if (!draft)
+        {
+            var mapped = MapInput(account, input, visible, source);
+            if (await WindowNotOpenError(mapped.Samples, visible, ct) is { } windowError)
+                throw new ForbiddenException(windowError);
+        }
+
+        return await DryRunAsync(account, input, source, draft, isReplacement: false, existing: null, options, ct, visible);
     }
 
     /// <inheritdoc />
@@ -183,7 +209,7 @@ public sealed class SubmissionService : ISubmissionService
             ?? throw new NotFoundException("Account");
         var visible = await LoadVisibleAsync(account.Id, ct);
 
-        if (!existing.IsDraft && ClosedCadenceError(existing, visible) is { } cadenceError)
+        if (!existing.IsDraft && await ClosedCadenceError(existing, visible, ct) is { } cadenceError)
             throw new ForbiddenException(cadenceError);
 
         return await DryRunAsync(account, input, source, draft, isReplacement: true, existing, options, ct, visible);
@@ -409,7 +435,7 @@ public sealed class SubmissionService : ISubmissionService
         // empty-list replace.
         var live = IsLive(submission);
         var projections = live
-            ? SampleProjectionBuilder.Build(submission, visible, _evaluator)
+            ? SampleProjectionBuilder.Build(submission, visible, _evaluator, await _appConfig.GetCadenceAnchorsAsync(ct))
             : Enumerable.Empty<SampleProjection>();
         await _samples.ReplaceForSubmissionAsync(submission.Id, projections, ct);
 
@@ -544,7 +570,7 @@ public sealed class SubmissionService : ISubmissionService
             submission.ApprovalStatus = ApprovalStatus.Approved;
             var visible = await LoadVisibleAsync(submission.ServiceAccountId, ct);
             await _submissions.UpdateAsync(submission, ct);
-            var projections = SampleProjectionBuilder.Build(submission, visible, _evaluator);
+            var projections = SampleProjectionBuilder.Build(submission, visible, _evaluator, await _appConfig.GetCadenceAnchorsAsync(ct));
             await _samples.ReplaceForSubmissionAsync(submission.Id, projections, ct);
             await _audit.RecordAsync(AuditTargetType.Submission, AuditChangeType.Approve, submission.Id, submission.ServiceName, note, ct);
             await PublishAcceptedAsync(submission, isReplacement: submission.ReplacedAt is not null, ct);
@@ -704,14 +730,17 @@ public sealed class SubmissionService : ISubmissionService
     }
 
     /// <summary>
-    /// Returns null when every sample in the submission still falls inside its (per-value) cadence
-    /// period; otherwise returns a human-readable message naming the first closed (schema, value)
-    /// pair. Samples whose schema/value can no longer be resolved are ignored — they're already in
-    /// a broken state that the validator will flag separately.
+    /// Returns null when every sample in the submission still falls inside its (per-value)
+    /// submission window (the cadence bucket extended by <see cref="CadenceWindow.GraceHours"/>);
+    /// otherwise returns a human-readable message naming the first closed (schema, value) pair.
+    /// Samples whose schema/value can no longer be resolved are ignored — they're already in a
+    /// broken state that the validator will flag separately.
     /// </summary>
-    private string? ClosedCadenceError(Submission existing, IReadOnlyDictionary<string, Schema> visible)
+    private async Task<string?> ClosedCadenceError(Submission existing, IReadOnlyDictionary<string, Schema> visible, CancellationToken ct)
     {
         var now = _time.GetUtcNow().UtcDateTime;
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
+        var windows = await _appConfig.GetCadenceWindowsAsync(ct);
         foreach (var sample in existing.Samples)
         {
             if (!visible.TryGetValue(sample.SchemaName, out var schema)) continue;
@@ -719,14 +748,70 @@ public sealed class SubmissionService : ISubmissionService
                 string.Equals(v.Name, sample.ValueName, StringComparison.OrdinalIgnoreCase));
             if (def is null) continue;
 
-            var (_, end) = CadenceCalculator.BucketFor(def.Cadence, sample.Timestamp);
-            if (end <= now)
+            var (_, windowEnd) = CadenceCalculator.WindowFor(def.Cadence, sample.Timestamp, anchors, windows);
+            if (windowEnd <= now)
             {
                 return $"Submission can no longer be modified: the {def.Cadence.ToString().ToLowerInvariant()} " +
-                       $"period for '{sample.SchemaName}.{sample.ValueName}' closed on {end:u}. " +
+                       $"period for '{sample.SchemaName}.{sample.ValueName}' closed on {windowEnd:u}. " +
                        $"Ask an administrator to amend it on your behalf.";
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Returns null when every incoming sample's timestamp falls inside its (per-value) submission
+    /// window; otherwise a human-readable message naming the first sample that's either not open
+    /// yet (before <see cref="CadenceWindow.OpenOffsetHours"/> has elapsed past the bucket's start)
+    /// or already closed (past <see cref="CadenceWindow.GraceHours"/> after the bucket's end). Used
+    /// on the create path only — <see cref="ClosedCadenceError"/> is its replace-path counterpart,
+    /// which only checks the "already closed" side since a submission being replaced necessarily
+    /// already exists. Samples whose schema/value can't be resolved are ignored — the validator
+    /// flags those separately.
+    /// </summary>
+    private async Task<string?> WindowNotOpenError(IEnumerable<Sample> samples, IReadOnlyDictionary<string, Schema> visible, CancellationToken ct)
+    {
+        var now = _time.GetUtcNow().UtcDateTime;
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
+        var windows = await _appConfig.GetCadenceWindowsAsync(ct);
+        foreach (var sample in samples)
+        {
+            if (!visible.TryGetValue(sample.SchemaName, out var schema)) continue;
+            var def = schema.Values.FirstOrDefault(v =>
+                string.Equals(v.Name, sample.ValueName, StringComparison.OrdinalIgnoreCase));
+            if (def is null) continue;
+
+            var (windowStart, windowEnd) = CadenceCalculator.WindowFor(def.Cadence, sample.Timestamp, anchors, windows);
+            if (now < windowStart)
+            {
+                return $"Submission cannot be created yet: the {def.Cadence.ToString().ToLowerInvariant()} " +
+                       $"period for '{sample.SchemaName}.{sample.ValueName}' doesn't open until {windowStart:u}.";
+            }
+            if (now >= windowEnd)
+            {
+                return $"Submission can no longer be created: the {def.Cadence.ToString().ToLowerInvariant()} " +
+                       $"period for '{sample.SchemaName}.{sample.ValueName}' closed on {windowEnd:u}. " +
+                       $"Ask an administrator to amend it on your behalf.";
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Guard for the three service-facing write paths (<see cref="CreateMineAsync"/>,
+    /// <see cref="ReplaceMineAsync"/>, and — via <c>BulkImportService</c>/the Teams inbound
+    /// endpoint — bulk import and Teams submissions). Throws <see cref="ServiceUnavailableException"/>
+    /// when the global kill switch is on. Admin-facing writes (<see cref="AdminCreateAsync"/>,
+    /// <see cref="AdminReplaceAsync"/>) intentionally never call this, so operators can still
+    /// remediate while ingestion is frozen. Validate-only (dry-run) callers also skip it.
+    /// </summary>
+    private async Task EnsureIngestionOpenAsync(CancellationToken ct)
+    {
+        var status = await _appConfig.GetIngestionStatusAsync(ct);
+        if (status.Closed)
+            throw new ServiceUnavailableException(
+                string.IsNullOrWhiteSpace(status.Message)
+                    ? "Submissions are temporarily closed."
+                    : status.Message!);
     }
 }

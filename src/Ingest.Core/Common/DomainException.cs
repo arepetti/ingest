@@ -34,6 +34,14 @@ public sealed class ConflictException(string message) : DomainException(message)
 public sealed class ForbiddenException(string message) : DomainException(message);
 
 /// <summary>
+/// The operation can't be performed right now because the server has deliberately taken itself
+/// offline for it (the ingestion kill switch). Mapped to HTTP 503. Distinct from an infrastructure
+/// outage: this is an intentional, operator-toggled state with a caller-facing explanation.
+/// </summary>
+/// <param name="message">Caller-facing message; the configured kill-switch message when set.</param>
+public sealed class ServiceUnavailableException(string message) : DomainException(message);
+
+/// <summary>
 /// One or more validation rules rejected the input. Mapped to HTTP 400 with an <c>errors</c>
 /// extension on the problem-details body. The individual rule messages are carried in
 /// <see cref="Errors"/>.

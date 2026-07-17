@@ -16,14 +16,28 @@ namespace Ingest.Infrastructure.Services;
 public sealed class BulkImportService : IBulkImportService
 {
     private readonly ISubmissionService _submissions;
+    private readonly IAppConfigurationService _appConfig;
 
     /// <summary>Create a new <see cref="BulkImportService"/>.</summary>
     /// <param name="submissions">Submission service used to persist each parsed group.</param>
-    public BulkImportService(ISubmissionService submissions) => _submissions = submissions;
+    /// <param name="appConfig">Application configuration provider; supplies the ingestion kill switch.</param>
+    public BulkImportService(ISubmissionService submissions, IAppConfigurationService appConfig)
+    {
+        _submissions = submissions;
+        _appConfig = appConfig;
+    }
 
     /// <inheritdoc />
     public async Task<BulkImportResult> ImportAsync(Guid serviceAccountId, BulkImportFormat format, string content, CancellationToken ct = default)
     {
+        // Bulk import replays through AdminCreateAsync — the same path the admin UI uses for
+        // remediation — so the kill switch can't be enforced there without also blocking admins.
+        // Gate here instead, at the service-facing entry point.
+        var status = await _appConfig.GetIngestionStatusAsync(ct);
+        if (status.Closed)
+            throw new ServiceUnavailableException(
+                string.IsNullOrWhiteSpace(status.Message) ? "Submissions are temporarily closed." : status.Message!);
+
         var parsed = BulkImportParser.Parse(format, content);
         if (parsed.Errors.Count > 0)
             throw new ValidationException(parsed.Errors);

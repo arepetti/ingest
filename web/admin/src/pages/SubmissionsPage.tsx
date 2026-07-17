@@ -401,9 +401,18 @@ export function SubmissionsPage() {
       <div className={s.toolbar}>
         <Title2>{isService ? 'My submissions' : 'Submissions'}</Title2>
         <Toolbar className={s.toolbarActions}>
-          <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={() => nav('/submissions/new')}>
-            New submission
-          </ToolbarButton>
+          <Tooltip
+            relationship="label"
+            content={isService && me?.submissionsClosed ? (me.submissionsClosedMessage || 'Submissions are temporarily closed.') : 'Create a new submission'}
+          >
+            <ToolbarButton
+              appearance="primary" icon={<Add20Regular />}
+              disabled={isService && !!me?.submissionsClosed}
+              onClick={() => nav('/submissions/new')}
+            >
+              New submission
+            </ToolbarButton>
+          </Tooltip>
           <Menu>
             <MenuTrigger disableButtonEnhancement>
               <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />

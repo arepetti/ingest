@@ -17,22 +17,26 @@ public sealed class StatusService : IStatusService
     private readonly ISampleRepository _samples;
     private readonly IAccountRepository _accounts;
     private readonly IAuditContext _audit;
+    private readonly IAppConfigurationService _appConfig;
 
     /// <summary>Create a new <see cref="StatusService"/>.</summary>
     /// <param name="schemas">Schema repository (for the audience-filtered listing).</param>
     /// <param name="samples">Sample projection repository (for the latest-sample lookup).</param>
     /// <param name="accounts">Account repository (for the name-based resolver).</param>
     /// <param name="audit">Audit context used as the clock.</param>
+    /// <param name="appConfig">Application configuration provider; supplies the cadence anchors used to bucket every window below.</param>
     public StatusService(
         ISchemaRepository schemas,
         ISampleRepository samples,
         IAccountRepository accounts,
-        IAuditContext audit)
+        IAuditContext audit,
+        IAppConfigurationService appConfig)
     {
         _schemas = schemas;
         _samples = samples;
         _accounts = accounts;
         _audit = audit;
+        _appConfig = appConfig;
     }
 
     /// <inheritdoc />
@@ -50,8 +54,9 @@ public sealed class StatusService : IStatusService
             ?? throw new NotFoundException($"Service '{serviceId}'");
 
         var visible = await _schemas.ListVisibleToAsync(serviceId, ct);
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
         // BucketForPeriod is kept for potential header info but the satisfied check uses each value's own cadence bucket.
-        _ = CadenceCalculator.BucketForPeriod(period, _audit.UtcNow);
+        _ = CadenceCalculator.BucketForPeriod(period, _audit.UtcNow, anchors);
 
         var schemaStatuses = new List<SchemaStatus>(visible.Count);
         foreach (var schema in visible)
@@ -63,7 +68,7 @@ public sealed class StatusService : IStatusService
             {
                 if (v.IsCalculated) continue;
 
-                var (valueStart, valueEnd) = CadenceCalculator.BucketFor(v.Cadence, _audit.UtcNow);
+                var (valueStart, valueEnd) = CadenceCalculator.BucketFor(v.Cadence, _audit.UtcNow, anchors);
                 SampleProjection? latest = null;
                 bool satisfied = false;
                 if (schemaEnabled && v.Enabled)
@@ -97,14 +102,16 @@ public sealed class StatusService : IStatusService
     {
         var scope = allowedServiceIds is { Count: > 0 } ? new HashSet<Guid>(allowedServiceIds) : null;
         var now = _audit.UtcNow;
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
+        var windows = await _appConfig.GetCadenceWindowsAsync(ct);
         // Cadence windows are constant for the whole report — compute the current and the
         // previous window for every cadence once. Previous windows are contiguous with the
         // current ones (previousEnd == currentStart), which the per-value short-circuit below
         // relies on.
         var currentWindow = Enum.GetValues<Cadence>()
-            .ToDictionary(c => c, c => CadenceCalculator.BucketFor(c, now));
+            .ToDictionary(c => c, c => CadenceCalculator.BucketFor(c, now, anchors));
         var previousWindow = Enum.GetValues<Cadence>()
-            .ToDictionary(c => c, c => CadenceCalculator.PreviousBucketFor(c, now));
+            .ToDictionary(c => c, c => CadenceCalculator.PreviousBucketFor(c, now, anchors));
 
         // One row per (service, schema) per cadence with at least one missing required value,
         // tracked separately for the current and previous windows so the dashboard can colour
@@ -180,10 +187,14 @@ public sealed class StatusService : IStatusService
             page++;
         }
 
-        // Current-window buckets first (ordered by cadence), then previous-window buckets.
+        // Current-window buckets first (ordered by cadence), then previous-window buckets. A
+        // previous bucket is withheld entirely — not just greyed out — until its grace period (if
+        // any) has actually elapsed, so "missed" status/notifications wait for the configured grace
+        // just like the create/replace gate does.
         var result = new List<MissingByCadence>();
         result.AddRange(BuildBuckets(current, currentWindow, MissingPeriodKind.Current));
-        result.AddRange(BuildBuckets(previous, previousWindow, MissingPeriodKind.Previous));
+        result.AddRange(BuildBuckets(previous, previousWindow, MissingPeriodKind.Previous)
+            .Where(b => CadenceCalculator.WindowFor(b.Cadence, b.PeriodStart, anchors, windows).End <= now));
         return result;
 
         static void Accumulate(Dictionary<Cadence, (int Missing, int Total)> tally, Cadence cadence, bool satisfied)
@@ -229,7 +240,8 @@ public sealed class StatusService : IStatusService
     /// <inheritdoc />
     public async Task<MissingPeriodReport> GetMissingForPeriodAsync(Cadence cadence, int offset, IReadOnlyCollection<Guid>? allowedServiceIds = null, CancellationToken ct = default)
     {
-        var (start, end) = CadenceCalculator.BucketAtOffset(cadence, _audit.UtcNow, offset);
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
+        var (start, end) = CadenceCalculator.BucketAtOffset(cadence, _audit.UtcNow, offset, anchors);
         var entries = await ComputeMissingForWindowAsync(cadence, start, end, null, allowedServiceIds, ct);
         return new MissingPeriodReport(cadence, offset, start, end, SortEntries(entries));
     }
@@ -239,12 +251,13 @@ public sealed class StatusService : IStatusService
     {
         periods = Math.Clamp(periods, 1, 52);
         var now = _audit.UtcNow;
+        var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
         var points = new List<MissingHistoryPoint>(periods);
         // Walk oldest → current so the trend reads left-to-right. Offset 0 is the current window.
         for (int i = periods - 1; i >= 0; i--)
         {
             var offset = -i;
-            var (start, end) = CadenceCalculator.BucketAtOffset(cadence, now, offset);
+            var (start, end) = CadenceCalculator.BucketAtOffset(cadence, now, offset, anchors);
             var entries = await ComputeMissingForWindowAsync(cadence, start, end, serviceId, allowedServiceIds, ct);
             points.Add(new MissingHistoryPoint(offset, start, end, entries.Sum(e => e.MissingRequiredCount)));
         }

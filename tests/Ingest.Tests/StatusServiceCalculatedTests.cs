@@ -37,7 +37,8 @@ public class StatusServiceCalculatedTests
             new SchemaRepo(schema),
             new EmptySampleRepo(),
             new AccountRepo(account),
-            new TestClock(FixedNow));
+            new TestClock(FixedNow),
+            new FakeAppConfigurationService());
 
         var status = await svc.GetStatusAsync(serviceId, "current");
         var values = Assert.Single(status.Schemas).Values;
