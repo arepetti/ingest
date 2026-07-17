@@ -24,8 +24,11 @@ public sealed class AdminSubmissionsController(
     ISubmissionService service,
     IAuditLogService auditLog,
     IBulkImportService bulkImport,
-    IPdfExportService pdfExport) : ControllerBase
+    IPdfExportService pdfExport,
+    ISubmissionExportService xlsxExport) : ControllerBase
 {
+    private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
     /// <summary>List submissions across all services, optionally filtered by service and/or date range.</summary>
     /// <param name="page">1-based page number; defaults to 1.</param>
     /// <param name="pageSize">Page size; defaults to 50.</param>
@@ -126,6 +129,53 @@ public sealed class AdminSubmissionsController(
 
         var doc = await pdfExport.ExportSubmissionAsync(id, ct);
         return doc is null ? NotFound() : File(doc.Content, "application/pdf", doc.FileName);
+    }
+
+    /// <summary>Export the submissions for a single schema (matching the current list filters) as an XLSX workbook.</summary>
+    /// <remarks>
+    /// One row per submission, one column per schema value (grouped by the outermost layout section
+    /// and tinted per group), with rows banded under per-area headers. Missing values are
+    /// highlighted; a submission's warnings ride along as a note on its schema-label cell. Exactly
+    /// one <paramref name="schemaName"/> is required — the export is a single-schema grid.
+    /// </remarks>
+    /// <param name="serviceId">Restrict to a single service (ANDed with the caller's scope).</param>
+    /// <param name="from">Lower bound on submission timestamp (inclusive).</param>
+    /// <param name="to">Upper bound on submission timestamp (exclusive).</param>
+    /// <param name="schemaName">The single schema to export; required.</param>
+    /// <param name="approvalStatus">Restrict to a single approval state.</param>
+    /// <param name="draft">Restrict to drafts (<c>true</c>) or exclude them (<c>false</c>); omit for both.</param>
+    /// <param name="includeDeleted">When true, soft-deleted submissions are included.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The rendered XLSX.</response>
+    /// <response code="400">No <paramref name="schemaName"/> was supplied.</response>
+    /// <response code="404">No schema with that name exists.</response>
+    [HttpGet("export.xlsx")]
+    [Produces(XlsxContentType)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportXlsx(
+        [FromQuery] Guid? serviceId,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] string? schemaName,
+        [FromQuery] ApprovalStatus? approvalStatus,
+        [FromQuery] bool? draft,
+        [FromQuery] bool? includeDeleted,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(schemaName))
+            return BadRequest("A single schemaName is required for the XLSX export.");
+
+        // Honour the caller's service scope by passing it as the allow-list; an out-of-scope
+        // serviceId then simply yields an empty (header-only) workbook.
+        var scope = User.CurrentAssignedServiceIds();
+        var filter = new SubmissionExportFilter(
+            schemaName, serviceId, from, to, approvalStatus, draft, includeDeleted ?? false,
+            scope.Count > 0 ? scope : null);
+
+        var doc = await xlsxExport.ExportSubmissionsAsync(filter, ct);
+        return doc is null ? NotFound() : File(doc.Content, XlsxContentType, doc.FileName);
     }
 
     /// <summary>Soft-delete a submission.</summary>

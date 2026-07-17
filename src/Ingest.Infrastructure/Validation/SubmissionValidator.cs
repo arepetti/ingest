@@ -76,7 +76,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
     {
         var skipCadence = options?.SkipCadence == true;
         var errors = new List<string>();
-        var warnings = new List<string>();
+        var warnings = new List<SubmissionWarning>();
         var discarded = new HashSet<SampleRef>();
         var visible = (await _schemas.ListVisibleToAsync(service.Id, ct))
             .ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
@@ -357,7 +357,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         SchemaValue value,
         IReadOnlyDictionary<string, object?> context,
         IReadOnlyDictionary<string, Func<object?[], object?>> customFns,
-        List<string> warnings,
+        List<SubmissionWarning> warnings,
         List<string> errors)
     {
         if (string.IsNullOrWhiteSpace(expression)) return false;
@@ -376,9 +376,9 @@ public sealed class SubmissionValidator : ISubmissionValidator
         // why their value didn't make it.
         if (!outcome.IsValid)
         {
-            warnings.Add(outcome.ErrorMessage is { Length: > 0 } msg
+            warnings.Add(new SubmissionWarning(value.Name, outcome.ErrorMessage is { Length: > 0 } msg
                 ? $"Sample '{Display(schema, value)}' discarded: {msg}"
-                : $"Sample '{Display(schema, value)}' discarded by {ruleName}.");
+                : $"Sample '{Display(schema, value)}' discarded by {ruleName}."));
             return true;
         }
         return false;
@@ -498,7 +498,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         Sample sample,
         IReadOnlyDictionary<string, object?> schemaContext,
         SchemaHistory history,
-        List<string> warnings)
+        List<SubmissionWarning> warnings)
     {
         if (string.IsNullOrWhiteSpace(def.Warning)) return;
         var key = Display(schema, def);
@@ -512,7 +512,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         try { raw = _evaluator.Evaluate(def.Warning, schemaContext, customFns); }
         catch (Exception ex)
         {
-            warnings.Add($"Value '{key}' warning rule evaluation error: {ex.Message}");
+            warnings.Add(new SubmissionWarning(def.Name, $"Value '{key}' warning rule evaluation error: {ex.Message}"));
             return;
         }
 
@@ -520,9 +520,9 @@ public sealed class SubmissionValidator : ISubmissionValidator
         {
             case null: return;
             case bool b when !b: return;
-            case bool: warnings.Add($"Sample '{key}': warning rule triggered."); return;
+            case bool: warnings.Add(new SubmissionWarning(def.Name, $"Sample '{key}': warning rule triggered.")); return;
             case string s when string.IsNullOrWhiteSpace(s): return;
-            case string s: warnings.Add($"Sample '{key}': {s}"); return;
+            case string s: warnings.Add(new SubmissionWarning(def.Name, $"Sample '{key}': {s}")); return;
             default: return; // numbers / dates aren't meaningful here; quietly ignore
         }
     }

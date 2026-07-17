@@ -20,6 +20,7 @@ export const EXPRESSION_FUNCTIONS: readonly ExprFunctionMeta[] = [
   // App built-ins (mirror NCalcExpressionEvaluator.BuiltIns + the `if` operator).
   { name: 'if', signature: 'if(condition, then, else)', description: 'Returns "then" when the condition is true, otherwise "else".' },
   { name: 'average', signature: 'average(a, b, …)', description: 'Mean of the numeric arguments. Booleans count as 1/0; nulls are ignored.' },
+  { name: 'higher_than', signature: 'higher_than(value, reference, percentage)', description: 'True when value exceeds reference by more than percentage% (e.g. 50 = 50%).' },
   { name: 'coalesce', signature: 'coalesce(a, b, …)', description: 'First argument that is not null.' },
   { name: 'isNull', signature: 'isNull(value)', description: 'True when the value is null.' },
   { name: 'len', signature: 'len(text)', description: 'Length of a string.' },

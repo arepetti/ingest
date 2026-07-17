@@ -66,6 +66,14 @@ public class NCalcToEnglishTranslatorTests
     }
 
     [Fact]
+    public void Higher_than_reads_as_a_percentage_uplift()
+    {
+        var text = English("higher_than(tonnes, latest_tonnes, 50)",
+            new Dictionary<string, string> { ["tonnes"] = "Tonnes", ["latest_tonnes"] = "Last tonnes" });
+        Assert.Equal("Tonnes is more than 50% higher than Last tonnes", text);
+    }
+
+    [Fact]
     public void Outer_parentheses_are_stripped()
     {
         // A single top-level binary shouldn't come back wrapped in parentheses.

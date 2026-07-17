@@ -109,7 +109,7 @@ public sealed class SubmissionService : ISubmissionService
 
         await ApplyDraftOrApprovalAsync(submission, visible, draft, ct);
         await PersistAsync(submission, visible, isReplacement: false, ct);
-        return new SubmissionWriteResult(submission, validation.Warnings);
+        return new SubmissionWriteResult(submission, WarningMessages(validation.Warnings));
     }
 
     /// <inheritdoc />
@@ -143,7 +143,7 @@ public sealed class SubmissionService : ISubmissionService
         existing.IsDraft = draft;
         await ApplyDraftOrApprovalAsync(existing, visible, draft, ct);
         await PersistAsync(existing, visible, isReplacement: true, ct);
-        return new SubmissionWriteResult(existing, validation.Warnings);
+        return new SubmissionWriteResult(existing, WarningMessages(validation.Warnings));
     }
 
     /// <inheritdoc />
@@ -218,7 +218,7 @@ public sealed class SubmissionService : ISubmissionService
         submission.Warnings = validation.Warnings.ToList();
         await ApplyDraftOrApprovalAsync(submission, visible, draft, ct);
         await PersistAsync(submission, visible, isReplacement: false, ct);
-        return new SubmissionWriteResult(submission, validation.Warnings);
+        return new SubmissionWriteResult(submission, WarningMessages(validation.Warnings));
     }
 
     /// <inheritdoc />
@@ -243,7 +243,7 @@ public sealed class SubmissionService : ISubmissionService
         existing.IsDraft = draft;
         await ApplyDraftOrApprovalAsync(existing, visible, draft, ct);
         await PersistAsync(existing, visible, isReplacement: true, ct);
-        return new SubmissionWriteResult(existing, validation.Warnings);
+        return new SubmissionWriteResult(existing, WarningMessages(validation.Warnings));
     }
 
     /// <inheritdoc />
@@ -349,7 +349,7 @@ public sealed class SubmissionService : ISubmissionService
         return new SubmissionValidationOutcome(
             validation.IsValid,
             validation.Errors,
-            validation.Warnings,
+            WarningMessages(validation.Warnings),
             validation.DiscardedSamples.ToList(),
             submission.ApprovalStatus,
             submission.RequiredApprovers);
@@ -603,6 +603,14 @@ public sealed class SubmissionService : ISubmissionService
         return (submission, approver);
     }
 
+    /// <summary>
+    /// Flatten structured warnings to the plain message strings the write/validate responses expose.
+    /// The associated value name is persisted on the submission (and used by the XLSX export) but is
+    /// not part of the API contract, so callers keep seeing the same list of strings as before.
+    /// </summary>
+    private static IReadOnlyList<string> WarningMessages(IReadOnlyList<SubmissionWarning> warnings) =>
+        warnings.Select(w => w.Message).ToList();
+
     private void RecordDecision(Submission submission, Account approver, ApprovalDecision decision, string? note)
     {
         submission.Approvals.RemoveAll(a => a.ApproverAccountId == approver.Id);
@@ -640,7 +648,9 @@ public sealed class SubmissionService : ISubmissionService
                 replacedAt = submission.ReplacedAt,
                 sampleCount = submission.Samples.Count,
                 schemas = submission.Samples.Select(s => s.SchemaName).Distinct().ToList(),
-                warnings = submission.Warnings,
+                // Keep the historical string-array shape for webhook consumers; the value name is
+                // an internal detail carried on the entity, not part of the public payload.
+                warnings = submission.Warnings.Select(w => w.Message).ToList(),
             };
 
             await _webhooks.PublishAsync(

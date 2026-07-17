@@ -290,6 +290,20 @@ function callBuiltin(name: string, args: unknown[]): unknown {
       }
       return count === 0 ? null : sum / count
     }
+    case 'higher_than': {
+      // Mirrors NCalcExpressionEvaluator.HigherThan: true when value exceeds reference by more
+      // than percentage% (percentage as a whole number, e.g. 50 == 50%). Null args ⇒ false.
+      if (args.length < 3) throw new Error('higher_than() expects (value, reference, percentage).')
+      if (args[0] === null || args[0] === undefined ||
+          args[1] === null || args[1] === undefined ||
+          args[2] === null || args[2] === undefined) return false
+      const value = toNumber(args[0])
+      const reference = toNumber(args[1])
+      const percentage = toNumber(args[2])
+      if (value === null || reference === null || percentage === null)
+        throw new Error('higher_than() expects numeric arguments.')
+      return value > reference * (1 + percentage / 100)
+    }
     case 'latest':
     case 'previous': {
       // Historical values aren't available in the browser preview — the server resolves them

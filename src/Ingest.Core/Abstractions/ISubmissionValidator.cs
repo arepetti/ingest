@@ -16,8 +16,9 @@ public readonly record struct SampleRef(string SchemaName, string ValueName);
 /// <param name="Warnings">
 /// Non-blocking diagnostics surfaced alongside a successful submission: triggered <c>Warning</c>
 /// expressions and notices that one or more samples were discarded because their
-/// <c>EnabledIf</c>/<c>VisibleIf</c> rule rendered them inactive. Returned to the caller as part
-/// of the response.
+/// <c>EnabledIf</c>/<c>VisibleIf</c> rule rendered them inactive. Each carries the machine name
+/// of the value it relates to (or <c>null</c> for submission-level diagnostics). Returned to the
+/// caller as part of the response.
 /// </param>
 /// <param name="DiscardedSamples">
 /// Samples that should NOT be persisted because their <c>EnabledIf</c> or <c>VisibleIf</c> rule
@@ -26,7 +27,7 @@ public readonly record struct SampleRef(string SchemaName, string ValueName);
 public sealed record SubmissionValidationResult(
     bool IsValid,
     IReadOnlyList<string> Errors,
-    IReadOnlyList<string> Warnings,
+    IReadOnlyList<SubmissionWarning> Warnings,
     IReadOnlySet<SampleRef> DiscardedSamples);
 
 /// <summary>

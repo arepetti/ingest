@@ -526,7 +526,7 @@ public sealed record SubmissionDto(
     public static SubmissionDto From(Submission s) => new(
         s.Id, s.ServiceAccountId, s.ServiceName,
         s.Samples.Select(x => new SampleDto(x.SchemaName, x.ValueName, x.Value, x.Timestamp, x.Note)).ToList(),
-        s.Warnings ?? new(),
+        (s.Warnings ?? new()).Select(w => w.Message).ToList(),
         s.SubmittedAt, s.ReplacedAt, s.CreatedAt, s.CreatedBy, s.ModifiedAt, s.ModifiedBy, s.IsDeleted,
         s.Source, s.ApprovalStatus,
         (s.RequiredApprovers ?? new()).Select(ApproverSpecDto.From).ToList(),

@@ -26,6 +26,21 @@ public sealed class Sample
 }
 
 /// <summary>
+/// A single non-blocking diagnostic recorded against a submission at write time. Carries the
+/// machine name of the schema value it relates to when the warning is value-scoped (a fired
+/// <c>Warning</c> rule or an <c>EnabledIf</c>/<c>VisibleIf</c> discard); <see cref="ValueName"/>
+/// is <c>null</c> for submission-level diagnostics that don't map to a single value.
+/// </summary>
+/// <remarks>
+/// Persisted with a bespoke BSON serializer (see <c>SubmissionWarningBsonSerializer</c>) so
+/// legacy submissions — which stored warnings as a plain array of strings — still deserialize:
+/// a stored string becomes a warning with a <c>null</c> <see cref="ValueName"/>.
+/// </remarks>
+/// <param name="ValueName">Machine name of the associated schema value, or <c>null</c> for submission-level warnings.</param>
+/// <param name="Message">Human-readable warning text (unchanged from the pre-structured format).</param>
+public sealed record SubmissionWarning(string? ValueName, string Message);
+
+/// <summary>
 /// A batch of <see cref="Sample"/> rows submitted together by one service. Submissions are the
 /// unit of writes; replacements happen at this level (you can't replace a single sample inside
 /// a submission, you replace the whole submission).
@@ -45,9 +60,11 @@ public sealed class Submission : AuditedEntity
     /// Non-blocking diagnostics produced by the validator at the last write (fired <c>Warning</c>
     /// rules and notices about samples discarded by <c>EnabledIf</c> / <c>VisibleIf</c>). Persisted
     /// so operators/admins can review them later. Legacy documents that predate this field
-    /// deserialize to an empty list, which is treated as "no warnings".
+    /// deserialize to an empty list; legacy documents that stored warnings as plain strings
+    /// deserialize with a <c>null</c> <see cref="SubmissionWarning.ValueName"/> (see the entity's
+    /// custom serializer), so no data migration is required.
     /// </summary>
-    public List<string> Warnings { get; set; } = new();
+    public List<SubmissionWarning> Warnings { get; set; } = new();
 
     /// <summary>When the submission was first accepted by the API.</summary>
     public DateTime SubmittedAt { get; set; }

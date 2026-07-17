@@ -238,6 +238,37 @@ public class AccountServiceTests
         Assert.DoesNotContain("'alpha'", ex.Message);
     }
 
+    // ── Area (informative-only tag) ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Create_trims_the_area_and_blanks_it_to_null()
+    {
+        var svc = NewService(out _, out _);
+
+        var padded = NewAccount(name: "north");
+        padded.Area = "  North area  ";
+        Assert.Equal("North area", (await svc.CreateAsync(padded)).Area);
+
+        var blank = NewAccount(name: "blank");
+        blank.Area = "   ";
+        Assert.Null((await svc.CreateAsync(blank)).Area);
+    }
+
+    [Fact]
+    public async Task Update_trims_the_area_and_blanks_it_to_null()
+    {
+        var svc = NewService(out _, out _);
+        var created = await svc.CreateAsync(NewAccount(name: "svc"));
+
+        var updated = await svc.UpdateAsync(created.Id,
+            new AccountUpdate("Svc", null, null, AccountRole.Service, true, Area: "  West  "));
+        Assert.Equal("West", updated!.Area);
+
+        var cleared = await svc.UpdateAsync(created.Id,
+            new AccountUpdate("Svc", null, null, AccountRole.Service, true, Area: "  "));
+        Assert.Null(cleared!.Area);
+    }
+
     // ── Capability overrides (Phase 2) ──────────────────────────────────────────────────────
 
     [Fact]

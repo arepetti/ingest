@@ -26,6 +26,10 @@ public static class ServiceCollectionExtensions
         });
         services.AddScoped<IPdfExportService, PdfExportService>();
 
+        // XLSX export: a submissions grid written with the ClosedXML-backed proxy. No external
+        // process, so it just needs the repositories and the audit clock (all from the container).
+        services.AddScoped<ISubmissionExportService, SubmissionXlsxExportService>();
+
         return services;
     }
 }

@@ -51,7 +51,7 @@ public sealed class AppConfigurationService : IAppConfigurationService
     }
 
     /// <summary>Trim, drop blanks and de-duplicate (case-insensitively) while preserving order.</summary>
-    private static List<string> Normalize(IReadOnlyList<string>? areas)
+    internal static List<string> Normalize(IReadOnlyList<string>? areas)
     {
         var result = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

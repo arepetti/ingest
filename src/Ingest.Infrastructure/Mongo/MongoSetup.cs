@@ -33,6 +33,12 @@ public static class MongoSetup
         ConventionRegistry.Register("ingest", pack, _ => true);
 
         BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
+
+        // Warnings used to be stored as a plain array of strings and are now structured
+        // (value name + message). The custom serializer reads both on-disk shapes so existing
+        // submissions deserialize unchanged — no data migration needed. Must be registered
+        // before the first Submission (de)serialization; RegisterClassMaps runs at host start.
+        BsonSerializer.RegisterSerializer(new SubmissionWarningBsonSerializer());
     }
 
     /// <summary>

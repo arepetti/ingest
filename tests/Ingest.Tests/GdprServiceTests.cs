@@ -227,7 +227,7 @@ public class GdprServiceTests
             {
                 ServiceAccountId = serviceId,
                 ServiceName = "Jane",
-                Warnings = new() { "a warning" },
+                Warnings = new() { new SubmissionWarning(null, "a warning") },
                 Samples = new()
                 {
                     new Sample { SchemaName = "sc", ValueName = "str", Value = "Jane Doe", Timestamp = Now, Note = "secret note" },

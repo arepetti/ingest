@@ -57,6 +57,10 @@ public sealed class NCalcExpressionEvaluator : IExpressionEvaluator
                 }
                 return count == 0 ? null : sum / count;
             },
+            // higher_than(value, reference, percentage): true when `value` exceeds `reference` by
+            // more than `percentage`% (percentage is expressed as a whole number, e.g. 50 == 50%).
+            // Any null argument yields false so a missing value never trips the check.
+            ["higher_than"] = args => HigherThan(args),
         };
 
     /// <inheritdoc />
@@ -116,6 +120,44 @@ public sealed class NCalcExpressionEvaluator : IExpressionEvaluator
         for (var i = 0; i < args.Parameters.Length; i++)
             values[i] = args.Parameters[i].Evaluate();
         return values;
+    }
+
+    /// <summary>
+    /// Evaluate <c>higher_than(value, reference, percentage)</c>: <c>true</c> when
+    /// <paramref name="args"/>[0] is strictly greater than <c>reference * (1 + percentage/100)</c>.
+    /// Returns <c>false</c> when any argument is null (a missing sample must not raise the flag);
+    /// throws when a non-null argument isn't numeric so schema authors see the mistake.
+    /// </summary>
+    private static object HigherThan(object?[] args)
+    {
+        if (args.Length < 3)
+            throw new InvalidOperationException("higher_than() expects (value, reference, percentage).");
+        if (args[0] is null || args[1] is null || args[2] is null) return false;
+
+        if (!TryToNumber(args[0], out var value) ||
+            !TryToNumber(args[1], out var reference) ||
+            !TryToNumber(args[2], out var percentage))
+            throw new InvalidOperationException("higher_than() expects numeric arguments.");
+
+        return value > reference * (1.0 + percentage / 100.0);
+    }
+
+    private static bool TryToNumber(object? value, out double result)
+    {
+        switch (value)
+        {
+            case double d: result = d; return true;
+            case float f: result = f; return true;
+            case int i: result = i; return true;
+            case long l: result = l; return true;
+            case short sh: result = sh; return true;
+            case byte bt: result = bt; return true;
+            case decimal m: result = (double)m; return true;
+            case bool b: result = b ? 1 : 0; return true;
+            case string s when double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var p):
+                result = p; return true;
+            default: result = 0; return false;
+        }
     }
 
     private static double ToAverageOperand(object a) => a switch

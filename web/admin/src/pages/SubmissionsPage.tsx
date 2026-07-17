@@ -6,11 +6,11 @@ import {
   Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow, Text, Textarea,
   Title2, Tooltip, makeStyles, MessageBarBody, Toolbar, ToolbarButton, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Checkmark20Regular, Copy20Regular, Delete20Regular, Dismiss20Regular, DocumentPdf20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Checkmark20Regular, Copy20Regular, Delete20Regular, Dismiss20Regular, DocumentPdf20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular, Table20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { BulkImportDialog } from '../components/BulkImportDialog'
 import { formatApiError } from '../api/client'
-import { fetchAllMySubmissions, fetchAllSubmissions, submissionPdfExportUrl, useAccounts, useApproveSubmission, useCapabilities, useDeleteSubmission, useMySchemas, useMySubmissions, useRejectSubmission, useSchemas, useSubmissions } from '../api/hooks'
+import { fetchAllMySubmissions, fetchAllSubmissions, submissionPdfExportUrl, submissionsXlsxExportUrl, useAccounts, useApproveSubmission, useCapabilities, useDeleteSubmission, useMySchemas, useMySubmissions, useRejectSubmission, useSchemas, useSubmissions } from '../api/hooks'
 import { downloadFromUrl } from '../utils/download'
 import { RowActions } from '../components/RowActions'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
@@ -373,6 +373,24 @@ export function SubmissionsPage() {
     onError: setExportError,
   })
 
+  // The XLSX export is a single-schema grid, so it's only offered to cross-service viewers who have
+  // narrowed the list to exactly one schema. It mirrors the current list filters.
+  const [xlsxExporting, setXlsxExporting] = useState(false)
+  const canExportXlsx = !isService && !!schemaName
+  async function onExportXlsx() {
+    if (!schemaName) return
+    setExportError(null)
+    setXlsxExporting(true)
+    try {
+      const url = submissionsXlsxExportUrl({ schemaName, serviceId, from, to, approvalStatus, draft: draftFilter })
+      await downloadFromUrl(url, `submissions-${schemaName}.xlsx`)
+    } catch (e) {
+      setExportError(formatApiError(e))
+    } finally {
+      setXlsxExporting(false)
+    }
+  }
+
   function changeInterval(next: Interval) {
     setInterval(next)
     setPage(1)
@@ -401,6 +419,20 @@ export function SubmissionsPage() {
                 >
                   {submissionsExport.exporting ? 'Exporting…' : 'Export this list'}
                 </MenuItem>
+                {!isService && (
+                  <Tooltip
+                    relationship="label"
+                    content={canExportXlsx ? 'Export the filtered submissions to XLSX' : 'Pick a single schema to enable the XLSX export'}
+                  >
+                    <MenuItem
+                      icon={<Table20Regular />}
+                      disabled={!canExportXlsx || xlsxExporting}
+                      onClick={onExportXlsx}
+                    >
+                      {xlsxExporting ? 'Exporting…' : 'Export XLSX (one schema)'}
+                    </MenuItem>
+                  </Tooltip>
+                )}
                 {canImport && (
                   <MenuItem icon={<ArrowUpload20Regular />} onClick={() => setImportOpen(true)}>
                     Import bulk data

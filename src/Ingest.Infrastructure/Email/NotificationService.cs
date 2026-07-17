@@ -238,7 +238,8 @@ public sealed class NotificationService : INotificationService
                 service = ServiceModel(service, sub.ServiceAccountId, sub.ServiceName),
                 submissionId = sub.Id.ToString(),
                 submittedAt = Fmt(sub.SubmittedAt),
-                warnings = sub.Warnings,
+                // The warning notice template iterates plain strings; keep passing message text.
+                warnings = sub.Warnings.Select(w => w.Message).ToList(),
             };
             queued += await EnqueueAsync(DefaultEmailTemplates.Warnings, model,
                 RecipientsFor(service, settings.Warnings, adminRecipients), "notification:warnings", sub.ServiceAccountId, ct);

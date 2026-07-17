@@ -643,6 +643,30 @@ export const useSubmission = (id?: string, enabled: boolean = true) =>
 export const submissionPdfExportUrl = (id: string) =>
   `/api/admin/submissions/${encodeURIComponent(id)}/export.pdf`
 
+/**
+ * Relative URL for the submissions XLSX export (authenticated via downloadFromUrl). A single
+ * `schemaName` is required; the other params mirror the submissions list filters.
+ */
+export const submissionsXlsxExportUrl = (params: {
+  schemaName: string
+  serviceId?: string
+  from?: string
+  to?: string
+  approvalStatus?: ApprovalStatus
+  draft?: boolean
+  includeDeleted?: boolean
+}) => {
+  const search = new URLSearchParams()
+  search.set('schemaName', params.schemaName)
+  if (params.serviceId) search.set('serviceId', params.serviceId)
+  if (params.from) search.set('from', params.from)
+  if (params.to) search.set('to', params.to)
+  if (params.approvalStatus) search.set('approvalStatus', params.approvalStatus)
+  if (params.draft !== undefined) search.set('draft', String(params.draft))
+  if (params.includeDeleted) search.set('includeDeleted', 'true')
+  return `/api/admin/submissions/export.xlsx?${search}`
+}
+
 export const useAdminCreateSubmission = () => {
   const qc = useQueryClient()
   return useMutation({

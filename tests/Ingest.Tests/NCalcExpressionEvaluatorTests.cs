@@ -178,4 +178,61 @@ public class NCalcExpressionEvaluatorTests
         Assert.Throws<InvalidOperationException>(() => ev.Evaluate("average('x')", NoVars));
         Assert.Throws<InvalidOperationException>(() => ev.Evaluate("average(now())", NoVars));
     }
+
+    [Theory]
+    // value, reference, percentage → expected. 120 vs 100 at 10% => threshold 110, 120 > 110 ⇒ true.
+    [InlineData(120d, 100d, 10d, true)]
+    // 120 vs 100 at 50% => threshold 150, 120 !> 150 ⇒ false.
+    [InlineData(120d, 100d, 50d, false)]
+    // Exactly on the threshold is NOT "higher than" (strict >): 150 vs 100 at 50% => threshold 150.
+    [InlineData(150d, 100d, 50d, false)]
+    // 0% threshold is a plain "greater than".
+    [InlineData(101d, 100d, 0d, true)]
+    [InlineData(100d, 100d, 0d, false)]
+    public void Higher_than_compares_against_a_percentage_uplift(double value, double reference, double pct, bool expected)
+    {
+        var ev = new NCalcExpressionEvaluator();
+        var result = ev.Evaluate("higher_than(value, reference, pct)",
+            new Dictionary<string, object?> { ["value"] = value, ["reference"] = reference, ["pct"] = pct });
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void Higher_than_returns_false_when_any_argument_is_null()
+    {
+        var ev = new NCalcExpressionEvaluator();
+        var missingValue = ev.Evaluate("higher_than(value, 100, 10)",
+            new Dictionary<string, object?> { ["value"] = null });
+        Assert.Equal(false, missingValue);
+
+        var missingReference = ev.Evaluate("higher_than(120, reference, 10)",
+            new Dictionary<string, object?> { ["reference"] = null });
+        Assert.Equal(false, missingReference);
+    }
+
+    [Fact]
+    public void Higher_than_coerces_numeric_strings()
+    {
+        var ev = new NCalcExpressionEvaluator();
+        var result = ev.Evaluate("higher_than('120', '100', '10')", NoVars);
+        Assert.Equal(true, result);
+    }
+
+    [Fact]
+    public void Higher_than_rejects_non_numeric_arguments()
+    {
+        var ev = new NCalcExpressionEvaluator();
+        Assert.Throws<InvalidOperationException>(() => ev.Evaluate("higher_than('x', 100, 10)", NoVars));
+    }
+
+    [Fact]
+    public void Higher_than_is_usable_as_a_warning_rule()
+    {
+        var ev = new NCalcExpressionEvaluator();
+        // A Warning rule fires on a non-empty string; guard it with higher_than for a spike alert.
+        var raw = ev.Evaluate(
+            "if(higher_than(tonnes, latest_tonnes, 50), 'Spiked more than 50% over last period', null)",
+            new Dictionary<string, object?> { ["tonnes"] = 300, ["latest_tonnes"] = 100 });
+        Assert.Equal("Spiked more than 50% over last period", raw);
+    }
 }

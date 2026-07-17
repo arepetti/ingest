@@ -368,6 +368,8 @@ public sealed class NCalcTranslator : IExpressionTranslator
                     return $"the first non-empty of ({string.Join(", ", args)})";
                 case "average" when args.Count > 0:
                     return $"the average of ({string.Join(", ", args)})";
+                case "higher_than" when args.Count == 3:
+                    return $"{args[0]} is more than {args[2]}% higher than {args[1]}";
                 case "now":
                     return "the current date and time";
                 case "today":
