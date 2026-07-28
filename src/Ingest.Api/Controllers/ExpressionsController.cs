@@ -162,6 +162,72 @@ public sealed class ExpressionsController : ControllerBase
         return Ok(new ValidateExpressionResponse(result.Ok, result.Error, result.Position));
     }
 
+    /// <summary>Maximum number of expressions accepted in one dependency-batch request.</summary>
+    /// <remarks>Comfortably above any real schema's rule count (five rule fields per value, plus schema-level rules) while keeping worst-case parse time bounded.</remarks>
+    public const int MaxDependencyBatchSize = 500;
+
+    /// <summary>
+    /// Parse a batch of expressions with the real NCalc parser and report the identifiers each one
+    /// references — the same engine (and the same <see cref="JsExpressionTranslation.Identifiers"/>
+    /// extraction) used by <see cref="Translate"/>, batched into one round trip.
+    /// </summary>
+    /// <remarks>
+    /// Powers the schema editor's "Dependencies" diagram: rather than a rough client-side guess at
+    /// what a rule references, the SPA sends every rule on the schema (including unsaved edits) here
+    /// and gets back the authoritative reference list for each, in the same order. A per-expression
+    /// parse failure is a normal outcome (not an HTTP error) — that expression's entry carries
+    /// <see cref="ExpressionDependencyResult.Error"/> and an empty identifier list, mirroring
+    /// <see cref="Validate"/>'s "always 200" contract, so one bad rule doesn't blank out the whole
+    /// diagram while the admin is mid-edit. Blank/whitespace-only entries resolve the same way,
+    /// with no error — there's simply nothing to reference.
+    /// </remarks>
+    /// <param name="request">The batch; <see cref="ExpressionDependencyBatchRequest.Expressions"/> must be non-null and at most <see cref="MaxDependencyBatchSize"/> entries.</param>
+    /// <returns>One <see cref="ExpressionDependencyResult"/> per input expression, in the same order.</returns>
+    /// <response code="200">The batch was processed (individual expressions may still have failed to parse — see each result's <c>error</c>).</response>
+    /// <response code="400">The request body was missing, or had more than <see cref="MaxDependencyBatchSize"/> expressions.</response>
+    [HttpPost("dependencies")]
+    [Consumes("application/json")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(ExpressionDependencyBatchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public IActionResult Dependencies([FromBody] ExpressionDependencyBatchRequest request)
+    {
+        if (request?.Expressions is null)
+            return BadRequest(new ProblemDetails { Title = "Expressions must not be null.", Status = StatusCodes.Status400BadRequest });
+
+        if (request.Expressions.Count > MaxDependencyBatchSize)
+            return BadRequest(new ProblemDetails
+            {
+                Title = $"Batch exceeds the {MaxDependencyBatchSize}-expression limit.",
+                Status = StatusCodes.Status400BadRequest,
+            });
+
+        var results = request.Expressions.Select(ParseOne).ToList();
+        return Ok(new ExpressionDependencyBatchResponse(results));
+    }
+
+    private ExpressionDependencyResult ParseOne(string expression)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+            return new ExpressionDependencyResult(Array.Empty<string>(), null);
+
+        // A single oversized entry shouldn't fail the whole batch — every other rule on the
+        // schema is still worth graphing.
+        if (expression.Length > MaxExpressionLength)
+            return new ExpressionDependencyResult(Array.Empty<string>(), $"Expression exceeds the {MaxExpressionLength}-character limit.");
+
+        try
+        {
+            var translation = _translator.TranslateToJavaScript(expression);
+            return new ExpressionDependencyResult(translation.Identifiers, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Dependency-batch expression failed to parse");
+            return new ExpressionDependencyResult(Array.Empty<string>(), ex.Message);
+        }
+    }
+
     /// <summary>
     /// Pick a supported response media type given the request's <c>Accept</c> header values.
     /// Returns <c>null</c> when no entry matches — the caller turns that into a 406. Wildcard

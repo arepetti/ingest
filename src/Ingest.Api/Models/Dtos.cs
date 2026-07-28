@@ -1036,6 +1036,28 @@ public sealed record TranslateExpressionRequest(string Expression);
 /// <param name="Position">Optional 0-based character offset where the parser stumbled; <c>null</c> when the underlying parser doesn't expose one.</param>
 public sealed record ValidateExpressionResponse(bool Ok, string? Error = null, int? Position = null);
 
+/// <summary>
+/// Request body for <c>POST /api/expressions/dependencies</c> — a batch of expressions to parse
+/// for identifier references, in the order the caller wants results back in. Powers the schema
+/// editor's dependency diagram: the SPA sends every rule on the (possibly unsaved) schema in one
+/// round trip rather than one request per rule.
+/// </summary>
+/// <param name="Expressions">Expression sources, one per rule. Order is preserved in the response.</param>
+public sealed record ExpressionDependencyBatchRequest(IReadOnlyList<string> Expressions);
+
+/// <summary>One expression's parse outcome within an <see cref="ExpressionDependencyBatchRequest"/>.</summary>
+/// <param name="Identifiers">
+/// Every identifier the expression references, verbatim as written (case preserved, so
+/// <c>[name.minimum]</c>/<c>[name.maximum]</c> bound keys keep their suffix — callers matching
+/// against schema value names should do so case-insensitively and strip a trailing
+/// <c>.minimum</c>/<c>.maximum</c> themselves). Empty when the expression is blank or failed to parse.
+/// </param>
+/// <param name="Error">Parser error message when the expression failed to parse; <c>null</c> on success (including a blank input).</param>
+public sealed record ExpressionDependencyResult(IReadOnlyList<string> Identifiers, string? Error);
+
+/// <summary>Response body for <c>POST /api/expressions/dependencies</c>. <see cref="Results"/> has exactly one entry per input expression, in the same order.</summary>
+public sealed record ExpressionDependencyBatchResponse(IReadOnlyList<ExpressionDependencyResult> Results);
+
 /// <summary>Generic paged response wrapper. Identical to <c>Ingest.Core.Common.PagedResult&lt;T&gt;</c> but lives in the API layer to keep Core wire-agnostic.</summary>
 /// <typeparam name="T">Item type.</typeparam>
 /// <param name="Items">Items in this page.</param>

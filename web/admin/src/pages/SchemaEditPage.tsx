@@ -9,7 +9,7 @@ import {
   Textarea, Title2, Toolbar, ToolbarButton, Tooltip,
   makeStyles, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowLeft20Regular, CheckmarkCircle16Regular, Delete20Regular, Dismiss16Regular, Edit20Regular, ErrorCircle16Regular, Eye20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowLeft20Regular, CheckmarkCircle16Regular, Delete20Regular, Dismiss16Regular, Edit20Regular, ErrorCircle16Regular, Eye20Regular, FlowchartCircle20Regular } from '@fluentui/react-icons'
 import type {
   Account, ApprovalPolicy,
   Cadence, Schema, SchemaLayoutNode, SchemaValue, SchemaValueKind, SchemaValueType, UpsertSchemaRequest,
@@ -19,6 +19,7 @@ import { accountHasCapability } from '../api/capabilities'
 import { formatApiError } from '../api/client'
 import { LayoutTreeEditor } from '../components/LayoutTreeEditor'
 import { SchemaPreviewDialog } from '../components/SchemaPreviewDialog'
+import { SchemaDependencyGraphDialog } from '../components/SchemaDependencyGraphDialog'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { cadenceLabel } from '../utils/cadence'
 import { ApprovalPolicyEditor } from '../components/ApprovalPolicyEditor'
@@ -151,6 +152,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
 
   const [req, setReq] = useState<UpsertSchemaRequest | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [dependenciesOpen, setDependenciesOpen] = useState(false)
   // Which editor section is showing. The form is split into three tabs that mirror the old
   // top-to-bottom sections (General settings, Values, Layout).
   const [tab, setTab] = useState<SchemaTab>('general')
@@ -370,6 +372,9 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
           <Toolbar>
             <ToolbarButton icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>
               Preview
+            </ToolbarButton>
+            <ToolbarButton icon={<FlowchartCircle20Regular />} onClick={() => setDependenciesOpen(true)}>
+              Dependencies
             </ToolbarButton>
             {!readOnly && (
               <ToolbarButton appearance="primary" disabled={isBusy} onClick={onSave}>
@@ -714,6 +719,9 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
 
       {previewSchema && (
         <SchemaPreviewDialog schema={previewSchema} open={previewOpen} onClose={() => setPreviewOpen(false)} />
+      )}
+      {previewSchema && (
+        <SchemaDependencyGraphDialog schema={previewSchema} open={dependenciesOpen} onClose={() => setDependenciesOpen(false)} />
       )}
     </div>
   )

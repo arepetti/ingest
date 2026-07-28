@@ -486,6 +486,17 @@ export interface SubmissionValidationResponse {
   requiredApprovers: ApproverSpec[]
 }
 
+/**
+ * One expression's parse outcome from `POST /api/expressions/dependencies`. `identifiers` are
+ * verbatim as written by the author (case preserved) — a `[name.minimum]`/`[name.maximum]` bound
+ * key keeps its suffix, so callers matching against schema value names should do so
+ * case-insensitively and strip a trailing `.minimum`/`.maximum` themselves.
+ */
+export interface ExpressionDependencyResult {
+  identifiers: string[]
+  error?: string | null
+}
+
 /** File format accepted by the admin bulk import endpoint. */
 export type BulkImportFormat = 'Json' | 'Csv'
 

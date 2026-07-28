@@ -166,6 +166,23 @@ For an authoritative check, the **Test submission** row action on the schemas li
 
 You can also tick **Skip cadence (one-per-period) checks** to ignore whether a value has already been submitted for the period — handy when you only want to confirm the shape and rules. Fill in the form, then press **Validate**: the result shows whether a real submission would be **accepted**, lists the server's errors and warnings, notes any conditionally-discarded values, and previews the **would-be approval state** (accepted immediately, or held for approval). The schema must be assigned to the chosen service for this to be meaningful — it validates the stored schema as that service would see it.
 
+## Visualizing value dependencies
+
+The **Dependencies** button (editor toolbar, next to **Preview**) opens a diagram of how this schema's values reference one another through their rules — handy for spotting an unexpected chain before you save, or just understanding an unfamiliar schema at a glance. Every value is a node arranged in a circle; a connector is drawn for each rule that references another value:
+
+| Connector | Rule | Points from → to |
+|-----------|------|-------------------|
+| Solid blue | `Calculated` value's expression | the values it reads → the calculated value |
+| Dashed teal | `Visible if` | the referenced value → the value it shows/hides |
+| Dash-dot purple | `Enabled if` | the referenced value → the value it enables/disables |
+| Long-dashed red | `Value validation` | the referenced value → the value being validated |
+| Fine-dotted amber | `Warning` | the referenced value → the value carrying the warning |
+| Dotted grey (no arrowhead) | a schema-level **cross-value validation** | undirected — chains together every value the rule mentions |
+
+Calculated values are drawn with a dashed border and tinted background so they stand out from ordinary values; every other value looks the same regardless of which rules it carries. Hover any connector to see the exact expression driving it. A rule referencing itself (e.g. a `Warning` that reads its own value) never draws a self-loop — there's nothing to relate it to.
+
+Like Preview, this works from the **unsaved** editor draft (and in the read-only schema view and version snapshots): opening the dialog sends every rule on the schema to the server, which parses each one with the same expression engine used to enforce the rules at submission time and reports back exactly which values it references — so the diagram reflects a real dependency walk, not a guess. Nothing here is enforced by the diagram itself, though — it's a picture of what the rule editors and server validation already do.
+
 ## Schema versioning
 
 Every schema carries an integer **Version**. New schemas start at `1`. When you introduce a new value to an existing schema:
