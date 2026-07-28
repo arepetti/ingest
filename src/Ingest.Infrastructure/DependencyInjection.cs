@@ -1,5 +1,6 @@
 using Ingest.Core.Abstractions;
 using Ingest.Infrastructure.Approvals;
+using Ingest.Infrastructure.Comments;
 using Ingest.Infrastructure.Configuration;
 using Ingest.Infrastructure.Email;
 using Ingest.Export;
@@ -106,6 +107,7 @@ public static class DependencyInjection
         services.AddScoped<IAppConfigurationService, AppConfigurationService>();
         services.AddScoped<IApprovalRulesService, ApprovalRulesService>();
         services.AddScoped<IEventsService, EventsService>();
+        services.AddScoped<ICommentsService, CommentsService>();
 
         // GDPR data-rights services (erasure, retention purge, DSAR export).
         services.AddScoped<IErasureService, ErasureService>();

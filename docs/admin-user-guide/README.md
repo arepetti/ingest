@@ -7,7 +7,7 @@ The guide is split into focused pages — pick whichever matches the task at han
 | Page                                          | What's inside                                                                 |
 |-----------------------------------------------|--------------------------------------------------------------------------------|
 | [accounts.md](accounts.md)                    | Creating people and applications, editing them, issuing & rotating API keys, disabling vs deleting, viewing a service's status. |
-| [schemas.md](schemas.md)                      | Designing schemas: per-value type/cadence flags, multi-line validation rules, conditional display (`Enabled if` / `Visible if`), warnings, historical-data view. |
+| [schemas.md](schemas.md)                      | Designing schemas: per-value type/cadence flags, multi-line validation rules, conditional display (`Enabled if` / `Visible if`), warnings, historical-data view, and threaded comments on a schema or its values. |
 | [submissions.md](submissions.md)              | Browsing submissions with filters, editing/creating on behalf of a service, saving work-in-progress drafts, cloning into a new submission, bulk-importing history from JSON/CSV, deleting submissions. |
 | [approval-process.md](approval-process.md)    | The optional submission approval workflow: per-schema/global source-aware policies, the `submissions:approve` capability, the review queue, and the replace-and-reset rule. |
 | [reports.md](reports.md)                      | Uploading HTML+Liquid report templates, what data they receive, the viewer's filter bar. |

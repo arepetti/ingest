@@ -23,6 +23,7 @@ import type {
   ApprovalStatus, ApprovalPolicy, ApprovalRule, UpsertApprovalRuleRequest,
   AreasConfiguration, SubmissionWindowConfig, IngestionStatus, CadenceWindows, CadencePreviewEntry,
   IngestEvent, UpsertEventRequest,
+  CommentTargetType, CommentThread, CreateCommentThreadRequest,
   Integration, IntegrationRequest, IntegrationRunResult,
   TeamsConnection, UpdateTeamsConnectionRequest, TeamsConnectionTestResult,
 } from './types'
@@ -692,6 +693,87 @@ export const useDeleteEvent = () => {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/api/admin/events/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
+  })
+}
+
+// --- Comments -----------------------------------------------------------------------------
+
+/** Every thread attached to a target (schema-level and every value-scoped thread alike), unresolved-first. */
+export const useCommentThreads = (targetType: CommentTargetType, targetId: string | undefined, enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['comment-threads', targetType, targetId],
+    queryFn: () => api.get<CommentThread[]>(`/api/admin/comments/threads?targetType=${targetType}&targetId=${targetId}`),
+    enabled: enabled && !!targetId,
+  })
+
+/** Open (unresolved) thread counts for a batch of target ids in one round trip — powers the schemas list column. */
+export const useOpenCommentCounts = (targetType: CommentTargetType, targetIds: string[], enabled: boolean = true) => {
+  const key = [...targetIds].sort()
+  return useQuery({
+    queryKey: ['comment-counts', targetType, key],
+    queryFn: async () => {
+      const search = new URLSearchParams({ targetType })
+      for (const id of key) search.append('targetIds', id)
+      const res = await api.get<{ counts: Record<string, number> }>(`/api/admin/comments/open-counts?${search}`)
+      return res.counts
+    },
+    enabled: enabled && targetIds.length > 0,
+  })
+}
+
+function invalidateCommentQueries(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['comment-threads'] })
+  qc.invalidateQueries({ queryKey: ['comment-counts'] })
+}
+
+export const useCreateCommentThread = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: CreateCommentThreadRequest) => api.post<CommentThread>('/api/admin/comments/threads', req),
+    onSuccess: () => invalidateCommentQueries(qc),
+  })
+}
+
+export const useAddComment = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ threadId, text }: { threadId: string; text: string }) =>
+      api.post<CommentThread>(`/api/admin/comments/threads/${threadId}/comments`, { text }),
+    onSuccess: () => invalidateCommentQueries(qc),
+  })
+}
+
+export const useEditComment = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ commentId, text }: { commentId: string; text: string }) =>
+      api.put<CommentThread>(`/api/admin/comments/${commentId}`, { text }),
+    onSuccess: () => invalidateCommentQueries(qc),
+  })
+}
+
+export const useDeleteComment = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (commentId: string) => api.delete<void>(`/api/admin/comments/${commentId}`),
+    onSuccess: () => invalidateCommentQueries(qc),
+  })
+}
+
+export const useResolveThread = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ threadId, resolved }: { threadId: string; resolved: boolean }) =>
+      api.put<CommentThread>(`/api/admin/comments/threads/${threadId}/resolved`, { resolved }),
+    onSuccess: () => invalidateCommentQueries(qc),
+  })
+}
+
+export const useDeleteThread = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (threadId: string) => api.delete<void>(`/api/admin/comments/threads/${threadId}`),
+    onSuccess: () => invalidateCommentQueries(qc),
   })
 }
 

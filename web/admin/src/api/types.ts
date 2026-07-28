@@ -113,6 +113,50 @@ export interface UpsertEventRequest {
   serviceIds: string[]
 }
 
+/** The kind of object a comment thread is attached to. Only `Schema` exists today. */
+export type CommentTargetType = 'Schema'
+
+/** A single plain-text reply within a `CommentThread`. */
+export interface Comment {
+  id: string
+  text: string
+  createdAt: string
+  createdBy?: string | null
+  /** Id of the authoring account; used to gate the "edit your own comment" affordance. */
+  createdByAccountId?: string | null
+  modifiedAt: string
+  modifiedBy?: string | null
+  /** True once the comment has been edited at least once. */
+  edited: boolean
+}
+
+/**
+ * A discussion thread attached to a schema — either the schema as a whole (`valueName` is null) or
+ * one specific value on it. Resolved threads are locked against new comments until reopened.
+ */
+export interface CommentThread {
+  id: string
+  targetType: CommentTargetType
+  targetId: string
+  /** Machine-style schema value name this thread is scoped to, or null for a schema-level (general) thread. */
+  valueName?: string | null
+  resolved: boolean
+  resolvedAt?: string | null
+  resolvedBy?: string | null
+  createdAt: string
+  createdBy?: string | null
+  /** The thread's replies, oldest first. */
+  comments: Comment[]
+}
+
+/** Body for `POST /api/admin/comments/threads`. */
+export interface CreateCommentThreadRequest {
+  targetType: CommentTargetType
+  targetId: string
+  valueName?: string | null
+  text: string
+}
+
 /** One recorded approval/rejection decision on a submission. */
 export interface SubmissionApproval {
   approverAccountId: string
@@ -792,7 +836,7 @@ export type AuditChangeType = 'Create' | 'Edit' | 'Delete' | 'Approve' | 'Reject
  * The type of object an audit entry targets. 'User' and 'Account' are both accounts, told apart
  * by the account's kind at the time of the change.
  */
-export type AuditTargetType = 'User' | 'Account' | 'Schema' | 'ApiKey' | 'Submission' | 'Report' | 'SchemaHistory' | 'ApprovalRule' | 'Settings' | 'Backup'
+export type AuditTargetType = 'User' | 'Account' | 'Schema' | 'ApiKey' | 'Submission' | 'Report' | 'SchemaHistory' | 'ApprovalRule' | 'Settings' | 'Backup' | 'Event' | 'CommentThread' | 'Comment'
 
 /** A single audit-log entry: who changed what, when, and how. */
 export interface AuditLog {

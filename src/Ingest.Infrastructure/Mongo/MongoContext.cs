@@ -79,6 +79,9 @@ public sealed class MongoContext
     /// <summary><c>appConfiguration</c> collection — singleton miscellaneous admin configuration (e.g. areas).</summary>
     public IMongoCollection<AppConfiguration> AppConfiguration => Database.GetCollection<AppConfiguration>("appConfiguration");
 
+    /// <summary><c>commentThreads</c> collection — comment threads on schemas (and, later, other target types), each with its replies embedded.</summary>
+    public IMongoCollection<CommentThread> CommentThreads => Database.GetCollection<CommentThread>("commentThreads");
+
     /// <summary>Create a new <see cref="MongoContext"/>.</summary>
     /// <param name="client">Mongo client supplied by the container.</param>
     /// <param name="databaseName">Name of the database to use.</param>

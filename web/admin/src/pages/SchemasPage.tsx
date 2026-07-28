@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import type { Account, Schema, UpsertSchemaRequest } from '../api/types'
 import {
   fetchAllSchemas, fetchSchemaExample, schemaPdfExportUrl, useAccounts, useCloneSchema,
-  useCapabilities, useDeleteSchema, useSchemas,
+  useCapabilities, useDeleteSchema, useOpenCommentCounts, useSchemas,
 } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import { RowActions } from '../components/RowActions'
@@ -66,6 +66,7 @@ const useStyles = makeStyles({
   colAudience:   { width: '160px' },
   colCreated:    { width: '110px' },
   colCreatedBy:  { width: '140px' },
+  colComments:   { width: '100px' },
   colActions:    { width: '80px' },
   truncate: {
     display: 'block',
@@ -73,6 +74,7 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
+  muted: { color: tokens.colorNeutralForeground3 },
   // Name + the optional "requires approval" marker, kept on one line; the label truncates while
   // the marker icon stays pinned and visible.
   nameWithMarker: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 },
@@ -124,6 +126,7 @@ export function SchemasPage() {
   // "Test submission" runs a dry-run validation on behalf of a service, which the admin API gates
   // behind submissions:submit (no data is written).
   const canTest = has('submissions:submit')
+  const canReadComments = has('comments:read')
   const approvalEnabled = !!me?.approvalEnabled
   const globalDefaultRequired = !!me?.approvalDefaultRequired
   const [page, setPage] = useState(1)
@@ -150,6 +153,10 @@ export function SchemasPage() {
   })
 
   const items = useMemo(() => data?.items ?? [], [data])
+  // One aggregate open-thread count per schema (schema-level + all its values combined), fetched
+  // in a single batch call and merged client-side — mirrors the schemaRequiresApproval pattern.
+  const openCommentCounts = useOpenCommentCounts('Schema', useMemo(() => items.map(i => i.id), [items]), canReadComments)
+  const columnCount = 8 + (canReadComments ? 1 : 0)
 
   // Create/edit now live on their own page (see SchemaEditPage); the listing just routes there.
   function openCreate() {
@@ -297,13 +304,14 @@ export function SchemasPage() {
             <TableHeaderCell className={s.colAudience}>Audience</TableHeaderCell>
             <TableHeaderCell className={s.colCreated}>Created</TableHeaderCell>
             <TableHeaderCell className={s.colCreatedBy}>Created by</TableHeaderCell>
+            {canReadComments && <TableHeaderCell className={s.colComments}>Comments</TableHeaderCell>}
             <TableHeaderCell className={`${s.colActions} ${s.actionsHeader}`}>Actions</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={8}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={columnCount}>Loading…</GridMessageRow>}
           {!isLoading && items.length === 0 && (
-            <GridMessageRow colSpan={8}>No schemas yet — click “New schema” to create one.</GridMessageRow>
+            <GridMessageRow colSpan={columnCount}>No schemas yet — click “New schema” to create one.</GridMessageRow>
           )}
           {items.map(sc => (
             <TableRow
@@ -343,6 +351,15 @@ export function SchemasPage() {
                   <span className={s.truncate}>{sc.createdBy || '—'}</span>
                 </Tooltip>
               </TableCell>
+              {canReadComments && (
+                <TableCell className={s.colComments}>
+                  {(openCommentCounts.data?.[sc.id] ?? 0) > 0 ? (
+                    <Badge appearance="filled" color="informative">{openCommentCounts.data![sc.id]}</Badge>
+                  ) : (
+                    <span className={s.muted}>—</span>
+                  )}
+                </TableCell>
+              )}
               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
                 <RowActions
                   ariaLabel={`Actions for ${sc.name}`}

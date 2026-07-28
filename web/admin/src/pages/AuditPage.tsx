@@ -29,13 +29,14 @@ import type {
 } from '../api/types'
 
 const CHANGE_TYPES: AuditChangeType[] = ['Create', 'Edit', 'Delete', 'Approve', 'Reject']
-const TARGET_TYPES: AuditTargetType[] = ['User', 'Account', 'Schema', 'ApiKey', 'Submission', 'Report', 'SchemaHistory', 'ApprovalRule', 'Settings', 'Backup']
+const TARGET_TYPES: AuditTargetType[] = ['User', 'Account', 'Schema', 'ApiKey', 'Submission', 'Report', 'SchemaHistory', 'ApprovalRule', 'Settings', 'Backup', 'Event', 'CommentThread', 'Comment']
 
 /** Friendly labels for target types whose raw enum name doesn't read well in the UI. */
 const TARGET_TYPE_LABELS: Partial<Record<AuditTargetType, string>> = {
   ApiKey: 'API key',
   SchemaHistory: 'Schema history',
   ApprovalRule: 'Approval rule',
+  CommentThread: 'Comment thread',
 }
 const targetTypeLabel = (t: AuditTargetType): string => TARGET_TYPE_LABELS[t] ?? t
 const EMAIL_STATUSES: EmailStatus[] = ['Pending', 'Sending', 'Sent', 'Failed']

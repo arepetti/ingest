@@ -70,6 +70,12 @@ public enum AuditTargetType
 
     /// <summary>An admin-recorded timeline event.</summary>
     Event = 10,
+
+    /// <summary>A comment thread (create, resolve/reopen, delete — see <see cref="Comment"/> for individual replies).</summary>
+    CommentThread = 11,
+
+    /// <summary>A single reply within a comment thread (create, edit, delete).</summary>
+    Comment = 12,
 }
 
 /// <summary>

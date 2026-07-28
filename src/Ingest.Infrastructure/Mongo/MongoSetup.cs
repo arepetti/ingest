@@ -186,6 +186,17 @@ public static class MongoSetup
                 new CreateIndexOptions { Name = "by_timestamp" }),
             cancellationToken: ct);
 
+        await ctx.CommentThreads.Indexes.CreateOneAsync(
+            // Backs both "list every thread for a target" and "count open threads across many
+            // targets" (the schemas list's open-thread column).
+            new CreateIndexModel<CommentThread>(
+                Builders<CommentThread>.IndexKeys
+                    .Ascending(t => t.TargetType)
+                    .Ascending(t => t.TargetId)
+                    .Ascending(t => t.Resolved),
+                new CreateIndexOptions { Name = "by_target_resolved" }),
+            cancellationToken: ct);
+
         await ctx.Samples.Indexes.CreateManyAsync(new[]
         {
             new CreateIndexModel<SampleProjection>(

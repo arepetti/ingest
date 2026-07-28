@@ -79,6 +79,12 @@ public static class Capabilities
     public const string EventsRead = "events:read";
     /// <summary>Create, edit and delete events.</summary>
     public const string EventsManage = "events:manage";
+    /// <summary>View comment threads on schemas (and their values).</summary>
+    public const string CommentsRead = "comments:read";
+    /// <summary>Start new comment threads and reply to existing (unresolved) ones.</summary>
+    public const string CommentsCreate = "comments:create";
+    /// <summary>Edit, delete or resolve/reopen any comment or thread (not just your own).</summary>
+    public const string CommentsManage = "comments:manage";
 
     /// <summary>Every capability in the catalogue, in display order (grouped data/content then administration).</summary>
     public static readonly IReadOnlyList<string> All = new[]
@@ -97,6 +103,7 @@ public static class Capabilities
         BackupRead, BackupManage,
         SettingsRead, SettingsManage,
         EventsRead, EventsManage,
+        CommentsRead, CommentsCreate, CommentsManage,
     };
 
     private static readonly HashSet<string> KnownSet = new(All, StringComparer.Ordinal);

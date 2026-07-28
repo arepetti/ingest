@@ -303,6 +303,78 @@ Accounts that can manage schemas can prune the history to reclaim space or cut n
 
 Both actions are **recorded in the audit log** (as a Delete against the schema), so cleanup is itself traceable. As above, deleting history has no effect on the live schema or its current version.
 
+## Comments
+
+Admins (by default) can hold threaded discussions on a schema — either about the schema as a whole,
+or scoped to one specific value — right from the schema editor. Comments are purely discussion:
+nothing in the submission pipeline reads them, and they don't affect validation or any figure.
+
+### Required capabilities
+
+Three capabilities gate the feature, none of which are part of the Operator's default bundle — only
+**Admin** carries them out of the box. Assign them individually to an Operator or a custom role via
+[custom capabilities](accounts.md) if you want someone other than an admin to participate:
+
+| Capability | Grants |
+|------------|--------|
+| `comments:read` | See threads and comments (required for everything else below). |
+| `comments:create` | Start new threads, reply to open threads, and edit your **own** comments. |
+| `comments:manage` | Edit or delete **any** comment, delete a thread, and resolve/reopen a thread. |
+
+### Threads and comments
+
+A **thread** is either **General** (about the schema as a whole) or scoped to a single **value**.
+Each thread holds one or more plain-text **comments**, oldest first; every comment records who
+posted it and when, and is flagged **(edited)** once changed. You can have as many threads — and as
+many comments within each — as you like.
+
+- Anyone with `comments:create` can start a new thread or reply to an existing **open** one.
+- You can always edit your **own** comments, provided you still hold both `comments:read` and
+  `comments:create`. `comments:manage` can edit or delete **anyone's** comment.
+- Deleting a comment or a thread is always `comments:manage`-only, even for your own comments —
+  `comments:create` alone only lets you edit your own text, not remove it.
+
+### Resolving a thread
+
+`comments:manage` can mark a thread **Resolved** once the discussion is settled. A resolved thread
+is **locked**: no one — including `comments:manage` holders — can add a new comment to it until it's
+**reopened**. Resolving and reopening are each recorded as an **Edit** in the audit log.
+
+Deleting a thread removes it and every comment in it in one action (soft-deleted, like everything
+else in this guide — recoverable only via manual database surgery).
+
+### Where comments show up
+
+- **Schema editor** — a **Comments** toolbar button (next to Preview/Dependencies) opens the
+  comments drawer, with a badge showing the number of currently **open** (unresolved) threads. Only
+  shown once the schema has been saved at least once (comments need a persisted schema id) and when
+  you hold `comments:read`.
+- **Schemas list** — a **Comments** column shows one aggregate open-thread count per schema (adding
+  together the schema-level thread and every value-scoped thread), so you can spot which schemas
+  have active discussions without opening each one. Only shown when you hold `comments:read`.
+
+Every create/edit/delete/resolve/reopen is recorded in the audit log under the **Comment** or
+**Comment thread** target type.
+
+### API
+
+```
+GET    /api/admin/comments/threads               # every thread for a target, with its comments
+       ?targetType=Schema&targetId={guid}
+GET    /api/admin/comments/open-counts           # open-thread counts for several targets in one call
+       ?targetType=Schema&targetIds={guid}&targetIds={guid}...
+POST   /api/admin/comments/threads               # start a new thread (comments:create)
+POST   /api/admin/comments/threads/{id}/comments # reply to a thread (comments:create; 409 if resolved)
+PUT    /api/admin/comments/{commentId}           # edit a comment (owner + comments:create, or comments:manage)
+DELETE /api/admin/comments/{commentId}           # delete a comment (comments:manage)
+PUT    /api/admin/comments/threads/{id}/resolved # resolve/reopen a thread (comments:manage)
+DELETE /api/admin/comments/threads/{id}          # delete a thread and its comments (comments:manage)
+```
+
+`targetType` is currently always `Schema`; `targetId` is the schema's id, and an optional
+`valueName` on `POST /threads` scopes the new thread to one of the schema's values (omit it, or send
+`null`, for a schema-level thread).
+
 ## Where to go next
 
 - [validation.md](validation.md) — the rule-authoring reference. Read this when you want anything more than `value >= 0`.

@@ -9,17 +9,18 @@ import {
   Textarea, Title2, Toolbar, ToolbarButton, Tooltip,
   makeStyles, tokens,
 } from '@fluentui/react-components'
-import { Add20Regular, ArrowLeft20Regular, CheckmarkCircle16Regular, Delete20Regular, Dismiss16Regular, Edit20Regular, ErrorCircle16Regular, Eye20Regular, FlowchartCircle20Regular } from '@fluentui/react-icons'
+import { Add20Regular, ArrowLeft20Regular, CheckmarkCircle16Regular, Chat20Regular, Delete20Regular, Dismiss16Regular, Edit20Regular, ErrorCircle16Regular, Eye20Regular, FlowchartCircle20Regular } from '@fluentui/react-icons'
 import type {
   Account, ApprovalPolicy,
   Cadence, Schema, SchemaLayoutNode, SchemaValue, SchemaValueKind, SchemaValueType, UpsertSchemaRequest,
 } from '../api/types'
-import { useAccounts, useCreateSchema, useMe, useSchemas, useSchemaVersionSnapshot, useSubmissions, useUpdateSchema } from '../api/hooks'
+import { useAccounts, useCapabilities, useCreateSchema, useMe, useOpenCommentCounts, useSchemas, useSchemaVersionSnapshot, useSubmissions, useUpdateSchema } from '../api/hooks'
 import { accountHasCapability } from '../api/capabilities'
 import { formatApiError } from '../api/client'
 import { LayoutTreeEditor } from '../components/LayoutTreeEditor'
 import { SchemaPreviewDialog } from '../components/SchemaPreviewDialog'
 import { SchemaDependencyGraphDialog } from '../components/SchemaDependencyGraphDialog'
+import { SchemaCommentsDrawer } from '../components/SchemaCommentsDrawer'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { cadenceLabel } from '../utils/cadence'
 import { ApprovalPolicyEditor } from '../components/ApprovalPolicyEditor'
@@ -127,6 +128,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
   const isEdit = !!name && !readOnly
 
   const { data: me } = useMe()
+  const { has } = useCapabilities()
   // The approval policy editor only appears when the workflow is switched on server-side.
   const approvalEnabled = !!me?.approvalEnabled
   // The audience picker only cares about Service-role accounts (those who submit data); the kind
@@ -153,10 +155,15 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
   const [req, setReq] = useState<UpsertSchemaRequest | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [dependenciesOpen, setDependenciesOpen] = useState(false)
+  const [commentsOpen, setCommentsOpen] = useState(false)
   // Which editor section is showing. The form is split into three tabs that mirror the old
   // top-to-bottom sections (General settings, Values, Layout).
   const [tab, setTab] = useState<SchemaTab>('general')
   const [schemaId, setSchemaId] = useState<string | undefined>(undefined)
+  // Powers the Comments toolbar button's badge; a persisted schema id is required (comments can't
+  // attach to a never-saved schema), so this stays disabled until one exists.
+  const openCommentCounts = useOpenCommentCounts('Schema', schemaId ? [schemaId] : [], has('comments:read') && !!schemaId)
+  const openCommentCount = schemaId ? openCommentCounts.data?.[schemaId] ?? 0 : 0
   const [hydrated, setHydrated] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   // Snapshot of the schema as it was when the editor opened — used for the "unsaved changes"
@@ -376,6 +383,12 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
             <ToolbarButton icon={<FlowchartCircle20Regular />} onClick={() => setDependenciesOpen(true)}>
               Dependencies
             </ToolbarButton>
+            {has('comments:read') && schemaId && (
+              <ToolbarButton icon={<Chat20Regular />} onClick={() => setCommentsOpen(true)}>
+                Comments
+                {openCommentCount > 0 && <Badge appearance="filled" color="informative" size="small" style={{ marginLeft: '6px' }}>{openCommentCount}</Badge>}
+              </ToolbarButton>
+            )}
             {!readOnly && (
               <ToolbarButton appearance="primary" disabled={isBusy} onClick={onSave}>
                 {isEdit ? 'Save changes' : 'Create schema'}
@@ -722,6 +735,14 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
       )}
       {previewSchema && (
         <SchemaDependencyGraphDialog schema={previewSchema} open={dependenciesOpen} onClose={() => setDependenciesOpen(false)} />
+      )}
+      {schemaId && (
+        <SchemaCommentsDrawer
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+          schemaId={schemaId}
+          values={req?.values ?? []}
+        />
       )}
     </div>
   )

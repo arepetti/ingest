@@ -808,6 +808,83 @@ public sealed record UpsertEventRequest(
     };
 }
 
+/// <summary>Wire shape of a single reply within a <see cref="CommentThreadDto"/>.</summary>
+/// <param name="Id">Stable identifier, unique within the parent thread.</param>
+/// <param name="Text">Plain-text body.</param>
+/// <param name="CreatedAt">When the comment was posted (UTC).</param>
+/// <param name="CreatedBy">Machine-style name of the author.</param>
+/// <param name="CreatedByAccountId">Id of the authoring account; used client-side to gate the "edit your own comment" affordance.</param>
+/// <param name="ModifiedAt">Last edit timestamp (UTC); equals <paramref name="CreatedAt"/> until edited.</param>
+/// <param name="ModifiedBy">Machine-style name of the last editor.</param>
+/// <param name="Edited">True once the comment has been edited at least once.</param>
+public sealed record CommentDto(
+    Guid Id,
+    string Text,
+    DateTime CreatedAt,
+    string? CreatedBy,
+    Guid? CreatedByAccountId,
+    DateTime ModifiedAt,
+    string? ModifiedBy,
+    bool Edited)
+{
+    /// <summary>Project the domain entity onto the wire shape.</summary>
+    public static CommentDto From(Comment c) => new(
+        c.Id, c.Text, c.CreatedAt, c.CreatedBy, c.CreatedByAccountId, c.ModifiedAt, c.ModifiedBy,
+        Edited: c.ModifiedAt != c.CreatedAt);
+}
+
+/// <summary>Wire shape of a comment thread, with its replies embedded.</summary>
+/// <param name="Id">Stable identifier.</param>
+/// <param name="TargetType">The kind of object this thread is attached to.</param>
+/// <param name="TargetId">Id of the object this thread is attached to.</param>
+/// <param name="ValueName">Machine-style schema value name this thread is scoped to, or <c>null</c> for a schema-level (general) thread.</param>
+/// <param name="Resolved">True once the discussion is marked resolved (locked against new comments).</param>
+/// <param name="ResolvedAt">When the thread was most recently resolved (UTC), or <c>null</c> if it never was / has since been reopened.</param>
+/// <param name="ResolvedBy">Machine-style name of whoever most recently resolved the thread.</param>
+/// <param name="CreatedAt">When the thread was started (UTC) — matches its first comment.</param>
+/// <param name="CreatedBy">Machine-style name of whoever started the thread.</param>
+/// <param name="Comments">The thread's replies, oldest first.</param>
+public sealed record CommentThreadDto(
+    Guid Id,
+    CommentTargetType TargetType,
+    Guid TargetId,
+    string? ValueName,
+    bool Resolved,
+    DateTime? ResolvedAt,
+    string? ResolvedBy,
+    DateTime CreatedAt,
+    string? CreatedBy,
+    IReadOnlyList<CommentDto> Comments)
+{
+    /// <summary>Project the domain entity (with its comments already filtered to non-deleted) onto the wire shape.</summary>
+    public static CommentThreadDto From(CommentThread t) => new(
+        t.Id, t.TargetType, t.TargetId, t.ValueName, t.Resolved, t.ResolvedAt, t.ResolvedBy,
+        t.CreatedAt, t.CreatedBy, t.Comments.Select(CommentDto.From).ToList());
+}
+
+/// <summary>Body for <c>POST /api/admin/comments/threads</c> — starts a new thread with its first comment.</summary>
+/// <param name="TargetType">The kind of object to attach the thread to.</param>
+/// <param name="TargetId">Id of the object to attach the thread to.</param>
+/// <param name="ValueName">Machine-style schema value name to scope the thread to; omit/null for a schema-level (general) thread.</param>
+/// <param name="Text">The first comment's text.</param>
+public sealed record CreateCommentThreadRequest(CommentTargetType TargetType, Guid TargetId, string? ValueName, string Text);
+
+/// <summary>Body for <c>POST /api/admin/comments/threads/{threadId}/comments</c> — appends a reply to an existing thread.</summary>
+/// <param name="Text">The reply's text.</param>
+public sealed record AddCommentRequest(string Text);
+
+/// <summary>Body for <c>PUT /api/admin/comments/{commentId}</c> — edits a comment's text.</summary>
+/// <param name="Text">The new text.</param>
+public sealed record EditCommentRequest(string Text);
+
+/// <summary>Body for <c>PUT /api/admin/comments/threads/{threadId}/resolved</c>.</summary>
+/// <param name="Resolved">The new resolved state — <c>true</c> resolves (locks) the thread, <c>false</c> reopens it.</param>
+public sealed record ResolveThreadRequest(bool Resolved);
+
+/// <summary>Response body for <c>GET /api/admin/comments/open-counts</c>. Targets with zero open threads are omitted.</summary>
+/// <param name="Counts">Open (unresolved, non-deleted) thread count keyed by target id.</param>
+public sealed record OpenCommentCountsResponse(IReadOnlyDictionary<Guid, int> Counts);
+
 /// <summary>Wire shape of one recorded approval/rejection decision on a submission.</summary>
 /// <param name="ApproverAccountId">Account that recorded the decision.</param>
 /// <param name="ApproverName">Machine-name snapshot of the approver.</param>

@@ -37,6 +37,9 @@ export const CAPABILITIES = {
   settingsManage: 'settings:manage',
   eventsRead: 'events:read',
   eventsManage: 'events:manage',
+  commentsRead: 'comments:read',
+  commentsCreate: 'comments:create',
+  commentsManage: 'comments:manage',
 } as const
 
 export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES]
@@ -137,6 +140,14 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     items: [
       { id: CAPABILITIES.eventsRead, label: 'View events', description: 'Browse the events timeline.' },
       { id: CAPABILITIES.eventsManage, label: 'Manage events', description: 'Create, edit and delete events.' },
+    ],
+  },
+  {
+    group: 'Comments',
+    items: [
+      { id: CAPABILITIES.commentsRead, label: 'View comments', description: 'See comment threads on schemas (and their values).' },
+      { id: CAPABILITIES.commentsCreate, label: 'Create comments', description: 'Start new threads and reply to existing ones; edit your own comments.' },
+      { id: CAPABILITIES.commentsManage, label: 'Manage comments', description: 'Edit, delete or resolve/reopen any comment or thread — not just your own.' },
     ],
   },
 ]
