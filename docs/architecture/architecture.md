@@ -4,9 +4,9 @@ This document explains how Ingest is put together, what each piece is responsibl
 
 ## What it is
 
-Ingest is a small data-ingestion backend for local-council KPI submissions. Local-council services authenticate with an API key and POST KPI samples; administrators manage the catalogue of accepted schemas, accounts, and submissions through a React/Fluent UI admin SPA. The same backend exposes an OData feed so PowerBI (and any other generic OData consumer) can read the data directly.
+Ingest is a small data-ingestion backend for KPI (or survey) submissions from services, teams, or partners. Submitters authenticate with an API key and POST samples; administrators manage the catalogue of accepted schemas, accounts, and submissions through a React/Fluent UI admin SPA. The same backend exposes an OData feed so PowerBI (and any other generic OData consumer) can read the data directly.
 
-Ingest is a single-tenant application with one clear job: collect KPI data from local-council services, validate it, and serve it to reporting tools through a stable read model. The design favours a small, extensible foundation with a well-defined scope over a multi-tenant SaaS.
+Ingest is a single-tenant application with one clear job: collect samples from reporting units, validate them against a schema catalogue, and serve them to reporting tools through a stable read model. The design favours a small, extensible foundation with a well-defined scope over a multi-tenant SaaS.
 
 ## Birds-eye view
 

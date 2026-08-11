@@ -4,9 +4,9 @@ A minimal PowerShell integration that turns a **weekly per-employee HR/payroll e
 
 ## What real software this stands in for
 
-Local councils run their HR and payroll on systems that can produce scheduled extracts of headcount, absence and overtime. The dominant local-government products are **MHR iTrent** and **Zellis ResourceLink** (formerly Northgate), with **Civica HR**, **IRIS Cascade** and (in larger authorities) **SAP / Oracle HCM** also common. A weekly CSV/Excel extract is the simplest integration point and is supported by essentially all of them.
+Many organisations run their HR and payroll on systems that can produce scheduled extracts of headcount, absence and overtime. Common products include **MHR iTrent** and **Zellis ResourceLink** (formerly Northgate), with **Civica HR**, **IRIS Cascade** and (in larger organisations) **SAP / Oracle HCM** also widely used. A weekly CSV/Excel extract is the simplest integration point and is supported by essentially all of them.
 
-> Educated guess: product names are illustrative of the local-government HR market. Column names differ per system — adjust the mapping to match your extract.
+> Educated guess: product names are illustrative of the HR/payroll market for this sample domain. Column names differ per system — adjust the mapping to match your extract.
 
 ## How it works
 

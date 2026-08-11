@@ -1,8 +1,8 @@
 # Integration examples
 
-End-to-end, copy-pasteable examples of pushing data from a typical local-council source system into Ingest. Each folder is one self-contained integration: a script, its sample source data, and a README.
+End-to-end, copy-pasteable examples of pushing data from a typical source system into Ingest. Each folder is one self-contained integration: a script, its sample source data, and a README.
 
-These are **educated-guess illustrations** of how a council's existing software (waste-collection / HR) would feed Ingest. The vendor names mentioned are representative of the local-government market, not endorsements; the field mappings are the part worth copying.
+These are **educated-guess illustrations** of how an organisation's existing software would feed Ingest, using waste-collection and HR as worked example domains (local government is one vertical among many). The vendor names mentioned are representative of those sample markets, not endorsements; the field mappings are the part worth copying.
 
 ## The examples
 

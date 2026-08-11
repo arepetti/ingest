@@ -4,9 +4,9 @@ A minimal Python integration that takes a **daily round-level CSV export** from 
 
 ## What real software this stands in for
 
-Councils (or their waste contractors) typically run a round-management / in-cab platform that can produce a scheduled CSV or Excel extract of the day's collections. Common products include **Bartec Collective**, **Whitespace Work Software**, **Echo** (Adur), **Yotta Alloy**, **Webaspx**, **Civica** and **AMCS**. The exact column names differ per product, so this example is deliberately vendor-agnostic: adjust the column mapping in `push_waste_rounds.py` to match your export and the rest works unchanged. A CSV drop is the lowest-common-denominator integration - almost every system can produce one even if it has no API.
+Waste operators (municipalities, contractors, or internal facilities teams) typically run a round-management / in-cab platform that can produce a scheduled CSV or Excel extract of the day's collections. Common products include **Bartec Collective**, **Whitespace Work Software**, **Echo** (Adur), **Yotta Alloy**, **Webaspx**, **Civica** and **AMCS**. The exact column names differ per product, so this example is deliberately vendor-agnostic: adjust the column mapping in `push_waste_rounds.py` to match your export and the rest works unchanged. A CSV drop is the lowest-common-denominator integration - almost every system can produce one even if it has no API.
 
-> Educated guess: product names above are illustrative of the local-government waste market, not an endorsement or a claim about any specific council.
+> Educated guess: product names above are illustrative of the waste-operations market for this sample domain, not an endorsement or a claim about any specific deployment.
 
 ## How it works
 

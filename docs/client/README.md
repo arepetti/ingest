@@ -1,6 +1,6 @@
 # For service clients
 
-You're here because you submit data to Ingest on behalf of a local-council service — automated from a script, scheduler, or any other tool that can make an HTTP call. This folder is your starting point.
+You're here because you submit data to Ingest on behalf of a service, team, or partner — automated from a script, scheduler, or any other tool that can make an HTTP call. This folder is your starting point.
 
 | Page                      | What's inside                                                                                                  |
 |---------------------------|----------------------------------------------------------------------------------------------------------------|
@@ -61,7 +61,7 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 
 ### Worked examples to copy from
 
-If you'd rather start from working code than the raw reference, the repository ships minimal, runnable integration scripts under [`examples/`](../../examples/README.md). They show the full pattern — read from a source, map to a schema, `POST /api/submissions`, handle warnings/errors — across **Python, PowerShell, C# and Java**, for both a **CSV export** and a **vendor REST API** source, against a council waste-collection and an HR schema:
+If you'd rather start from working code than the raw reference, the repository ships minimal, runnable integration scripts under [`examples/`](../../examples/README.md). They show the full pattern — read from a source, map to a schema, `POST /api/submissions`, handle warnings/errors — across **Python, PowerShell, C# and Java**, for both a **CSV export** and a **vendor REST API** source, against sample waste-collection and HR schemas:
 
 | Example | Source style | Language |
 |---------|--------------|----------|

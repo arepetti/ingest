@@ -6,7 +6,7 @@ A minimal PowerShell integration that **pulls a daily collection summary from a 
 
 Some waste platforms expose a REST/JSON API for daily operational data rather than (or as well as) a file export. Products in this space include **Bartec Collective**, **Whitespace Work Software**, **Echo**, **Yotta Alloy** and **AMCS**. This example assumes such an endpoint returns an already-aggregated daily summary; you point the script at it and map its field names to the schema's values.
 
-> Educated guess: vendor names are illustrative of the local-government waste market. Real API shapes vary — edit the mapping section to match yours.
+> Educated guess: vendor names are illustrative of the waste-operations market for this sample domain. Real API shapes vary — edit the mapping section to match yours.
 
 ## How it works
 

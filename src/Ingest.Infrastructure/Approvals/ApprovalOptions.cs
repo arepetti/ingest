@@ -10,7 +10,7 @@ public sealed class ApprovalOptions
 {
     /// <summary>
     /// Master switch. Defaults to <c>true</c> so the feature is available out of the box (it still
-    /// does nothing until an admin configures a schema or the global default). A council that does
+    /// does nothing until an admin configures a schema or the global default). An organisation that does
     /// not use approval can set this to <c>false</c> to remove the feature entirely.
     /// </summary>
     public bool Enabled { get; set; } = true;

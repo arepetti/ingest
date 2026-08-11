@@ -4,9 +4,9 @@ A minimal Python integration that **pulls a weekly workforce summary from an HR 
 
 ## What real software this stands in for
 
-Modern HR/payroll platforms expose REST APIs alongside their file exports. In local government, common systems include **MHR iTrent** and **Zellis ResourceLink**, with **Civica HR**, **IRIS Cascade** and **SAP / Oracle HCM** also in use. This example assumes such an API returns an already-aggregated weekly summary for a team; you point the script at it and map its fields to the schema.
+Modern HR/payroll platforms expose REST APIs alongside their file exports. Common systems include **MHR iTrent** and **Zellis ResourceLink**, with **Civica HR**, **IRIS Cascade** and **SAP / Oracle HCM** also in use. This example assumes such an API returns an already-aggregated weekly summary for a team; you point the script at it and map its fields to the schema.
 
-> Educated guess: vendor names are illustrative of the local-government HR market. Real API shapes vary — edit the mapping in `build_samples` to match.
+> Educated guess: vendor names are illustrative of the HR/payroll market for this sample domain. Real API shapes vary — edit the mapping in `build_samples` to match.
 
 ## How it works
 

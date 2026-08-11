@@ -143,7 +143,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "Ingest API",
         Version = "v1",
-        Description = "KPI ingestion backend for local-council services. Authenticate by sending your API key " +
+        Description = "KPI (or survey) ingestion backend for services, teams, or partners. Authenticate by sending your API key " +
                       "in the X-Api-Key header. Bootstrap admin credentials are written to the server log on first start.",
     });
     c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme

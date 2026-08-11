@@ -1,8 +1,8 @@
 # Ingest
 
-**A simple way to collect KPI data from local-council services, keep it clean, and feed it straight into your reporting tools.**
+**A simple way to collect KPI (or survey) data from services, teams, or partners, keep it clean, and feed it straight into your reporting tools.**
 
-Local-council services — waste collection, roads, public health, and the like — produce numbers every day, every week, every month. Getting those numbers into a central database where analysts can query them is usually a tangle of spreadsheets, ad-hoc forms, and email reminders. Ingest replaces that tangle with one small back-end and one web console:
+Wherever multiple reporting units produce numbers on a schedule — local-government services, a chain of clinics, an association collecting data from well-known partners, internal ops teams, and the like — getting those numbers into a central database where analysts can query them is usually a tangle of spreadsheets, ad-hoc forms, and email reminders. Ingest replaces that tangle with one small back-end and one web console:
 
 - **Services** push their KPIs through a stable API (or type them in by hand if they prefer).
 - **Administrators** define which KPIs are expected, what they should look like, and when they're due — all without writing code.
@@ -42,7 +42,7 @@ Service-side users can use a slimmed-down version of the same console to file su
 
 ### …or use the API and stop typing numbers in by hand
 
-Most KPIs already exist somewhere in the council's systems — a waste-collection schedule, a finance ledger, a roads-maintenance backlog. Re-typing those numbers into a web form every week is busywork: it eats hours, it introduces transcription errors, and it relies on someone remembering to do it before the cadence window closes.
+Most KPIs already exist somewhere in your organisation's systems — a clinic roster, a finance ledger, a waste-collection schedule, a partner survey export. Re-typing those numbers into a web form every week is busywork: it eats hours, it introduces transcription errors, and it relies on someone remembering to do it before the cadence window closes.
 
 Every action the bundled console performs — creating services, authoring schemas, submitting and editing data, checking status, exporting samples — is also available as a documented HTTP API. That means a service can drop the form entirely and let a small script do the work:
 
@@ -79,7 +79,7 @@ The whole system ships as a single Docker image bundling the API and the admin S
 | You are…                                          | …and you get                                                                                                                                                                                     | …start here                                                                              |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | **Just kicking the tyres**                        | The whole thing running locally in a couple of minutes with **only Docker** — no .NET SDK, Node, or MongoDB to install.                                                                          | [docs/setup/quickstart.md](docs/setup/quickstart.md)                                     |
-| A **council administrator** running the catalogue | The web console for managing services, schemas, submissions, and watching status across all services.                                                                                            | [docs/admin-user-guide/](docs/admin-user-guide/README.md)                                |
+| A **catalogue administrator** running the deployment | The web console for managing services, schemas, submissions, and watching status across all services.                                                                                            | [docs/admin-user-guide/](docs/admin-user-guide/README.md)                                |
 | A **service** sending KPI data                    | A stable REST API that lets a scheduled job or an existing back-office system push KPIs automatically — no more weekly form-filling. A web form is there as a fallback (or for getting started). | [docs/client/](docs/client/README.md)                                                    |
 | A **data analyst / report author**                | A direct OData feed for Power BI (and equivalents), with examples and refresh-schedule guidance.                                                                                                 | [docs/setup/powerbi/](docs/setup/powerbi/README.md)                                      |
 | A **DevOps / SRE** rolling it out                 | A step-by-step Azure deployment, an exhaustive configuration reference, and an operational checklist.                                                                                            | [docs/setup/](docs/setup/README.md)                                                      |
@@ -98,11 +98,11 @@ Long-form docs live under `[docs/](docs/README.md)` and are split by audience:
 
 ## Examples
 
-Ingest is designed to be extended **without changing the product code**. The three extension points each ship ready-to-use, copy-pasteable examples for contributors and council developers who want to add a useful data page or pipeline of their own:
+Ingest is designed to be extended **without changing the product code**. The three extension points each ship ready-to-use, copy-pasteable examples for contributors and integrators who want to add a useful data page or pipeline of their own:
 
 - **Schemas** — `[examples/schemas/*.json](examples/schemas/)` — example KPI packages (garbage collection, weekly workforce, finance month-end close). Upload one through the admin console (**Schemas → New schema → Upload JSON…**) as-is, or adapt it. See [docs/admin-user-guide/schemas.md](docs/admin-user-guide/schemas.md).
 - **Reports** — `[examples/reports/html/*.html](examples/reports/html/)` — HTML + Liquid templates (single-submission summaries and period roll-ups) you upload to add a small, server-rendered data page. No editor, no redeploy. See [docs/admin-user-guide/reports.md](docs/admin-user-guide/reports.md).
-- **Integrations** — `[examples/integrations/](examples/integrations/README.md)` — minimal scripts (Python, PowerShell, C#, Java) showing how a council's existing waste-collection or HR software (a CSV export, or a vendor REST API) can push KPIs to the API on a schedule.
+- **Integrations** — `[examples/integrations/](examples/integrations/README.md)` — minimal scripts (Python, PowerShell, C#, Java) showing how an organisation's existing software (a CSV export, or a vendor REST API) can push KPIs to the API on a schedule, using waste-collection and HR as worked example domains.
 
 Schemas and reports are uploaded through the admin console; integrations run wherever your scripts run. None of them require touching or rebuilding the application.
 

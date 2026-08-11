@@ -1,12 +1,12 @@
 # Performance & capacity
 
-This page describes the **expected workload and response times** for a typical council KPI deployment on the [standard Azure hosting setup](hosting.md) (Azure Container Apps at 0.5 vCPU / 1 GiB with min 1 replica, backed by Cosmos DB for MongoDB vCore on the **M30** tier). The figures are order-of-magnitude forecasts — useful for sizing, SLA conversations, and setting expectations — not the result of a formal load test.
+This page describes the **expected workload and response times** for a typical mid-sized KPI deployment on the [standard Azure hosting setup](hosting.md) (Azure Container Apps at 0.5 vCPU / 1 GiB with min 1 replica, backed by Cosmos DB for MongoDB vCore on the **M30** tier). The figures are order-of-magnitude forecasts — useful for sizing, SLA conversations, and setting expectations — not the result of a formal load test.
 
 Ingest is deliberately small: one container, one database, no horizontal sharding. At the scale described below the standard Azure footprint is **comfortably oversized**; bottlenecks show up as occasional slow admin pages or long Power BI refreshes, not as sustained throughput limits.
 
 ## Reference deployment profile
 
-The forecasts assume a registry that looks like a mid-sized local council after a couple of years of operation:
+The forecasts assume a registry that looks like a mid-sized organisation after a couple of years of operation:
 
 | Dimension | Typical value |
 |-----------|---------------|
@@ -172,7 +172,7 @@ Rate limiting and IP restrictions belong at the ingress layer, not in the applic
 
 ## Summary
 
-For a typical council deployment — low admin UI use, API-driven submissions, a few analysts querying a few times per day, and a couple of years of history — Ingest on **Container Apps + Cosmos M30** operates at a small fraction of available capacity:
+For a typical mid-sized deployment — low admin UI use, API-driven submissions, a few analysts querying a few times per day, and a couple of years of history — Ingest on **Container Apps + Cosmos M30** operates at a small fraction of available capacity:
 
 | Metric | Typical | Peak |
 |--------|---------|------|

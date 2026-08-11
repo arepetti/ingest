@@ -6,9 +6,9 @@ It is a **.NET 10 file-based app** — a single `.cs` file you run directly with
 
 ## What real software this stands in for
 
-Councils (or their waste contractors) typically run a round-management / in-cab platform that can produce a scheduled CSV or Excel extract of the day's collections — **Bartec Collective**, **Whitespace Work Software**, **Echo**, **Yotta Alloy**, **Webaspx**, **Civica**, **AMCS**, and others. Column names differ per product, so the mapping in `push_waste_rounds.cs` is the part you adapt; the rest is generic.
+Waste operators (municipalities, contractors, or internal facilities teams) typically run a round-management / in-cab platform that can produce a scheduled CSV or Excel extract of the day's collections — **Bartec Collective**, **Whitespace Work Software**, **Echo**, **Yotta Alloy**, **Webaspx**, **Civica**, **AMCS**, and others. Column names differ per product, so the mapping in `push_waste_rounds.cs` is the part you adapt; the rest is generic.
 
-> Educated guess: product names are illustrative of the local-government waste market, not an endorsement.
+> Educated guess: product names are illustrative of the waste-operations market for this sample domain, not an endorsement.
 
 ## How it works
 

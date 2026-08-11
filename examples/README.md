@@ -20,7 +20,7 @@ HTML + Liquid templates an administrator uploads (**Reports → Upload report**)
 
 ### Integrations
 
-Scripts that collect data from a source system and submit it to Ingest — the "how would my council's existing software feed this?" examples. See [integrations/](integrations/README.md) for the shared conventions (auth, environment variables, dry-run, error handling) and how to **schedule a script on Windows**.
+Scripts that collect data from a source system and submit it to Ingest — the "how would my organisation's existing software feed this?" examples. See [integrations/](integrations/README.md) for the shared conventions (auth, environment variables, dry-run, error handling) and how to **schedule a script on Windows**.
 
 | Example | Domain | Source style | Language |
 |---------|--------|--------------|----------|

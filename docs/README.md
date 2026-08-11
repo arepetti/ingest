@@ -1,6 +1,6 @@
 # Ingest documentation
 
-This folder collects the long-form documentation for **Ingest**, the small data-ingestion backend for local-council KPI submissions. The repository's top-level [`README.md`](../README.md) carries the quick-start; everything else lives in the four sub-folders below.
+This folder collects the long-form documentation for **Ingest**, the small single-tenant backend for collecting KPI (or survey) samples from services, teams, or partners. The repository's top-level [`README.md`](../README.md) carries the quick-start; everything else lives in the four sub-folders below.
 
 ## Pick your starting point
 
@@ -34,7 +34,7 @@ Ingest is meant to be extended **without changing the product code**, and ships 
 
 - **Schemas** — [`examples/schemas/*.json`](../examples/schemas/) — example KPI packages to upload via **Schemas → New schema → Upload JSON…** (see [admin-user-guide/schemas.md](admin-user-guide/schemas.md)).
 - **Reports** — [`examples/reports/html/*.html`](../examples/reports/html/) — HTML + Liquid templates to upload (see [admin-user-guide/reports.md](admin-user-guide/reports.md)).
-- **Integrations** — [`examples/integrations/`](../examples/integrations/README.md) — minimal scripts (Python, PowerShell, C#, Java) that push KPIs from a council's waste-collection or HR system (CSV export or vendor REST API) to the [service API](client/api.md).
+- **Integrations** — [`examples/integrations/`](../examples/integrations/README.md) — minimal scripts (Python, PowerShell, C#, Java) that push KPIs from an existing source system (CSV export or vendor REST API) to the [service API](client/api.md), using waste-collection and HR as worked example domains.
 
 ### "I'm deciding whether to adopt it — what does owning it cost?"
 

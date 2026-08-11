@@ -1,7 +1,7 @@
 {
   "name": "finance_monthly_close",
   "label": "Finance — monthly close",
-  "description": "Internal monthly close pack run by the council's Finance & Treasury team. Captures budget vs actuals, revenue against target, accounts-payable health, and the basic month-end controls (bank reconciliation, audit findings).",
+  "description": "Internal monthly close pack run by the organisation's Finance & Treasury team. Captures budget vs actuals, revenue against target, accounts-payable health, and the basic month-end controls (bank reconciliation, audit findings).",
   "notes": "Submitted by the senior accountant after the monthly ledger close. Most values live on a monthly cadence; the audit-findings block reports quarterly because that's how often Internal Audit refreshes the registry.",
   "modifiable": true,
   "enabled": true,
@@ -17,7 +17,7 @@
     {
       "name": "budget_planned",
       "label": "Planned budget",
-      "description": "Approved operating budget for the month, taken from the council's adopted budget book.",
+      "description": "Approved operating budget for the month, taken from the organisation's adopted budget book.",
       "notes": null,
       "caption": null,
       "type": "Number",

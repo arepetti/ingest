@@ -174,7 +174,7 @@ public interface IStatusService
     /// entries are only produced for schemas <em>and</em> services that already existed before
     /// the window closed (<c>CreatedAt &lt; PeriodEnd</c>), so freshly-onboarded services and
     /// brand-new schemas aren't retroactively flagged as overdue. The walk is
-    /// O(services × schemas × required values); fine for the working-set of a council-sized
+    /// O(services × schemas × required values); fine for the working-set of a mid-sized
     /// registry, would want pre-aggregation in Mongo for anything larger.
     /// </remarks>
     /// <param name="allowedServiceIds">Security scope: when non-null, only these service accounts are evaluated. <c>null</c> means every service.</param>

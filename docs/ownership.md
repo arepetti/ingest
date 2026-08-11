@@ -44,7 +44,7 @@ The app is a single image (API + admin SPA) plus one MongoDB. Where it runs is y
 
 | Option | One-off effort | Ongoing effort | When to pick it |
 |--------|----------------|----------------|-----------------|
-| **Container Apps + Cosmos vCore** (recommended) | Moderate — the [step-by-step guide](setup/hosting.md) is ~14 commands | Low — managed DB, revision-based rollout | Default for most councils |
+| **Container Apps + Cosmos vCore** (recommended) | Moderate — the [step-by-step guide](setup/hosting.md) is ~14 commands | Low — managed DB, revision-based rollout | Default for most deployments |
 | **App Service (Linux container)** | Moderate — similar plumbing, deployment slots | Low | You already standardise on App Service |
 | **AKS** | Higher — you bring the manifests and secrets flow | Higher — you own the cluster | Your org already runs Kubernetes |
 | **Self-hosted MongoDB** | Higher — you run the database | **Highest** — patching, backups, HA all yours | You must keep data on specific infrastructure |

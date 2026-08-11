@@ -467,7 +467,7 @@ Keeping these at the hosting layer means they apply uniformly to every entry poi
 
 #### Picking a rate limit
 
-There's no single correct number — it depends on how many services submit, how chatty your Power BI refreshes are, and how much burst you want to absorb. The [performance profile](performance.md) is the starting point: a typical council deployment sits **well under 1 request/second** on average, with short peaks of **~1–2 req/s** (analysts plus a Power BI refresh) and a worst-plausible write spike of **~0.5 req/s** for a few seconds. So a limit that protects the platform without tripping on legitimate traffic is generously above those numbers. Reasonable **starting points** (then tune from real traffic):
+There's no single correct number — it depends on how many services submit, how chatty your Power BI refreshes are, and how much burst you want to absorb. The [performance profile](performance.md) is the starting point: a typical mid-sized deployment sits **well under 1 request/second** on average, with short peaks of **~1–2 req/s** (analysts plus a Power BI refresh) and a worst-plausible write spike of **~0.5 req/s** for a few seconds. So a limit that protects the platform without tripping on legitimate traffic is generously above those numbers. Reasonable **starting points** (then tune from real traffic):
 
 | Scope | Suggested starting limit | Rationale |
 |-------|--------------------------|-----------|

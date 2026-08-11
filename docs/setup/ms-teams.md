@@ -11,7 +11,7 @@ This page is the authoritative deployment walk-through — Azure Bot registratio
 Before you begin, confirm you have:
 
 - An **Azure subscription** where you can create an Azure Bot resource and a Microsoft Entra app registration.
-- A **Microsoft 365 organizational tenant** with **Microsoft Teams** — the kind councils and businesses use with work/school accounts. You need a Teams administrator (or equivalent) who can enable custom app upload.
+- A **Microsoft 365 organizational tenant** with **Microsoft Teams** — the kind organisations use with work/school accounts. You need a Teams administrator (or equivalent) who can enable custom app upload.
 - **Ingest reachable over public HTTPS** — the Bot Framework connector must POST to your messaging endpoint from the internet. A hostname behind Azure Container Apps ingress, App Service, or your own reverse proxy is fine; `localhost` is not.
 - The **Integrations feature enabled** on the server (`Integrations:Enabled`, **on by default** — see [Configuration reference](#configuration-reference) below).
 
@@ -27,14 +27,14 @@ The card Ingest sends is **interactive** — recipients type values into form fi
 
 ### 1 — Create an Azure Bot resource
 
-In the [Azure portal](https://portal.azure.com), create an **Azure Bot** resource. The **F0 (Free)** pricing tier covers the Microsoft Teams channel for typical council workloads.
+In the [Azure portal](https://portal.azure.com), create an **Azure Bot** resource. The **F0 (Free)** pricing tier covers the Microsoft Teams channel for typical organisational workloads.
 
 When prompted for the Microsoft App ID, either:
 
 - **Create a new Microsoft App ID** — Azure creates a matching **Microsoft Entra app registration** for you, or
 - **Use an existing registration** if your org already has one.
 
-Choose **Multi Tenant** or **Single Tenant** to match your org's policy (single-tenant is common for internal council bots).
+Choose **Multi Tenant** or **Single Tenant** to match your org's policy (single-tenant is common for internal organisational bots).
 
 ### 2 — Note the App ID, tenant id, and create a client secret
 

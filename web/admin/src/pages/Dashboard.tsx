@@ -251,7 +251,7 @@ function MissingSubmissionsSection({
 }
 
 // Cadences offered in the trend's cadence picker, in the same order as the server enum. Monthly
-// is the default because it's the most common reporting rhythm for council KPIs.
+// is the default because it's the most common reporting rhythm for operational KPIs.
 const TREND_CADENCES: Cadence[] = ['Daily', 'Weekly', 'Fortnightly', 'Monthly', 'Quarterly', 'SemiAnnually', 'Yearly']
 
 // Sentinel option value for the "all services" (global) view in the service picker.

@@ -242,7 +242,7 @@
     {
       "name": "monthly_inspection_passed",
       "label": "Monthly inspection passed",
-      "description": "Result of the monthly council compliance inspection. Leave empty if not yet scheduled.",
+      "description": "Result of the monthly regulatory compliance inspection. Leave empty if not yet scheduled.",
       "notes": null,
       "caption": null,
       "type": "Boolean",
@@ -328,7 +328,7 @@
     {
       "kind": "section",
       "caption": "Recycling",
-      "description": "Performance of the recycling stream. Contamination rate is the lead indicator we share with the council.",
+      "description": "Performance of the recycling stream. Contamination rate is the lead indicator we share with the regulator.",
       "items": [
         { "kind": "value", "valueName": "recycling_tonnes_collected" },
         { "kind": "value", "valueName": "contamination_pct" }

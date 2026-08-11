@@ -83,7 +83,7 @@ These aren't GDPR features per se but support the same goals:
 Intentionally out of scope of the product — these are controller/deployment responsibilities:
 
 - **Governance artifacts** — DPIA, privacy notice, and Records of Processing Activities (ROPA) are documents you maintain, not features.
-- **Lawful-basis tracking / consent management** — Ingest assumes a public-task or legitimate-interest basis appropriate to council KPI reporting; it does not record per-subject consent.
+- **Lawful-basis tracking / consent management** — Ingest assumes a public-task or legitimate-interest basis appropriate to organisational KPI or survey reporting; it does not record per-subject consent.
 - **App-level HTTPS/HSTS enforcement** — handled at the ingress/reverse proxy ([setup/hosting.md](setup/hosting.md)).
 - **Automated detection of personal data inside free-text KPI fields** — anonymise redacts *all* string values/notes for an erased subject, but the system can't tell which free-text elsewhere happens to be personal. Schema authors should avoid collecting personal data in free-text where it isn't needed.
 - **Special-category data (Art. 9)** — there is no dedicated handling; don't collect it through KPI fields.

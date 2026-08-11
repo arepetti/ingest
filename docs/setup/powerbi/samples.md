@@ -133,7 +133,7 @@ Because partitions outside the refresh window are never re-read, three things **
 
 Normal *late reporting* is fine: a January figure submitted today gets `SubmittedAt = today`, lands in the current (in-window) partition, and is picked up. The problem is only retroactive changes to *old* `SubmittedAt`. Mitigations:
 
-- **Size the refresh window** to exceed your realistic correction lag (a council that fixes prior-month numbers should refresh the last *two* months, not two weeks).
+- **Size the refresh window** to exceed your realistic correction lag (an organisation that fixes prior-month numbers should refresh the last *two* months, not two weeks).
 - **Run a one-off full refresh after a bulk history import** (or do the import *before* first publishing the dataset).
 - **Schedule an occasional full refresh** (e.g. monthly) as a backstop so any stray old edit eventually lands.
 
