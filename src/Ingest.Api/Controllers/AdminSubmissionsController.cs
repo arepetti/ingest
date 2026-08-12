@@ -81,7 +81,8 @@ public sealed class AdminSubmissionsController(
     {
         var s = await service.GetAsync(id, includeDeleted ?? false, ct);
         // Hide the existence of out-of-scope submissions behind a 404 for scoped callers.
-        if (s is null || !User.CanAccessService(s.ServiceAccountId)) return NotFound();
+        if (s is null || !User.CanAccessService(s.ServiceAccountId))
+            return NotFound(DiagnosticProblem.NotFound("Submission", id));
         return Ok(SubmissionDto.From(s));
     }
 
@@ -101,7 +102,8 @@ public sealed class AdminSubmissionsController(
     {
         // Scoped callers may only read the history of submissions they can see.
         var s = await service.GetAsync(id, includeDeleted: true, ct);
-        if (s is null || !User.CanAccessService(s.ServiceAccountId)) return NotFound();
+        if (s is null || !User.CanAccessService(s.ServiceAccountId))
+            return NotFound(DiagnosticProblem.NotFound("Submission", id));
 
         var result = await auditLog.ListByTargetAsync(id, RequestHelpers.ToPageRequest(page, pageSize, null, false), ct);
         return Ok(result.Map(AuditLogDto.From));
@@ -125,10 +127,13 @@ public sealed class AdminSubmissionsController(
     {
         // Respect the caller's service scope: out-of-scope submissions 404 just like GetById.
         var existing = await service.GetAsync(id, includeDeleted: false, ct);
-        if (existing is null || !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+        if (existing is null || !User.CanAccessService(existing.ServiceAccountId))
+            return NotFound(DiagnosticProblem.NotFound("Submission", id));
 
         var doc = await pdfExport.ExportSubmissionAsync(id, ct);
-        return doc is null ? NotFound() : File(doc.Content, "application/pdf", doc.FileName);
+        return doc is null
+            ? NotFound(DiagnosticProblem.NotFound("Submission", id))
+            : File(doc.Content, "application/pdf", doc.FileName);
     }
 
     /// <summary>Export the submissions for a single schema (matching the current list filters) as an XLSX workbook.</summary>
@@ -165,7 +170,14 @@ public sealed class AdminSubmissionsController(
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(schemaName))
-            return BadRequest("A single schemaName is required for the XLSX export.");
+        {
+            var diagnostic = Diagnostic.Create(
+                DiagnosticCodes.Api.SingleParameterRequired,
+                "A single schemaName is required for the XLSX export.",
+                ("parameter", "schemaName"),
+                ("operation", "submissions.export.xlsx"));
+            return BadRequest(DiagnosticProblem.BadRequest(diagnostic));
+        }
 
         // Honour the caller's service scope by passing it as the allow-list; an out-of-scope
         // serviceId then simply yields an empty (header-only) workbook.
@@ -175,7 +187,9 @@ public sealed class AdminSubmissionsController(
             scope.Count > 0 ? scope : null);
 
         var doc = await xlsxExport.ExportSubmissionsAsync(filter, ct);
-        return doc is null ? NotFound() : File(doc.Content, XlsxContentType, doc.FileName);
+        return doc is null
+            ? NotFound(DiagnosticProblem.NotFound("Schema", schemaName))
+            : File(doc.Content, XlsxContentType, doc.FileName);
     }
 
     /// <summary>Soft-delete a submission.</summary>
@@ -196,7 +210,8 @@ public sealed class AdminSubmissionsController(
         // A scoped caller can only delete within its assigned services; out-of-scope ids 404 so the
         // existence of other services' submissions stays hidden. (DeleteAsync is otherwise idempotent.)
         var existing = await service.GetAsync(id, includeDeleted: true, ct);
-        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId))
+            return NotFound(DiagnosticProblem.NotFound("Submission", id));
 
         await service.DeleteAsync(id, ct);
         return NoContent();
@@ -227,7 +242,10 @@ public sealed class AdminSubmissionsController(
         EnsureServiceInScope(input.ServiceAccountId);
         var written = await service.AdminCreateAsync(input, Request.ResolveSource(), draft: draft, ct: ct);
         return Created($"/api/admin/submissions/{written.Submission.Id}",
-            new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
+            new SubmissionWriteResponse(written.Submission.Id, written.Warnings)
+            {
+                WarningDetails = written.WarningDetails,
+            });
     }
 
     /// <summary>Validate a would-be submission on behalf of a service without saving (dry run).</summary>
@@ -311,10 +329,14 @@ public sealed class AdminSubmissionsController(
     public async Task<IActionResult> Replace(Guid id, [FromBody] AdminSubmissionInput input, [FromQuery] bool draft, CancellationToken ct)
     {
         var existing = await service.GetAsync(id, includeDeleted: true, ct);
-        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId))
+            return NotFound(DiagnosticProblem.NotFound("Submission", id));
 
         var written = await service.AdminReplaceAsync(id, input, Request.ResolveSource(), draft: draft, ct: ct);
-        return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
+        return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings)
+        {
+            WarningDetails = written.WarningDetails,
+        });
     }
 
     /// <summary>Number of submissions currently awaiting approval. Backs the dashboard pending-approvals card.</summary>
@@ -363,7 +385,8 @@ public sealed class AdminSubmissionsController(
     public async Task<IActionResult> Approve(Guid id, [FromBody] ApprovalDecisionRequest? body, CancellationToken ct)
     {
         var existing = await service.GetAsync(id, includeDeleted: true, ct);
-        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId))
+            return NotFound(DiagnosticProblem.NotFound("Submission", id));
 
         var updated = await service.ApproveAsync(User.CurrentAccountId(), id, body?.Note, ct);
         return Ok(SubmissionDto.From(updated));
@@ -390,7 +413,8 @@ public sealed class AdminSubmissionsController(
     public async Task<IActionResult> Reject(Guid id, [FromBody] ApprovalDecisionRequest? body, CancellationToken ct)
     {
         var existing = await service.GetAsync(id, includeDeleted: true, ct);
-        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId)) return NotFound();
+        if (existing is not null && !User.CanAccessService(existing.ServiceAccountId))
+            return NotFound(DiagnosticProblem.NotFound("Submission", id));
 
         var updated = await service.RejectAsync(User.CurrentAccountId(), id, body?.Note, ct);
         return Ok(SubmissionDto.From(updated));
@@ -404,6 +428,9 @@ public sealed class AdminSubmissionsController(
     private void EnsureServiceInScope(Guid serviceId)
     {
         if (!User.CanAccessService(serviceId))
-            throw new ForbiddenException("This service is outside your assigned scope.");
+            throw new ForbiddenException(Diagnostic.Create(
+                DiagnosticCodes.Api.ServiceOutsideScope,
+                "This service is outside your assigned scope.",
+                ("serviceId", serviceId)));
     }
 }

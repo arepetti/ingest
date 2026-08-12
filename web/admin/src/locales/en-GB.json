@@ -1,0 +1,2595 @@
+{
+  "metadata": {
+    "locale": "en-GB",
+    "description": "English as used in the United Kingdom",
+    "nativeLabel": "English (UK)",
+    "englishLabel": "English (United Kingdom)"
+  },
+  "strings": {
+    "app": {
+      "title": "Ingest Admin"
+    },
+    "apiErrors": {
+      "unexpected": "Something went wrong.",
+      "status": {
+        "400": "The request was invalid.",
+        "401": "Your API key wasn't accepted.",
+        "403": "You don't have permission to do this.",
+        "404": "That item could not be found.",
+        "408": "The request took too long. Please try again.",
+        "409": "This conflicts with another change. Reload and try again.",
+        "410": "That item is no longer available.",
+        "413": "The request is too large.",
+        "415": "That type of content is not supported.",
+        "422": "The data could not be processed.",
+        "429": "Too many requests — please wait a moment and try again.",
+        "500": "Something went wrong on the server. Please try again.",
+        "502": "The server isn't responding right now. Please try again shortly.",
+        "503": "The server isn't responding right now. Please try again shortly.",
+        "504": "The server isn't responding right now. Please try again shortly.",
+        "server": "Something went wrong on the server. Please try again.",
+        "request": "The request failed.",
+        "unexpected": "Something unexpected happened."
+      }
+    },
+    "apiMessages": {
+      "common": {
+        "not_found": "{{resource}} could not be found.",
+        "conflict": "The request conflicts with the current state. {{message}}",
+        "forbidden": "You don't have permission to do this. {{message}}",
+        "unauthorized": "You need to sign in to continue.",
+        "service_unavailable": "This service is temporarily unavailable. {{message}}",
+        "validation": "Validation failed. {{message}}",
+        "internal": "Something went wrong on the server. Please try again.",
+        "feature_disabled": "This feature is not enabled. {{message}}"
+      },
+      "api": {
+        "invalid_request": "The request was invalid. {{message}}",
+        "missing_required_parameter": "The required “{{parameter}}” parameter is missing.",
+        "unsupported_omit": "The omit value “{{value}}” is not supported.",
+        "single_parameter_required": "A single “{{parameter}}” value is required for {{operation}}.",
+        "service_outside_scope": "Service “{{serviceId}}” is outside your assigned scope."
+      },
+      "submissions": {
+        "validation": "Submission validation failed. {{message}}",
+        "duplicate_period": "“{{displayName}}” has already been submitted for this {{cadence}} period.",
+        "pending_duplicate_period": "“{{displayName}}” already has a submission awaiting approval for this {{cadence}} period.",
+        "schema_not_assigned": "Schema “{{schemaName}}” is not assigned to this service.",
+        "schema_disabled": "Schema “{{schemaName}}” is currently disabled.",
+        "value_not_defined": "Value “{{valueName}}” is not defined in schema “{{schemaName}}”.",
+        "calculated_value_submitted": "Calculated value “{{valueName}}” cannot be submitted.",
+        "value_disabled": "Value “{{displayName}}” is currently disabled.",
+        "value_required": "Value “{{displayName}}” is required.",
+        "required_value_missing": "Required value “{{displayName}}” ({{schemaName}}.{{valueName}}) is missing.",
+        "value_type": "Value “{{displayName}}” must be a valid {{expectedType}}.",
+        "value_minimum": "Value “{{displayName}}” must be at least {{minimum}} (received {{actual}}).",
+        "value_maximum": "Value “{{displayName}}” must be no more than {{maximum}} (received {{actual}}).",
+        "value_before_minimum_date": "Value “{{displayName}}” ({{schemaName}}.{{valueName}}) must be on or after {{minimum}} (received {{actual}}).",
+        "value_after_maximum_date": "Value “{{displayName}}” ({{schemaName}}.{{valueName}}) must be on or before {{maximum}} (received {{actual}}).",
+        "value_minimum_length": "Value “{{displayName}}” must contain at least {{minimum}} characters (received {{actual}}).",
+        "value_maximum_length": "Value “{{displayName}}” must contain no more than {{maximum}} characters (received {{actual}}).",
+        "value_regex": "Value “{{displayName}}” does not match the required format.",
+        "value_validation_failed": "Validation failed for “{{displayName}}”: {{detail}}",
+        "value_validation_error": "The validation rule for “{{displayName}}” could not be evaluated: {{detail}}",
+        "schema_validation_failed": "Submission validation failed for schema “{{schemaName}}”: {{detail}}",
+        "schema_validation_error": "A validation rule for schema “{{schemaName}}” could not be evaluated: {{detail}}",
+        "value_not_modifiable": "Value “{{displayName}}” cannot be changed.",
+        "gating_evaluation_error": "The {{rule}} rule for “{{schemaName}} / {{valueName}}” could not be evaluated: {{detail}}",
+        "sample_discarded": "A submitted sample was discarded. {{message}}",
+        "sample_discarded_with_message": "Sample “{{schemaName}} / {{valueName}}” was discarded by {{rule}}: {{detail}}",
+        "sample_discarded_by_rule": "Sample “{{schemaName}} / {{valueName}}” was discarded by {{rule}}.",
+        "warning_rule_triggered": "The warning rule for “{{displayName}}” was triggered.",
+        "warning_rule_message": "Warning for “{{displayName}}”: {{detail}}",
+        "warning_rule_error": "The warning rule for “{{displayName}}” could not be evaluated: {{detail}}",
+        "legacy_warning": "{{message}}",
+        "published_cannot_become_draft": "A published submission cannot be returned to draft.",
+        "not_awaiting_approval": "This submission is not awaiting approval.",
+        "wrong_owner": "This submission belongs to a different account.",
+        "window_not_open": "The submission window is not open. {{message}}",
+        "window_closed": "The submission window has closed. {{message}}",
+        "create_window_not_open": "The {{cadence}} submission window for “{{schemaName}}.{{valueName}}” opens at {{windowStart}}.",
+        "create_window_closed": "The {{cadence}} submission window for “{{schemaName}}.{{valueName}}” closed at {{windowEnd}}.",
+        "modify_window_closed": "Submission {{submissionId}} cannot be modified: the {{cadence}} window for “{{schemaName}}.{{valueName}}” closed at {{windowEnd}}.",
+        "ingestion_closed": "Submissions are temporarily closed. {{message}}"
+      },
+      "imports": {
+        "invalid_file": "The import file is invalid. {{message}}",
+        "empty_file": "The import file is empty.",
+        "invalid_json": "The import file is not valid JSON: {{detail}}",
+        "unsupported_format": "The import format is not supported. {{message}}",
+        "submissions_not_array": "The “submissions” property must be an array, not {{actualKind}}.",
+        "invalid_root": "The import root kind {{actualKind}} is invalid. Accepted shapes: {{acceptedShapes}}.",
+        "submission_not_object": "Submission {{submissionNumber}} must be an object, not {{actualKind}}.",
+        "samples_missing": "Submission {{submissionNumber}} must contain a samples array (received {{actualKind}}).",
+        "sample_names_required": "Submission {{submissionNumber}}, sample {{sampleNumber}} requires schemaName “{{schemaName}}” and valueName “{{valueName}}”.",
+        "sample_invalid_json": "Submission {{submissionNumber}}, sample {{sampleNumber}} contains invalid JSON at line {{lineNumber}}, byte {{bytePositionInLine}}: {{detail}}",
+        "submission_no_samples": "Submission {{submissionNumber}} contains no valid samples.",
+        "missing_column": "The required “{{column}}” column is missing.",
+        "row_names_required": "Row {{row}} requires schemaName “{{schemaName}}” and valueName “{{valueName}}”.",
+        "row_timestamp_invalid": "Row {{row}} has an invalid timestamp “{{timestamp}}”.",
+        "no_data_rows": "The import file contains no data rows.",
+        "invalid_row": "An import row is invalid. {{message}}",
+        "no_submissions": "No submissions were found in the file.",
+        "accounts": {
+          "invalid_marker": "This is not an Ingest accounts export.",
+          "invalid_json": "The {{fileType}} file is not valid JSON: {{detail}}",
+          "unsupported_version": "Accounts export version {{actualVersion}} is not supported; expected version {{expectedVersion}}.",
+          "no_accounts": "The accounts file contains no accounts.",
+          "entry_name_missing": "An account entry was skipped because accountName “{{accountName}}” is missing.",
+          "entry_failed": "An account entry was skipped. {{message}}"
+        }
+      },
+      "accounts": {
+        "validation": "Account validation failed. {{message}}",
+        "already_exists": "Account “{{accountName}}” already exists.",
+        "invalid_email": "“{{email}}” is not a valid email address.",
+        "unknown_capabilities": "Unknown capabilities: {{capabilities}}.",
+        "invalid_assigned_services": "One or more assigned service IDs are invalid: {{serviceIds}}.",
+        "invalid_sso_link": "The SSO link is invalid. {{message}}",
+        "sso_links_user_only": "Only User accounts may have SSO links; this account is {{accountKind}}.",
+        "sso_link_fields_required": "Each SSO link requires both provider “{{provider}}” and email “{{email}}”.",
+        "duplicate_sso_link": "The SSO link for {{provider}} / {{email}} is duplicated.",
+        "sso_link_in_use": "The {{provider}} identity “{{email}}” is already linked to another account.",
+        "delete_in_use": "Account “{{accountName}}” has submitted data and cannot be deleted. Disable it instead.",
+        "api_key_description_too_long": "The API key description is {{actualLength}} characters; the maximum is {{maxLength}}.",
+        "api_key_expiry_not_future": "The API key expiry {{expiry}} must be later than {{now}}.",
+        "api_key_expiry_too_distant": "The API key expiry {{expiry}} is more than {{maxLifetimeYears}} years after {{now}}."
+      },
+      "schemas": {
+        "validation": "Schema validation failed. {{message}}",
+        "already_exists": "Schema “{{schemaName}}” already exists.",
+        "delete_in_use": "Schema “{{schemaName}}” is used by submissions and cannot be deleted. Disable it instead.",
+        "version_negative": "Schema version {{version}} must be at least {{minimum}}.",
+        "version_decreased": "Schema version cannot decrease from {{previousVersion}} to {{requestedVersion}}.",
+        "value_name_invalid": "Value name “{{valueName}}” must match {{pattern}}.",
+        "since_version_negative": "Value “{{valueName}}” has sinceVersion {{sinceVersion}}; the minimum is {{minimum}}.",
+        "since_version_after_schema": "Value “{{valueName}}” has sinceVersion {{sinceVersion}}, after schema version {{schemaVersion}}.",
+        "target_band_out_of_order": "Value “{{valueName}}” has {{lowerBand}} {{lowerValue}} above {{upperBand}} {{upperValue}}.",
+        "green_min_without_amber_min": "Value “{{valueName}}” sets GreenMin {{greenMin}} without an AmberMin.",
+        "green_max_without_amber_max": "Value “{{valueName}}” sets GreenMax {{greenMax}} without an AmberMax.",
+        "calculated_expression_missing": "Calculated value “{{valueName}}” requires an expression.",
+        "calculated_value_required": "Calculated value “{{valueName}}” cannot be required.",
+        "calculated_expression_syntax": "Expression for “{{valueName}}” has a syntax error at {{position}}: {{detail}}",
+        "calculated_expression_analysis": "Expression for “{{valueName}}” could not be analysed: {{detail}}",
+        "calculated_self_reference": "Expression for “{{valueName}}” references itself.",
+        "calculated_history_reference": "Expression for “{{valueName}}” cannot use history functions: {{functions}}.",
+        "calculated_unknown_identifier": "Expression for “{{valueName}}” references unknown identifier “{{identifier}}”.",
+        "calculated_dependency_cycle": "Calculated values contain a dependency cycle.",
+        "layout_depth_exceeded": "Layout depth {{actualDepth}} exceeds the maximum {{maxDepth}}.",
+        "layout_value_name_missing": "A layout value node is missing valueName.",
+        "layout_unknown_value": "The layout references unknown value “{{valueName}}”.",
+        "layout_duplicate_value": "Value “{{valueName}}” appears more than once in the layout.",
+        "layout_section_caption_missing": "A layout section is missing its caption.",
+        "layout_unknown_kind": "Layout kind “{{actualKind}}” is invalid. Expected: {{expectedKinds}}."
+      },
+      "reports": {
+        "validation": "Report validation failed. {{message}}",
+        "already_exists": "Report “{{reportName}}” already exists.",
+        "missing_upload": "Upload a non-empty file in the “{{field}}” field.",
+        "content_empty": "Report content must not be empty.",
+        "name_required": "A report name is required; file “{{fileName}}” did not provide one.",
+        "date_range_invalid": "Report start {{from}} must not be after end {{to}}.",
+        "type_unsupported": "Report type “{{reportType}}” is not supported.",
+        "schema_not_target": "Schema “{{schemaName}}” is not a target of report “{{reportName}}”. Targets: {{targetSchemaNames}}.",
+        "schema_required_for_multiple_targets": "Report “{{reportName}}” targets {{targetSchemaNames}}; provide “{{parameter}}”.",
+        "submission_id_required": "Report “{{reportName}}” requires “{{parameter}}”.",
+        "submission_schema_missing": "Submission {{submissionId}} has no samples for schema “{{schemaName}}”.",
+        "aggregate_schema_required": "Aggregate report “{{reportName}}” requires “{{parameter}}”.",
+        "front_matter_unclosed": "Report front matter opens with “---” but never closes.",
+        "front_matter_line_invalid": "Front-matter line {{lineNumber}} cannot be parsed: {{line}}",
+        "front_matter_type_invalid": "Front-matter type “{{actualType}}” is invalid. Allowed: {{allowedTypes}}.",
+        "front_matter_inline_list_invalid": "Inline list “{{value}}” must use {{expectedWrapper}}.",
+        "template_parse_failed": "{{engine}} template parsing failed: {{detail}}",
+        "template_render_failed": "{{engine}} template rendering failed: {{detail}}"
+      },
+      "expressions": {
+        "empty": "The expression must not be empty.",
+        "too_long": "The expression exceeds the {{maxLength}}-character limit.",
+        "parse_failed": "The expression could not be parsed: {{detail}}",
+        "unsupported_target": "Expression target “{{target}}” is not supported.",
+        "batch_missing": "The expression batch is missing.",
+        "batch_too_large": "The batch exceeds the {{maxCount}}-expression limit."
+      },
+      "configuration": {
+        "validation": "Configuration validation failed. {{message}}",
+        "backup_empty": "The backup file is empty.",
+        "backup_invalid_json": "The backup file is not valid JSON: {{detail}}",
+        "backup_invalid_marker": "This is not an Ingest backup (expected “{{expectedFormat}}”, received “{{actualFormat}}”).",
+        "backup_unsupported_version": "Backup version {{version}} is unsupported; maximum supported version is {{maximumVersion}}.",
+        "backup_missing_collections": "The backup file has no collections section.",
+        "config_backup_empty": "The configuration backup file is empty.",
+        "config_backup_invalid_json": "The configuration backup file is not valid JSON: {{detail}}",
+        "config_backup_invalid_marker": "This is not an Ingest configuration backup (expected “{{expectedFormat}}”, received “{{actualFormat}}”).",
+        "config_backup_unsupported_version": "Configuration backup version {{version}} is unsupported; maximum supported version is {{maximumVersion}}.",
+        "config_backup_missing_collections": "The configuration backup file has no collections section."
+      },
+      "comments": {
+        "validation": "Comment validation failed. {{message}}",
+        "thread_resolved": "This thread is resolved. Reopen it before adding a comment.",
+        "edit_forbidden": "You can only edit your own comments.",
+        "value_not_on_schema": "Value “{{valueName}}” is not on schema {{schemaId}}.",
+        "target_type_unsupported": "Comment target type “{{targetType}}” is unsupported for target {{targetId}}.",
+        "text_required": "Comment text is required.",
+        "text_too_long": "Comment text is {{actualLength}} characters; the maximum is {{maxLength}}."
+      },
+      "events": {
+        "validation": "Event validation failed. {{message}}",
+        "label_required": "Event label is required.",
+        "timestamp_required": "Event timestamp is required.",
+        "interval_duration_required": "A positive duration “{{duration}}” is required for {{eventKind}} events.",
+        "invalid_service_ids": "Affected service IDs must identify existing services: {{serviceIds}}."
+      },
+      "approval": {
+        "validation": "Approval validation failed. {{message}}",
+        "global_default_not_allowed": "Approval mode “{{mode}}” cannot defer to the global default here.",
+        "approver_required": "At least one approver is required.",
+        "required_approver_required": "At least one approver must be marked required.",
+        "duplicate_service_owner": "The service owner is listed more than once.",
+        "duplicate_approver": "Approver account {{accountId}} is listed more than once.",
+        "approver_not_found": "Approver account {{accountId}} does not exist.",
+        "not_designated_approver": "Account {{approverAccountId}} is not a designated approver for submission {{submissionId}}."
+      },
+      "integrations": {
+        "validation": "Integration validation failed. {{message}}",
+        "connection_failed": "The integration connection failed: {{detail}}",
+        "schedule_hour_invalid": "Schedule hour {{hourUtc}} must be between {{minimum}} and {{maximum}} UTC.",
+        "schedule_minute_invalid": "Schedule minute {{minuteUtc}} must be between {{minimum}} and {{maximum}}.",
+        "schedule_day_invalid": "Day {{dayOfMonth}} for {{frequency}} schedules must be between {{minimum}} and {{maximum}}.",
+        "schedule_anchor_month_invalid": "Anchor month {{anchorMonth}} for {{frequency}} schedules must be between {{minimum}} and {{maximum}}.",
+        "teams_target_required": "A Teams {{targetKind}} target is required for {{integrationKind}}."
+      },
+      "webhooks": {
+        "validation": "Webhook validation failed. {{message}}",
+        "delivery_failed": "Webhook delivery failed. {{message}}",
+        "name_required": "Webhook name is required.",
+        "url_required": "Webhook URL is required.",
+        "url_invalid": "Webhook URL “{{url}}” must be absolute and use one of: {{allowedSchemes}}."
+      },
+      "email": {
+        "validation": "Email validation failed. {{message}}",
+        "delivery_failed": "Email delivery failed. {{message}}",
+        "address_invalid": "“{{address}}” is not a valid email address.",
+        "subject_required": "Subject is required.",
+        "email_subject_required": "Email subject is required.",
+        "text_body_required": "Text body is required.",
+        "template_parse_failed": "{{engine}} template field “{{field}}” could not be parsed: {{detail}}",
+        "smtp_host_required": "SMTP host is required.",
+        "smtp_port_invalid": "SMTP port {{port}} must be between {{minimum}} and {{maximum}}.",
+        "from_address_required": "From address is required.",
+        "account_contact_missing": "Account “{{accountName}}” ({{accountId}}) has no contact email."
+      }
+    },
+    "settings": {
+      "title": "Settings",
+      "general": {
+        "navigationLabel": "General",
+        "navigationGroup": "General",
+        "title": "General",
+        "description": "Preferences for the admin console.",
+        "language": "Language",
+        "theme": "Theme",
+        "lightTheme": "Light"
+      },
+      "permissionDenied": "You don't have permission to manage any settings.",
+      "noneEnabled": "No configurable settings are enabled. Turn on email, webhooks, integrations, or the approval workflow in the server configuration to manage them here.",
+      "navigation": {
+        "areas": "Areas",
+        "configuration": "Configuration",
+        "submissionPeriods": "Submission periods",
+        "ingestion": "Ingestion",
+        "approval": "Approval",
+        "approvals": "Approvals",
+        "rules": "Rules",
+        "email": "Email",
+        "emailTemplates": "Email templates",
+        "notifications": "Notifications",
+        "webhooks": "Webhooks",
+        "integrations": "Integrations",
+        "teamsNotifications": "Teams notifications",
+        "teamsConnection": "Teams connection"
+      },
+      "common": {
+        "loading": "Loading…",
+        "saving": "Saving…",
+        "save": "Save",
+        "saveChanges": "Save changes",
+        "add": "Add",
+        "cancel": "Cancel",
+        "done": "Done",
+        "refresh": "Refresh",
+        "moreActions": "More actions",
+        "actions": "Actions",
+        "edit": "Edit",
+        "delete": "Delete",
+        "enable": "Enable",
+        "disable": "Disable",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "configured": "Configured",
+        "notConfigured": "Not configured",
+        "label": "Label",
+        "status": "Status",
+        "services": "Services",
+        "schemas": "Schemas",
+        "allServices": "All services",
+        "allSchemas": "All schemas",
+        "selectServices": "Select services",
+        "selectSchemas": "Select schemas",
+        "removed": "(removed)",
+        "unset": "(unset)",
+        "optionalListName": "Optional name shown only in this list.",
+        "serviceRequired": "Pick at least one service, or choose “All services”.",
+        "schemaRequired": "Pick at least one schema, or choose “All schemas”.",
+        "cadence": "Cadence",
+        "cadences": {
+          "Daily": "Daily",
+          "Weekly": "Weekly",
+          "Fortnightly": "Fortnightly",
+          "Monthly": "Monthly",
+          "Quarterly": "Quarterly",
+          "SemiAnnually": "Semi-annually",
+          "Yearly": "Yearly"
+        },
+        "months": {
+          "january": "January",
+          "february": "February",
+          "march": "March",
+          "april": "April",
+          "may": "May",
+          "june": "June",
+          "july": "July",
+          "august": "August",
+          "september": "September",
+          "october": "October",
+          "november": "November",
+          "december": "December"
+        },
+        "weekDays": {
+          "monday": "Monday",
+          "tuesday": "Tuesday",
+          "wednesday": "Wednesday",
+          "thursday": "Thursday",
+          "friday": "Friday",
+          "saturday": "Saturday",
+          "sunday": "Sunday"
+        },
+        "weekDaysShort": {
+          "monday": "Mon",
+          "tuesday": "Tue",
+          "wednesday": "Wed",
+          "thursday": "Thu",
+          "friday": "Fri",
+          "saturday": "Sat",
+          "sunday": "Sun"
+        }
+      },
+      "approval": {
+        "title": "Default approval policy",
+        "description": "Schemas set to “Use the global default” fall back to this policy. Changing it affects only new submissions; in-flight ones keep the approvers they were created with.",
+        "saved": "Approval policy saved.",
+        "defaultBehavior": "When a schema defers to the default",
+        "dontRequire": "Don’t require approval",
+        "require": "Require approval",
+        "appliesTo": "Applies to",
+        "approvers": "Approvers",
+        "approversHint": "Approver/Admin accounts who may review, and/or the service owner (the account that sent the submission). Mark at least one as Required.",
+        "requiredApproverValidation": "Add at least one Required approver.",
+        "selectApprovers": "Select approvers",
+        "serviceOwner": "Service owner (the submitting service)",
+        "required": "Required",
+        "optional": "Optional",
+        "sources": {
+          "both": "Both manual and API submissions",
+          "manualOnly": "Manual (web console) submissions only",
+          "apiOnly": "API submissions only"
+        }
+      },
+      "areas": {
+        "title": "Areas",
+        "description": "Optional grouping tags offered when editing an account. With one or more areas defined the account editor shows a dropdown; leave the list empty to let editors type a free-text area. Areas are informative only — changing them never affects existing accounts.",
+        "saved": "Areas saved.",
+        "empty": "No areas defined — the account editor uses a free-text field.",
+        "moveUp": "Move {{name}} up",
+        "moveDown": "Move {{name}} down",
+        "remove": "Remove {{name}}",
+        "addLabel": "Add an area",
+        "placeholder": "e.g. North region"
+      },
+      "submissionPeriods": {
+        "title": "Submission periods",
+        "description": "Where each reporting period starts and ends. Changing these takes effect immediately for new submissions and open-period checks; periods already recorded keep the boundaries they were written with.",
+        "saved": "Submission periods saved.",
+        "fiscalYearStart": "Fiscal year starts in",
+        "fiscalYearHint": "Also anchors quarterly and half-yearly periods.",
+        "weekStart": "Week starts on",
+        "monthStart": "Month starts on day",
+        "monthStartHint": "1-28.",
+        "fortnightAnchor": "Fortnight anchor",
+        "fortnightAnchorHint": "Any date on a fortnight boundary; only the date matters."
+      },
+      "submissionWindows": {
+        "title": "Submission windows",
+        "description": "How long before/after each cadence's period a service may actually create or edit a submission for it. Open offset delays when the window opens after the period starts; Grace period extends how long it stays open after the period ends. Both default to 0 hours — the window is exactly the period — until set here. “Missed submission” reporting and reminders also wait for the grace period to elapse.",
+        "saved": "Submission windows saved.",
+        "openOffset": "Open offset (hours)",
+        "gracePeriod": "Grace period (hours)"
+      },
+      "currentPeriods": {
+        "title": "Current periods",
+        "description": "What the settings above resolve to right now — a live snapshot, not something that updates on its own.",
+        "period": "Period",
+        "window": "Window"
+      },
+      "ingestion": {
+        "title": "Ingestion",
+        "description": "A global kill switch for disaster recovery. Closing submissions blocks service-facing ingestion — service accounts, bulk import and the Teams integration — while everything else (reads, OData, admin create/edit for remediation, schemas, settings) stays available. A banner with the message below is shown to everyone while closed.",
+        "saved": "Ingestion status saved.",
+        "closeAll": "Close all submissions",
+        "bannerLabel": "Banner message (optional)",
+        "bannerHint": "Shown to everyone while submissions are closed.",
+        "bannerPlaceholder": "e.g. Submissions are paused while we investigate a data issue. Expected back up by 5pm UTC."
+      },
+      "email": {
+        "title": "Email server (SMTP)",
+        "description": "Where outgoing mail is sent from. Stored in the database; the password is encrypted at rest and never shown again.",
+        "saved": "Settings saved.",
+        "host": "Host",
+        "hostPlaceholder": "smtp.example.org",
+        "port": "Port",
+        "useTls": "Use TLS (STARTTLS)",
+        "fromAddress": "From address",
+        "fromAddressPlaceholder": "ingest@example.org",
+        "fromName": "From name",
+        "fromNamePlaceholder": "Ingest",
+        "username": "Username",
+        "usernamePlaceholder": "(blank = anonymous relay)",
+        "changePassword": "Change the stored password",
+        "setPassword": "Set a password",
+        "password": "Password",
+        "passwordHint": "Leave blank to clear the stored password."
+      },
+      "emailTemplates": {
+        "title": "Email templates",
+        "description": "Liquid templates used to build notification emails. Select one to edit its subject and body.",
+        "empty": "No templates yet.",
+        "template": "Template",
+        "subject": "Subject",
+        "format": "Format",
+        "editAria": "Edit template {{name}}",
+        "htmlAndText": "HTML + text",
+        "text": "Text",
+        "editNamed": "Edit template — {{name}}",
+        "edit": "Edit template",
+        "saved": "Template saved.",
+        "textBody": "Text body",
+        "textBodyHint": "Plain-text fallback. Liquid is supported.",
+        "htmlBody": "HTML body",
+        "htmlBodyHint": "Optional. Leave blank to send text only.",
+        "save": "Save template"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "description": "Choose which events generate emails and who receives them. Each trigger can notify the service's own contact email, the recipient list below, or both.",
+        "saved": "Notification settings saved.",
+        "runResult": "Queued {{total}} email(s): {{upcoming}} upcoming, {{missed}} missed, {{warnings}} warnings.",
+        "upcoming": "Upcoming submission reminder",
+        "leadTime": "Lead time (hours before the window closes)",
+        "missed": "Missed submission alert",
+        "warnings": "Submission with warnings notice",
+        "draftSaved": "Draft saved nudge",
+        "draftSavedHint": "Sent on every draft save (no dedupe) to nudge collaborators. The email shows a relative path you paste after your console's address — it isn't a clickable link.",
+        "pendingApproval": "Submission pending approval notice",
+        "pendingApprovalHint": "The submission's designated approvers are always emailed; these switches add the submitter and/or admin list.",
+        "approved": "Submission approved notice",
+        "rejected": "Submission rejected notice",
+        "recipientList": "Admin / operator recipient list",
+        "recipientListHint": "Accounts (with an email) that receive the copy when a trigger has 'admin list' on.",
+        "noEligibleAccounts": "No eligible accounts (operators/admins need an email)",
+        "selectRecipients": "Select recipients…",
+        "running": "Running…",
+        "runNow": "Run now",
+        "notifyService": "Notify the service account",
+        "notifyAdminList": "Notify the admin/operator list"
+      },
+      "approvalRules": {
+        "title": "Rules",
+        "description": "Require approval for specific services and schemas, on top of each schema's own policy. Leave a side set to “All” to cover every service or every schema. A rule scoped to API submissions can force a person to review and fill in partially-automated feeds before they go live.",
+        "add": "Add rule",
+        "edit": "Edit rule",
+        "create": "Create rule",
+        "created": "Rule created.",
+        "saved": "Rule saved.",
+        "deleted": "Rule deleted.",
+        "disabledMessage": "Rule disabled.",
+        "enabledMessage": "Rule enabled.",
+        "deleteType": "approval rule",
+        "approval": "Approval",
+        "useGlobalDefault": "Use global default",
+        "noApproval": "No approval",
+        "requiredSummary": "Required ({{source}})",
+        "emptyManage": "No rules yet — click “Add rule” to create one.",
+        "emptyReadOnly": "No rules yet.",
+        "editAria": "Edit rule {{name}}",
+        "actionsAria": "Actions for rule {{name}}",
+        "labelPlaceholder": "e.g. Finance feeds need sign-off",
+        "sources": {
+          "both": "manual + API",
+          "manualOnly": "manual only",
+          "apiOnly": "API only"
+        }
+      },
+      "teamsConnection": {
+        "title": "Microsoft Teams connection",
+        "description": "The bot app registration used to send prompts to Teams. Stored in the database; the bot secret is encrypted at rest and never shown again. See the setup guide for how to register the bot in Azure.",
+        "saved": "Connection saved.",
+        "testSucceeded": "Connection succeeded — credentials are valid.",
+        "testFailed": "Connection failed.",
+        "appId": "App (client) ID",
+        "appIdPlaceholder": "00000000-0000-0000-0000-000000000000",
+        "tenantId": "Tenant ID",
+        "tenantHint": "Leave blank for a multi-tenant bot.",
+        "tenantPlaceholder": "(blank = multi-tenant)",
+        "singleTenant": "Single-tenant app registration",
+        "changeSecret": "Change the stored bot secret",
+        "setSecret": "Set the bot secret",
+        "secret": "Bot secret (client secret)",
+        "secretHint": "Leave blank to clear the stored secret.",
+        "testing": "Testing…",
+        "test": "Test connection"
+      },
+      "integrations": {
+        "title": "Integrations",
+        "description": "Each integration prompts a Teams user or channel for the samples that are still outstanding across the services and schemas it covers. Prompts run on a daily schedule, or on demand with “Run now”. Disabled and hidden fields are omitted; warnings are surfaced inline.",
+        "connectionWarning": "The Microsoft Teams connection isn’t configured yet — set the bot credentials on the “Teams connection” subpage before integrations can send prompts.",
+        "add": "Add integration",
+        "edit": "Edit integration",
+        "create": "Create integration",
+        "created": "Integration created.",
+        "saved": "Integration saved.",
+        "deleted": "Integration deleted.",
+        "disabledMessage": "Integration disabled.",
+        "enabledMessage": "Integration enabled.",
+        "deleteType": "integration",
+        "runComplete": "Run complete — prompted {{prompted}}, skipped {{skipped}}.",
+        "testEnqueued": "Test prompt enqueued.",
+        "target": "Target",
+        "scheduleLabel": "Schedule",
+        "emptyManage": "No integrations yet — click “Add integration” to create one.",
+        "emptyReadOnly": "No integrations yet.",
+        "editAria": "Edit integration {{name}}",
+        "actionsAria": "Actions for integration {{name}}",
+        "runNow": "Run now",
+        "sendTest": "Send test",
+        "targetSummary": "{{kind}}: {{target}}",
+        "channel": "Channel",
+        "user": "User",
+        "targetRequired": "Enter the target user or channel id.",
+        "hourValidation": "Hour must be between 0 and 23.",
+        "minuteValidation": "Minute must be between 0 and 59.",
+        "labelPlaceholder": "e.g. Daily nudge for the ops channel",
+        "sendTo": "Send to",
+        "aUser": "A user",
+        "aChannel": "A channel",
+        "channelId": "Channel id",
+        "userId": "User id (Entra object id, UPN, or email)",
+        "targetIdHint": "See the setup guide for how to find this id.",
+        "channelIdPlaceholder": "19:...@thread.tacv2",
+        "userIdPlaceholder": "user@example.org",
+        "displayName": "Display name",
+        "displayNameHint": "Optional friendly label for this target.",
+        "displayNamePlaceholder": "e.g. Ops team channel",
+        "frequency": "Frequency",
+        "frequencyHint": "How often the pass looks for outstanding values. It also runs on demand with “Run now”.",
+        "daysOfWeek": "Days of the week",
+        "daysOfWeekHint": "Leave empty to run every day.",
+        "everyDay": "Every day",
+        "anchorMonth": "Anchor month",
+        "anchorMonthHint": "The period repeats from this month (e.g. quarterly from February = Feb, May, Aug, Nov).",
+        "dayOfMonth": "Day of the month",
+        "dayOfMonthHint": "Runs on (or after) this day within the period; “Last day” runs on the final day of the month.",
+        "lastDay": "Last day",
+        "theLastDay": "the last day",
+        "hourUtc": "Hour (UTC)",
+        "minuteUtc": "Minute (UTC)",
+        "ordinal": {
+          "zero": "{{count}}th",
+          "one": "{{count}}st",
+          "two": "{{count}}nd",
+          "few": "{{count}}rd",
+          "many": "{{count}}th",
+          "other": "{{count}}th"
+        },
+        "schedule": {
+          "weeklyEveryDay": "Weekly (every day), {{time}}",
+          "weeklyDays": "{{days}}, {{time}}",
+          "monthly": "Monthly on {{day}}, {{time}}",
+          "quarterly": "Quarterly from {{month}} on {{day}}, {{time}}",
+          "semiAnnually": "Semi-annually from {{month}} on {{day}}, {{time}}",
+          "yearly": "Yearly in {{month}} on {{day}}, {{time}}",
+          "daily": "Daily, {{time}}"
+        }
+      },
+      "webhooks": {
+        "title": "Webhook endpoints",
+        "description": "Send a signed HTTP POST to an external URL (Teams, Power Automate, your own service) when a subscribed event happens — no polling required.",
+        "add": "Add endpoint",
+        "addTitle": "Add webhook endpoint",
+        "editTitle": "Edit endpoint — {{name}}",
+        "editAria": "Edit endpoint {{name}}",
+        "actionsAria": "Actions for {{name}}",
+        "deleteConfirm": "Delete the webhook endpoint “{{name}}”?\n\nIts past deliveries are kept for audit.",
+        "deleted": "Deleted “{{name}}”.",
+        "rotateConfirm": "Generate a new signing secret for “{{name}}”?\n\nThe old secret stops working immediately.",
+        "testQueued": "Test delivery queued for “{{name}}”. Check the delivery log below.",
+        "name": "Name",
+        "url": "URL",
+        "eventsLabel": "Events",
+        "empty": "No endpoints yet. Add one to start receiving events.",
+        "unsignedHint": "No signing secret set — deliveries are sent unsigned.",
+        "unsigned": "unsigned",
+        "noEvents": "No events",
+        "eventCount_one": "{{count}} event",
+        "eventCount_other": "{{count}} events",
+        "rotateSecret": "Rotate secret",
+        "generateSecret": "Generate secret",
+        "deliveryHistory": "Delivery history — status, retries, and manual redelivery — lives on the <auditLink>Audit page</auditLink> under <sectionName>Webhook deliveries</sectionName>.",
+        "nameRequired": "A name is required.",
+        "urlValidation": "Enter an absolute http(s) URL.",
+        "eventRequired": "Select at least one event to subscribe to.",
+        "namePlaceholder": "Teams – submissions channel",
+        "destinationUrl": "Destination URL",
+        "destinationUrlHint": "The signed POST is sent here. Must be an absolute http(s) URL.",
+        "urlPlaceholder": "https://example.org/hooks/ingest",
+        "onlyForService": "Only for service",
+        "onlyForServiceHint": "Limit deliveries to one service account. Leave blank to fire for every service.",
+        "descriptionLabel": "Description",
+        "descriptionHint": "Optional note shown only in this admin list.",
+        "generateOnCreate": "Generate a signing secret (HMAC-SHA256). Shown once after saving.",
+        "create": "Create endpoint",
+        "secretTitle": "Signing secret for “{{name}}”",
+        "secretInstructions": "Copy this now — it is shown once and cannot be retrieved later. Use it to verify the X-Ingest-Signature header on each delivery.",
+        "copied": "Copied",
+        "copySecret": "Copy secret",
+        "events": {
+          "SubmissionAccepted": {
+            "label": "Submission accepted",
+            "description": "A service submitted data and it was accepted."
+          },
+          "SubmissionWarnings": {
+            "label": "Submission warnings",
+            "description": "An accepted submission carried non-blocking warnings."
+          },
+          "WindowUpcoming": {
+            "label": "Window upcoming",
+            "description": "A submission window is approaching its close."
+          },
+          "WindowMissed": {
+            "label": "Window missed",
+            "description": "A window closed without the required submission."
+          },
+          "SubmissionPendingApproval": {
+            "label": "Submission pending approval",
+            "description": "A submission was accepted but is held awaiting approval."
+          },
+          "SubmissionApproved": {
+            "label": "Submission approved",
+            "description": "A pending submission was approved and is now live."
+          },
+          "SubmissionRejected": {
+            "label": "Submission rejected",
+            "description": "A pending submission was rejected and will not go live."
+          }
+        }
+      }
+    },
+    "shell": {
+      "common": {
+        "close": "Close",
+        "cancel": "Cancel"
+      },
+      "skipToContent": "Skip to main content",
+      "primaryAriaLabel": "Primary",
+      "mainNavigationAriaLabel": "Main navigation",
+      "serviceConsole": "Service console",
+      "adminConsole": "Admin console",
+      "navigation": {
+        "dashboard": "Dashboard",
+        "submissions": "Submissions",
+        "missing": "Missing",
+        "explore": "Explore",
+        "reports": "Reports",
+        "accounts": "Accounts",
+        "schemas": "Schemas",
+        "events": "Events",
+        "audit": "Audit",
+        "tools": "Tools",
+        "settings": "Settings"
+      },
+      "submissionsClosed": {
+        "title": "Submissions are closed",
+        "message": "New submissions and edits from service accounts are temporarily paused."
+      },
+      "login": {
+        "hint": "Paste your API key. Only User-kind credentials can sign in here (any role); Application-kind keys are API-only.",
+        "applicationKeyError": "This API key is for application (non-interactive) use only. Ask an administrator for a User-kind credential to access the admin UI.",
+        "continueWith": "Continue with {{provider}}",
+        "orUseApiKey": "or use an API key",
+        "apiKey": "API key",
+        "couldNotSignIn": "Could not sign in",
+        "verifying": "Verifying…",
+        "signIn": "Sign in",
+        "sso": {
+          "title": "Single sign-on",
+          "errors": {
+            "notLinked": "That account is not set up for single sign-on here. Ask an administrator to link your identity, or sign in with an API key.",
+            "noEmail": "Your identity provider didn't share a verified email, which is required to sign in.",
+            "remote": "Single sign-on was cancelled or failed. Please try again.",
+            "default": "Single sign-on did not complete. Please try again."
+          }
+        }
+      },
+      "breadcrumbs": {
+        "home": "Home",
+        "new": "New",
+        "edit": "Edit",
+        "view": "View",
+        "status": "Status",
+        "historicalData": "Historical data",
+        "submission": "Submission",
+        "missingSubmissions": "Missing submissions"
+      },
+      "topBar": {
+        "pageLocation": "Page location",
+        "searchPlaceholder": "Search…",
+        "searchAriaLabel": "Search (Ctrl+K)",
+        "role": "Role: {{role}}",
+        "accountMenu": "Account menu",
+        "accountMenuFor": "Account menu for {{name}}",
+        "signOut": "Sign out",
+        "scope": {
+          "names": "This session can only see: {{names}}",
+          "count_one": "This session is limited to {{count}} service.",
+          "count_other": "This session is limited to {{count}} services.",
+          "badge_one": "Limited view · {{count}} service",
+          "badge_other": "Limited view · {{count}} services"
+        }
+      },
+      "account": {
+        "label": "Account",
+        "kinds": {
+          "User": "User",
+          "Application": "Application"
+        },
+        "roles": {
+          "Service": "Service",
+          "Operator": "Operator",
+          "Admin": "Admin",
+          "Approver": "Approver"
+        }
+      },
+      "search": {
+        "title": "Search",
+        "placeholder": "Search actions, schemas, values, events, accounts…",
+        "button": "Search",
+        "hint": "Type what you want to do (for example “add user”, “submit”, “scorecard”) or the name of a schema, value, event, account or report.",
+        "searching": "Searching…",
+        "viewAll": "View all",
+        "valueCount_one": "{{count}} value",
+        "valueCount_other": "{{count}} values",
+        "viewAllSchemas_one": "View all {{count}} schema",
+        "viewAllSchemas_other": "View all {{count}} schemas",
+        "inSchema": "in {{schema}}",
+        "matchingValues_one": "{{count}} matching value",
+        "matchingValues_other": "{{count}} matching values",
+        "accountKindRole": "{{kind}} · {{role}}",
+        "viewAllAccounts_one": "View all {{count}} account",
+        "viewAllAccounts_other": "View all {{count}} accounts",
+        "eventSummaryRich": "{{kind}} · <timestamp />",
+        "viewAllEvents_one": "View all {{count}} event",
+        "viewAllEvents_other": "View all {{count}} events",
+        "viewAllReports_one": "View all {{count}} report",
+        "viewAllReports_other": "View all {{count}} reports",
+        "submissionSummaryRich": "{{schemas}} · <submittedAt />",
+        "noSchemas": "No schemas",
+        "recentMatches_one": "{{count}} recent match",
+        "recentMatches_other": "{{count}} recent matches",
+        "noResults": "No results for “{{query}}”. Try a different term.",
+        "sections": {
+          "actions": "Actions",
+          "schemas": "Schemas",
+          "schemaValues": "Schema values",
+          "accounts": "Accounts",
+          "events": "Events",
+          "reports": "Reports",
+          "submissions": "Submissions"
+        },
+        "reportType": {
+          "single": "Single submission report",
+          "aggregate": "Aggregate report"
+        },
+        "actions": {
+          "submission-new": {
+            "title": "New submission",
+            "description": "Submit KPI data for a service",
+            "keywords": "submit|add submission|create submission|send data|report data"
+          },
+          "schema-new": {
+            "title": "Add schema",
+            "description": "Create a new schema",
+            "keywords": "new schema|create schema|add kpi"
+          },
+          "account-new-user": {
+            "title": "Add user",
+            "description": "Create a new account",
+            "keywords": "new user|create user|add account|new account|add operator|add admin|invite"
+          },
+          "account-new-service": {
+            "title": "Add service",
+            "description": "Create a new service account",
+            "keywords": "new service|create service|onboard service|add account"
+          },
+          "event-new": {
+            "title": "Add event",
+            "description": "Record a timeline event",
+            "keywords": "new event|create event|incident|maintenance|deployment"
+          },
+          "report-upload": {
+            "title": "Upload report",
+            "description": "Add a report definition",
+            "keywords": "new report|add report|import report"
+          },
+          "explore": {
+            "title": "Explore",
+            "description": "In-app analytics: trends, compare, snapshot",
+            "keywords": "analytics|analyse|analyze|chart|trend|graph"
+          },
+          "explore-scorecard": {
+            "title": "Scorecard",
+            "description": "Cross-schema RAG status board",
+            "keywords": "rag|red amber green|traffic light|status board|targets"
+          },
+          "explore-anomalies": {
+            "title": "Anomalies",
+            "description": "Per-period anomaly detection board",
+            "keywords": "anomaly|outlier|unusual|spike"
+          },
+          "missing": {
+            "title": "Missing submissions",
+            "description": "What each service still owes",
+            "keywords": "missing|overdue|gaps|not submitted"
+          },
+          "dashboard": {
+            "title": "Dashboard",
+            "description": "Home overview",
+            "keywords": "home|overview|start"
+          },
+          "submissions": {
+            "title": "Submissions",
+            "description": "Browse submitted data",
+            "keywords": "data|kpi|samples"
+          },
+          "schemas": {
+            "title": "Schemas",
+            "description": "Browse the schema catalogue",
+            "keywords": "kpi definitions|templates|fields"
+          },
+          "accounts": {
+            "title": "Accounts",
+            "description": "Services, operators, users and admins",
+            "keywords": "services|users|operators|admins|people"
+          },
+          "events": {
+            "title": "Events",
+            "description": "Browse the events timeline",
+            "keywords": "timeline|incidents|maintenance"
+          },
+          "reports": {
+            "title": "Reports",
+            "description": "Browse and render reports",
+            "keywords": "report catalogue|catalog|render"
+          },
+          "audit": {
+            "title": "Audit",
+            "description": "Who changed what, when",
+            "keywords": "audit log|history|trail|changes"
+          },
+          "tools": {
+            "title": "Tools",
+            "description": "Backup and restore utilities",
+            "keywords": "backup|restore|export|import"
+          },
+          "settings": {
+            "title": "Settings",
+            "description": "Email, notifications, webhooks and policy",
+            "keywords": "configuration|config|email|notifications|webhooks|approval policy"
+          }
+        }
+      },
+      "gridPager": {
+        "rowsPerPage": "Rows per page",
+        "results_one": "{{count}} result",
+        "results_other": "{{count}} results",
+        "range": "{{from}}–{{to}} of {{total}}",
+        "previous": "Previous",
+        "page": "Page {{page}} of {{totalPages}}",
+        "next": "Next"
+      },
+      "rowActions": {
+        "ariaLabel": "Row actions"
+      },
+      "period": {
+        "label": "Period",
+        "from": "From",
+        "to": "To",
+        "interval": {
+          "all": "All time",
+          "lastDay": "Last 24 hours",
+          "lastWeek": "Last 7 days",
+          "lastMonth": "Last 30 days",
+          "custom": "Custom range"
+        },
+        "shift": {
+          "1m": "1 month",
+          "6m": "6 months",
+          "1y": "1 year"
+        }
+      },
+      "wizard": {
+        "back": "Back",
+        "finish": "Finish",
+        "next": "Next"
+      },
+      "drawer": {
+        "collapse": "Collapse drawer",
+        "expand": "Expand drawer"
+      },
+      "export": {
+        "csv": "Export CSV",
+        "exporting": "Exporting…"
+      },
+      "valueLabel": {
+        "required": "required",
+        "description": "Description",
+        "new": "New"
+      },
+      "cadence": {
+        "Daily": "Daily",
+        "Weekly": "Weekly",
+        "Fortnightly": "Fortnightly",
+        "Monthly": "Monthly",
+        "Quarterly": "Quarterly",
+        "SemiAnnually": "Semi-annually",
+        "Yearly": "Yearly"
+      },
+      "eventKind": {
+        "PointInTime": "Point in time",
+        "Interval": "Interval",
+        "FromNowOn": "From now on"
+      },
+      "comments": {
+        "general": "General"
+      },
+      "confirm": {
+        "namedSubject": "{{noun}} \"{{target}}\"",
+        "cannotUndo": "This cannot be undone.",
+        "delete": "Delete {{subject}}?\n\n{{note}}"
+      },
+      "avatars": {
+        "account": "{{kind}} · {{role}}{{context}}",
+        "disabledSuffix": " (disabled)",
+        "schema": "Schema",
+        "schemaDisabled": "Schema (disabled)",
+        "submission": "Submission",
+        "submissionStatus": "Submission · {{status}}",
+        "auditChange": "{{target}} · {{change}}",
+        "status": "Status",
+        "deliveryStatus": "{{label}} · {{status}}",
+        "schemaValue": "{{type}}{{context}}"
+      },
+      "submissionStatus": {
+        "Draft": "Draft",
+        "Pending": "Pending",
+        "Approved": "Approved",
+        "Rejected": "Rejected",
+        "NotRequired": "Not required"
+      },
+      "deliveryStatus": {
+        "Pending": "Pending",
+        "Sending": "Sending",
+        "Sent": "Sent",
+        "Failed": "Failed"
+      },
+      "auditChange": {
+        "Create": "Create",
+        "Edit": "Edit",
+        "Delete": "Delete",
+        "Approve": "Approve",
+        "Reject": "Reject"
+      },
+      "auditTarget": {
+        "User": "User",
+        "Account": "Account",
+        "Schema": "Schema",
+        "ApiKey": "API key",
+        "Submission": "Submission",
+        "Report": "Report",
+        "SchemaHistory": "Schema history",
+        "ApprovalRule": "Approval rule",
+        "Settings": "Settings",
+        "Backup": "Backup",
+        "Event": "Event",
+        "CommentThread": "Comment thread",
+        "Comment": "Comment"
+      },
+      "auditTargetInitials": {
+        "User": "Us",
+        "Account": "Ac",
+        "Schema": "Sc",
+        "ApiKey": "Ak",
+        "Submission": "Sb",
+        "Report": "Rp",
+        "SchemaHistory": "Sh",
+        "ApprovalRule": "Ar",
+        "Settings": "St",
+        "Backup": "Bk",
+        "Event": "Ev",
+        "CommentThread": "Ct",
+        "Comment": "Cm"
+      },
+      "valueType": {
+        "String": "String",
+        "Integer": "Integer",
+        "Number": "Number",
+        "Date": "Date",
+        "Boolean": "Boolean"
+      },
+      "valueTypeInitials": {
+        "String": "S",
+        "Integer": "I",
+        "Number": "N",
+        "Date": "D",
+        "Boolean": "B"
+      },
+      "capabilities": {
+        "groups": {
+          "schemas": "Schemas",
+          "submissions": "Submissions",
+          "analytics": "Analytics",
+          "reports": "Reports",
+          "accountsKeys": "Accounts & keys",
+          "oversight": "Oversight",
+          "notificationsIntegrations": "Notifications & integrations",
+          "settings": "Settings",
+          "events": "Events",
+          "comments": "Comments"
+        },
+        "items": {
+          "schemasRead": {
+            "label": "View schemas",
+            "description": "Browse the schema catalogue, detail and history."
+          },
+          "schemasManage": {
+            "label": "Manage schemas",
+            "description": "Create, edit, clone and delete schemas."
+          },
+          "submissionsRead": {
+            "label": "View submissions",
+            "description": "See submissions across every service."
+          },
+          "submissionsSubmit": {
+            "label": "Submit on behalf",
+            "description": "Create, edit and bulk-import submissions for a service."
+          },
+          "submissionsDelete": {
+            "label": "Delete submissions",
+            "description": "Permanently remove a submission."
+          },
+          "submissionsApprove": {
+            "label": "Approve submissions",
+            "description": "Approve or reject pending submissions."
+          },
+          "queryRead": {
+            "label": "Query data",
+            "description": "Use the OData feed and ad-hoc query endpoint."
+          },
+          "exploreRead": {
+            "label": "Explore",
+            "description": "Use the in-app Explore analytics."
+          },
+          "statusRead": {
+            "label": "View status",
+            "description": "See cross-service status and missing-submission analytics."
+          },
+          "reportsRead": {
+            "label": "View reports",
+            "description": "Browse and render the report catalogue."
+          },
+          "reportsManage": {
+            "label": "Manage reports",
+            "description": "Upload and delete report definitions."
+          },
+          "accountsRead": {
+            "label": "View accounts",
+            "description": "Browse accounts."
+          },
+          "accountsManage": {
+            "label": "Manage accounts",
+            "description": "Create, edit and delete accounts and their permissions."
+          },
+          "apiKeysRead": {
+            "label": "View API keys",
+            "description": "See the API keys attached to accounts."
+          },
+          "apiKeysManage": {
+            "label": "Manage API keys",
+            "description": "Issue and revoke API keys."
+          },
+          "auditRead": {
+            "label": "View audit log",
+            "description": "Read and export the audit trail."
+          },
+          "privacyRead": {
+            "label": "Export personal data",
+            "description": "Run a data-subject access export."
+          },
+          "privacyManage": {
+            "label": "Erase / retention",
+            "description": "Erase personal data and run retention."
+          },
+          "backupRead": {
+            "label": "Export backup",
+            "description": "Download a full backup."
+          },
+          "backupManage": {
+            "label": "Restore backup",
+            "description": "Restore the registry from a backup."
+          },
+          "notificationsRead": {
+            "label": "View notifications",
+            "description": "See email/notification config, templates and the outbox."
+          },
+          "notificationsManage": {
+            "label": "Manage notifications",
+            "description": "Edit email/notification config and templates; send mail."
+          },
+          "webhooksRead": {
+            "label": "View webhooks",
+            "description": "See webhook endpoints and deliveries."
+          },
+          "webhooksManage": {
+            "label": "Manage webhooks",
+            "description": "Create/edit webhooks, rotate secrets, redeliver and drain."
+          },
+          "integrationsRead": {
+            "label": "View integrations",
+            "description": "See integrations (e.g. Microsoft Teams) and their connection."
+          },
+          "integrationsManage": {
+            "label": "Manage integrations",
+            "description": "Create/edit integrations, edit the connection, run/test and drain."
+          },
+          "settingsRead": {
+            "label": "View settings",
+            "description": "Read global settings (e.g. the default approval policy)."
+          },
+          "settingsManage": {
+            "label": "Manage settings",
+            "description": "Change global settings (e.g. the default approval policy)."
+          },
+          "eventsRead": {
+            "label": "View events",
+            "description": "Browse the events timeline."
+          },
+          "eventsManage": {
+            "label": "Manage events",
+            "description": "Create, edit and delete events."
+          },
+          "commentsRead": {
+            "label": "View comments",
+            "description": "See comment threads on schemas (and their values)."
+          },
+          "commentsCreate": {
+            "label": "Create comments",
+            "description": "Start new threads and reply to existing ones; edit your own comments."
+          },
+          "commentsManage": {
+            "label": "Manage comments",
+            "description": "Edit, delete or resolve/reopen any comment or thread — not just your own."
+          }
+        }
+      },
+      "expression": {
+        "empty": "Expression is empty.",
+        "invalid": "Invalid expression.",
+        "editorAriaLabel": "Expression editor",
+        "lint": {
+          "unknownFunction": "Unknown function '{{name}}'.",
+          "unknownValue": "Unknown value '{{name}}'."
+        },
+        "runtime": {
+          "averageArgument": "average() expects numeric or boolean arguments, got {{type}}.",
+          "higherThanArity": "higher_than() expects (value, reference, percentage).",
+          "higherThanNumeric": "higher_than() expects numeric arguments.",
+          "types": {
+            "undefined": "undefined",
+            "object": "object",
+            "boolean": "boolean",
+            "number": "number",
+            "bigint": "bigint",
+            "string": "string",
+            "symbol": "symbol",
+            "function": "function"
+          }
+        },
+        "keywords": {
+          "true": "boolean literal",
+          "false": "boolean literal",
+          "null": "null literal",
+          "and": "logical and",
+          "or": "logical or",
+          "not": "logical not",
+          "in": "membership test",
+          "like": "SQL-style pattern match"
+        },
+        "functions": {
+          "if": {
+            "description": "Returns \"then\" when the condition is true, otherwise \"else\"."
+          },
+          "average": {
+            "description": "Mean of the numeric arguments. Booleans count as 1/0; nulls are ignored."
+          },
+          "higher_than": {
+            "description": "True when value exceeds reference by more than percentage% (e.g. 50 = 50%)."
+          },
+          "coalesce": {
+            "description": "First argument that is not null."
+          },
+          "isNull": {
+            "description": "True when the value is null."
+          },
+          "len": {
+            "description": "Length of a string."
+          },
+          "now": {
+            "description": "Current UTC date and time."
+          },
+          "today": {
+            "description": "Current UTC date at midnight."
+          },
+          "year": {
+            "description": "Year component of a date."
+          },
+          "month": {
+            "description": "Month component of a date (1-12)."
+          },
+          "dayOfMonth": {
+            "description": "Day of the month (1-31)."
+          },
+          "dayOfWeek": {
+            "description": "Day of the week (0 = Sunday)."
+          },
+          "dayOfYear": {
+            "description": "Day of the year (1-366)."
+          },
+          "weekOfYear": {
+            "description": "ISO-8601 week number."
+          },
+          "hour": {
+            "description": "Hour component (0-23)."
+          },
+          "minute": {
+            "description": "Minute component (0-59)."
+          },
+          "second": {
+            "description": "Second component (0-59)."
+          },
+          "abs": {
+            "description": "Absolute value."
+          },
+          "ceiling": {
+            "description": "Smallest integer greater than or equal to the number."
+          },
+          "floor": {
+            "description": "Largest integer less than or equal to the number."
+          },
+          "round": {
+            "description": "Round to the given number of decimal places."
+          },
+          "truncate": {
+            "description": "Integer part of the number (drops the fraction)."
+          },
+          "sign": {
+            "description": "Sign of the number: -1, 0 or 1."
+          },
+          "sqrt": {
+            "description": "Square root."
+          },
+          "pow": {
+            "description": "Base raised to the exponent."
+          },
+          "exp": {
+            "description": "e raised to the given power."
+          },
+          "log": {
+            "description": "Logarithm of the number in the given base."
+          },
+          "log10": {
+            "description": "Base-10 logarithm."
+          },
+          "max": {
+            "description": "Larger of the two numbers."
+          },
+          "min": {
+            "description": "Smaller of the two numbers."
+          },
+          "ieeeRemainder": {
+            "description": "IEEE 754 remainder of x divided by y."
+          },
+          "sin": {
+            "description": "Sine (radians)."
+          },
+          "cos": {
+            "description": "Cosine (radians)."
+          },
+          "tan": {
+            "description": "Tangent (radians)."
+          },
+          "asin": {
+            "description": "Arc sine (radians)."
+          },
+          "acos": {
+            "description": "Arc cosine (radians)."
+          },
+          "atan": {
+            "description": "Arc tangent (radians)."
+          }
+        }
+      }
+    },
+    "accounts": {
+      "title": "Accounts",
+      "singular": "Account",
+      "common": {
+        "yes": "Yes",
+        "no": "No"
+      },
+      "roles": {
+        "Service": "Service",
+        "Operator": "Operator",
+        "Approver": "Approver",
+        "Admin": "Admin"
+      },
+      "kinds": {
+        "User": "User",
+        "Application": "Application"
+      },
+      "kindHints": {
+        "Application": "API-only credential (cannot log in to the UI)",
+        "User": "Interactive account (can log in to the UI and call APIs)"
+      },
+      "status": {
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "deleted": "Deleted"
+      },
+      "fields": {
+        "name": "Name",
+        "label": "Label",
+        "kind": "Kind",
+        "role": "Role",
+        "status": "Status",
+        "email": "Email",
+        "area": "Area",
+        "created": "Created",
+        "createdBy": "Created by",
+        "modified": "Modified",
+        "description": "Description",
+        "actions": "Actions"
+      },
+      "actions": {
+        "new": "New account",
+        "more": "More actions",
+        "onboardService": "Onboard new service",
+        "onboardOperator": "Onboard new operator",
+        "refresh": "Refresh",
+        "exporting": "Exporting…",
+        "exportCsv": "Export this list (CSV)",
+        "exportJson": "Export accounts (JSON)",
+        "importing": "Importing…",
+        "importJson": "Import accounts (JSON)…",
+        "edit": "Edit",
+        "apiKeys": "API keys",
+        "sendEmail": "Send email",
+        "viewStatus": "View status",
+        "exportPersonalData": "Export personal data",
+        "exportData": "Export data",
+        "erase": "Erase (GDPR)",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "save": "Save",
+        "close": "Close"
+      },
+      "messages": {
+        "loadFailed": "Failed to load",
+        "actionFailed": "Action failed",
+        "loading": "Loading…",
+        "empty": "No accounts yet — click “New account” to add one."
+      },
+      "validation": {
+        "emailRequired": "Email is required.",
+        "emailInvalid": "Enter a valid email address."
+      },
+      "aria": {
+        "viewAccount": "View account {{name}}",
+        "actionsFor": "Actions for {{name}}"
+      },
+      "confirmDelete": "Delete account \"{{target}}\"?\n\nThis cannot be undone.",
+      "import": {
+        "readError": "Could not read the accounts file: {{error}}",
+        "confirm": "Import accounts from this file?\n\nAccounts are matched by name: existing ones are updated and new names are created. Accounts not in the file are left untouched.\n\nAPI keys are NOT included, so any account created by this import starts with no key — generate one for each afterwards.",
+        "skipped": " · {{count}} skipped: {{errors}}",
+        "complete": "Import complete: {{created}} created, {{updated}} updated{{tail}}."
+      },
+      "placeholders": {
+        "email": "user@example.com",
+        "area": "e.g. North region"
+      },
+      "editor": {
+        "newTitle": "New account",
+        "editTitle": "Edit account",
+        "tabs": {
+          "general": "General",
+          "permissions": "Role & permissions"
+        },
+        "emailHint": "Used for email notifications and ad-hoc messages.",
+        "areaHint": "Optional grouping tag.",
+        "none": "None",
+        "roleHint": "A template that seeds the permissions below — adjust them freely afterwards."
+      },
+      "scope": {
+        "title": "Service scope",
+        "hint": "Which services this account can see. Leave empty for unrestricted access to every service; pick one or more to confine it to just those.",
+        "viewHint": "Which services this account can see.",
+        "allServices": "All services",
+        "unrestricted": "All services (unrestricted)"
+      },
+      "permissions": {
+        "title": "Permissions",
+        "hint": "Fine-grained capabilities. The role above is just a starting template — tailor these as needed.",
+        "adminNote": "Administrators always hold every permission; this cannot be reduced.",
+        "serviceNote": "Service accounts only submit and view their own data; they hold no back-office permissions."
+      },
+      "onboarding": {
+        "serviceTitle": "Onboard a new service",
+        "operatorTitle": "Onboard a new operator",
+        "createAccount": "Create account",
+        "details": {
+          "title": "Account details",
+          "description": "Create the new {{role}} account.",
+          "nameHint": "Stable machine-style identifier, globally unique.",
+          "namePlaceholder": "e.g. acme_logistics",
+          "labelPlaceholder": "Friendly display name",
+          "emailPlaceholder": "contact@example.com"
+        },
+        "kindHints": {
+          "Application": "API-only credential (cannot log in to the UI).",
+          "User": "Interactive account (can log in to the UI and call APIs)."
+        },
+        "scope": {
+          "description": "Choose which services this {{role}} can see. Leave empty for unrestricted access to every service.",
+          "visibleServices": "Visible services",
+          "hint": "Leave empty for unrestricted access to every service; pick one or more to confine this account to just those."
+        },
+        "key": {
+          "title": "API key",
+          "description": "Optionally issue an API key so the account can call the ingest API right away.",
+          "generateNow": "Generate an API key now",
+          "applicationWarning": "An Application account can only authenticate with an API key. Without one it won't be able to submit data until a key is issued later.",
+          "descriptionLabel": "Key description (optional)",
+          "descriptionHint": "A note on who or why this key is for — handy for temporary or holiday-cover keys.",
+          "expiryLabel": "Key expiry (optional)"
+        },
+        "result": {
+          "created": "{{role}} “{{name}}” created",
+          "copyKey": "Copy this API key now — it will not be shown again.",
+          "copied": "Copied!",
+          "copyToClipboard": "Copy to clipboard",
+          "copyAria": "Copy API key",
+          "noKey": "No API key was generated. You can issue one later from the account's API keys dialog."
+        }
+      },
+      "erase": {
+        "title": "Erase {{name}}",
+        "deleted": "Account deleted.",
+        "anonymised": "Account anonymised.",
+        "resultPrefix": "Pseudonym",
+        "resultCounts": "{{submissions}} submission(s), {{samples}} sample(s), {{emails}} email(s), {{auditEntries}} audit entr(ies), {{keys}} key(s).",
+        "warningBefore": "This satisfies a right-to-erasure request. It is",
+        "irreversible": "irreversible",
+        "warningAfter": "and bypasses the usual “account has submitted data” protection.",
+        "mode": "Mode",
+        "anonymiseOption": "Anonymise — keep numeric/date KPI values for reporting, strip all identity (pseudonymise the account, redact free-text, drop keys & emails).",
+        "deleteOption": "Delete — permanently remove the account and everything tied to it (submissions, samples, emails, audit trail).",
+        "acknowledgement": "I understand this cannot be undone.",
+        "erasing": "Erasing…",
+        "deleteEverything": "Delete everything",
+        "anonymise": "Anonymise"
+      },
+      "email": {
+        "title": "Send email to {{name}}",
+        "to": "To: {{email}}",
+        "subjectRequired": "Subject is required.",
+        "queued": "Email queued for delivery.",
+        "subject": "Subject",
+        "message": "Message",
+        "sending": "Sending…",
+        "send": "Send"
+      },
+      "sso": {
+        "title": "SSO sign-in",
+        "hint": "Link an identity-provider account so this user can sign in with “Continue with …”. Matched on the provider and the user’s verified email.",
+        "provider": "Provider",
+        "remove": "Remove SSO link",
+        "add": "Add SSO link"
+      },
+      "audit": {
+        "title": "Audit",
+        "by": " · by {{name}}"
+      },
+      "keys": {
+        "title": "API keys for {{name}}",
+        "copyNow": "Copy this key now — it will not be shown again.",
+        "keyId": "Key ID",
+        "expires": "Expires",
+        "never": "Never",
+        "revoke": "Revoke",
+        "delete": "Delete key",
+        "deleteAria": "Delete key {{keyId}}",
+        "saveDescription": "Save description",
+        "editDescription": "Edit description",
+        "nextDescription": "Description for the next key (optional)",
+        "descriptionHint": "A note on who or why this key is for — handy for temporary or holiday-cover keys, especially with an expiry.",
+        "descriptionPlaceholderShort": "e.g. holiday cover for Jane",
+        "descriptionPlaceholder": "e.g. holiday cover for Jane (reviewer)",
+        "nextExpiry": "Expiry for the next key (optional)",
+        "expiryHint": "Leave blank for a key that never expires. Maximum two years from today.",
+        "generate": "Generate new key",
+        "confirmDeleteRevoked": "Permanently delete API key {{keyId}}?\n\nThis removes the revoked key from the list for good.\n\nThis cannot be undone.",
+        "confirmDeleteActive": "Permanently delete API key {{keyId}}?\n\nThe key is still active — deleting it stops it working immediately, just like revoking, but also removes it from the list.\n\nThis cannot be undone.",
+        "status": {
+          "revoked": "Revoked",
+          "expired": "Expired",
+          "active": "Active"
+        }
+      }
+    },
+    "tools": {
+      "title": "Tools",
+      "loading": "Loading…",
+      "noPermission": "You don't have permission to use these tools.",
+      "navigationGroup": "Backup & restore",
+      "preparing": "Preparing…",
+      "restoring": "Restoring…",
+      "importing": "Importing…",
+      "restoreFromFile": "Restore from file…",
+      "importFromFile": "Import from file…",
+      "restoreComplete": "Restore complete.",
+      "dataBackup": {
+        "title": "Data backup",
+        "description": "Export the entire registry (accounts, keys, schemas, submissions, reports, audit log) to a single JSON file, or restore it from one.",
+        "readError": "Could not read the backup file: {{error}}",
+        "confirmRestore": "Restore from this backup?\n\nThis REPLACES all current data (accounts, keys, schemas, submissions, reports, audit log) with the contents of the file. It cannot be undone. Make sure you have a current backup first.",
+        "warningBeforeSmall": "This is a convenience tool for",
+        "small": "small",
+        "warningBeforeNot": "deployments and moving data between environments —",
+        "notPrimary": "not the primary backup mechanism.",
+        "warningBeforeCommand": "For real backups, take a database-level snapshot (",
+        "warningBeforeReplace": "or your hosting provider's backup). A restore",
+        "replacesAll": "replaces all current data",
+        "warningAfterReplace": "and is not transactional.",
+        "download": "Download backup"
+      },
+      "configBackup": {
+        "title": "Configuration backup",
+        "description": "Export all configuration (approval policy & rules, email & notification settings and templates, webhooks, integrations and the Teams connection) to a single JSON file, or restore it from one — to copy configuration between environments or recover after a disaster.",
+        "readError": "Could not read the configuration file: {{error}}",
+        "confirmRestore": "Restore from this configuration backup?\n\nThis REPLACES all current configuration (approval policy & rules, email & notification settings and templates, webhooks, integrations and the Teams connection) with the contents of the file. It cannot be undone.\n\nEncrypted secrets (SMTP password, webhook secrets, Teams bot secret) only work if this server uses the same ApiKey:Pepper as the one that produced the file; otherwise re-enter them afterwards. A stored secret is kept when the file omits it.",
+        "warningBeforeReplace": "Restoring",
+        "replacesAll": "replaces all current configuration",
+        "warningBeforePepper": "and is not transactional. Encrypted secrets are included as ciphertext and only decrypt on a server using the same",
+        "warningAfterPepper": "; on a different deployment, re-enter them after the restore. A stored secret is preserved when the file omits it.",
+        "download": "Download configuration"
+      },
+      "accountsBackup": {
+        "title": "Accounts",
+        "description": "Export every account (name, label, role, permissions, SSO links, enabled state) to a single JSON file, or import one to create and update accounts — handy for cloning or seeding an environment.",
+        "readError": "Could not read the accounts file: {{error}}",
+        "confirmImport": "Import accounts from this file?\n\nAccounts are matched by name: existing ones are updated and new names are created. Accounts not in the file are left untouched.\n\nAPI keys are NOT included in the file, so any account created by this import starts with no key — generate one for each afterwards.",
+        "keysNeverExported": "API keys are never exported.",
+        "warningBeforeNoKey": "They aren't stored in a recoverable form, so an imported account starts with",
+        "noKey": "no key",
+        "warningAfterNoKey": "and must have one re-generated before it can authenticate. Import is non-destructive — accounts missing from the file are left as they are.",
+        "importCompleteBeforeCreated": "Import complete:",
+        "created": "created",
+        "updated": "updated",
+        "download": "Download accounts"
+      }
+    },
+    "reports": {
+      "title": "Reports",
+      "singular": "Report",
+      "actions": {
+        "more": "More actions",
+        "refresh": "Refresh",
+        "upload": "Upload report",
+        "view": "View",
+        "delete": "Delete"
+      },
+      "messages": {
+        "loadFailed": "Failed to load",
+        "actionFailed": "Could not complete the action",
+        "loading": "Loading…",
+        "empty": "No reports yet.",
+        "emptyAdmin": "No reports yet — click “Upload report” to add one."
+      },
+      "fields": {
+        "name": "Name",
+        "type": "Type",
+        "targets": "Targets",
+        "created": "Created",
+        "createdBy": "Created by",
+        "actions": "Actions"
+      },
+      "types": {
+        "single": "Single",
+        "aggregate": "Aggregate"
+      },
+      "targets": {
+        "global": "Global"
+      },
+      "validation": {
+        "emptyFile": "The file is empty."
+      },
+      "aria": {
+        "open": "Open report {{name}}",
+        "actionsFor": "Actions for {{name}}"
+      },
+      "confirmDelete": "Delete report \"{{target}}\"?\n\nThis cannot be undone.",
+      "view": {
+        "back": "Back",
+        "loadFailed": "Could not load the report",
+        "loading": "Loading report…",
+        "schema": "Schema",
+        "pickGlobalSchema": "Pick a schema (global report)…",
+        "pickSchema": "Pick a schema…",
+        "period": "Period",
+        "periods": {
+          "thisMonth": "This month",
+          "lastWeek": "Last 7 days",
+          "lastMonth": "Last 30 days",
+          "lastYear": "Last 365 days",
+          "custom": "Custom range"
+        },
+        "from": "From",
+        "to": "To",
+        "submission": "Submission",
+        "submissionOption": "{{service}} — {{date}} ({{count}} samples)",
+        "submissionOptionRich": "{{service}} — <submittedAt /> ({{count}} samples)",
+        "noMatchingSubmissions": "No submissions match the filters",
+        "pickSubmission": "Pick a submission…",
+        "rendering": "Rendering…",
+        "render": "Render",
+        "renderFailed": "Render failed",
+        "frameTitle": "Report: {{name}}",
+        "collapse": "Collapse",
+        "expand": "Expand",
+        "openNewTab": "Open in new tab",
+        "download": "Download"
+      }
+    },
+    "schemasSubmissions": {
+      "approval": {
+        "appliesTo": "Applies to",
+        "appliesToHint": "You can require approval for only manual entries, only API submissions, or both.",
+        "approvers": "Approvers",
+        "approversHint": "Pick who may review: the Approver/Admin accounts below, and/or the service owner (the account that sent the submission, so a service can sign off on its own data). Mark at least one as Required; the submission goes live once every Required approver has approved.",
+        "globalDefaultHelp": "This follows the global default approval policy, configured in Settings — Approval.",
+        "heading": "Approval",
+        "mode": {
+          "globalDefault": "Use the global default",
+          "none": "No approval required",
+          "required": "Approval required"
+        },
+        "modeHint": "Submissions in scope are held as Pending until approved, and excluded from the OData feed and Explore until then. Defaults to no approval for backwards compatibility.",
+        "modeLabel": "Approval mode",
+        "modifiableHelp": "Re-submitting data for a window that already has a submission replaces it and resets its approval status to Pending — even if it was previously approved. While it waits for re-approval it drops out of the OData feed and Explore. If you don't want re-submissions to disturb approved data, mark the schema as not modifiable.",
+        "modifiableTitle": "Heads up: this schema is modifiable",
+        "requiredValidation": "Add at least one Required approver.",
+        "requirement": {
+          "optional": "Optional",
+          "required": "Required"
+        },
+        "selectApprovers": "Select approvers",
+        "serviceOwner": "Service owner (the submitting service)",
+        "source": {
+          "apiOnly": "API submissions only",
+          "both": "Both manual and API submissions",
+          "manualOnly": "Manual (web console) submissions only"
+        }
+      },
+      "bulkImport": {
+        "chooseService": "Choose a service",
+        "failed": "{{count}} failed.",
+        "file": "File",
+        "format": "Format",
+        "formatHint": "Auto-detected from the file extension; override if needed.",
+        "formats": {
+          "csv": "CSV",
+          "json": "JSON"
+        },
+        "group": "Group \"{{name}}\"",
+        "help": "Import historical submissions for a single service from a JSON or CSV file. Parsing must succeed for the whole file; each submission is then validated and saved independently, so a rejected one won't block the rest. Submissions that already exist are skipped, so re-running the same file is safe.",
+        "import": "Import",
+        "importing": "Importing…",
+        "itemFailed": "({{count}} sample(s)) — failed",
+        "skipped": "{{count}} already existed (skipped).",
+        "submissionNumber": "Submission #{{number}}",
+        "summary": "Imported {{succeeded}} of {{total}} submission(s).",
+        "title": "Import submissions"
+      },
+      "comments": {
+        "comment": "Comment",
+        "deleteThread": "Delete thread",
+        "deleteThreadWarning": "This deletes every comment in the thread. This cannot be undone.",
+        "edited": "(edited)",
+        "empty": "No comments yet.",
+        "general": "General",
+        "loading": "Loading comments…",
+        "newThread": "New thread",
+        "open": "Open",
+        "post": "Post",
+        "reopen": "Reopen",
+        "reply": "Reply",
+        "replyPlaceholder": "Reply…",
+        "required": "Comment text is required.",
+        "resolve": "Resolve",
+        "resolved": "Resolved",
+        "resolvedCanReopen": "This thread is resolved — reopen it to add another comment.",
+        "resolvedReadOnly": "This thread is resolved.",
+        "scope": "Scope",
+        "thread": "Thread",
+        "threadActions": "Thread actions",
+        "title": "Comments",
+        "unknown": "Unknown",
+        "writeComment": "Write a comment…"
+      },
+      "common": {
+        "actionFailed": "Could not complete the action",
+        "actions": "Actions",
+        "actionsFor": "Actions for {{name}}",
+        "approvalStatus": {
+          "Approved": "Approved",
+          "NotRequired": "Not required",
+          "Pending": "Pending",
+          "Rejected": "Rejected"
+        },
+        "approve": "Approve",
+        "audit": "Audit",
+        "back": "Back",
+        "by": "by {{name}}",
+        "cadenceLabel": "Cadence",
+        "cancel": "Cancel",
+        "clone": "Clone",
+        "close": "Close",
+        "continue": "Continue",
+        "created": "Created",
+        "createdBy": "Created by",
+        "delete": "Delete",
+        "deleted": "Deleted",
+        "description": "Description",
+        "disabled": "Disabled",
+        "dismiss": "Dismiss",
+        "download": "Download",
+        "draft": "Draft",
+        "edit": "Edit",
+        "enabled": "Enabled",
+        "exportList": "Export this list",
+        "exporting": "Exporting…",
+        "false": "false",
+        "from": "From",
+        "global": "Global",
+        "history": "History",
+        "id": "ID",
+        "label": "Label",
+        "loadFailed": "Failed to load",
+        "loading": "Loading…",
+        "modifiable": "Modifiable",
+        "modified": "Modified",
+        "moreActions": "More actions",
+        "name": "Name",
+        "no": "No",
+        "note": "Note",
+        "notes": "Notes",
+        "preview": "Preview",
+        "publish": "Publish",
+        "published": "Published",
+        "refresh": "Refresh",
+        "reject": "Reject",
+        "remove": "Remove",
+        "replacedAt": "Replaced at",
+        "requiresApproval": "Requires approval",
+        "retry": "Retry",
+        "sample": "Sample",
+        "samples": "Samples",
+        "save": "Save",
+        "saveChanges": "Save changes",
+        "schema": "Schema",
+        "service": "Service",
+        "status": "Status",
+        "submission": "Submission",
+        "submissions": "Submissions",
+        "submittedAt": "Submitted at",
+        "timestamp": "Timestamp",
+        "to": "To",
+        "true": "true",
+        "type": "Type",
+        "untitledSchema": "Untitled schema",
+        "value": "Value",
+        "valueType": {
+          "Boolean": "Yes/No",
+          "Date": "Date",
+          "Integer": "Whole number",
+          "Number": "Number",
+          "String": "Text"
+        },
+        "values": "Values",
+        "version": "Version",
+        "view": "View",
+        "viewDetails": "View details",
+        "warnings": "Warnings",
+        "yes": "Yes"
+      },
+      "dependencies": {
+        "calculatedValue": "Calculated value",
+        "connectorHelp": "A connector points from a referenced value to the one whose rule depends on it.",
+        "edge": {
+          "calculated": "Calculated from",
+          "enabledIf": "Enabled when",
+          "submissionValidation": "Cross-value validation (schema-level)",
+          "validation": "Valid when",
+          "visibleIf": "Visible when",
+          "warning": "Warns when"
+        },
+        "failed": "Couldn't build the dependency graph:",
+        "legend": "Legend",
+        "loading": "Walking this schema's rules for dependencies…",
+        "noValues": "This schema has no usable values yet — add one to see its dependencies.",
+        "none": "No dependencies detected among these values yet.",
+        "title": "Dependencies: {{name}}",
+        "value": "Value"
+      },
+      "layout": {
+        "addSection": "Add section",
+        "addSubsection": "Add subsection",
+        "addSubsectionInside": "Add subsection inside",
+        "allPlaced": "Every value is placed in the layout.",
+        "duplicateValue": "Value \"{{name}}\" appears more than once in the layout.",
+        "emptyHelp": "Drag values from above to place them, or add a section. Values that aren't placed here will still render first in submission forms (under no heading).",
+        "errorPrefix": "Error: ",
+        "missingCaption": "A section is missing its caption.",
+        "missingTarget": "A layout value node is missing its target.",
+        "newSection": "New section",
+        "notePrefix": "Note: ",
+        "removeFromLayout": "Remove from layout",
+        "removeSection": "Remove section",
+        "sectionCaption": "Section caption",
+        "sectionDescription": "Section description",
+        "sectionDescriptionPlaceholder": "Optional sub-heading (rendered under the caption)",
+        "sectionHeading": "Section heading",
+        "tooDeep": "Layout is nested too deep (max 32 levels).",
+        "unassignedValues": "Unassigned values ({{count}})",
+        "unassignedWarning": "{{count}} value(s) not placed in the layout — they will render before the sections.",
+        "unknownValue": "Layout references unknown value \"{{name}}\".",
+        "untitledSection": "(untitled section)"
+      },
+      "preview": {
+        "bestEffortHeading": "Best-effort preview",
+        "bestEffortHelp": "This renders the form and evaluates rules in your browser against the unsaved schema. The server stays authoritative — some semantics differ here (regex dialect, and helpers like sampleTimestamp()/serviceName() aren't available client-side), so always confirm with a real submission or the API before relying on a rule.",
+        "conditionalHelp": "Conditional display (hide/grey) and inline warnings appear on the form to the left.",
+        "findings": {
+          "requiredEmpty": "required value is empty",
+          "schemaRejected": "schema-level rule rejected this submission",
+          "valueRejected": "value validation rule rejected this value"
+        },
+        "loadingServices": "Loading services…",
+        "noFilledValues": "No filled values yet — fill in the form below first.",
+        "noProblems": "No problems with the current values.",
+        "noUsableValues": "This schema has no usable values to preview yet. Add a value first.",
+        "previewTitle": "Preview: {{name}}",
+        "resetValues": "Reset values",
+        "sampleTimestamp": "Sample timestamp",
+        "scopes": {
+          "required": "Missing required",
+          "schema": "Schema-level validation",
+          "shape": "Shape checks",
+          "value": "Value validation"
+        },
+        "selectService": "Select a service",
+        "server": {
+          "acceptedImmediately": "Would be accepted immediately (no approval required).",
+          "discarded": "Discarded by EnabledIf/VisibleIf: {{names}}.",
+          "heldForApproval": "Would be held for approval ({{count}} approver(s) required).",
+          "invalid": "Invalid — {{count}} error(s)",
+          "valid": "Valid — a real submission would be accepted."
+        },
+        "serverValidation": "Server validation",
+        "shape": {
+          "aboveMaximum": "above the maximum of {{value}}",
+          "belowMinimum": "below the minimum of {{value}}",
+          "earlier": "earlier than {{value}}",
+          "invalidDate": "value is not a valid date",
+          "later": "later than {{value}}",
+          "longer": "longer than the maximum length of {{value}}",
+          "notNumber": "value is not a number",
+          "pattern": "does not match the pattern {{value}}",
+          "regexBrowser": "regex pattern could not be evaluated in the browser (will be checked on the server)",
+          "shorter": "shorter than the minimum length of {{value}}",
+          "wholeNumber": "value must be a whole number"
+        },
+        "skipCadence": "Skip cadence (one-per-period) checks",
+        "skippedValues": "Skipped {{count}} value(s) with a blank or duplicate name: {{names}}. Give every value a unique name to preview it.",
+        "testHeading": "Test submission",
+        "testHelp": "Runs the real server validation as the chosen service — including cadence duplicates, history rules, and the would-be approval state — without saving anything. Fill in the form, pick a service, then Validate.",
+        "testTitle": "Test submission: {{name}}",
+        "timestampPreviewHint": "Used for the samples and any date-based rules that read a Date value.",
+        "timestampServerHint": "Used for every sample and any date/cadence/history rules.",
+        "unnamedValue": "(unnamed value)",
+        "validate": "Validate",
+        "validateAsService": "Validate as service",
+        "validationCount": "{{count}} value(s) will be validated. The schema must be saved and visible to the chosen service.",
+        "validationResults": "Validation results"
+      },
+      "sampleFields": {
+        "addNotes": "Add notes",
+        "calculated": "Calculated",
+        "disabled": "Disabled",
+        "from": "from {{value}}",
+        "max": "max {{value}}",
+        "maxLength": "max length {{value}}",
+        "min": "min {{value}}",
+        "minLength": "min length {{value}}",
+        "notProvided": "(not provided)",
+        "note": "Note",
+        "optional": "Optional",
+        "regex": "regex: {{value}}",
+        "required": "Required",
+        "to": "to {{value}}",
+        "value": "Value{{unit}}"
+      },
+      "schemaEdit": {
+        "addRule": "Add rule",
+        "addValue": "Add value",
+        "amberMax": "Acceptable (amber) max",
+        "amberMaxHint": "Above this is red. Outer upper edge.",
+        "amberMin": "Acceptable (amber) min",
+        "amberMinHint": "Below this is red. Outer lower edge.",
+        "calculated": "Calculated",
+        "cancelEditing": "Cancel and keep editing",
+        "caption": "Caption",
+        "captionHint": "Optional heading rendered above this value in the submission form and view (think section title). Display-only; clients ignore it.",
+        "checking": "Checking…",
+        "conditionalDisplay": "Conditional display",
+        "create": "Create schema",
+        "dateConstraints": "Date constraints",
+        "deleteType": "value",
+        "dependencies": "Dependencies",
+        "discardChanges": "Discard the changes",
+        "draftUnavailable": "Unavailable — {{count}} submission(s) already exist for this schema.",
+        "editTitle": "Edit schema",
+        "editValue": "Edit value {{name}}",
+        "enabledIf": "Enabled if",
+        "enabledIfHint": "When false (or null) the value is disabled in the UI and a submitted sample is dropped with a warning. Empty = always enabled.",
+        "enabledPublished": "Enabled (Published)",
+        "expression": "Expression",
+        "expressionHint": "NCalc formula referencing sibling values in the same submission only (e.g. average(a, b)). Chaining to other calculated values is allowed.",
+        "greenMax": "Ideal (green) max",
+        "greenMaxHint": "Inner upper edge. Needs an amber max.",
+        "greenMin": "Ideal (green) min",
+        "greenMinHint": "Inner lower edge. Needs an amber min.",
+        "incrementVersion": "Automatically increment the version number (to {{version}})",
+        "kind": "Kind",
+        "kindHint": "Calculated values are computed from sibling values in the same submission and are never submitted.",
+        "layoutHint": "Drag values into sections to group them. This affects the submission form layout only — the server treats submissions as flat lists.",
+        "loading": "Loading schema…",
+        "max": "Max",
+        "maxDate": "Max date (ISO)",
+        "maxLength": "Max length",
+        "min": "Min",
+        "minDate": "Min date (ISO)",
+        "minLength": "Min length",
+        "moveToDraft": "Move the schema back to Draft and apply the changes",
+        "nameFixed": "The schema name is fixed after creation — changing it could break validation rules and existing submissions.",
+        "needsValue": "A schema needs at least one value to be useful.",
+        "noRules": "No rules yet.",
+        "noRulesAdd": "No rules yet. Use \"Add rule\" to create one.",
+        "notFound": "Schema not found",
+        "numericConstraints": "Numeric constraints",
+        "publishAsIs": "Publish as-is without changing the version",
+        "publishChanges": "Publish changes",
+        "publishHelp": "You changed this published schema but didn't update the version number. What would you like to do?",
+        "readOnlySnapshot": "Read-only snapshot",
+        "regexPattern": "Regex pattern",
+        "removeRule": "Remove rule",
+        "removeValueWarning": "Removing a value can break validation rules and reject or alter existing submissions. Consider disabling it instead (uncheck \"Enabled\") to keep historical data intact.\n\nRemove it anyway?",
+        "schemaMissing": "No schema named \"{{name}}\" exists. It may have been deleted.",
+        "sinceVersion": "Since version",
+        "sinceVersionHint": "Optional. When set and equal to the schema's current version ({{version}}), the SPA shows a \"New\" tag next to this value for one cadence period. Leave empty for \"always present\".",
+        "snapshotHelp": "Version {{version}} saved <savedAt /> {{author}}. This is a historical view and cannot be edited — it does not affect the current schema.",
+        "snapshotMissing": "This version snapshot no longer exists. It may have been deleted from the history.",
+        "stringConstraints": "String constraints",
+        "syntaxError": "Syntax error:",
+        "tabs": {
+          "approvals": "Approvals",
+          "general": "General",
+          "layout": "Layout",
+          "validations": "Validations"
+        },
+        "targetBand": "Target band (RAG, optional)",
+        "targetBandHelp": "Reporting-only Red/Amber/Green ranges shown as shaded bands on charts — never enforced. The acceptable (amber) range is the outer band; the ideal (green) range sits inside it. Outside the amber range is red. Each edge is optional, but a green edge needs the matching amber edge on the same side, and edges must read low-to-high: amber min ≤ green min ≤ green max ≤ amber max.",
+        "unit": "Unit",
+        "userDefined": "User-defined",
+        "validSyntax": "Valid syntax",
+        "validation": "Validation",
+        "validationPlaceholder": "e.g. if(expenses > revenue, 'expenses cannot exceed revenue', null)",
+        "validationsHint": "Each rule runs once per submission against every value in the schema. Add several to enforce multiple cross-value invariants.",
+        "valueDetails": "Value details",
+        "valueNameFixed": "The name is fixed after creation — it is referenced by validation rules and existing submissions. Add a new value if you need a different name.",
+        "valueNameHint": "Used as the identifier in validation rules. Must start with a letter or underscore and contain only letters, digits, and underscores.",
+        "valueNameValidation": "Must be a valid identifier: letters, digits and underscores only; cannot start with a digit.",
+        "valueNumber": "(value #{{number}})",
+        "valueValidation": "Value validation",
+        "valueValidationHint": "Runs against the submitted sample. Vars include value, minimum, maximum. Whitespace and line breaks are ignored.",
+        "versionHint": "Bump when introducing new values. Cannot decrease. Each value's 'Since version' must be ≤ this.",
+        "viewVersionTitle": "View schema version",
+        "visibleIf": "Visible if",
+        "visibleIfHint": "When false (or null) the value is hidden in the UI. Server-side behaves like Enabled if. Empty = always visible.",
+        "visibleServices": "Visible to services",
+        "warning": "Warning",
+        "warningHint": "Optional rule that produces a non-blocking warning when true or when it returns a non-empty string."
+      },
+      "schemaHistory": {
+        "bucketDescription": "{{count}} bucket(s) — whiskers show min/max, dot shows the average",
+        "minAvgMax": "min / avg / max",
+        "noNumericValues": "This schema has no numeric values, so there's nothing to chart. Add a Number or Integer value to see a timeline.",
+        "noSamples": "No samples submitted yet.",
+        "title": "Historical data"
+      },
+      "schemaVersions": {
+        "actionsForVersion": "Actions for version {{version}}",
+        "author": "Author",
+        "bumped": "bumped",
+        "changeDate": "Change date",
+        "deleteAll": "Delete all history",
+        "deleteAllWarning": "This removes every saved snapshot for this schema. The current schema is unaffected. This cannot be undone.",
+        "deleteEntryWarning": "This removes the snapshot from the history only. The current schema is unaffected. This cannot be undone.",
+        "deleteThisEntry": "Delete this entry",
+        "empty": "No version history recorded.",
+        "entireHistory": "entire version history",
+        "entry": "version-history entry",
+        "entryLabel": "v{{version}} from {{date}}",
+        "exportCsv": "Export CSV",
+        "newVersion": "New version",
+        "oldVersion": "Old version",
+        "title": "Version history — {{name}}",
+        "viewThisVersion": "View this version",
+        "viewVersion": "View version {{version}}"
+      },
+      "schemas": {
+        "audience": "Audience",
+        "bumpedAt": "bumped <bumpedAt />",
+        "deleteType": "schema",
+        "empty": "No schemas yet — click \"New schema\" to create one.",
+        "exampleJson": "Example submission (JSON)",
+        "frozen": "Frozen",
+        "globalAudience": "Global (visible to all services)",
+        "importFailed": "Could not import schema",
+        "jsonObjectError": "JSON root must be an object.",
+        "modifiableApprovalHelp": "Re-submitting data for a window that already has a submission replaces it and resets approval to Pending — even if it was previously approved — so the earlier values are withdrawn from live reporting and ultimately overwritten. Mark the schema (or value) as not modifiable if approved figures should never change mid-cycle.",
+        "modifiableApprovalTitle": "Modifiable and approval-gated",
+        "new": "New schema",
+        "noServices": "(no services)",
+        "noValuesDefined": "No values defined.",
+        "schemaJson": "Schema as JSON",
+        "schemaPdf": "Schema as PDF",
+        "serviceCount": "{{count}} service(s)",
+        "submissionValidations": "Submission validations",
+        "testSubmission": "Test submission",
+        "title": "Schemas",
+        "upload": "Upload schema",
+        "validationRule": "Submission validation rule {{number}}",
+        "valuesCount": "Values ({{count}})",
+        "viewHistoricalData": "View historical data",
+        "viewSchema": "View schema {{name}}",
+        "viewVersionHistory": "View version history"
+      },
+      "submissionDetail": {
+        "change": "Change",
+        "changeType": {
+          "Create": "Create",
+          "Delete": "Delete",
+          "Replace": "Replace",
+          "Update": "Update"
+        },
+        "changedBy": "Changed by",
+        "details": "Details",
+        "noChanges": "No changes recorded."
+      },
+      "submissionEdit": {
+        "acceptedWarnings": "Submission accepted with warnings",
+        "clonedHelp": "The service, schema and values were pre-filled and the timestamp reset to now. Review them, adjust the service or schema if needed, then Submit to create a new submission.",
+        "clonedTitle": "Cloned from an existing submission.",
+        "editDraftTitle": "Edit draft",
+        "editTitle": "Edit submission",
+        "missingRequired": "Missing required values",
+        "multiSchemaHelp": "Saving will keep only the values for {{name}}. Pick another schema first if you need those values instead.",
+        "multiSchemaTitle": "The source submission contained values from multiple schemas.",
+        "newTitle": "New submission",
+        "noValues": "This schema has no values defined.",
+        "pickSchema": "Pick a schema",
+        "pickSchemaError": "Pick a schema first.",
+        "pickSchemaHelp": "Pick a schema to see the values you can submit.",
+        "pickService": "Pick a service",
+        "pickServiceError": "Pick a service first.",
+        "pickServiceFirst": "Pick a service first",
+        "pickServiceSchemaHelp": "Pick a service and a schema to start entering values.",
+        "saveAsDraft": "Save as draft",
+        "saveFailed": "Could not save submission",
+        "submit": "Submit",
+        "timestamp": "Timestamp (UTC)",
+        "timestampHint": "Applied to every sample in this submission.",
+        "valueCountHelp": "{{count}} values — leave optional ones empty to skip them",
+        "viewTitle": "View submission"
+      },
+      "submissions": {
+        "actionsFor": "Actions for submission {{id}}",
+        "allSchemas": "All schemas",
+        "allServices": "All services",
+        "approvalsReceived": "{{approved}} of {{count}} required approvals received.",
+        "cloneNew": "Clone into new submission",
+        "createNew": "Create a new submission",
+        "deleteType": "submission",
+        "draftHelp": "This submission is a work-in-progress draft. It is excluded from reporting and approval until it is published.",
+        "empty": "No submissions match these filters.",
+        "exportPdf": "Export as PDF",
+        "exportXlsx": "Export XLSX (one schema)",
+        "exportXlsxHelp": "Export the filtered submissions to XLSX",
+        "importBulk": "Import bulk data",
+        "interval": {
+          "all": "All time",
+          "custom": "Custom range",
+          "label": "Interval",
+          "lastMonth": "Last 30 days",
+          "lastWeek": "Last 7 days",
+          "lastYear": "Last 365 days"
+        },
+        "manualEntry": "Manual entry",
+        "myTitle": "My submissions",
+        "new": "New submission",
+        "pickSchemaForXlsx": "Pick a single schema to enable the XLSX export",
+        "rejectHelp": "This submission will be marked rejected and excluded from the OData feed and Explore, but stays visible here. You can leave an optional reason for the submitter and other reviewers.",
+        "rejectPlaceholder": "e.g. Week 22 figures look transposed — please re-check the night-shift totals.",
+        "rejectReason": "Reason (optional)",
+        "rejectTitle": "Reject submission",
+        "rejecting": "Rejecting…",
+        "rejectionReason": "Rejection reason",
+        "source": "Source",
+        "status": {
+          "all": "All statuses"
+        },
+        "temporarilyClosed": "Submissions are temporarily closed.",
+        "viewFrom": "View submission from {{label}}",
+        "warningsCount": "Warnings ({{count}})"
+      }
+    },
+    "analytics": {
+      "common": {
+        "actions": "Actions",
+        "all": "All",
+        "allServices": "All services",
+        "cadence": "Cadence",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit",
+        "exportCsv": "Export CSV",
+        "exporting": "Exporting…",
+        "exportListCsv": "Export this list (CSV)",
+        "exportView": "Export this view",
+        "failedToLoad": "Failed to load",
+        "loading": "Loading…",
+        "moreActions": "More actions",
+        "no": "No",
+        "noData": "No data.",
+        "period": "Period",
+        "refresh": "Refresh",
+        "save": "Save",
+        "saving": "Saving…",
+        "schema": "Schema",
+        "selectedCount_one": "{{count}} selected",
+        "selectedCount_other": "{{count}} selected",
+        "sending": "Sending…",
+        "service": "Service",
+        "services": "Services",
+        "yes": "Yes"
+      },
+      "cadence": {
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "fortnightly": "Fortnightly",
+        "monthly": "Monthly",
+        "quarterly": "Quarterly",
+        "semiannually": "Semi-annually",
+        "yearly": "Yearly"
+      },
+      "periodFilter": {
+        "intervals": {
+          "all": "All time",
+          "lastDay": "Last 24 hours",
+          "lastWeek": "Last 7 days",
+          "lastMonth": "Last 30 days",
+          "custom": "Custom range"
+        },
+        "from": "From",
+        "to": "To"
+      },
+      "dashboard": {
+        "title": "Overview",
+        "welcome": "Welcome, {{name}}",
+        "cards": {
+          "pendingApprovals": "Pending approvals",
+          "operators": "Operators",
+          "admins": "Admins",
+          "submissions": "Submissions",
+          "mySubmissions": "My submissions",
+          "submitData": "Submit data"
+        },
+        "actions": {
+          "review": "Review",
+          "manage": "Manage",
+          "browse": "Browse",
+          "newSubmission": "New submission →",
+          "viewByPeriod": "View by period →"
+        },
+        "missing": {
+          "overdueTitle": "Overdue — previous period",
+          "overdueDescription": "These submission windows have closed.",
+          "currentTitle": "This period",
+          "currentDescription": "Still within the submission window.",
+          "servicesShort_one": "service short on submissions",
+          "servicesShort_other": "services short on submissions"
+        },
+        "trend": {
+          "title": "Missing submissions over time",
+          "loading": "Loading trend…",
+          "empty": "No trend data available.",
+          "seriesName": "Missing — {{service}}"
+        }
+      },
+      "missing": {
+        "title": "Missing submissions by period",
+        "titleShort": "Missing submissions",
+        "columns": {
+          "missing": "Missing",
+          "totalRequired": "Total required"
+        },
+        "trend": {
+          "title": "Missing over time",
+          "description": "Total missing required values per {{cadence}} period · click a bar to inspect it"
+        },
+        "chart": {
+          "missing": "missing"
+        },
+        "byService": {
+          "title": "By service — {{period}}",
+          "description": "Missing required values per service in the selected period",
+          "empty": "Nothing missing in this period. 🎉"
+        },
+        "summary": "{{missing}} missing required value(s) across {{services}} service(s) in {{period}}",
+        "selectedPeriod": "the selected period",
+        "detail": {
+          "complete": "All required submissions are in for this period."
+        }
+      },
+      "explore": {
+        "title": "Explore",
+        "tabs": {
+          "scorecard": "Scorecard",
+          "analysis": "Analysis",
+          "anomalies": "Anomalies"
+        },
+        "actions": {
+          "exportCsv": "Export CSV (this view)",
+          "exportPng": "Export chart (PNG)"
+        },
+        "errors": {
+          "nothingToExport": "Nothing to export for this view yet."
+        },
+        "filters": {
+          "schemas": "Schemas",
+          "selectSchema": "Select a schema",
+          "allSchemas": "All schemas",
+          "value": "Value",
+          "selectValue": "Select a value",
+          "show": "Show",
+          "latestAvailable": "Latest available",
+          "lastPeriod": "Last period",
+          "latestClosed": "Latest closed",
+          "current": "Current",
+          "aggregation": "Aggregation",
+          "comparePrevious": "Compare with previous"
+        },
+        "help": {
+          "schemas": "Which schemas to scan for anomalies. Leave empty to scan every schema with numeric values.",
+          "schemasAria": "What does Schemas do?",
+          "show": "Latest available shows each service's most recent submission, however old. Last period shows a single period and marks services that didn't submit it as grey “no submission” cards.",
+          "showAria": "What does Show do?",
+          "aggregation": "How the samples that fall in each period are reduced to one number — and how several services are combined into the overall figure. Average is count-weighted; Sample count just tallies how many were submitted.",
+          "aggregationAria": "What does Aggregation do?",
+          "comparePrevious": "Overlay the same selection shifted back in time so you can read this period against an earlier one. Needs a Period range (not All time); the two windows may overlap.",
+          "compareAria": "What does Compare do?"
+        },
+        "shifts": {
+          "1m": "1 month",
+          "6m": "6 months",
+          "1y": "1 year"
+        },
+        "views": {
+          "trend": "Trend",
+          "compare": "Compare services",
+          "snapshot": "Snapshot"
+        },
+        "aggregation": {
+          "average": "Average",
+          "sum": "Sum",
+          "min": "Minimum",
+          "max": "Maximum",
+          "count": "Sample count"
+        },
+        "status": {
+          "green": "On target",
+          "amber": "Warning",
+          "red": "Off target",
+          "normal": "No anomalies",
+          "anomaly": "Anomaly",
+          "noSubmission": "No submission",
+          "hideMissing": "Hide missing"
+        },
+        "presets": {
+          "label": "Presets",
+          "empty": "No saved presets yet.",
+          "namePrompt": "Preset name",
+          "limit_one": "You can keep at most {{count}} preset. Delete one first.",
+          "limit_other": "You can keep at most {{count}} presets. Delete one first.",
+          "deleteAria": "Delete preset {{name}}",
+          "saveCurrent": "Save current as preset…"
+        },
+        "anomaly": {
+          "historyWindow": "History window (periods)",
+          "sensitivity": "Sensitivity (|z| threshold)",
+          "baselineMode": "Baseline mode",
+          "robustHelp": "Robust mode resists a few extreme spikes skewing the baseline. Standard mode uses the mean and standard deviation.",
+          "robustAria": "What does Robust mode do?",
+          "robust": "Robust (median / MAD)",
+          "standard": "Standard (mean / SD)",
+          "detection": "Anomaly detection",
+          "highlight": "Highlight anomalies",
+          "summaryAnomaly_one": "{{count}} anomaly",
+          "summaryAnomaly_other": "{{count}} anomalies",
+          "summaryNormal_one": "{{count}} normal",
+          "summaryNormal_other": "{{count}} normal",
+          "summaryMissing_one": "{{count}} no submission",
+          "summaryMissing_other": "{{count}} no submission",
+          "empty": "No numeric KPIs to scan yet. Pick one or more schemas with numeric values to check the latest period for anomalies.",
+          "hideNormal": "Hide normal",
+          "noneInPeriod": "No anomalies in the {{period}} period.",
+          "openAnalysis": "Open in Analysis · {{state}}"
+        },
+        "scorecard": {
+          "summaryOnTarget_one": "{{count}} on target",
+          "summaryOnTarget_other": "{{count}} on target",
+          "summaryWarning_one": "{{count}} warning",
+          "summaryWarning_other": "{{count}} warnings",
+          "summaryOffTarget_one": "{{count}} off target",
+          "summaryOffTarget_other": "{{count}} off target",
+          "summaryMissing_one": "{{count}} no submission",
+          "summaryMissing_other": "{{count}} no submission",
+          "empty": "No KPIs with a target band yet. Add an acceptable/ideal range to a numeric schema value to see it here.",
+          "hideOnTarget": "Hide on-target",
+          "allOnTarget": "Every KPI is on target.",
+          "asOf": "as of <periodDate />",
+          "viewSubmission": "View submission · {{state}}"
+        },
+        "content": {
+          "pickSchema": "Pick a schema to start exploring.",
+          "noNumeric": "This schema has no numeric values, so there's nothing to chart. Add a Number or Integer value to explore it.",
+          "trendOverTime": "Trend over time",
+          "aggregationOf": "{{aggregation}} of {{value}}",
+          "perCadencePeriod": "per {{cadence}} period",
+          "combineServices": "Combine services",
+          "projection": "Projection",
+          "viewAsTable": "View as table",
+          "showEvents": "Show events",
+          "noSamples": "No samples for this selection.",
+          "overallAggregation": "Overall {{aggregation}}",
+          "latestPeriod": "Latest period",
+          "samples": "Samples",
+          "periodsServices": "Periods / services"
+        },
+        "trend": {
+          "noAnomalies": "No anomalies in the current selection.",
+          "anomaliesHighlighted_one": "{{count}} anomaly highlighted in the current selection.",
+          "anomaliesHighlighted_other": "{{count}} anomalies highlighted in the current selection.",
+          "ago": "{{period}} ago",
+          "previous": "Previous",
+          "projectionName": "{{name}} (projection)",
+          "overallTrend": "Overall trend"
+        },
+        "snapshot": {
+          "title": "Latest value per service",
+          "description": "Most recent period per value · cells show the {{aggregation}} for that period"
+        }
+      },
+      "events": {
+        "title": "Events",
+        "singular": "Event",
+        "ongoing": "Ongoing",
+        "removed": "(removed)",
+        "notApplicable": "Not applicable",
+        "durationHours_one": "{{count}}h",
+        "durationHours_other": "{{count}}h",
+        "durationMinutes_one": "{{count}}m",
+        "durationMinutes_other": "{{count}}m",
+        "kinds": {
+          "pointintime": "Point in time",
+          "interval": "Interval",
+          "fromnowon": "From now on"
+        },
+        "fields": {
+          "label": "Label",
+          "timestamp": "Timestamp",
+          "kind": "Kind",
+          "duration": "Duration",
+          "description": "Description",
+          "affects": "Affects",
+          "created": "Created",
+          "createdBy": "Created by",
+          "modified": "Modified"
+        },
+        "actions": {
+          "add": "Add event",
+          "edit": "Edit event"
+        },
+        "validation": {
+          "labelRequired": "Label is required.",
+          "timestampRequired": "Timestamp is required.",
+          "serviceRequired": "Pick at least one affected service, or choose “All services”.",
+          "durationFormat": "Duration format not recognised. Use minutes (45), hours:minutes (1:30), or days hours:minutes (2 03:15).",
+          "durationRequired": "Duration is required for interval events."
+        },
+        "help": {
+          "fromNowOn": "Runs from the timestamp above until further notice.",
+          "duration": "Minutes (45), hours:minutes (1:30), or days hours:minutes (2 03:15)."
+        },
+        "placeholders": {
+          "duration": "e.g. 90 or 1:30",
+          "selectServices": "Select services"
+        },
+        "deleteConfirm": "Delete event \"{{label}}\"?\n\nThis cannot be undone.",
+        "empty": "No events yet.",
+        "emptyManage": "No events yet — click “Add event” to create one.",
+        "viewAria": "View event {{label}}",
+        "actionsAria": "Actions for event {{label}}",
+        "byActor": "by {{actor}}"
+      },
+      "audit": {
+        "title": "Audit",
+        "email": "Email",
+        "delivery": "Delivery",
+        "actionError": "Could not complete the action",
+        "deliveryActionsAria": "Actions for delivery {{id}}",
+        "tabs": {
+          "changes": "Changes",
+          "sentEmails": "Sent emails",
+          "webhookDeliveries": "Webhook deliveries"
+        },
+        "actions": {
+          "sendPending": "Send pending now",
+          "redeliver": "Redeliver"
+        },
+        "filters": {
+          "changeType": "Change type",
+          "targetType": "Target type"
+        },
+        "columns": {
+          "created": "Created",
+          "to": "To",
+          "subject": "Subject",
+          "status": "Status",
+          "attempts": "Attempts",
+          "sent": "Sent",
+          "event": "Event",
+          "url": "URL",
+          "delivered": "Delivered",
+          "lastStatusCode": "Last status code",
+          "lastError": "Last error",
+          "timestamp": "Timestamp",
+          "change": "Change",
+          "target": "Target",
+          "changedBy": "Changed by",
+          "note": "Note"
+        },
+        "empty": {
+          "changes": "No changes recorded.",
+          "emails": "No emails recorded.",
+          "deliveries": "No deliveries recorded."
+        },
+        "changeTypes": {
+          "create": "Create",
+          "edit": "Edit",
+          "delete": "Delete",
+          "approve": "Approve",
+          "reject": "Reject"
+        },
+        "targetTypes": {
+          "user": "User",
+          "account": "Account",
+          "schema": "Schema",
+          "apiKey": "API key",
+          "submission": "Submission",
+          "report": "Report",
+          "schemaHistory": "Schema history",
+          "approvalRule": "Approval rule",
+          "settings": "Settings",
+          "backup": "Backup",
+          "event": "Event",
+          "commentThread": "Comment thread",
+          "comment": "Comment"
+        },
+        "statuses": {
+          "pending": "Pending",
+          "sending": "Sending",
+          "sent": "Sent",
+          "failed": "Failed"
+        }
+      },
+      "serviceStatus": {
+        "title": "Status — {{service}}",
+        "mixed": "Mixed",
+        "disabled": "Disabled",
+        "empty": "No schemas visible to this service.",
+        "periods": {
+          "day": "Day",
+          "week": "Week",
+          "fortnight": "Fortnight",
+          "month": "Month",
+          "quarter": "Quarter",
+          "halfyear": "Half-year",
+          "year": "Year"
+        },
+        "columns": {
+          "submitted": "Submitted",
+          "lastSample": "Last sample",
+          "status": "Status"
+        },
+        "submittedHelp": "{{submitted}} of {{total}} active value(s) submitted in the current cadence window — {{requiredSubmitted}}/{{requiredTotal}} required.",
+        "requiredRatio": "{{submitted}}/{{total}} required",
+        "statuses": {
+          "inert": "Inert",
+          "noValues": "No values",
+          "submitted": "Submitted",
+          "optional": "Optional",
+          "missing": "Missing"
+        }
+      }
+    }
+  }
+}

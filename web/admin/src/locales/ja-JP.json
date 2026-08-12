@@ -1,0 +1,2595 @@
+{
+  "metadata": {
+    "locale": "ja-JP",
+    "description": "Japanese as used in Japan",
+    "nativeLabel": "日本語（日本）",
+    "englishLabel": "Japanese (Japan)"
+  },
+  "strings": {
+    "app": {
+      "title": "Ingest Admin"
+    },
+    "apiErrors": {
+      "unexpected": "エラーが発生しました。",
+      "status": {
+        "400": "リクエストが無効です。",
+        "401": "API キーが承認されませんでした。",
+        "403": "この操作を行う権限がありません。",
+        "404": "項目が見つかりませんでした。",
+        "408": "リクエストがタイムアウトしました。もう一度お試しください。",
+        "409": "別の変更と競合しています。再読み込みしてからもう一度お試しください。",
+        "410": "項目は利用できなくなりました。",
+        "413": "リクエストが大きすぎます。",
+        "415": "このコンテンツ形式はサポートされていません。",
+        "422": "データを処理できませんでした。",
+        "429": "リクエストが多すぎます。しばらく待ってからもう一度お試しください。",
+        "500": "サーバーでエラーが発生しました。もう一度お試しください。",
+        "502": "現在サーバーが応答していません。しばらくしてからもう一度お試しください。",
+        "503": "現在サーバーが応答していません。しばらくしてからもう一度お試しください。",
+        "504": "現在サーバーが応答していません。しばらくしてからもう一度お試しください。",
+        "server": "サーバーでエラーが発生しました。もう一度お試しください。",
+        "request": "リクエストに失敗しました。",
+        "unexpected": "予期しない問題が発生しました。"
+      }
+    },
+    "apiMessages": {
+      "common": {
+        "not_found": "{{resource}} が見つかりませんでした。",
+        "conflict": "リクエストが現在の状態と競合しています。{{message}}",
+        "forbidden": "この操作を行う権限がありません。{{message}}",
+        "unauthorized": "続行するにはサインインしてください。",
+        "service_unavailable": "このサービスは一時的に利用できません。{{message}}",
+        "validation": "検証に失敗しました。{{message}}",
+        "internal": "サーバーでエラーが発生しました。もう一度お試しください。",
+        "feature_disabled": "この機能は有効になっていません。{{message}}"
+      },
+      "api": {
+        "invalid_request": "リクエストが無効です。{{message}}",
+        "missing_required_parameter": "必須パラメーター「{{parameter}}」がありません。",
+        "unsupported_omit": "omit 値「{{value}}」はサポートされていません。",
+        "single_parameter_required": "{{operation}} には「{{parameter}}」を1つ指定する必要があります。",
+        "service_outside_scope": "サービス「{{serviceId}}」は割り当てられた範囲外です。"
+      },
+      "submissions": {
+        "validation": "送信内容の検証に失敗しました。{{message}}",
+        "duplicate_period": "「{{displayName}}」はこの{{cadence}}の期間にすでに送信されています。",
+        "pending_duplicate_period": "「{{displayName}}」には、この{{cadence}}の期間の承認待ち送信がすでにあります。",
+        "schema_not_assigned": "スキーマ「{{schemaName}}」はこのサービスに割り当てられていません。",
+        "schema_disabled": "スキーマ「{{schemaName}}」は現在無効です。",
+        "value_not_defined": "値「{{valueName}}」はスキーマ「{{schemaName}}」に定義されていません。",
+        "calculated_value_submitted": "計算値「{{valueName}}」は送信できません。",
+        "value_disabled": "値「{{displayName}}」は現在無効です。",
+        "value_required": "値「{{displayName}}」は必須です。",
+        "required_value_missing": "必須値「{{displayName}}」（{{schemaName}}.{{valueName}}）がありません。",
+        "value_type": "値「{{displayName}}」には有効な {{expectedType}} を指定してください。",
+        "value_minimum": "値「{{displayName}}」は {{minimum}} 以上である必要があります（受信値：{{actual}}）。",
+        "value_maximum": "値「{{displayName}}」は {{maximum}} 以下である必要があります（受信値：{{actual}}）。",
+        "value_before_minimum_date": "値「{{displayName}}」（{{schemaName}}.{{valueName}}）は {{minimum}} 以降である必要があります（受信値：{{actual}}）。",
+        "value_after_maximum_date": "値「{{displayName}}」（{{schemaName}}.{{valueName}}）は {{maximum}} 以前である必要があります（受信値：{{actual}}）。",
+        "value_minimum_length": "値「{{displayName}}」は {{minimum}} 文字以上である必要があります（受信文字数：{{actual}}）。",
+        "value_maximum_length": "値「{{displayName}}」は {{maximum}} 文字以下である必要があります（受信文字数：{{actual}}）。",
+        "value_regex": "値「{{displayName}}」が必要な形式と一致しません。",
+        "value_validation_failed": "「{{displayName}}」の検証に失敗しました：{{detail}}",
+        "value_validation_error": "「{{displayName}}」の検証ルールを評価できませんでした：{{detail}}",
+        "schema_validation_failed": "スキーマ「{{schemaName}}」の送信検証に失敗しました：{{detail}}",
+        "schema_validation_error": "スキーマ「{{schemaName}}」の検証ルールを評価できませんでした：{{detail}}",
+        "value_not_modifiable": "値「{{displayName}}」は変更できません。",
+        "gating_evaluation_error": "「{{schemaName}} / {{valueName}}」の {{rule}} ルールを評価できませんでした：{{detail}}",
+        "sample_discarded": "送信されたサンプルが破棄されました。{{message}}",
+        "sample_discarded_with_message": "サンプル「{{schemaName}} / {{valueName}}」は {{rule}} ルールにより破棄されました：{{detail}}",
+        "sample_discarded_by_rule": "サンプル「{{schemaName}} / {{valueName}}」は {{rule}} ルールにより破棄されました。",
+        "warning_rule_triggered": "「{{displayName}}」の警告ルールが作動しました。",
+        "warning_rule_message": "「{{displayName}}」の警告：{{detail}}",
+        "warning_rule_error": "「{{displayName}}」の警告ルールを評価できませんでした：{{detail}}",
+        "legacy_warning": "{{message}}",
+        "published_cannot_become_draft": "公開済みの送信を下書きに戻すことはできません。",
+        "not_awaiting_approval": "この送信は承認待ちではありません。",
+        "wrong_owner": "この送信は別のアカウントに属しています。",
+        "window_not_open": "送信ウィンドウはまだ開いていません。{{message}}",
+        "window_closed": "送信ウィンドウは終了しました。{{message}}",
+        "create_window_not_open": "「{{schemaName}}.{{valueName}}」の{{cadence}}の送信ウィンドウは {{windowStart}} に開きます。",
+        "create_window_closed": "「{{schemaName}}.{{valueName}}」の{{cadence}}の送信ウィンドウは {{windowEnd}} に終了しました。",
+        "modify_window_closed": "送信 {{submissionId}} は変更できません。「{{schemaName}}.{{valueName}}」の{{cadence}}のウィンドウは {{windowEnd}} に終了しました。",
+        "ingestion_closed": "送信は一時的に停止されています。{{message}}"
+      },
+      "imports": {
+        "invalid_file": "インポートファイルが無効です。{{message}}",
+        "empty_file": "インポートファイルが空です。",
+        "invalid_json": "インポートファイルは有効な JSON ではありません：{{detail}}",
+        "unsupported_format": "インポート形式はサポートされていません。{{message}}",
+        "submissions_not_array": "「submissions」プロパティは配列である必要があります（{{actualKind}} は使用できません）。",
+        "invalid_root": "インポートのルート種類 {{actualKind}} は無効です。使用可能な形式：{{acceptedShapes}}。",
+        "submission_not_object": "送信 {{submissionNumber}} はオブジェクトである必要があります（{{actualKind}} は使用できません）。",
+        "samples_missing": "送信 {{submissionNumber}} には samples 配列が必要です（受信：{{actualKind}}）。",
+        "sample_names_required": "送信 {{submissionNumber}}、サンプル {{sampleNumber}} には schemaName「{{schemaName}}」と valueName「{{valueName}}」が必要です。",
+        "sample_invalid_json": "送信 {{submissionNumber}}、サンプル {{sampleNumber}} の JSON が無効です（行 {{lineNumber}}、バイト {{bytePositionInLine}}）: {{detail}}",
+        "submission_no_samples": "送信 {{submissionNumber}} に有効なサンプルがありません。",
+        "missing_column": "必須列「{{column}}」がありません。",
+        "row_names_required": "行 {{row}} には schemaName「{{schemaName}}」と valueName「{{valueName}}」が必要です。",
+        "row_timestamp_invalid": "行 {{row}} のタイムスタンプ「{{timestamp}}」は無効です。",
+        "no_data_rows": "インポートファイルにデータ行がありません。",
+        "invalid_row": "インポート行が無効です。{{message}}",
+        "no_submissions": "ファイルに送信データがありません。",
+        "accounts": {
+          "invalid_marker": "これは Ingest アカウントのエクスポートファイルではありません。",
+          "invalid_json": "{{fileType}} ファイルは有効な JSON ではありません：{{detail}}",
+          "unsupported_version": "アカウントエクスポートのバージョン {{actualVersion}} はサポートされていません。必要なバージョンは {{expectedVersion}} です。",
+          "no_accounts": "アカウントファイルにアカウントがありません。",
+          "entry_name_missing": "accountName「{{accountName}}」がないため、アカウント項目をスキップしました。",
+          "entry_failed": "アカウント項目がスキップされました。{{message}}"
+        }
+      },
+      "accounts": {
+        "validation": "アカウントの検証に失敗しました。{{message}}",
+        "already_exists": "アカウント「{{accountName}}」はすでに存在します。",
+        "invalid_email": "「{{email}}」は有効なメールアドレスではありません。",
+        "unknown_capabilities": "不明な権限：{{capabilities}}。",
+        "invalid_assigned_services": "割り当てられたサービス ID の一部が無効です：{{serviceIds}}。",
+        "invalid_sso_link": "SSO リンクが無効です。{{message}}",
+        "sso_links_user_only": "SSO リンクを設定できるのは User アカウントだけです。このアカウントは {{accountKind}} です。",
+        "sso_link_fields_required": "各 SSO リンクには provider「{{provider}}」と email「{{email}}」の両方が必要です。",
+        "duplicate_sso_link": "{{provider}} / {{email}} の SSO リンクが重複しています。",
+        "sso_link_in_use": "{{provider}} ID「{{email}}」はすでに別のアカウントにリンクされています。",
+        "delete_in_use": "アカウント「{{accountName}}」には送信済みデータがあるため削除できません。代わりに無効にしてください。",
+        "api_key_description_too_long": "API キーの説明は {{actualLength}} 文字です。上限は {{maxLength}} 文字です。",
+        "api_key_expiry_not_future": "API キーの有効期限 {{expiry}} は {{now}} より後である必要があります。",
+        "api_key_expiry_too_distant": "API キーの有効期限 {{expiry}} は {{now}} から {{maxLifetimeYears}} 年を超えています。"
+      },
+      "schemas": {
+        "validation": "スキーマの検証に失敗しました。{{message}}",
+        "already_exists": "スキーマ「{{schemaName}}」はすでに存在します。",
+        "delete_in_use": "スキーマ「{{schemaName}}」は送信で使用されているため削除できません。代わりに無効にしてください。",
+        "version_negative": "スキーマバージョン {{version}} は {{minimum}} 以上である必要があります。",
+        "version_decreased": "スキーマバージョンを {{previousVersion}} から {{requestedVersion}} に下げることはできません。",
+        "value_name_invalid": "値名「{{valueName}}」は {{pattern}} に一致する必要があります。",
+        "since_version_negative": "値「{{valueName}}」の sinceVersion は {{sinceVersion}} です。最小値は {{minimum}} です。",
+        "since_version_after_schema": "値「{{valueName}}」の sinceVersion {{sinceVersion}} はスキーマバージョン {{schemaVersion}} より後です。",
+        "target_band_out_of_order": "値「{{valueName}}」の {{lowerBand}} {{lowerValue}} が {{upperBand}} {{upperValue}} を上回っています。",
+        "green_min_without_amber_min": "値「{{valueName}}」は AmberMin なしで GreenMin {{greenMin}} を設定しています。",
+        "green_max_without_amber_max": "値「{{valueName}}」は AmberMax なしで GreenMax {{greenMax}} を設定しています。",
+        "calculated_expression_missing": "計算値「{{valueName}}」には式が必要です。",
+        "calculated_value_required": "計算値「{{valueName}}」を必須にすることはできません。",
+        "calculated_expression_syntax": "「{{valueName}}」の式に位置 {{position}} で構文エラーがあります：{{detail}}",
+        "calculated_expression_analysis": "「{{valueName}}」の式を解析できませんでした：{{detail}}",
+        "calculated_self_reference": "「{{valueName}}」の式が自身を参照しています。",
+        "calculated_history_reference": "「{{valueName}}」の式では履歴関数を使用できません：{{functions}}。",
+        "calculated_unknown_identifier": "「{{valueName}}」の式が不明な識別子「{{identifier}}」を参照しています。",
+        "calculated_dependency_cycle": "計算値に依存関係の循環があります。",
+        "layout_depth_exceeded": "レイアウトの深さ {{actualDepth}} が上限 {{maxDepth}} を超えています。",
+        "layout_value_name_missing": "レイアウトの値ノードに valueName がありません。",
+        "layout_unknown_value": "レイアウトが不明な値「{{valueName}}」を参照しています。",
+        "layout_duplicate_value": "値「{{valueName}}」がレイアウトに複数回あります。",
+        "layout_section_caption_missing": "レイアウトセクションにキャプションがありません。",
+        "layout_unknown_kind": "レイアウト種類「{{actualKind}}」は無効です。想定値：{{expectedKinds}}。"
+      },
+      "reports": {
+        "validation": "レポートの検証に失敗しました。{{message}}",
+        "already_exists": "レポート「{{reportName}}」はすでに存在します。",
+        "missing_upload": "「{{field}}」フィールドに空でないファイルをアップロードしてください。",
+        "content_empty": "レポート内容を空にすることはできません。",
+        "name_required": "レポート名が必要です。ファイル「{{fileName}}」に名前がありません。",
+        "date_range_invalid": "レポートの開始 {{from}} は終了 {{to}} より後にできません。",
+        "type_unsupported": "レポート種類「{{reportType}}」はサポートされていません。",
+        "schema_not_target": "スキーマ「{{schemaName}}」はレポート「{{reportName}}」の対象ではありません。対象：{{targetSchemaNames}}。",
+        "schema_required_for_multiple_targets": "レポート「{{reportName}}」の対象は {{targetSchemaNames}} です。「{{parameter}}」を指定してください。",
+        "submission_id_required": "レポート「{{reportName}}」には「{{parameter}}」が必要です。",
+        "submission_schema_missing": "送信 {{submissionId}} にスキーマ「{{schemaName}}」のサンプルがありません。",
+        "aggregate_schema_required": "集計レポート「{{reportName}}」には「{{parameter}}」が必要です。",
+        "front_matter_unclosed": "レポートのフロントマターが「---」で始まっていますが閉じられていません。",
+        "front_matter_line_invalid": "フロントマターの行 {{lineNumber}} を解析できません：{{line}}",
+        "front_matter_type_invalid": "フロントマター種類「{{actualType}}」は無効です。許可値：{{allowedTypes}}。",
+        "front_matter_inline_list_invalid": "インラインリスト「{{value}}」には {{expectedWrapper}} を使用してください。",
+        "template_parse_failed": "{{engine}} テンプレートを解析できませんでした：{{detail}}",
+        "template_render_failed": "{{engine}} テンプレートをレンダリングできませんでした：{{detail}}"
+      },
+      "expressions": {
+        "empty": "式を空にすることはできません。",
+        "too_long": "式が {{maxLength}} 文字の上限を超えています。",
+        "parse_failed": "式を解析できませんでした：{{detail}}",
+        "unsupported_target": "式のターゲット「{{target}}」はサポートされていません。",
+        "batch_missing": "式のバッチがありません。",
+        "batch_too_large": "バッチが {{maxCount}} 式の上限を超えています。"
+      },
+      "configuration": {
+        "validation": "構成の検証に失敗しました。{{message}}",
+        "backup_empty": "バックアップファイルが空です。",
+        "backup_invalid_json": "バックアップファイルは有効な JSON ではありません：{{detail}}",
+        "backup_invalid_marker": "Ingest バックアップではありません（想定「{{expectedFormat}}」、受信「{{actualFormat}}」）。",
+        "backup_unsupported_version": "バックアップバージョン {{version}} は未対応です。対応する最大バージョンは {{maximumVersion}} です。",
+        "backup_missing_collections": "バックアップファイルに collections セクションがありません。",
+        "config_backup_empty": "構成バックアップファイルが空です。",
+        "config_backup_invalid_json": "構成バックアップファイルは有効な JSON ではありません：{{detail}}",
+        "config_backup_invalid_marker": "Ingest 構成バックアップではありません（想定「{{expectedFormat}}」、受信「{{actualFormat}}」）。",
+        "config_backup_unsupported_version": "構成バックアップバージョン {{version}} は未対応です。対応する最大バージョンは {{maximumVersion}} です。",
+        "config_backup_missing_collections": "構成バックアップファイルに collections セクションがありません。"
+      },
+      "comments": {
+        "validation": "コメントの検証に失敗しました。{{message}}",
+        "thread_resolved": "このスレッドは解決済みです。コメントを追加する前に再開してください。",
+        "edit_forbidden": "編集できるのは自分のコメントだけです。",
+        "value_not_on_schema": "値「{{valueName}}」はスキーマ {{schemaId}} にありません。",
+        "target_type_unsupported": "コメント対象種類「{{targetType}}」は対象 {{targetId}} では未対応です。",
+        "text_required": "コメント本文は必須です。",
+        "text_too_long": "コメント本文は {{actualLength}} 文字です。上限は {{maxLength}} 文字です。"
+      },
+      "events": {
+        "validation": "イベントの検証に失敗しました。{{message}}",
+        "label_required": "イベントラベルは必須です。",
+        "timestamp_required": "イベントのタイムスタンプは必須です。",
+        "interval_duration_required": "{{eventKind}} イベントには正の期間「{{duration}}」が必要です。",
+        "invalid_service_ids": "影響を受けるサービス ID は既存のサービスを示す必要があります：{{serviceIds}}。"
+      },
+      "approval": {
+        "validation": "承認の検証に失敗しました。{{message}}",
+        "global_default_not_allowed": "この場所では承認モード「{{mode}}」にグローバル既定値を使用できません。",
+        "approver_required": "承認者を1人以上指定してください。",
+        "required_approver_required": "1人以上の承認者を必須に設定してください。",
+        "duplicate_service_owner": "サービス所有者が複数回登録されています。",
+        "duplicate_approver": "承認者アカウント {{accountId}} が複数回登録されています。",
+        "approver_not_found": "承認者アカウント {{accountId}} は存在しません。",
+        "not_designated_approver": "アカウント {{approverAccountId}} は送信 {{submissionId}} の指定承認者ではありません。"
+      },
+      "integrations": {
+        "validation": "統合の検証に失敗しました。{{message}}",
+        "connection_failed": "統合への接続に失敗しました：{{detail}}",
+        "schedule_hour_invalid": "スケジュールの時刻 {{hourUtc}} は UTC {{minimum}}〜{{maximum}} の範囲にしてください。",
+        "schedule_minute_invalid": "スケジュールの分 {{minuteUtc}} は {{minimum}}〜{{maximum}} の範囲にしてください。",
+        "schedule_day_invalid": "{{frequency}} スケジュールの日 {{dayOfMonth}} は {{minimum}}〜{{maximum}} の範囲にしてください。",
+        "schedule_anchor_month_invalid": "{{frequency}} スケジュールの基準月 {{anchorMonth}} は {{minimum}}〜{{maximum}} の範囲にしてください。",
+        "teams_target_required": "{{integrationKind}} には Teams の {{targetKind}} 対象が必要です。"
+      },
+      "webhooks": {
+        "validation": "Webhook の検証に失敗しました。{{message}}",
+        "delivery_failed": "Webhook の配信に失敗しました。{{message}}",
+        "name_required": "Webhook 名は必須です。",
+        "url_required": "Webhook URL は必須です。",
+        "url_invalid": "Webhook URL「{{url}}」は絶対 URL で、次のスキームを使用する必要があります：{{allowedSchemes}}。"
+      },
+      "email": {
+        "validation": "メールの検証に失敗しました。{{message}}",
+        "delivery_failed": "メールの配信に失敗しました。{{message}}",
+        "address_invalid": "「{{address}}」は有効なメールアドレスではありません。",
+        "subject_required": "件名は必須です。",
+        "email_subject_required": "メール件名は必須です。",
+        "text_body_required": "テキスト本文は必須です。",
+        "template_parse_failed": "{{engine}} テンプレートのフィールド「{{field}}」を解析できませんでした：{{detail}}",
+        "smtp_host_required": "SMTP ホストは必須です。",
+        "smtp_port_invalid": "SMTP ポート {{port}} は {{minimum}}〜{{maximum}} の範囲にしてください。",
+        "from_address_required": "送信元アドレスは必須です。",
+        "account_contact_missing": "アカウント「{{accountName}}」（{{accountId}}）に連絡先メールアドレスがありません。"
+      }
+    },
+    "settings": {
+      "title": "設定",
+      "general": {
+        "navigationLabel": "一般",
+        "navigationGroup": "一般",
+        "title": "一般",
+        "description": "管理コンソールの設定。",
+        "language": "言語",
+        "theme": "テーマ",
+        "lightTheme": "ライト"
+      },
+      "permissionDenied": "設定を管理する権限がありません。",
+      "noneEnabled": "構成可能な設定が有効になっていません。ここで管理するには、サーバー構成でメール、Webhook、統合、または承認ワークフローを有効にしてください。",
+      "navigation": {
+        "areas": "エリア",
+        "configuration": "構成",
+        "submissionPeriods": "送信期間",
+        "ingestion": "取り込み",
+        "approval": "承認",
+        "approvals": "承認",
+        "rules": "ルール",
+        "email": "メール",
+        "emailTemplates": "メールテンプレート",
+        "notifications": "通知",
+        "webhooks": "Webhook",
+        "integrations": "統合",
+        "teamsNotifications": "Teams 通知",
+        "teamsConnection": "Teams 接続"
+      },
+      "common": {
+        "loading": "読み込んでいます…",
+        "saving": "保存しています…",
+        "save": "保存",
+        "saveChanges": "変更を保存",
+        "add": "追加",
+        "cancel": "キャンセル",
+        "done": "完了",
+        "refresh": "更新",
+        "moreActions": "その他のアクション",
+        "actions": "アクション",
+        "edit": "編集",
+        "delete": "削除",
+        "enable": "有効にする",
+        "disable": "無効にする",
+        "enabled": "有効",
+        "disabled": "無効",
+        "configured": "設定済み",
+        "notConfigured": "未設定",
+        "label": "ラベル",
+        "status": "状態",
+        "services": "サービス",
+        "schemas": "スキーマ",
+        "allServices": "すべてのサービス",
+        "allSchemas": "すべてのスキーマ",
+        "selectServices": "サービスの選択",
+        "selectSchemas": "スキーマの選択",
+        "removed": "（削除済み）",
+        "unset": "（未設定）",
+        "optionalListName": "このリストにのみ表示される任意の名前です。",
+        "serviceRequired": "サービスを 1 つ以上選択するか、「すべてのサービス」を選択してください。",
+        "schemaRequired": "スキーマを 1 つ以上選択するか、「すべてのスキーマ」を選択してください。",
+        "cadence": "周期",
+        "cadences": {
+          "Daily": "毎日",
+          "Weekly": "毎週",
+          "Fortnightly": "隔週",
+          "Monthly": "毎月",
+          "Quarterly": "四半期ごと",
+          "SemiAnnually": "半年ごと",
+          "Yearly": "毎年"
+        },
+        "months": {
+          "january": "1月",
+          "february": "2月",
+          "march": "3月",
+          "april": "4月",
+          "may": "5月",
+          "june": "6月",
+          "july": "7月",
+          "august": "8月",
+          "september": "9月",
+          "october": "10月",
+          "november": "11月",
+          "december": "12月"
+        },
+        "weekDays": {
+          "monday": "月曜日",
+          "tuesday": "火曜日",
+          "wednesday": "水曜日",
+          "thursday": "木曜日",
+          "friday": "金曜日",
+          "saturday": "土曜日",
+          "sunday": "日曜日"
+        },
+        "weekDaysShort": {
+          "monday": "月",
+          "tuesday": "火",
+          "wednesday": "水",
+          "thursday": "木",
+          "friday": "金",
+          "saturday": "土",
+          "sunday": "日"
+        }
+      },
+      "approval": {
+        "title": "既定の承認ポリシー",
+        "description": "「グローバル既定値を使用」に設定されたスキーマには、このポリシーが適用されます。変更しても影響を受けるのは新しい送信だけで、処理中の送信は作成時の承認者を保持します。",
+        "saved": "承認ポリシーが保存されました。",
+        "defaultBehavior": "スキーマが既定値に従う場合",
+        "dontRequire": "承認を必須にしない",
+        "require": "承認を必須にする",
+        "appliesTo": "適用対象",
+        "approvers": "承認者",
+        "approversHint": "レビューできる承認者/管理者アカウント、またはサービス所有者（送信を行ったアカウント）、あるいはその両方です。少なくとも 1 つを「必須」に設定してください。",
+        "requiredApproverValidation": "「必須」の承認者を 1 人以上追加してください。",
+        "selectApprovers": "承認者の選択",
+        "serviceOwner": "サービス所有者 (送信側サービス)",
+        "required": "必須",
+        "optional": "任意",
+        "sources": {
+          "both": "手動送信と API 送信の両方",
+          "manualOnly": "手動 (Web コンソール) 送信のみ",
+          "apiOnly": "API 送信のみ"
+        }
+      },
+      "areas": {
+        "title": "エリア",
+        "description": "アカウントの編集時に選択できる任意のグループ化タグです。エリアを 1 つ以上定義すると、アカウントエディターにドロップダウンが表示されます。リストを空のままにすると、エリアを自由入力できます。エリアは情報提供のみを目的としており、変更しても既存のアカウントには影響しません。",
+        "saved": "エリアが保存されました。",
+        "empty": "エリアが定義されていません。アカウントエディターは自由入力フィールドを使用します。",
+        "moveUp": "{{name}} を上に移動",
+        "moveDown": "{{name}} を下に移動",
+        "remove": "{{name}} を削除",
+        "addLabel": "エリアを追加",
+        "placeholder": "例：北部地域"
+      },
+      "submissionPeriods": {
+        "title": "送信期間",
+        "description": "各レポート期間の開始と終了の位置です。変更は新しい送信と期間の開閉判定にすぐ反映されます。すでに記録された期間は、記録時の境界のまま維持されます。",
+        "saved": "送信期間が保存されました。",
+        "fiscalYearStart": "会計年度の開始月",
+        "fiscalYearHint": "四半期および半期の期間の基準にもなります。",
+        "weekStart": "週の開始曜日",
+        "monthStart": "月の開始日",
+        "monthStartHint": "1〜28。",
+        "fortnightAnchor": "隔週の基準日",
+        "fortnightAnchorHint": "隔週の区切りに当たる任意の日付です。日付のみが使用されます。"
+      },
+      "submissionWindows": {
+        "title": "送信ウィンドウ",
+        "description": "各周期の期間の前後で、サービスが実際に送信を作成・編集できる時間の長さです。「開始オフセット」は期間の開始後にウィンドウが開くまでの遅延、「猶予期間」は期間の終了後にウィンドウが開いたままになる時間を延長します。ここで設定するまではどちらも既定で 0 時間、つまりウィンドウは期間とまったく同じです。「送信漏れ」のレポートとリマインダーも、猶予期間が経過するまで待機します。",
+        "saved": "送信ウィンドウが保存されました。",
+        "openOffset": "開始オフセット（時間）",
+        "gracePeriod": "猶予期間（時間）"
+      },
+      "currentPeriods": {
+        "title": "現在の期間",
+        "description": "上記の設定が現時点で示す内容です。取得時点のスナップショットであり、自動では更新されません。",
+        "period": "期間",
+        "window": "ウィンドウ"
+      },
+      "ingestion": {
+        "title": "取り込み",
+        "description": "災害復旧用のグローバルなキルスイッチです。送信を停止すると、サービス側の取り込み（サービスアカウント、一括インポート、Teams 統合）がブロックされますが、その他（読み取り、OData、管理者による修復目的の作成・編集、スキーマ、設定）は引き続き利用できます。停止中は、以下のメッセージを含むバナーが全員に表示されます。",
+        "saved": "取り込みの状態が保存されました。",
+        "closeAll": "すべての送信を停止",
+        "bannerLabel": "バナーメッセージ（任意）",
+        "bannerHint": "送信を停止している間、全員に表示されます。",
+        "bannerPlaceholder": "例：データの問題を調査しているため、送信を一時停止しています。UTC 17 時までに復旧する見込みです。"
+      },
+      "email": {
+        "title": "メールサーバー（SMTP）",
+        "description": "送信メールの送信元です。データベースに保存され、パスワードは保存時に暗号化されて再表示されません。",
+        "saved": "設定が保存されました。",
+        "host": "ホスト",
+        "hostPlaceholder": "smtp.example.org",
+        "port": "ポート",
+        "useTls": "TLS（STARTTLS）を使用",
+        "fromAddress": "送信元アドレス",
+        "fromAddressPlaceholder": "ingest@example.org",
+        "fromName": "送信者名",
+        "fromNamePlaceholder": "Ingest",
+        "username": "ユーザー名",
+        "usernamePlaceholder": "（空欄 = 匿名リレー）",
+        "changePassword": "保存済みのパスワードを変更",
+        "setPassword": "パスワードを設定",
+        "password": "パスワード",
+        "passwordHint": "保存済みのパスワードを削除するには、空白のままにしてください。"
+      },
+      "emailTemplates": {
+        "title": "メールテンプレート",
+        "description": "通知メールの作成に使用する Liquid テンプレートです。件名と本文を編集するには、いずれかを選択してください。",
+        "empty": "テンプレートはまだありません。",
+        "template": "テンプレート",
+        "subject": "件名",
+        "format": "形式",
+        "editAria": "テンプレート {{name}} を編集",
+        "htmlAndText": "HTML + テキスト",
+        "text": "テキスト",
+        "editNamed": "テンプレートの編集 — {{name}}",
+        "edit": "テンプレートの編集",
+        "saved": "テンプレートが保存されました。",
+        "textBody": "テキスト本文",
+        "textBodyHint": "HTML を表示できない場合に使われるプレーンテキストです。Liquid を使用できます。",
+        "htmlBody": "HTML 本文",
+        "htmlBodyHint": "任意です。テキストのみを送信する場合は空白のままにしてください。",
+        "save": "テンプレートを保存"
+      },
+      "notifications": {
+        "title": "通知",
+        "description": "どのイベントでメールを生成し、誰が受け取るかを選択します。各トリガーは、サービス自身の連絡先メールアドレス、以下の受信者リスト、またはその両方に通知できます。",
+        "saved": "通知設定が保存されました。",
+        "runResult": "{{total}} 件のメールをキューに登録しました：期限間近 {{upcoming}} 件、送信漏れ {{missed}} 件、警告 {{warnings}} 件。",
+        "upcoming": "送信期限間近のリマインダー",
+        "leadTime": "リードタイム（ウィンドウが閉じる何時間前か）",
+        "missed": "送信漏れのアラート",
+        "warnings": "警告付き送信の通知",
+        "draftSaved": "下書き保存の通知",
+        "draftSavedHint": "共同編集者に知らせるため、下書きを保存するたびに送信されます（重複排除なし）。メールには、コンソールのアドレスの後ろに貼り付ける相対パスが表示されます。クリックできるリンクではありません。",
+        "pendingApproval": "承認待ち送信の通知",
+        "pendingApprovalHint": "送信に指定された承認者には常にメールが送信されます。以下のスイッチで、送信者や管理者リストを追加できます。",
+        "approved": "送信承認の通知",
+        "rejected": "送信却下の通知",
+        "recipientList": "管理者/オペレーター受信者リスト",
+        "recipientListHint": "トリガーで「管理者リスト」がオンのときに写しを受け取るアカウント（メールアドレスを持つもの）です。",
+        "noEligibleAccounts": "対象となるアカウントがありません（オペレーター/管理者にはメールアドレスが必要です）",
+        "selectRecipients": "受信者を選択…",
+        "running": "実行しています…",
+        "runNow": "今すぐ実行",
+        "notifyService": "サービスアカウントに通知",
+        "notifyAdminList": "管理者/オペレーターリストに通知"
+      },
+      "approvalRules": {
+        "title": "ルール",
+        "description": "各スキーマ独自のポリシーに加えて、特定のサービスとスキーマに承認を必須にします。片方を「すべて」のままにすると、すべてのサービスまたはすべてのスキーマが対象になります。API 送信を対象とするルールを使うと、部分的に自動化されたフィードを公開前に担当者がレビューして補完するよう強制できます。",
+        "add": "ルールの追加",
+        "edit": "ルールの編集",
+        "create": "ルールの作成",
+        "created": "ルールが作成されました。",
+        "saved": "ルールが保存されました。",
+        "deleted": "ルールが削除されました。",
+        "disabledMessage": "ルールが無効になりました。",
+        "enabledMessage": "ルールが有効になりました。",
+        "deleteType": "承認ルール",
+        "approval": "承認",
+        "useGlobalDefault": "グローバル既定値を使用",
+        "noApproval": "承認なし",
+        "requiredSummary": "必須 ({{source}})",
+        "emptyManage": "まだルールがありません。「ルールの追加」をクリックして作成してください。",
+        "emptyReadOnly": "まだルールはありません。",
+        "editAria": "ルール {{name}} を編集",
+        "actionsAria": "ルール {{name}} のアクション",
+        "labelPlaceholder": "例：財務フィードは承認が必要",
+        "sources": {
+          "both": "手動 + API",
+          "manualOnly": "手動のみ",
+          "apiOnly": "API のみ"
+        }
+      },
+      "teamsConnection": {
+        "title": "Microsoft Teams 接続",
+        "description": "Teams にプロンプトを送信するために使用するボットアプリの登録です。データベースに保存され、ボットシークレットは保存時に暗号化されて再表示されません。Azure でのボットの登録方法は、セットアップガイドを参照してください。",
+        "saved": "接続が保存されました。",
+        "testSucceeded": "接続に成功しました — 資格情報は有効です。",
+        "testFailed": "接続に失敗しました。",
+        "appId": "アプリ（クライアント）ID",
+        "appIdPlaceholder": "00000000-0000-0000-0000-000000000000",
+        "tenantId": "テナント ID",
+        "tenantHint": "マルチテナントボットの場合は空白のままにします。",
+        "tenantPlaceholder": "（空欄 = マルチテナント）",
+        "singleTenant": "シングルテナントのアプリ登録",
+        "changeSecret": "保存済みのボットシークレットを変更",
+        "setSecret": "ボットシークレットを設定",
+        "secret": "ボットシークレット（クライアントシークレット）",
+        "secretHint": "保存済みのシークレットを削除するには、空白のままにしてください。",
+        "testing": "テストしています…",
+        "test": "接続をテスト"
+      },
+      "integrations": {
+        "title": "統合",
+        "description": "各統合は、対象のサービスとスキーマで未送信のサンプルについて、Teams のユーザーまたはチャネルに入力を促します。プロンプトは日次スケジュールで実行されるほか、「今すぐ実行」でオンデマンドに実行できます。無効な項目と非表示の項目は省略され、警告はインラインで表示されます。",
+        "connectionWarning": "Microsoft Teams 接続がまだ構成されていません。統合がプロンプトを送信できるようにするには、「Teams 接続」のサブページでボットの資格情報を設定してください。",
+        "add": "統合の追加",
+        "edit": "統合の編集",
+        "create": "統合の作成",
+        "created": "統合が作成されました。",
+        "saved": "統合が保存されました。",
+        "deleted": "統合が削除されました。",
+        "disabledMessage": "統合が無効になりました。",
+        "enabledMessage": "統合が有効になりました。",
+        "deleteType": "統合",
+        "runComplete": "実行が完了しました — 送信 {{prompted}} 件、スキップ {{skipped}} 件。",
+        "testEnqueued": "テストプロンプトをキューに登録しました。",
+        "target": "宛先",
+        "scheduleLabel": "スケジュール",
+        "emptyManage": "まだ統合がありません。「統合の追加」をクリックして作成してください。",
+        "emptyReadOnly": "まだ統合はありません。",
+        "editAria": "統合 {{name}} を編集",
+        "actionsAria": "統合 {{name}} のアクション",
+        "runNow": "今すぐ実行",
+        "sendTest": "テストを送信",
+        "targetSummary": "{{kind}}: {{target}}",
+        "channel": "チャネル",
+        "user": "ユーザー",
+        "targetRequired": "宛先のユーザー ID またはチャネル ID を入力してください。",
+        "hourValidation": "時は 0 〜 23 の範囲で指定してください。",
+        "minuteValidation": "分は 0 〜 59 の範囲で指定してください。",
+        "labelPlaceholder": "例：運用チャネルへの毎日のリマインダー",
+        "sendTo": "送信先",
+        "aUser": "ユーザー",
+        "aChannel": "チャネル",
+        "channelId": "チャネル ID",
+        "userId": "ユーザー ID（Entra オブジェクト ID、UPN、またはメールアドレス）",
+        "targetIdHint": "この ID の調べ方は、セットアップガイドを参照してください。",
+        "channelIdPlaceholder": "19:...@thread.tacv2",
+        "userIdPlaceholder": "user@example.org",
+        "displayName": "表示名",
+        "displayNameHint": "この宛先に付ける任意のわかりやすいラベルです。",
+        "displayNamePlaceholder": "例：運用チームのチャネル",
+        "frequency": "頻度",
+        "frequencyHint": "未送信の値を確認する頻度です。「今すぐ実行」でオンデマンドに実行することもできます。",
+        "daysOfWeek": "曜日",
+        "daysOfWeekHint": "毎日実行するには空のままにします。",
+        "everyDay": "毎日",
+        "anchorMonth": "アンカー月",
+        "anchorMonthHint": "この月を起点に期間が繰り返されます（例：2 月から四半期ごと = 2 月、5 月、8 月、11 月）。",
+        "dayOfMonth": "日付",
+        "dayOfMonthHint": "期間内のこの日（またはそれ以降）に実行されます。「最終日」を選ぶと月末に実行されます。",
+        "lastDay": "最終日",
+        "theLastDay": "最終日",
+        "hourUtc": "時（UTC）",
+        "minuteUtc": "分（UTC）",
+        "ordinal": {
+          "zero": "{{count}}日",
+          "one": "{{count}}日",
+          "two": "{{count}}日",
+          "few": "{{count}}日",
+          "many": "{{count}}日",
+          "other": "{{count}}日"
+        },
+        "schedule": {
+          "weeklyEveryDay": "毎週 (毎日)、{{time}}",
+          "weeklyDays": "{{days}}、{{time}}",
+          "monthly": "毎月 {{day}}、{{time}}",
+          "quarterly": "{{month}} から四半期ごと {{day}}、{{time}}",
+          "semiAnnually": "{{month}} から半年ごと {{day}}、{{time}}",
+          "yearly": "毎年 {{month}} {{day}}、{{time}}",
+          "daily": "毎日、{{time}}"
+        }
+      },
+      "webhooks": {
+        "title": "Webhook エンドポイント",
+        "description": "購読中のイベントが発生したときに、署名付きの HTTP POST を外部 URL（Teams、Power Automate、独自のサービス）へ送信します。ポーリングは不要です。",
+        "add": "エンドポイントの追加",
+        "addTitle": "Webhook エンドポイントの追加",
+        "editTitle": "エンドポイントの編集 — {{name}}",
+        "editAria": "エンドポイント {{name}} を編集",
+        "actionsAria": "{{name}} のアクション",
+        "deleteConfirm": "Webhook エンドポイント「{{name}}」を削除しますか?\n\n過去の配信は監査のために保持されます。",
+        "deleted": "「{{name}}」を削除しました。",
+        "rotateConfirm": "「{{name}}」の新しい署名シークレットを生成しますか?\n\n古いシークレットはすぐに機能しなくなります。",
+        "testQueued": "「{{name}}」のテスト配信をキューに登録しました。以下の配信ログを確認してください。",
+        "name": "名前",
+        "url": "URL",
+        "eventsLabel": "イベント",
+        "empty": "まだエンドポイントがありません。イベントの受信を開始するには、1 つ追加してください。",
+        "unsignedHint": "署名シークレットが未設定です。配信は署名なしで送信されます。",
+        "unsigned": "未署名",
+        "noEvents": "イベントはありません",
+        "eventCount_one": "{{count}} 件のイベント",
+        "eventCount_other": "{{count}} 件のイベント",
+        "rotateSecret": "シークレットのローテーション",
+        "generateSecret": "シークレットの生成",
+        "deliveryHistory": "配信履歴（ステータス、再試行、手動での再配信）は<auditLink>監査ページ</auditLink>の<sectionName>Webhook 配信</sectionName>で確認できます。",
+        "nameRequired": "名前は必須です。",
+        "urlValidation": "絶対 http(s) URL を入力してください。",
+        "eventRequired": "購読するイベントを 1 つ以上選択してください。",
+        "namePlaceholder": "Teams – 送信チャネル",
+        "destinationUrl": "宛先 URL",
+        "destinationUrlHint": "署名された POST がここに送信されます。絶対 http(s) URL である必要があります。",
+        "urlPlaceholder": "https://example.org/hooks/ingest",
+        "onlyForService": "特定のサービスのみ",
+        "onlyForServiceHint": "配信を 1 つのサービスアカウントに限定します。すべてのサービスを対象にする場合は空白のままにしてください。",
+        "descriptionLabel": "説明",
+        "descriptionHint": "この管理者向けリストにのみ表示される任意のメモです。",
+        "generateOnCreate": "署名シークレット（HMAC-SHA256）を生成する。保存後に一度だけ表示されます。",
+        "create": "エンドポイントの作成",
+        "secretTitle": "「{{name}}」の署名シークレット",
+        "secretInstructions": "今すぐコピーしてください。一度しか表示されず、後から取得できません。各配信の X-Ingest-Signature ヘッダーの検証に使用します。",
+        "copied": "コピーしました",
+        "copySecret": "シークレットをコピー",
+        "events": {
+          "SubmissionAccepted": {
+            "label": "送信の受理",
+            "description": "サービスがデータを送信し、受理されました。"
+          },
+          "SubmissionWarnings": {
+            "label": "送信の警告",
+            "description": "受理された送信に、処理を妨げない警告が含まれていました。"
+          },
+          "WindowUpcoming": {
+            "label": "ウィンドウ終了間近",
+            "description": "送信ウィンドウの終了が近づいています。"
+          },
+          "WindowMissed": {
+            "label": "送信漏れ",
+            "description": "必要な送信がないままウィンドウが終了しました。"
+          },
+          "SubmissionPendingApproval": {
+            "label": "送信の承認待ち",
+            "description": "送信は受理されましたが、承認待ちで保留されています。"
+          },
+          "SubmissionApproved": {
+            "label": "送信の承認",
+            "description": "承認待ちの送信が承認され、公開されました。"
+          },
+          "SubmissionRejected": {
+            "label": "送信の却下",
+            "description": "承認待ちの送信が却下され、公開されません。"
+          }
+        }
+      }
+    },
+    "shell": {
+      "common": {
+        "close": "閉じる",
+        "cancel": "キャンセル"
+      },
+      "skipToContent": "メインコンテンツにスキップ",
+      "primaryAriaLabel": "メイン",
+      "mainNavigationAriaLabel": "メインナビゲーション",
+      "serviceConsole": "サービスコンソール",
+      "adminConsole": "管理コンソール",
+      "navigation": {
+        "dashboard": "ダッシュボード",
+        "submissions": "送信",
+        "missing": "送信漏れ",
+        "explore": "探索",
+        "reports": "レポート",
+        "accounts": "アカウント",
+        "schemas": "スキーマ",
+        "events": "イベント",
+        "audit": "監査",
+        "tools": "ツール",
+        "settings": "設定"
+      },
+      "submissionsClosed": {
+        "title": "送信は停止中です",
+        "message": "サービスアカウントからの新しい送信と編集は一時的に停止されています。"
+      },
+      "login": {
+        "hint": "API キーを貼り付けてください。ここでサインインできるのは User 種別の資格情報のみです（ロールは問いません）。Application 種別のキーは API 専用です。",
+        "applicationKeyError": "この API キーはアプリケーション（非対話型）専用です。管理 UI にアクセスするには、管理者に User 種別の資格情報を依頼してください。",
+        "continueWith": "{{provider}} で続行",
+        "orUseApiKey": "または API キーを使用",
+        "apiKey": "API キー",
+        "couldNotSignIn": "サインインできませんでした",
+        "verifying": "確認中…",
+        "signIn": "サインイン",
+        "sso": {
+          "title": "シングルサインオン",
+          "errors": {
+            "notLinked": "このアカウントはシングルサインオン用に設定されていません。管理者に ID のリンクを依頼するか、API キーでサインインしてください。",
+            "noEmail": "ID プロバイダーから、サインインに必要な確認済みメールアドレスが提供されませんでした。",
+            "remote": "シングルサインオンがキャンセルされたか、失敗しました。もう一度お試しください。",
+            "default": "シングルサインオンが完了しませんでした。もう一度お試しください。"
+          }
+        }
+      },
+      "breadcrumbs": {
+        "home": "ホーム",
+        "new": "新規",
+        "edit": "編集",
+        "view": "表示",
+        "status": "状態",
+        "historicalData": "過去のデータ",
+        "submission": "送信",
+        "missingSubmissions": "送信漏れ"
+      },
+      "topBar": {
+        "pageLocation": "ページの場所",
+        "searchPlaceholder": "検索…",
+        "searchAriaLabel": "検索 (Ctrl+K)",
+        "role": "ロール：{{role}}",
+        "accountMenu": "アカウントメニュー",
+        "accountMenuFor": "{{name}} のアカウントメニュー",
+        "signOut": "サインアウト",
+        "scope": {
+          "names": "このセッションでは次の情報のみを参照できます：{{names}}",
+          "count_one": "このセッションは {{count}} サービスに限定されています。",
+          "count_other": "このセッションは {{count}} サービスに限定されています。",
+          "badge_one": "限定されたビュー · {{count}} サービス",
+          "badge_other": "限定されたビュー · {{count}} サービス"
+        }
+      },
+      "account": {
+        "label": "アカウント",
+        "kinds": {
+          "User": "ユーザー",
+          "Application": "アプリケーション"
+        },
+        "roles": {
+          "Service": "サービス",
+          "Operator": "オペレーター",
+          "Admin": "管理者",
+          "Approver": "承認者"
+        }
+      },
+      "search": {
+        "title": "検索",
+        "placeholder": "アクション、スキーマ、値、イベント、アカウントを検索…",
+        "button": "検索",
+        "hint": "実行したい操作（「ユーザーの追加」「送信」「スコアカード」など）、またはスキーマ、値、イベント、アカウント、レポートの名前を入力してください。",
+        "searching": "検索しています…",
+        "viewAll": "すべて表示",
+        "valueCount_one": "{{count}} 件の値",
+        "valueCount_other": "{{count}} 件の値",
+        "viewAllSchemas_one": "{{count}} 件のスキーマをすべて表示",
+        "viewAllSchemas_other": "すべての {{count}} スキーマを表示",
+        "inSchema": "{{schema}} 内",
+        "matchingValues_one": "一致する値 {{count}} 件",
+        "matchingValues_other": "一致する値 {{count}} 件",
+        "accountKindRole": "{{kind}} · {{role}}",
+        "viewAllAccounts_one": "{{count}} 件のアカウントをすべて表示",
+        "viewAllAccounts_other": "{{count}} 件のアカウントをすべて表示",
+        "eventSummaryRich": "{{kind}} · <timestamp />",
+        "viewAllEvents_one": "すべての {{count}} イベントを表示",
+        "viewAllEvents_other": "{{count}} 件のイベントをすべて表示",
+        "viewAllReports_one": "すべての {{count}} レポートを表示",
+        "viewAllReports_other": "{{count}} 件のレポートをすべて表示",
+        "submissionSummaryRich": "{{schemas}} · <submittedAt />",
+        "noSchemas": "スキーマなし",
+        "recentMatches_one": "最近の一致 {{count}} 件",
+        "recentMatches_other": "最近の一致 {{count}} 件",
+        "noResults": "「{{query}}」に一致する結果はありません。別の用語を試してください。",
+        "sections": {
+          "actions": "アクション",
+          "schemas": "スキーマ",
+          "schemaValues": "スキーマ値",
+          "accounts": "アカウント",
+          "events": "イベント",
+          "reports": "レポート",
+          "submissions": "送信"
+        },
+        "reportType": {
+          "single": "単一送信レポート",
+          "aggregate": "集計レポート"
+        },
+        "actions": {
+          "submission-new": {
+            "title": "新規送信",
+            "description": "サービスの KPI データを送信",
+            "keywords": "送信|送信を追加|送信を作成|データを送信|データを報告"
+          },
+          "schema-new": {
+            "title": "スキーマの追加",
+            "description": "新しいスキーマを作成",
+            "keywords": "新しいスキーマ|スキーマの作成|KPI の追加"
+          },
+          "account-new-user": {
+            "title": "ユーザーの追加",
+            "description": "新しいアカウントを作成",
+            "keywords": "新しいユーザー|ユーザーの作成|アカウントの追加|新しいアカウント|オペレーターの追加|管理者の追加|招待"
+          },
+          "account-new-service": {
+            "title": "サービスの追加",
+            "description": "新しいサービスアカウントを作成",
+            "keywords": "新しいサービス|サービスの作成|サービスのオンボード|アカウントの追加"
+          },
+          "event-new": {
+            "title": "イベントを追加",
+            "description": "タイムラインにイベントを記録",
+            "keywords": "新しいイベント|イベントの作成|インシデント|メンテナンス|デプロイ"
+          },
+          "report-upload": {
+            "title": "レポートのアップロード",
+            "description": "レポート定義を追加",
+            "keywords": "新しいレポート|レポートの追加|レポートのインポート"
+          },
+          "explore": {
+            "title": "探索",
+            "description": "アプリ内分析：推移、比較、スナップショット",
+            "keywords": "分析|アナリティクス|チャート|トレンド|グラフ|推移"
+          },
+          "explore-scorecard": {
+            "title": "スコアカード",
+            "description": "スキーマ横断の RAG ステータスボード",
+            "keywords": "RAG|赤 アンバー 緑|信号|ステータスボード|目標"
+          },
+          "explore-anomalies": {
+            "title": "異常",
+            "description": "期間別の異常検知ボード",
+            "keywords": "異常|外れ値|異常値|スパイク"
+          },
+          "missing": {
+            "title": "送信漏れ",
+            "description": "各サービスの未送信分",
+            "keywords": "送信漏れ|期限超過|未送信|不足"
+          },
+          "dashboard": {
+            "title": "ダッシュボード",
+            "description": "ホーム概要",
+            "keywords": "ホーム|概要|スタート"
+          },
+          "submissions": {
+            "title": "送信",
+            "description": "送信されたデータを参照",
+            "keywords": "データ|kpi|サンプル"
+          },
+          "schemas": {
+            "title": "スキーマ",
+            "description": "スキーマカタログを参照",
+            "keywords": "KPI 定義|テンプレート|フィールド"
+          },
+          "accounts": {
+            "title": "アカウント",
+            "description": "サービス、オペレーター、ユーザー、管理者",
+            "keywords": "サービス|ユーザー|オペレーター|管理者|担当者"
+          },
+          "events": {
+            "title": "イベント",
+            "description": "イベントのタイムラインを参照",
+            "keywords": "タイムライン|インシデント|メンテナンス"
+          },
+          "reports": {
+            "title": "レポート",
+            "description": "レポートの参照とレンダリング",
+            "keywords": "レポートカタログ|レンダリング"
+          },
+          "audit": {
+            "title": "監査",
+            "description": "誰が何をいつ変更したか",
+            "keywords": "監査ログ|履歴|証跡|変更"
+          },
+          "tools": {
+            "title": "ツール",
+            "description": "バックアップと復元のユーティリティ",
+            "keywords": "バックアップ|復元|エクスポート|インポート"
+          },
+          "settings": {
+            "title": "設定",
+            "description": "メール、通知、Webhook、ポリシー",
+            "keywords": "構成|設定|メール|通知|Webhook|承認ポリシー"
+          }
+        }
+      },
+      "gridPager": {
+        "rowsPerPage": "ページあたりの行数",
+        "results_one": "{{count}} 件",
+        "results_other": "{{count}} 件",
+        "range": "{{from}}–{{to}} / {{total}}",
+        "previous": "前へ",
+        "page": "ページ {{page}} / {{totalPages}}",
+        "next": "次へ"
+      },
+      "rowActions": {
+        "ariaLabel": "行アクション"
+      },
+      "period": {
+        "label": "期間",
+        "from": "開始",
+        "to": "終了",
+        "interval": {
+          "all": "全期間",
+          "lastDay": "過去 24 時間",
+          "lastWeek": "過去 7 日間",
+          "lastMonth": "過去 30 日間",
+          "custom": "カスタム範囲"
+        },
+        "shift": {
+          "1m": "1 か月",
+          "6m": "6 か月",
+          "1y": "1 年"
+        }
+      },
+      "wizard": {
+        "back": "戻る",
+        "finish": "完了",
+        "next": "次へ"
+      },
+      "drawer": {
+        "collapse": "ドロワーを折りたたむ",
+        "expand": "ドロワーを展開する"
+      },
+      "export": {
+        "csv": "CSV をエクスポート",
+        "exporting": "エクスポートしています…"
+      },
+      "valueLabel": {
+        "required": "必須",
+        "description": "説明",
+        "new": "新規"
+      },
+      "cadence": {
+        "Daily": "毎日",
+        "Weekly": "毎週",
+        "Fortnightly": "隔週",
+        "Monthly": "毎月",
+        "Quarterly": "四半期ごと",
+        "SemiAnnually": "半年ごと",
+        "Yearly": "毎年"
+      },
+      "eventKind": {
+        "PointInTime": "特定の時点",
+        "Interval": "間隔",
+        "FromNowOn": "今後"
+      },
+      "comments": {
+        "general": "一般"
+      },
+      "confirm": {
+        "namedSubject": "{{noun}}「{{target}}」",
+        "cannotUndo": "これを元に戻すことはできません。",
+        "delete": "{{subject}} を削除しますか?\n\n{{note}}"
+      },
+      "avatars": {
+        "account": "{{kind}} · {{role}}{{context}}",
+        "disabledSuffix": "（無効）",
+        "schema": "スキーマ",
+        "schemaDisabled": "スキーマ（無効）",
+        "submission": "送信",
+        "submissionStatus": "送信 · {{status}}",
+        "auditChange": "{{target}} · {{change}}",
+        "status": "状態",
+        "deliveryStatus": "{{label}} · {{status}}",
+        "schemaValue": "{{type}}{{context}}"
+      },
+      "submissionStatus": {
+        "Draft": "下書き",
+        "Pending": "保留中",
+        "Approved": "承認済み",
+        "Rejected": "却下",
+        "NotRequired": "不要"
+      },
+      "deliveryStatus": {
+        "Pending": "保留中",
+        "Sending": "送信中",
+        "Sent": "送信済み",
+        "Failed": "失敗"
+      },
+      "auditChange": {
+        "Create": "作成",
+        "Edit": "編集",
+        "Delete": "削除",
+        "Approve": "承認",
+        "Reject": "却下"
+      },
+      "auditTarget": {
+        "User": "ユーザー",
+        "Account": "アカウント",
+        "Schema": "スキーマ",
+        "ApiKey": "API キー",
+        "Submission": "送信",
+        "Report": "レポート",
+        "SchemaHistory": "スキーマ履歴",
+        "ApprovalRule": "承認ルール",
+        "Settings": "設定",
+        "Backup": "バックアップ",
+        "Event": "イベント",
+        "CommentThread": "コメントスレッド",
+        "Comment": "コメント"
+      },
+      "auditTargetInitials": {
+        "User": "Us",
+        "Account": "Ac",
+        "Schema": "Sc",
+        "ApiKey": "Ak",
+        "Submission": "Sb",
+        "Report": "Rp",
+        "SchemaHistory": "Sh",
+        "ApprovalRule": "Ar",
+        "Settings": "St",
+        "Backup": "Bk",
+        "Event": "Ev",
+        "CommentThread": "Ct",
+        "Comment": "Cm"
+      },
+      "valueType": {
+        "String": "文字列",
+        "Integer": "整数",
+        "Number": "数値",
+        "Date": "日付",
+        "Boolean": "ブール値"
+      },
+      "valueTypeInitials": {
+        "String": "S",
+        "Integer": "I",
+        "Number": "N",
+        "Date": "D",
+        "Boolean": "B"
+      },
+      "capabilities": {
+        "groups": {
+          "schemas": "スキーマ",
+          "submissions": "送信",
+          "analytics": "分析",
+          "reports": "レポート",
+          "accountsKeys": "アカウントとキー",
+          "oversight": "監督",
+          "notificationsIntegrations": "通知と統合",
+          "settings": "設定",
+          "events": "イベント",
+          "comments": "コメント"
+        },
+        "items": {
+          "schemasRead": {
+            "label": "スキーマの表示",
+            "description": "スキーマのカタログ、詳細、履歴を参照します。"
+          },
+          "schemasManage": {
+            "label": "スキーマの管理",
+            "description": "スキーマを作成、編集、複製、削除します。"
+          },
+          "submissionsRead": {
+            "label": "送信の表示",
+            "description": "すべてのサービスの送信を確認します。"
+          },
+          "submissionsSubmit": {
+            "label": "代理送信",
+            "description": "サービスの送信を作成、編集、一括インポートします。"
+          },
+          "submissionsDelete": {
+            "label": "送信の削除",
+            "description": "送信を完全に削除します。"
+          },
+          "submissionsApprove": {
+            "label": "送信の承認",
+            "description": "承認待ちの送信を承認または却下します。"
+          },
+          "queryRead": {
+            "label": "データのクエリ",
+            "description": "OData フィードとアドホッククエリのエンドポイントを使用します。"
+          },
+          "exploreRead": {
+            "label": "探索",
+            "description": "アプリ内の「探索」分析を使用します。"
+          },
+          "statusRead": {
+            "label": "ステータスの表示",
+            "description": "サービス横断のステータスと送信漏れの分析を確認します。"
+          },
+          "reportsRead": {
+            "label": "レポートの表示",
+            "description": "レポートカタログを参照してレンダリングします。"
+          },
+          "reportsManage": {
+            "label": "レポートの管理",
+            "description": "レポート定義をアップロード、削除します。"
+          },
+          "accountsRead": {
+            "label": "アカウントの表示",
+            "description": "アカウントを参照します。"
+          },
+          "accountsManage": {
+            "label": "アカウントの管理",
+            "description": "アカウントとその権限を作成、編集、削除します。"
+          },
+          "apiKeysRead": {
+            "label": "API キーの表示",
+            "description": "アカウントに紐づく API キーを確認します。"
+          },
+          "apiKeysManage": {
+            "label": "API キーの管理",
+            "description": "API キーを発行および取り消します。"
+          },
+          "auditRead": {
+            "label": "監査ログの表示",
+            "description": "監査証跡を読み取り、エクスポートします。"
+          },
+          "privacyRead": {
+            "label": "個人データのエクスポート",
+            "description": "データ主体からのアクセス要求に応じたエクスポートを実行します。"
+          },
+          "privacyManage": {
+            "label": "消去 / 保持",
+            "description": "個人データを消去し、保持ポリシーを実行します。"
+          },
+          "backupRead": {
+            "label": "バックアップのエクスポート",
+            "description": "完全バックアップをダウンロードします。"
+          },
+          "backupManage": {
+            "label": "バックアップの復元",
+            "description": "バックアップからレジストリを復元します。"
+          },
+          "notificationsRead": {
+            "label": "通知の表示",
+            "description": "メール/通知の設定、テンプレート、送信トレイを確認します。"
+          },
+          "notificationsManage": {
+            "label": "通知の管理",
+            "description": "メール/通知の構成とテンプレートを編集し、メールを送信します。"
+          },
+          "webhooksRead": {
+            "label": "Webhook の表示",
+            "description": "Webhook エンドポイントと配信を確認します。"
+          },
+          "webhooksManage": {
+            "label": "Webhook の管理",
+            "description": "Webhook の作成/編集、シークレットのローテーション、再配信、キューの一括送信を行います。"
+          },
+          "integrationsRead": {
+            "label": "統合の表示",
+            "description": "統合（例：Microsoft Teams）とその接続を確認します。"
+          },
+          "integrationsManage": {
+            "label": "統合の管理",
+            "description": "統合の作成/編集、接続の編集、実行/テスト、キューの一括送信を行います。"
+          },
+          "settingsRead": {
+            "label": "設定の表示",
+            "description": "グローバル設定（既定の承認ポリシーなど）を読み取ります。"
+          },
+          "settingsManage": {
+            "label": "設定の管理",
+            "description": "グローバル設定（既定の承認ポリシーなど）を変更します。"
+          },
+          "eventsRead": {
+            "label": "イベントの表示",
+            "description": "イベントのタイムラインを参照します。"
+          },
+          "eventsManage": {
+            "label": "イベントの管理",
+            "description": "イベントを作成、編集、削除します。"
+          },
+          "commentsRead": {
+            "label": "コメントの表示",
+            "description": "スキーマ（およびその値）のコメントスレッドを確認します。"
+          },
+          "commentsCreate": {
+            "label": "コメントの作成",
+            "description": "新しいスレッドを開始し、既存のスレッドに返信します。自分のコメントを編集できます。"
+          },
+          "commentsManage": {
+            "label": "コメントの管理",
+            "description": "自分のコメントやスレッドだけでなく、あらゆるコメントやスレッドを編集、削除、解決/再開します。"
+          }
+        }
+      },
+      "expression": {
+        "empty": "式が空です。",
+        "invalid": "無効な式です。",
+        "editorAriaLabel": "式エディター",
+        "lint": {
+          "unknownFunction": "不明な関数 '{{name}}'。",
+          "unknownValue": "不明な値「{{name}}」。"
+        },
+        "runtime": {
+          "averageArgument": "average() は数値またはブール値の引数を必要としますが、{{type}} を取得しました。",
+          "higherThanArity": "higher_than() は (value, reference, percentage) を受け取ります。",
+          "higherThanNumeric": "higher_than() は数値引数を必要とします。",
+          "types": {
+            "undefined": "未定義",
+            "object": "オブジェクト",
+            "boolean": "ブール値",
+            "number": "数値",
+            "bigint": "bigint",
+            "string": "文字列",
+            "symbol": "シンボル",
+            "function": "関数"
+          }
+        },
+        "keywords": {
+          "true": "ブールリテラル",
+          "false": "ブールリテラル",
+          "null": "null リテラル",
+          "and": "論理積",
+          "or": "論理和",
+          "not": "論理否定",
+          "in": "包含判定",
+          "like": "SQL 形式のパターン一致"
+        },
+        "functions": {
+          "if": {
+            "description": "条件が true の場合は「then」を返し、それ以外の場合は「else」を返します。"
+          },
+          "average": {
+            "description": "数値引数の平均。ブール値は 1/0 として数え、null は無視されます。"
+          },
+          "higher_than": {
+            "description": "値が基準を percentage%（例：50 = 50%）を超えて上回る場合に true。"
+          },
+          "coalesce": {
+            "description": "null ではない最初の引数。"
+          },
+          "isNull": {
+            "description": "値が null の場合は true。"
+          },
+          "len": {
+            "description": "文字列の長さ。"
+          },
+          "now": {
+            "description": "現在の UTC の日付と時刻。"
+          },
+          "today": {
+            "description": "現在の UTC 日付の午前 0 時。"
+          },
+          "year": {
+            "description": "日付の年の要素。"
+          },
+          "month": {
+            "description": "日付の月の要素（1〜12）。"
+          },
+          "dayOfMonth": {
+            "description": "日（1〜31）。"
+          },
+          "dayOfWeek": {
+            "description": "曜日 (0 = 日曜日)。"
+          },
+          "dayOfYear": {
+            "description": "年内通算日（1〜366）。"
+          },
+          "weekOfYear": {
+            "description": "ISO-8601 週番号。"
+          },
+          "hour": {
+            "description": "時の要素（0〜23）。"
+          },
+          "minute": {
+            "description": "分の要素（0〜59）。"
+          },
+          "second": {
+            "description": "秒の要素（0〜59）。"
+          },
+          "abs": {
+            "description": "絶対値。"
+          },
+          "ceiling": {
+            "description": "数値以上の最小の整数。"
+          },
+          "floor": {
+            "description": "数値以下の最大の整数。"
+          },
+          "round": {
+            "description": "指定された小数点以下の桁数に丸めます。"
+          },
+          "truncate": {
+            "description": "数値の整数部分 (小数点以下は切り捨て)。"
+          },
+          "sign": {
+            "description": "数値の符号：-1、0、または 1。"
+          },
+          "sqrt": {
+            "description": "平方根。"
+          },
+          "pow": {
+            "description": "底を指数でべき乗した値。"
+          },
+          "exp": {
+            "description": "e を指定した値で累乗した結果。"
+          },
+          "log": {
+            "description": "指定された底の数値の対数。"
+          },
+          "log10": {
+            "description": "10 を底とする対数。"
+          },
+          "max": {
+            "description": "2 つの数値のうち大きい方。"
+          },
+          "min": {
+            "description": "2 つの数値のうち小さい方。"
+          },
+          "ieeeRemainder": {
+            "description": "IEEE 754 x を y で割った余り。"
+          },
+          "sin": {
+            "description": "サイン (ラジアン)。"
+          },
+          "cos": {
+            "description": "コサイン (ラジアン)。"
+          },
+          "tan": {
+            "description": "タンジェント（ラジアン）。"
+          },
+          "asin": {
+            "description": "逆正弦 (ラジアン)。"
+          },
+          "acos": {
+            "description": "逆余弦 (ラジアン)。"
+          },
+          "atan": {
+            "description": "逆正接 (ラジアン)。"
+          }
+        }
+      }
+    },
+    "accounts": {
+      "title": "アカウント",
+      "singular": "アカウント",
+      "common": {
+        "yes": "はい",
+        "no": "いいえ"
+      },
+      "roles": {
+        "Service": "サービス",
+        "Operator": "オペレーター",
+        "Approver": "承認者",
+        "Admin": "管理者"
+      },
+      "kinds": {
+        "User": "ユーザー",
+        "Application": "アプリケーション"
+      },
+      "kindHints": {
+        "Application": "API 専用の資格情報（UI にログインできません）",
+        "User": "対話型アカウント（UI にログインでき、API も呼び出せます）"
+      },
+      "status": {
+        "enabled": "有効",
+        "disabled": "無効",
+        "deleted": "削除済み"
+      },
+      "fields": {
+        "name": "名前",
+        "label": "ラベル",
+        "kind": "種別",
+        "role": "ロール",
+        "status": "状態",
+        "email": "メール",
+        "area": "エリア",
+        "created": "作成日時",
+        "createdBy": "作成者",
+        "modified": "更新日時",
+        "description": "説明",
+        "actions": "アクション"
+      },
+      "actions": {
+        "new": "新しいアカウント",
+        "more": "その他のアクション",
+        "onboardService": "新しいサービスをオンボード",
+        "onboardOperator": "新しいオペレーターをオンボード",
+        "refresh": "更新",
+        "exporting": "エクスポートしています…",
+        "exportCsv": "このリストをエクスポート（CSV）",
+        "exportJson": "アカウントをエクスポート（JSON）",
+        "importing": "インポートしています…",
+        "importJson": "アカウントをインポート（JSON）…",
+        "edit": "編集",
+        "apiKeys": "API キー",
+        "sendEmail": "メールを送信",
+        "viewStatus": "ステータスの表示",
+        "exportPersonalData": "個人データのエクスポート",
+        "exportData": "データのエクスポート",
+        "erase": "消去 (GDPR)",
+        "delete": "削除",
+        "cancel": "キャンセル",
+        "save": "保存",
+        "close": "閉じる"
+      },
+      "messages": {
+        "loadFailed": "読み込みに失敗しました",
+        "actionFailed": "アクションが失敗しました",
+        "loading": "読み込んでいます…",
+        "empty": "まだアカウントがありません。「新しいアカウント」をクリックして追加してください。"
+      },
+      "validation": {
+        "emailRequired": "メールアドレスは必須です。",
+        "emailInvalid": "有効なメールアドレスを入力してください。"
+      },
+      "aria": {
+        "viewAccount": "アカウント {{name}} を表示",
+        "actionsFor": "{{name}} のアクション"
+      },
+      "confirmDelete": "アカウント「{{target}}」を削除しますか?\n\nこれを元に戻すことはできません。",
+      "import": {
+        "readError": "アカウントファイルを読み取れませんでした：{{error}}",
+        "confirm": "このファイルからアカウントをインポートしますか?\n\nアカウントは名前で照合されます。既存のアカウントは更新され、新しい名前は作成されます。ファイルにないアカウントはそのまま残ります。\n\nAPI キーは含まれていないため、このインポートで作成されたアカウントはキーなしの状態で始まります。後でそれぞれに発行してください。",
+        "skipped": " · {{count}} 件をスキップ：{{errors}}",
+        "complete": "インポートが完了しました：{{created}} 件作成、{{updated}} 件更新{{tail}}。"
+      },
+      "placeholders": {
+        "email": "user@example.com",
+        "area": "例：北部地域"
+      },
+      "editor": {
+        "newTitle": "新しいアカウント",
+        "editTitle": "アカウントの編集",
+        "tabs": {
+          "general": "一般",
+          "permissions": "ロールと権限"
+        },
+        "emailHint": "メール通知と個別メッセージの送信に使用されます。",
+        "areaHint": "任意のグループ化タグです。",
+        "none": "なし",
+        "roleHint": "下の権限の初期値を決めるテンプレートです。後から自由に調整できます。"
+      },
+      "scope": {
+        "title": "サービス範囲",
+        "hint": "このアカウントが参照できるサービスです。すべてのサービスに無制限にアクセスさせる場合は空のままにします。1 つ以上を選ぶと、そのサービスだけに限定されます。",
+        "viewHint": "このアカウントが参照できるサービスです。",
+        "allServices": "すべてのサービス",
+        "unrestricted": "すべてのサービス（無制限）"
+      },
+      "permissions": {
+        "title": "権限",
+        "hint": "きめ細かい機能単位の権限です。上のロールは初期テンプレートにすぎないため、必要に応じて調整してください。",
+        "adminNote": "管理者は常にすべての権限を保持し、これを減らすことはできません。",
+        "serviceNote": "サービスアカウントは自身のデータの送信と表示のみを行い、バックオフィスの権限は持ちません。"
+      },
+      "onboarding": {
+        "serviceTitle": "新しいサービスのオンボード",
+        "operatorTitle": "新しいオペレーターのオンボード",
+        "createAccount": "アカウントを作成",
+        "details": {
+          "title": "アカウントの詳細",
+          "description": "新しい {{role}} アカウントを作成します。",
+          "nameHint": "変更しない機械可読な識別子です。全体で一意である必要があります。",
+          "namePlaceholder": "例：acme_logistics",
+          "labelPlaceholder": "わかりやすい表示名",
+          "emailPlaceholder": "contact@example.com"
+        },
+        "kindHints": {
+          "Application": "API 専用の資格情報です（UI にはログインできません）。",
+          "User": "対話型アカウントです（UI にログインでき、API も呼び出せます）。"
+        },
+        "scope": {
+          "description": "この {{role}} が参照できるサービスを選択してください。すべてのサービスに無制限にアクセスさせる場合は空のままにします。",
+          "visibleServices": "参照できるサービス",
+          "hint": "すべてのサービスに無制限にアクセスさせる場合は空のままにします。1 つ以上を選ぶと、このアカウントはそのサービスだけに限定されます。"
+        },
+        "key": {
+          "title": "API キー",
+          "description": "必要に応じて API キーを発行すると、アカウントはすぐに Ingest API を呼び出せます。",
+          "generateNow": "今すぐ API キーを生成する",
+          "applicationWarning": "アプリケーションアカウントは API キーでしか認証できません。キーがないと、後で発行するまでデータを送信できません。",
+          "descriptionLabel": "キーの説明（任意）",
+          "descriptionHint": "このキーを誰が何のために使うかのメモです。一時的なキーや休暇中の代行用キーに便利です。",
+          "expiryLabel": "キーの有効期限（任意）"
+        },
+        "result": {
+          "created": "{{role}} 「{{name}}」が作成されました",
+          "copyKey": "この API キーを今すぐコピーしてください。再度は表示されません。",
+          "copied": "コピーしました！",
+          "copyToClipboard": "クリップボードにコピー",
+          "copyAria": "API キーをコピー",
+          "noKey": "API キーは生成されませんでした。後でアカウントの API キーダイアログから発行できます。"
+        }
+      },
+      "erase": {
+        "title": "{{name}} を消去",
+        "deleted": "アカウントが削除されました。",
+        "anonymised": "アカウントは匿名化されました。",
+        "resultPrefix": "仮名",
+        "resultCounts": "送信 {{submissions}} 件、サンプル {{samples}} 件、メール {{emails}} 件、監査エントリ {{auditEntries}} 件、キー {{keys}} 件。",
+        "warningBefore": "これは消去権（忘れられる権利）の要求に応える操作です。この操作は",
+        "irreversible": "取り消せません",
+        "warningAfter": "。通常の「アカウントに送信データがある」場合の削除保護も回避します。",
+        "mode": "モード",
+        "anonymiseOption": "匿名化 — レポート用に数値/日付の KPI 値を残し、識別情報をすべて除去します（アカウントの仮名化、自由入力テキストの伏せ字化、キーとメールの削除）。",
+        "deleteOption": "削除 — アカウントと、それに紐づくすべて（送信、サンプル、メール、監査証跡）を完全に削除します。",
+        "acknowledgement": "これを元に戻すことはできないことを理解しています。",
+        "erasing": "消去中…",
+        "deleteEverything": "すべて削除",
+        "anonymise": "匿名化"
+      },
+      "email": {
+        "title": "{{name}} にメールを送信",
+        "to": "宛先：{{email}}",
+        "subjectRequired": "件名は必須です。",
+        "queued": "メールを送信キューに登録しました。",
+        "subject": "件名",
+        "message": "メッセージ",
+        "sending": "送信しています…",
+        "send": "送信"
+      },
+      "sso": {
+        "title": "SSO サインイン",
+        "hint": "ID プロバイダーのアカウントをリンクすると、このユーザーは「…で続行」からサインインできます。プロバイダーとユーザーの確認済みメールアドレスで照合されます。",
+        "provider": "プロバイダー",
+        "remove": "SSO リンクを削除",
+        "add": "SSO リンクを追加"
+      },
+      "audit": {
+        "title": "監査",
+        "by": " · {{name}} による"
+      },
+      "keys": {
+        "title": "{{name}} の API キー",
+        "copyNow": "このキーを今すぐコピーしてください。再度は表示されません。",
+        "keyId": "キー ID",
+        "expires": "有効期限",
+        "never": "なし",
+        "revoke": "取り消し",
+        "delete": "キーを削除",
+        "deleteAria": "キー {{keyId}} を削除",
+        "saveDescription": "説明を保存",
+        "editDescription": "説明の編集",
+        "nextDescription": "次のキーの説明（任意）",
+        "descriptionHint": "このキーを誰が何のために使うかのメモです。特に有効期限付きの一時キーや、休暇中の代行用キーに便利です。",
+        "descriptionPlaceholderShort": "例：Jane の休暇中の代行用",
+        "descriptionPlaceholder": "例：Jane（レビュー担当）の休暇中の代行用",
+        "nextExpiry": "次のキーの有効期限（任意）",
+        "expiryHint": "有効期限を設けない場合は空白のままにします。本日から最長 2 年です。",
+        "generate": "新しいキーを生成",
+        "confirmDeleteRevoked": "API キー {{keyId}} を完全に削除しますか?\n\nこれにより、取り消されたキーがリストから永久に削除されます。\n\nこれを元に戻すことはできません。",
+        "confirmDeleteActive": "API キー {{keyId}} を完全に削除しますか?\n\nこのキーはまだ有効です。削除すると、取り消しと同様にすぐに使用できなくなり、さらにリストからも削除されます。\n\nこれを元に戻すことはできません。",
+        "status": {
+          "revoked": "取り消し済み",
+          "expired": "期限切れ",
+          "active": "アクティブ"
+        }
+      }
+    },
+    "tools": {
+      "title": "ツール",
+      "loading": "読み込んでいます…",
+      "noPermission": "これらのツールを使用する権限がありません。",
+      "navigationGroup": "バックアップと復元",
+      "preparing": "準備しています…",
+      "restoring": "復元しています…",
+      "importing": "インポートしています…",
+      "restoreFromFile": "ファイルから復元…",
+      "importFromFile": "ファイルからインポート…",
+      "restoreComplete": "復元が完了しました。",
+      "dataBackup": {
+        "title": "データのバックアップ",
+        "description": "レジストリ全体（アカウント、キー、スキーマ、送信、レポート、監査ログ）を 1 つの JSON ファイルにエクスポート、またはそのファイルから復元します。",
+        "readError": "バックアップファイルを読み取れませんでした：{{error}}",
+        "confirmRestore": "このバックアップから復元しますか?\n\nこれにより、現在のデータ (アカウント、キー、スキーマ、送信、レポート、監査ログ) がすべてファイルの内容に置き換えられます。元に戻すことはできません。まず最新のバックアップがあることを確認してください。",
+        "warningBeforeSmall": "これは",
+        "small": "小規模な",
+        "warningBeforeNot": "環境や、環境間でデータを移動するための簡易ツールであり、",
+        "notPrimary": "主要なバックアップ手段ではありません。",
+        "warningBeforeCommand": "本格的なバックアップには、データベースレベルのスナップショット（",
+        "warningBeforeReplace": "やホスティング事業者のバックアップ）を取得してください。復元は",
+        "replacesAll": "現在のデータをすべて置き換えます。",
+        "warningAfterReplace": "また、トランザクションではありません。",
+        "download": "バックアップをダウンロード"
+      },
+      "configBackup": {
+        "title": "構成のバックアップ",
+        "description": "すべての構成（承認ポリシーとルール、メールと通知の設定およびテンプレート、Webhook、統合、Teams 接続）を 1 つの JSON ファイルにエクスポート、またはそのファイルから復元します。環境間で構成をコピーしたり、障害後に復旧したりするのに使用します。",
+        "readError": "構成ファイルを読み取れませんでした：{{error}}",
+        "confirmRestore": "この構成バックアップから復元しますか?\n\nこれにより、現在の構成（承認ポリシーとルール、メールと通知の設定およびテンプレート、Webhook、統合、Teams 接続）がすべてファイルの内容に置き換えられます。元に戻すことはできません。\n\n暗号化されたシークレット（SMTP パスワード、Webhook シークレット、Teams ボットシークレット）が使えるのは、このサーバーがファイルを生成したサーバーと同じ ApiKey:Pepper を使用している場合だけです。それ以外の場合は、後で再入力してください。ファイルにシークレットが含まれていない場合は、保存済みのシークレットが保持されます。",
+        "warningBeforeReplace": "復元は",
+        "replacesAll": "現在の構成をすべて置き換え",
+        "warningBeforePepper": "、トランザクションではありません。暗号化されたシークレットは暗号文として含まれ、復号できるのは同じ",
+        "warningAfterPepper": "を使用するサーバーだけです。別の環境では、復元後に再入力してください。ファイルにシークレットが含まれていない場合は、保存済みのシークレットが保持されます。",
+        "download": "構成をダウンロード"
+      },
+      "accountsBackup": {
+        "title": "アカウント",
+        "description": "すべてのアカウント（名前、ラベル、ロール、権限、SSO リンク、有効状態）を 1 つの JSON ファイルにエクスポート、またはインポートしてアカウントを作成・更新します。環境の複製や初期投入に便利です。",
+        "readError": "アカウントファイルを読み取れませんでした：{{error}}",
+        "confirmImport": "このファイルからアカウントをインポートしますか?\n\nアカウントは名前で照合されます。既存のアカウントは更新され、新しい名前は作成されます。ファイルにないアカウントはそのまま残ります。\n\nAPI キーはファイルに含まれていないため、このインポートで作成されたアカウントはキーなしの状態で始まります。後でそれぞれに発行してください。",
+        "keysNeverExported": "API キーはエクスポートされません。",
+        "warningBeforeNoKey": "復元可能な形式では保存されないため、インポートしたアカウントは",
+        "noKey": "キーなし",
+        "warningAfterNoKey": "の状態から始まり、認証するにはキーを再生成する必要があります。インポートは非破壊的で、ファイルにないアカウントはそのまま残ります。",
+        "importCompleteBeforeCreated": "インポートが完了しました：",
+        "created": "件作成",
+        "updated": "件更新",
+        "download": "アカウントをダウンロード"
+      }
+    },
+    "reports": {
+      "title": "レポート",
+      "singular": "レポート",
+      "actions": {
+        "more": "その他のアクション",
+        "refresh": "更新",
+        "upload": "レポートのアップロード",
+        "view": "表示",
+        "delete": "削除"
+      },
+      "messages": {
+        "loadFailed": "読み込みに失敗しました",
+        "actionFailed": "アクションを完了できませんでした",
+        "loading": "読み込んでいます…",
+        "empty": "まだレポートはありません。",
+        "emptyAdmin": "まだレポートがありません。「レポートのアップロード」をクリックして追加してください。"
+      },
+      "fields": {
+        "name": "名前",
+        "type": "種類",
+        "targets": "対象",
+        "created": "作成日時",
+        "createdBy": "作成者",
+        "actions": "アクション"
+      },
+      "types": {
+        "single": "単一",
+        "aggregate": "集計"
+      },
+      "targets": {
+        "global": "グローバル"
+      },
+      "validation": {
+        "emptyFile": "ファイルは空です。"
+      },
+      "aria": {
+        "open": "レポート {{name}} を開く",
+        "actionsFor": "{{name}} のアクション"
+      },
+      "confirmDelete": "レポート「{{target}}」を削除しますか?\n\nこれを元に戻すことはできません。",
+      "view": {
+        "back": "戻る",
+        "loadFailed": "レポートを読み込めませんでした",
+        "loading": "レポートを読み込んでいます…",
+        "schema": "スキーマ",
+        "pickGlobalSchema": "スキーマを選択（グローバルレポート）…",
+        "pickSchema": "スキーマを選択…",
+        "period": "期間",
+        "periods": {
+          "thisMonth": "今月",
+          "lastWeek": "過去 7 日間",
+          "lastMonth": "過去 30 日間",
+          "lastYear": "過去 365 日間",
+          "custom": "カスタム範囲"
+        },
+        "from": "開始",
+        "to": "終了",
+        "submission": "送信",
+        "submissionOption": "{{service}} — {{date}}（{{count}} 件のサンプル）",
+        "submissionOptionRich": "{{service}} — <submittedAt />（{{count}} 件のサンプル）",
+        "noMatchingSubmissions": "フィルターに一致する送信はありません",
+        "pickSubmission": "送信を選択…",
+        "rendering": "レンダリング中…",
+        "render": "レンダリング",
+        "renderFailed": "レンダリングに失敗しました",
+        "frameTitle": "レポート：{{name}}",
+        "collapse": "折りたたむ",
+        "expand": "展開",
+        "openNewTab": "新しいタブで開く",
+        "download": "ダウンロード"
+      }
+    },
+    "schemasSubmissions": {
+      "approval": {
+        "appliesTo": "適用対象",
+        "appliesToHint": "手動入力のみ、API 送信のみ、またはその両方に承認を必須にできます。",
+        "approvers": "承認者",
+        "approversHint": "レビューできる担当者を選びます。下の承認者/管理者アカウント、またはサービス所有者（送信を行ったアカウント。サービスが自身のデータを承認できます）、あるいはその両方です。少なくとも 1 つを「必須」に設定してください。必須の承認者全員が承認すると、送信が公開されます。",
+        "globalDefaultHelp": "「設定」→「承認」で構成したグローバル既定の承認ポリシーに従います。",
+        "heading": "承認",
+        "mode": {
+          "globalDefault": "グローバル既定値を使用",
+          "none": "承認は必要ありません",
+          "required": "承認が必要です"
+        },
+        "modeHint": "対象となる送信は、承認されるまで「承認待ち」として保留され、その間は OData フィードと「探索」から除外されます。下位互換性のため、既定では承認は不要です。",
+        "modeLabel": "承認モード",
+        "modifiableHelp": "すでに送信があるウィンドウにデータを再送信すると、そのデータが置き換えられ、以前に承認済みであっても承認ステータスが「承認待ち」にリセットされます。再承認を待つ間は、OData フィードと「探索」から除外されます。再送信によって承認済みデータが変わることを避けたい場合は、スキーマを変更不可に設定してください。",
+        "modifiableTitle": "注意：このスキーマは変更可能です",
+        "requiredValidation": "「必須」の承認者を 1 人以上追加してください。",
+        "requirement": {
+          "optional": "任意",
+          "required": "必須"
+        },
+        "selectApprovers": "承認者の選択",
+        "serviceOwner": "サービス所有者 (送信側サービス)",
+        "source": {
+          "apiOnly": "API 送信のみ",
+          "both": "手動送信と API 送信の両方",
+          "manualOnly": "手動 (Web コンソール) 送信のみ"
+        }
+      },
+      "bulkImport": {
+        "chooseService": "サービスを選択",
+        "failed": "{{count}} 件が失敗しました。",
+        "file": "ファイル",
+        "format": "形式",
+        "formatHint": "ファイル拡張子から自動判別されます。必要に応じて変更してください。",
+        "formats": {
+          "csv": "CSV",
+          "json": "JSON"
+        },
+        "group": "グループ「{{name}}」",
+        "help": "1 つのサービスの過去の送信を、JSON または CSV ファイルからインポートします。解析はファイル全体で成功する必要があります。その後、各送信は個別に検証・保存されるため、拒否された送信が他をブロックすることはありません。すでに存在する送信はスキップされるので、同じファイルを再実行しても安全です。",
+        "import": "インポート",
+        "importing": "インポートしています…",
+        "itemFailed": "（{{count}} 件のサンプル）— 失敗",
+        "skipped": "{{count}} 件はすでに存在するためスキップしました。",
+        "submissionNumber": "送信 #{{number}}",
+        "summary": "{{total}} 件の送信のうち {{succeeded}} 件をインポートしました。",
+        "title": "送信のインポート"
+      },
+      "comments": {
+        "comment": "コメント",
+        "deleteThread": "スレッドの削除",
+        "deleteThreadWarning": "これにより、スレッド内のすべてのコメントが削除されます。これを元に戻すことはできません。",
+        "edited": "（編集済み）",
+        "empty": "コメントはまだありません。",
+        "general": "一般",
+        "loading": "コメントを読み込んでいます…",
+        "newThread": "新しいスレッド",
+        "open": "未解決",
+        "post": "投稿",
+        "reopen": "再開",
+        "reply": "返信",
+        "replyPlaceholder": "返信…",
+        "required": "コメント本文は必須です。",
+        "resolve": "解決",
+        "resolved": "解決済み",
+        "resolvedCanReopen": "このスレッドは解決済みです。コメントを追加するには、再度開いてください。",
+        "resolvedReadOnly": "このスレッドは解決済みです。",
+        "scope": "範囲",
+        "thread": "スレッド",
+        "threadActions": "スレッドアクション",
+        "title": "コメント",
+        "unknown": "不明",
+        "writeComment": "コメントを入力…"
+      },
+      "common": {
+        "actionFailed": "アクションを完了できませんでした",
+        "actions": "アクション",
+        "actionsFor": "{{name}} のアクション",
+        "approvalStatus": {
+          "Approved": "承認済み",
+          "NotRequired": "不要",
+          "Pending": "保留中",
+          "Rejected": "却下"
+        },
+        "approve": "承認",
+        "audit": "監査",
+        "back": "戻る",
+        "by": "{{name}} による",
+        "cadenceLabel": "周期",
+        "cancel": "キャンセル",
+        "clone": "クローン",
+        "close": "閉じる",
+        "continue": "続行",
+        "created": "作成日時",
+        "createdBy": "作成者",
+        "delete": "削除",
+        "deleted": "削除済み",
+        "description": "説明",
+        "disabled": "無効",
+        "dismiss": "閉じる",
+        "download": "ダウンロード",
+        "draft": "下書き",
+        "edit": "編集",
+        "enabled": "有効",
+        "exportList": "このリストをエクスポート",
+        "exporting": "エクスポートしています…",
+        "false": "いいえ",
+        "from": "開始",
+        "global": "グローバル",
+        "history": "履歴",
+        "id": "ID",
+        "label": "ラベル",
+        "loadFailed": "読み込みに失敗しました",
+        "loading": "読み込んでいます…",
+        "modifiable": "変更可能",
+        "modified": "更新日時",
+        "moreActions": "その他のアクション",
+        "name": "名前",
+        "no": "いいえ",
+        "note": "メモ",
+        "notes": "メモ",
+        "preview": "プレビュー",
+        "publish": "公開",
+        "published": "公開済み",
+        "refresh": "更新",
+        "reject": "却下",
+        "remove": "削除",
+        "replacedAt": "置換日時",
+        "requiresApproval": "承認が必要",
+        "retry": "再試行",
+        "sample": "サンプル",
+        "samples": "サンプル",
+        "save": "保存",
+        "saveChanges": "変更を保存",
+        "schema": "スキーマ",
+        "service": "サービス",
+        "status": "状態",
+        "submission": "送信",
+        "submissions": "送信",
+        "submittedAt": "送信日時",
+        "timestamp": "タイムスタンプ",
+        "to": "終了",
+        "true": "はい",
+        "type": "種類",
+        "untitledSchema": "無題のスキーマ",
+        "value": "値",
+        "valueType": {
+          "Boolean": "はい/いいえ",
+          "Date": "日付",
+          "Integer": "整数",
+          "Number": "数値",
+          "String": "テキスト"
+        },
+        "values": "値",
+        "version": "バージョン",
+        "view": "表示",
+        "viewDetails": "詳細を表示",
+        "warnings": "警告",
+        "yes": "はい"
+      },
+      "dependencies": {
+        "calculatedValue": "計算値",
+        "connectorHelp": "コネクタは、参照される値から、その値を使うルールを持つ値へと向かいます。",
+        "edge": {
+          "calculated": "計算元",
+          "enabledIf": "有効化条件",
+          "submissionValidation": "値間の検証（スキーマレベル）",
+          "validation": "検証条件",
+          "visibleIf": "表示条件",
+          "warning": "警告条件"
+        },
+        "failed": "依存関係グラフを構築できませんでした：",
+        "legend": "凡例",
+        "loading": "このスキーマのルールから依存関係を解析中…",
+        "noValues": "このスキーマには使用できる値がまだありません。依存関係を確認するには値を追加してください。",
+        "none": "これらの値の間で依存関係はまだ検出されていません。",
+        "title": "依存関係：{{name}}",
+        "value": "値"
+      },
+      "layout": {
+        "addSection": "セクションを追加",
+        "addSubsection": "サブセクションを追加",
+        "addSubsectionInside": "中にサブセクションを追加",
+        "allPlaced": "すべての値がレイアウトに配置されています。",
+        "duplicateValue": "値「{{name}}」がレイアウト内に複数回登場します。",
+        "emptyHelp": "値を上からドラッグして配置するか、セクションを追加します。ここに配置しなかった値も、送信フォームでは先頭に表示されます（見出しなし）。",
+        "errorPrefix": "エラー：",
+        "missingCaption": "セクションのキャプションがありません。",
+        "missingTarget": "レイアウト値ノードにターゲットがありません。",
+        "newSection": "新しいセクション",
+        "notePrefix": "注記：",
+        "removeFromLayout": "レイアウトから削除",
+        "removeSection": "セクションを削除",
+        "sectionCaption": "セクションのキャプション",
+        "sectionDescription": "セクションの説明",
+        "sectionDescriptionPlaceholder": "オプションの小見出し (キャプションの下に表示されます)",
+        "sectionHeading": "セクションの見出し",
+        "tooDeep": "レイアウトのネストが深すぎます（最大 32 階層）。",
+        "unassignedValues": "未割り当ての値 ({{count}})",
+        "unassignedWarning": "{{count}} 件の値がレイアウトに配置されていません。これらはセクションより前に表示されます。",
+        "unknownValue": "レイアウトは不明な値「{{name}}」を参照しています。",
+        "untitledSection": "（無題のセクション）"
+      },
+      "preview": {
+        "bestEffortHeading": "ベストエフォート型プレビュー",
+        "bestEffortHelp": "これはフォームを表示し、保存前のスキーマに対してブラウザー内でルールを評価します。最終的な判断はサーバー側で行われ、一部の挙動はここと異なります（正規表現の方言や、sampleTimestamp()/serviceName() などのヘルパーはクライアント側では利用できません）。ルールに頼る前に、必ず実際の送信または API で確認してください。",
+        "conditionalHelp": "条件付き表示 (非表示/グレー) とインライン警告が左側のフォームに表示されます。",
+        "findings": {
+          "requiredEmpty": "必須の値が空です",
+          "schemaRejected": "スキーマレベルのルールがこの送信を拒否しました",
+          "valueRejected": "値検証ルールによりこの値が拒否されました"
+        },
+        "loadingServices": "サービスを読み込んでいます…",
+        "noFilledValues": "まだ値が入力されていません。まず下のフォームに入力してください。",
+        "noProblems": "現在の値に問題はありません。",
+        "noUsableValues": "このスキーマには、プレビューできる値がまだありません。まず値を追加してください。",
+        "previewTitle": "プレビュー：{{name}}",
+        "resetValues": "値をリセット",
+        "sampleTimestamp": "サンプルのタイムスタンプ",
+        "scopes": {
+          "required": "必須値の欠落",
+          "schema": "スキーマレベルの検証",
+          "shape": "形式チェック",
+          "value": "値の検証"
+        },
+        "selectService": "サービスを選択",
+        "server": {
+          "acceptedImmediately": "すぐに受理されます（承認は不要です）。",
+          "discarded": "EnabledIf/VisibleIf によって破棄されました：{{names}}。",
+          "heldForApproval": "承認のため保留されます（承認者 {{count}} 人が必要）。",
+          "invalid": "無効 — エラー {{count}} 件",
+          "valid": "有効 — 実際の送信であれば受理されます。"
+        },
+        "serverValidation": "サーバーの検証",
+        "shape": {
+          "aboveMaximum": "最大値 {{value}} を超えています",
+          "belowMinimum": "最小値 {{value}} を下回ります",
+          "earlier": "{{value}} より前",
+          "invalidDate": "値は有効な日付ではありません",
+          "later": "{{value}} より後",
+          "longer": "最大長 {{value}} を超えています",
+          "notNumber": "値は数値ではありません",
+          "pattern": "パターン {{value}} と一致しません",
+          "regexBrowser": "正規表現パターンをブラウザーで評価できませんでした（サーバー側で確認されます）",
+          "shorter": "最小長 {{value}} を下回っています",
+          "wholeNumber": "値は整数でなければなりません"
+        },
+        "skipCadence": "周期（期間ごとに 1 件）のチェックをスキップ",
+        "skippedValues": "名前が空または重複している値 {{count}} 件をスキップしました：{{names}}。プレビューするには、すべての値に一意の名前を付けてください。",
+        "testHeading": "テスト送信",
+        "testHelp": "何も保存せずに、選択したサービスとして実際のサーバー検証（周期の重複、履歴ルール、承認状態の見込みを含む）を実行します。フォームに入力し、サービスを選択してから「検証」を実行してください。",
+        "testTitle": "テスト送信：{{name}}",
+        "timestampPreviewHint": "サンプルと、日付値を読み取る日付ベースのルールに使用されます。",
+        "timestampServerHint": "すべてのサンプルと、日付/周期/履歴のルールに使用されます。",
+        "unnamedValue": "（名前のない値）",
+        "validate": "検証",
+        "validateAsService": "サービスとして検証",
+        "validationCount": "{{count}} 件の値が検証されます。スキーマは保存済みで、選択したサービスから参照できる必要があります。",
+        "validationResults": "検証結果"
+      },
+      "sampleFields": {
+        "addNotes": "メモを追加",
+        "calculated": "計算値",
+        "disabled": "無効",
+        "from": "{{value}} から",
+        "max": "最大 {{value}}",
+        "maxLength": "最大長 {{value}}",
+        "min": "最小 {{value}}",
+        "minLength": "最小長 {{value}}",
+        "notProvided": "（未入力）",
+        "note": "メモ",
+        "optional": "任意",
+        "regex": "正規表現：{{value}}",
+        "required": "必須",
+        "to": "{{value}} まで",
+        "value": "値{{unit}}"
+      },
+      "schemaEdit": {
+        "addRule": "ルールの追加",
+        "addValue": "値を追加",
+        "amberMax": "許容範囲（アンバー）の最大値",
+        "amberMaxHint": "これを超えると赤になります。外側の上限です。",
+        "amberMin": "許容範囲（アンバー）の最小値",
+        "amberMinHint": "これを下回ると赤になります。外側の下限です。",
+        "calculated": "計算値",
+        "cancelEditing": "キャンセルして編集を続ける",
+        "caption": "キャプション",
+        "captionHint": "送信フォームや表示画面で、この値の上に表示される任意の見出しです（セクションタイトルのようなもの）。表示専用で、クライアントからは無視されます。",
+        "checking": "確認しています…",
+        "conditionalDisplay": "条件付き表示",
+        "create": "スキーマの作成",
+        "dateConstraints": "日付の制約",
+        "deleteType": "値",
+        "dependencies": "依存関係",
+        "discardChanges": "変更を破棄",
+        "draftUnavailable": "利用できません — このスキーマにはすでに {{count}} 件の送信があります。",
+        "editTitle": "スキーマの編集",
+        "editValue": "値 {{name}} を編集",
+        "enabledIf": "有効化条件",
+        "enabledIfHint": "false（または null）の場合、値は UI で無効になり、送信されたサンプルは警告付きで破棄されます。空欄の場合は常に有効です。",
+        "enabledPublished": "有効（公開済み）",
+        "expression": "式",
+        "expressionHint": "同じ送信内の他の値のみを参照する NCalc 式です（例：average(a, b)）。他の計算値を連鎖して参照できます。",
+        "greenMax": "理想範囲（グリーン）の最大値",
+        "greenMaxHint": "内側の上限です。アンバーの最大値が必要です。",
+        "greenMin": "理想範囲（グリーン）の最小値",
+        "greenMinHint": "内側の下限です。アンバーの最小値が必要です。",
+        "incrementVersion": "バージョン番号を自動的に上げる（{{version}} へ）",
+        "kind": "種別",
+        "kindHint": "計算値は同じ送信内の他の値から算出され、送信されることはありません。",
+        "layoutHint": "値をセクションにドラッグしてグループ化します。これは送信フォームのレイアウトにのみ影響します。サーバーは送信をフラットなリストとして扱います。",
+        "loading": "スキーマを読み込んでいます…",
+        "max": "最大値",
+        "maxDate": "最大日付 (ISO)",
+        "maxLength": "最大長",
+        "min": "最小値",
+        "minDate": "最小日付 (ISO)",
+        "minLength": "最小長",
+        "moveToDraft": "スキーマを下書きに戻して変更を適用する",
+        "nameFixed": "スキーマ名は作成後に固定されます。変更すると、検証ルールや既存の送信が壊れる可能性があります。",
+        "needsValue": "スキーマを活用するには、値が少なくとも 1 つ必要です。",
+        "noRules": "まだルールはありません。",
+        "noRulesAdd": "まだルールがありません。「ルールの追加」から作成してください。",
+        "notFound": "スキーマが見つかりません",
+        "numericConstraints": "数値制約",
+        "publishAsIs": "バージョンを変更せずにそのまま公開する",
+        "publishChanges": "変更を公開",
+        "publishHelp": "公開済みのスキーマを変更しましたが、バージョン番号は更新されていません。どのように処理しますか?",
+        "readOnlySnapshot": "読み取り専用スナップショット",
+        "regexPattern": "正規表現パターン",
+        "removeRule": "ルールの削除",
+        "removeValueWarning": "値を削除すると、検証ルールが壊れたり、既存の送信が拒否・変更されたりする可能性があります。過去のデータをそのまま保持するには、代わりに無効化（「有効」のチェックを外す）を検討してください。\n\nそれでも削除しますか？",
+        "schemaMissing": "「{{name}}」という名前のスキーマは存在しません。削除された可能性があります。",
+        "sinceVersion": "追加バージョン",
+        "sinceVersionHint": "任意です。指定した値がスキーマの現在のバージョン（{{version}}）と一致する場合、1 周期分の期間だけこの値の横に「New」タグが表示されます。常に存在する値の場合は空欄のままにしてください。",
+        "snapshotHelp": "バージョン {{version}}（<savedAt /> に {{author}} が保存）。これは履歴の表示で、編集はできません。現在のスキーマには影響しません。",
+        "snapshotMissing": "このバージョンのスナップショットはもう存在しません。履歴から削除されている可能性があります。",
+        "stringConstraints": "文字列制約",
+        "syntaxError": "構文エラー：",
+        "tabs": {
+          "approvals": "承認",
+          "general": "一般",
+          "layout": "レイアウト",
+          "validations": "検証"
+        },
+        "targetBand": "ターゲットバンド（RAG、任意）",
+        "targetBandHelp": "レポート専用の赤/アンバー/緑の範囲で、グラフ上に網掛けの帯として表示されます。強制されることはありません。許容範囲（アンバー）が外側の帯で、理想範囲（グリーン）はその内側に入ります。アンバーの範囲外は赤です。各境界は任意ですが、緑の境界には同じ側のアンバーの境界が必要で、境界は小さい順に並ぶ必要があります：アンバー最小値 ≤ 緑最小値 ≤ 緑最大値 ≤ アンバー最大値。",
+        "unit": "単位",
+        "userDefined": "ユーザー定義",
+        "validSyntax": "有効な構文",
+        "validation": "検証",
+        "validationPlaceholder": "例：if(expenses > revenue, 'expenses cannot exceed revenue', null)",
+        "validationsHint": "各ルールは、スキーマ内のすべての値を対象に送信ごとに 1 回実行されます。値をまたぐ条件を複数適用したい場合は、ルールを複数追加してください。",
+        "valueDetails": "値の詳細",
+        "valueNameFixed": "名前は作成後に固定され、検証ルールや既存の送信から参照されます。別の名前が必要な場合は、新しい値を追加してください。",
+        "valueNameHint": "検証ルールでの識別子として使用されます。英字またはアンダースコアで始まり、英数字とアンダースコアのみを含める必要があります。",
+        "valueNameValidation": "有効な識別子である必要があります：文字、数字、アンダースコアのみ。数字で始めることはできません。",
+        "valueNumber": "（値 #{{number}}）",
+        "valueValidation": "値の検証",
+        "valueValidationHint": "送信されたサンプルに対して実行されます。変数には value、minimum、maximum が使用できます。空白と改行は無視されます。",
+        "versionHint": "新しい値を追加するときに上げます。下げることはできません。各値の「追加バージョン」は、この値以下である必要があります。",
+        "viewVersionTitle": "スキーマのバージョンを表示",
+        "visibleIf": "表示条件",
+        "visibleIfHint": "false（または null）の場合、値は UI で非表示になります。サーバー側の動作は「有効化条件」と同じです。空欄の場合は常に表示されます。",
+        "visibleServices": "参照できるサービス",
+        "warning": "警告",
+        "warningHint": "true を返した場合、または空でない文字列を返した場合に、処理を妨げない警告を出す任意のルールです。"
+      },
+      "schemaHistory": {
+        "bucketDescription": "{{count}} 個のバケット — ひげは最小/最大、ドットは平均を示します",
+        "minAvgMax": "最小 / 平均 / 最大",
+        "noNumericValues": "このスキーマには数値の値がないため、グラフ化できません。推移を表示するには、数値型または整数型の値を追加してください。",
+        "noSamples": "まだサンプルは送信されていません。",
+        "title": "過去のデータ"
+      },
+      "schemaVersions": {
+        "actionsForVersion": "バージョン {{version}} のアクション",
+        "author": "変更者",
+        "bumped": "更新",
+        "changeDate": "変更日",
+        "deleteAll": "すべての履歴を削除",
+        "deleteAllWarning": "これにより、このスキーマに保存されているすべてのスナップショットが削除されます。現在のスキーマは影響を受けません。これを元に戻すことはできません。",
+        "deleteEntryWarning": "これにより、スナップショットは履歴からのみ削除されます。現在のスキーマは影響を受けません。これを元に戻すことはできません。",
+        "deleteThisEntry": "このエントリを削除",
+        "empty": "バージョン履歴は記録されていません。",
+        "entireHistory": "バージョン履歴全体",
+        "entry": "バージョン履歴エントリ",
+        "entryLabel": "v{{version}}（{{date}}）",
+        "exportCsv": "CSV をエクスポート",
+        "newVersion": "新しいバージョン",
+        "oldVersion": "旧バージョン",
+        "title": "バージョン履歴 — {{name}}",
+        "viewThisVersion": "このバージョンを表示",
+        "viewVersion": "バージョン {{version}} を表示"
+      },
+      "schemas": {
+        "audience": "公開範囲",
+        "bumpedAt": "<bumpedAt /> に更新",
+        "deleteType": "スキーマ",
+        "empty": "まだスキーマがありません。「新しいスキーマ」をクリックして作成してください。",
+        "exampleJson": "送信例（JSON）",
+        "frozen": "凍結",
+        "globalAudience": "グローバル（すべてのサービスに公開）",
+        "importFailed": "スキーマをインポートできませんでした",
+        "jsonObjectError": "JSON ルートはオブジェクトである必要があります。",
+        "modifiableApprovalHelp": "すでに送信があるウィンドウにデータを再送信すると、そのデータが置き換えられ、以前に承認済みであっても承認が「承認待ち」にリセットされます。そのため、以前の値は公開中のレポートから外れ、最終的には上書きされます。承認済みの数値をサイクルの途中で変更したくない場合は、スキーマ（または値）を変更不可に設定してください。",
+        "modifiableApprovalTitle": "変更可能かつ承認ゲートあり",
+        "new": "新しいスキーマ",
+        "noServices": "（サービスなし）",
+        "noValuesDefined": "値が定義されていません。",
+        "schemaJson": "スキーマ（JSON）",
+        "schemaPdf": "スキーマ（PDF）",
+        "serviceCount": "{{count}} 件のサービス",
+        "submissionValidations": "送信の検証",
+        "testSubmission": "テスト送信",
+        "title": "スキーマ",
+        "upload": "スキーマのアップロード",
+        "validationRule": "送信検証ルール {{number}}",
+        "valuesCount": "値 ({{count}})",
+        "viewHistoricalData": "過去のデータを表示",
+        "viewSchema": "スキーマ {{name}} を表示",
+        "viewVersionHistory": "バージョン履歴を表示"
+      },
+      "submissionDetail": {
+        "change": "変更",
+        "changeType": {
+          "Create": "作成",
+          "Delete": "削除",
+          "Replace": "置換",
+          "Update": "更新"
+        },
+        "changedBy": "変更者",
+        "details": "詳細",
+        "noChanges": "変更は記録されていません。"
+      },
+      "submissionEdit": {
+        "acceptedWarnings": "送信は警告付きで受理されました",
+        "clonedHelp": "サービス、スキーマ、値があらかじめ入力され、タイムスタンプは現在時刻にリセットされています。内容を確認し、必要に応じてサービスやスキーマを変更してから「送信」して、新しい送信を作成してください。",
+        "clonedTitle": "既存の送信から複製しました。",
+        "editDraftTitle": "下書きの編集",
+        "editTitle": "送信の編集",
+        "missingRequired": "必須の値が未入力です",
+        "multiSchemaHelp": "保存すると、{{name}} の値のみが保持されます。他の値が必要な場合は、先に別のスキーマを選択してください。",
+        "multiSchemaTitle": "複製元の送信には、複数のスキーマの値が含まれていました。",
+        "newTitle": "新規送信",
+        "noValues": "このスキーマには値が定義されていません。",
+        "pickSchema": "スキーマを選択",
+        "pickSchemaError": "先にスキーマを選択してください。",
+        "pickSchemaHelp": "スキーマを選択すると、送信できる値が表示されます。",
+        "pickService": "サービスを選択",
+        "pickServiceError": "先にサービスを選択してください。",
+        "pickServiceFirst": "先にサービスを選択",
+        "pickServiceSchemaHelp": "サービスとスキーマを選択すると、値の入力を開始できます。",
+        "saveAsDraft": "下書きとして保存",
+        "saveFailed": "送信を保存できませんでした",
+        "submit": "送信",
+        "timestamp": "タイムスタンプ (UTC)",
+        "timestampHint": "この送信のすべてのサンプルに適用されます。",
+        "valueCountHelp": "{{count}} 件の値 — 任意の値は空のままにするとスキップされます",
+        "viewTitle": "送信の表示"
+      },
+      "submissions": {
+        "actionsFor": "送信 {{id}} のアクション",
+        "allSchemas": "すべてのスキーマ",
+        "allServices": "すべてのサービス",
+        "approvalsReceived": "必要な承認 {{count}} 件のうち {{approved}} 件を受領しました。",
+        "cloneNew": "新しい送信として複製",
+        "createNew": "新しい送信を作成",
+        "deleteType": "送信",
+        "draftHelp": "この送信は作業中の下書きです。公開されるまで、レポートと承認の対象から除外されます。",
+        "empty": "これらのフィルターに一致する送信はありません。",
+        "exportPdf": "PDF としてエクスポート",
+        "exportXlsx": "XLSX をエクスポート（単一スキーマ）",
+        "exportXlsxHelp": "絞り込んだ送信を XLSX にエクスポート",
+        "importBulk": "一括データをインポート",
+        "interval": {
+          "all": "全期間",
+          "custom": "カスタム範囲",
+          "label": "間隔",
+          "lastMonth": "過去 30 日間",
+          "lastWeek": "過去 7 日間",
+          "lastYear": "過去 365 日間"
+        },
+        "manualEntry": "手動入力",
+        "myTitle": "自分の送信",
+        "new": "新規送信",
+        "pickSchemaForXlsx": "XLSX エクスポートを行うには、スキーマを 1 つ選択してください",
+        "rejectHelp": "この送信は却下として記録され、OData フィードと「探索」から除外されますが、この画面には引き続き表示されます。送信者や他のレビュー担当者向けに、任意で理由を残せます。",
+        "rejectPlaceholder": "例：第 22 週の数値が入れ替わっているようです。夜勤の合計を再確認してください。",
+        "rejectReason": "理由 (省略可)",
+        "rejectTitle": "送信を却下",
+        "rejecting": "却下中…",
+        "rejectionReason": "却下理由",
+        "source": "ソース",
+        "status": {
+          "all": "すべてのステータス"
+        },
+        "temporarilyClosed": "送信は一時的に停止されています。",
+        "viewFrom": "{{label}} の送信を表示",
+        "warningsCount": "警告 ({{count}})"
+      }
+    },
+    "analytics": {
+      "common": {
+        "actions": "アクション",
+        "all": "すべて",
+        "allServices": "すべてのサービス",
+        "cadence": "周期",
+        "cancel": "キャンセル",
+        "delete": "削除",
+        "edit": "編集",
+        "exportCsv": "CSV をエクスポート",
+        "exporting": "エクスポートしています…",
+        "exportListCsv": "このリストをエクスポート（CSV）",
+        "exportView": "このビューをエクスポート",
+        "failedToLoad": "読み込みに失敗しました",
+        "loading": "読み込んでいます…",
+        "moreActions": "その他のアクション",
+        "no": "いいえ",
+        "noData": "データがありません。",
+        "period": "期間",
+        "refresh": "更新",
+        "save": "保存",
+        "saving": "保存しています…",
+        "schema": "スキーマ",
+        "selectedCount_one": "{{count}} 件選択",
+        "selectedCount_other": "{{count}} 件選択",
+        "sending": "送信しています…",
+        "service": "サービス",
+        "services": "サービス",
+        "yes": "はい"
+      },
+      "cadence": {
+        "daily": "毎日",
+        "weekly": "毎週",
+        "fortnightly": "隔週",
+        "monthly": "毎月",
+        "quarterly": "四半期ごと",
+        "semiannually": "半年ごと",
+        "yearly": "毎年"
+      },
+      "periodFilter": {
+        "intervals": {
+          "all": "全期間",
+          "lastDay": "過去 24 時間",
+          "lastWeek": "過去 7 日間",
+          "lastMonth": "過去 30 日間",
+          "custom": "カスタム範囲"
+        },
+        "from": "開始",
+        "to": "終了"
+      },
+      "dashboard": {
+        "title": "概要",
+        "welcome": "ようこそ、{{name}}",
+        "cards": {
+          "pendingApprovals": "承認待ち",
+          "operators": "オペレーター",
+          "admins": "管理者",
+          "submissions": "送信",
+          "mySubmissions": "自分の送信",
+          "submitData": "データを送信"
+        },
+        "actions": {
+          "review": "レビュー",
+          "manage": "管理",
+          "browse": "参照",
+          "newSubmission": "新規送信 →",
+          "viewByPeriod": "期間別に表示 →"
+        },
+        "missing": {
+          "overdueTitle": "期限超過 — 前の期間",
+          "overdueDescription": "これらの送信ウィンドウは終了しました。",
+          "currentTitle": "この期間",
+          "currentDescription": "まだ送信ウィンドウ内です。",
+          "servicesShort_one": "送信が不足しているサービス",
+          "servicesShort_other": "送信が不足しているサービス"
+        },
+        "trend": {
+          "title": "送信漏れの推移",
+          "loading": "推移を読み込み中…",
+          "empty": "表示できる推移データがありません。",
+          "seriesName": "送信漏れ — {{service}}"
+        }
+      },
+      "missing": {
+        "title": "期間別の送信漏れ",
+        "titleShort": "送信漏れ",
+        "columns": {
+          "missing": "未送信",
+          "totalRequired": "必須の合計"
+        },
+        "trend": {
+          "title": "送信漏れの推移",
+          "description": "{{cadence}}の期間ごとの未送信の必須値の合計 · バーをクリックすると詳細を確認できます"
+        },
+        "chart": {
+          "missing": "未送信"
+        },
+        "byService": {
+          "title": "サービス別 — {{period}}",
+          "description": "選択した期間における、サービスごとの未送信の必須値",
+          "empty": "この期間に不足しているものはありません。🎉"
+        },
+        "summary": "{{period}}に {{services}} 件のサービスで {{missing}} 件の必須値が未送信です",
+        "selectedPeriod": "選択した期間",
+        "detail": {
+          "complete": "この期間に必要な送信は、すべて完了しています。"
+        }
+      },
+      "explore": {
+        "title": "探索",
+        "tabs": {
+          "scorecard": "スコアカード",
+          "analysis": "分析",
+          "anomalies": "異常"
+        },
+        "actions": {
+          "exportCsv": "CSV をエクスポート（このビュー）",
+          "exportPng": "グラフをエクスポート（PNG）"
+        },
+        "errors": {
+          "nothingToExport": "このビューにはまだエクスポートするものがありません。"
+        },
+        "filters": {
+          "schemas": "スキーマ",
+          "selectSchema": "スキーマを選択",
+          "allSchemas": "すべてのスキーマ",
+          "value": "値",
+          "selectValue": "値を選択",
+          "show": "表示",
+          "latestAvailable": "利用可能な最新",
+          "lastPeriod": "直近の期間",
+          "latestClosed": "直近の終了済み期間",
+          "current": "現在",
+          "aggregation": "集計",
+          "comparePrevious": "前の期間と比較"
+        },
+        "help": {
+          "schemas": "異常をスキャンするスキーマです。数値を含むすべてのスキーマをスキャンする場合は、空のままにしてください。",
+          "schemasAria": "「スキーマ」の説明",
+          "show": "「利用可能な最新」は、各サービスの最新の送信を、古いものであっても表示します。「直近の期間」は 1 つの期間だけを表示し、その期間に送信しなかったサービスをグレーの「送信なし」カードとして示します。",
+          "showAria": "「表示」の説明",
+          "aggregation": "各期間に含まれるサンプルを 1 つの数値にまとめる方法と、複数のサービスを全体の数値に合算する方法です。平均は件数で重み付けされ、サンプル数は送信された件数を数えるだけです。",
+          "aggregationAria": "「集計」の説明",
+          "comparePrevious": "同じ選択範囲を過去にずらして重ね、この期間を以前の期間と比較できます。「全期間」ではなく期間範囲の指定が必要です。2 つのウィンドウは重なっても構いません。",
+          "compareAria": "「比較」の説明"
+        },
+        "shifts": {
+          "1m": "1 か月",
+          "6m": "6 か月",
+          "1y": "1 年"
+        },
+        "views": {
+          "trend": "推移",
+          "compare": "サービスを比較",
+          "snapshot": "スナップショット"
+        },
+        "aggregation": {
+          "average": "平均",
+          "sum": "合計",
+          "min": "最小",
+          "max": "最大",
+          "count": "サンプル数"
+        },
+        "status": {
+          "green": "目標達成",
+          "amber": "警告",
+          "red": "目標未達",
+          "normal": "異常なし",
+          "anomaly": "異常",
+          "noSubmission": "送信なし",
+          "hideMissing": "未送信を非表示"
+        },
+        "presets": {
+          "label": "プリセット",
+          "empty": "保存されたプリセットはまだありません。",
+          "namePrompt": "プリセット名",
+          "limit_one": "プリセットは最大 {{count}} 件まで保持できます。先に 1 件削除してください。",
+          "limit_other": "プリセットは最大 {{count}} 件まで保持できます。先に 1 件削除してください。",
+          "deleteAria": "プリセット {{name}} を削除",
+          "saveCurrent": "現在の設定をプリセットとして保存…"
+        },
+        "anomaly": {
+          "historyWindow": "履歴ウィンドウ（期間数）",
+          "sensitivity": "感度 (|z| しきい値)",
+          "baselineMode": "ベースラインモード",
+          "robustHelp": "ロバストモードは、少数の極端なスパイクがベースラインを歪めるのを防ぎます。標準モードは平均と標準偏差を使用します。",
+          "robustAria": "「ロバストモード」の説明",
+          "robust": "ロバスト（中央値 / MAD）",
+          "standard": "標準 (平均 / SD)",
+          "detection": "異常検知",
+          "highlight": "異常を強調表示",
+          "summaryAnomaly_one": "異常 {{count}} 件",
+          "summaryAnomaly_other": "異常 {{count}} 件",
+          "summaryNormal_one": "正常 {{count}} 件",
+          "summaryNormal_other": "正常 {{count}} 件",
+          "summaryMissing_one": "送信なし {{count}} 件",
+          "summaryMissing_other": "送信なし {{count}} 件",
+          "empty": "スキャンできる数値 KPI がまだありません。数値を含むスキーマを 1 つ以上選択して、最新期間の異常を確認してください。",
+          "hideNormal": "正常を非表示",
+          "noneInPeriod": "{{period}} 期間には異常はありません。",
+          "openAnalysis": "分析で開く · {{state}}"
+        },
+        "scorecard": {
+          "summaryOnTarget_one": "目標達成 {{count}} 件",
+          "summaryOnTarget_other": "目標達成 {{count}} 件",
+          "summaryWarning_one": "警告 {{count}} 件",
+          "summaryWarning_other": "警告 {{count}} 件",
+          "summaryOffTarget_one": "目標未達 {{count}} 件",
+          "summaryOffTarget_other": "目標未達 {{count}} 件",
+          "summaryMissing_one": "送信なし {{count}} 件",
+          "summaryMissing_other": "送信なし {{count}} 件",
+          "empty": "ターゲットバンドが設定された KPI はまだありません。ここに表示するには、数値型のスキーマ値に許容範囲/理想範囲を追加してください。",
+          "hideOnTarget": "目標達成を非表示",
+          "allOnTarget": "すべての KPI が目標を達成しています。",
+          "asOf": "<periodDate /> 時点",
+          "viewSubmission": "送信を表示 · {{state}}"
+        },
+        "content": {
+          "pickSchema": "スキーマを選択すると、探索を開始できます。",
+          "noNumeric": "このスキーマには数値の値がないため、グラフ化できません。数値型または整数型の値を追加してください。",
+          "trendOverTime": "時系列の推移",
+          "aggregationOf": "{{value}} の{{aggregation}}",
+          "perCadencePeriod": "{{cadence}}の期間ごと",
+          "combineServices": "サービスを合算",
+          "projection": "予測",
+          "viewAsTable": "テーブルとして表示",
+          "showEvents": "イベントを表示",
+          "noSamples": "この選択にはサンプルがありません。",
+          "overallAggregation": "全体 {{aggregation}}",
+          "latestPeriod": "最新期間",
+          "samples": "サンプル",
+          "periodsServices": "期間 / サービス"
+        },
+        "trend": {
+          "noAnomalies": "現在の選択に異常はありません。",
+          "anomaliesHighlighted_one": "現在の選択範囲で、異常 {{count}} 件を強調表示しています。",
+          "anomaliesHighlighted_other": "現在の選択範囲で、異常 {{count}} 件を強調表示しています。",
+          "ago": "{{period}} 前",
+          "previous": "前の期間",
+          "projectionName": "{{name}}（予測）",
+          "overallTrend": "全体の推移"
+        },
+        "snapshot": {
+          "title": "サービスごとの最新値",
+          "description": "値ごとの最新の期間 · セルにはその期間の {{aggregation}} が表示されます"
+        }
+      },
+      "events": {
+        "title": "イベント",
+        "singular": "イベント",
+        "ongoing": "進行中",
+        "removed": "（削除済み）",
+        "notApplicable": "該当なし",
+        "durationHours_one": "{{count}} 時間",
+        "durationHours_other": "{{count}} 時間",
+        "durationMinutes_one": "{{count}} 分",
+        "durationMinutes_other": "{{count}} 分",
+        "kinds": {
+          "pointintime": "特定の時点",
+          "interval": "間隔",
+          "fromnowon": "今後"
+        },
+        "fields": {
+          "label": "ラベル",
+          "timestamp": "タイムスタンプ",
+          "kind": "種別",
+          "duration": "継続時間",
+          "description": "説明",
+          "affects": "影響範囲",
+          "created": "作成日時",
+          "createdBy": "作成者",
+          "modified": "更新日時"
+        },
+        "actions": {
+          "add": "イベントを追加",
+          "edit": "イベントの編集"
+        },
+        "validation": {
+          "labelRequired": "ラベルは必須です。",
+          "timestampRequired": "タイムスタンプは必須です。",
+          "serviceRequired": "影響を受けるサービスを 1 つ以上選択するか、「すべてのサービス」を選択してください。",
+          "durationFormat": "継続時間の形式が認識できません。分（45）、時:分（1:30）、または日 時:分（2 03:15）の形式で入力してください。",
+          "durationRequired": "間隔イベントには継続時間が必要です。"
+        },
+        "help": {
+          "fromNowOn": "上記のタイムスタンプから、解除されるまで継続します。",
+          "duration": "分（45）、時:分（1:30）、または日 時:分（2 03:15）。"
+        },
+        "placeholders": {
+          "duration": "例：90 または 1:30",
+          "selectServices": "サービスの選択"
+        },
+        "deleteConfirm": "イベント「{{label}}」を削除しますか?\n\nこれを元に戻すことはできません。",
+        "empty": "まだイベントはありません。",
+        "emptyManage": "まだイベントがありません。「イベントを追加」をクリックして作成してください。",
+        "viewAria": "イベント {{label}} を表示",
+        "actionsAria": "イベント {{label}} のアクション",
+        "byActor": "{{actor}} による"
+      },
+      "audit": {
+        "title": "監査",
+        "email": "メール",
+        "delivery": "配信",
+        "actionError": "アクションを完了できませんでした",
+        "deliveryActionsAria": "配信 {{id}} のアクション",
+        "tabs": {
+          "changes": "変更",
+          "sentEmails": "送信済みメール",
+          "webhookDeliveries": "Webhook 配信"
+        },
+        "actions": {
+          "sendPending": "保留分を今すぐ送信",
+          "redeliver": "再配信"
+        },
+        "filters": {
+          "changeType": "変更の種類",
+          "targetType": "対象の種類"
+        },
+        "columns": {
+          "created": "作成日時",
+          "to": "宛先",
+          "subject": "件名",
+          "status": "状態",
+          "attempts": "試行回数",
+          "sent": "送信日時",
+          "event": "イベント",
+          "url": "URL",
+          "delivered": "配信日時",
+          "lastStatusCode": "最終ステータスコード",
+          "lastError": "最終エラー",
+          "timestamp": "タイムスタンプ",
+          "change": "変更",
+          "target": "対象",
+          "changedBy": "変更者",
+          "note": "メモ"
+        },
+        "empty": {
+          "changes": "変更は記録されていません。",
+          "emails": "メールは記録されていません。",
+          "deliveries": "配信は記録されていません。"
+        },
+        "changeTypes": {
+          "create": "作成",
+          "edit": "編集",
+          "delete": "削除",
+          "approve": "承認",
+          "reject": "却下"
+        },
+        "targetTypes": {
+          "user": "ユーザー",
+          "account": "アカウント",
+          "schema": "スキーマ",
+          "apiKey": "API キー",
+          "submission": "送信",
+          "report": "レポート",
+          "schemaHistory": "スキーマ履歴",
+          "approvalRule": "承認ルール",
+          "settings": "設定",
+          "backup": "バックアップ",
+          "event": "イベント",
+          "commentThread": "コメントスレッド",
+          "comment": "コメント"
+        },
+        "statuses": {
+          "pending": "保留中",
+          "sending": "送信中",
+          "sent": "送信済み",
+          "failed": "失敗"
+        }
+      },
+      "serviceStatus": {
+        "title": "ステータス — {{service}}",
+        "mixed": "混合",
+        "disabled": "無効",
+        "empty": "このサービスから参照できるスキーマはありません。",
+        "periods": {
+          "day": "日",
+          "week": "週",
+          "fortnight": "2 週間",
+          "month": "月",
+          "quarter": "四半期",
+          "halfyear": "半年",
+          "year": "年"
+        },
+        "columns": {
+          "submitted": "送信済み",
+          "lastSample": "最新のサンプル",
+          "status": "状態"
+        },
+        "submittedHelp": "現在の周期のウィンドウで、有効な値 {{total}} 件中 {{submitted}} 件を送信済み — 必須は {{requiredSubmitted}}/{{requiredTotal}} 件。",
+        "requiredRatio": "必須 {{submitted}}/{{total}}",
+        "statuses": {
+          "inert": "対象外",
+          "noValues": "値がありません",
+          "submitted": "送信済み",
+          "optional": "任意",
+          "missing": "未送信"
+        }
+      }
+    }
+  }
+}

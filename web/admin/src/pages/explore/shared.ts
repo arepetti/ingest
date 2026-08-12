@@ -1,4 +1,5 @@
 import { makeStyles, tokens } from '@fluentui/react-components'
+import type { TFunction } from 'i18next'
 import type {
   Cadence, EventKind, ExploreAggregation, ExploreBucket, ExploreServicePoint, ExploreServiceRef,
   ExploreValueSeries, IngestEvent, RagStatus,
@@ -21,17 +22,18 @@ export const RAG_COLORS: Record<RagStatus, string> = {
   Amber: '#d97706',
   Red: '#dc2626',
 }
-export const RAG_LABELS: Record<RagStatus, string> = { Green: 'On target', Amber: 'Warning', Red: 'Off target' }
+export const ragLabel = (status: RagStatus, t: TFunction): string => t(`analytics.explore.status.${status.toLowerCase()}`)
 
 // Neutral grey for "missing" cells (a service that didn't submit the requested period). Kept as an
 // explicit hex like the RAG colours so it reads as a true grey in both themes.
 export const MISSING_COLOR = '#9ca3af'
-export const MISSING_LABEL = 'No submission'
+export const missingLabel = (t: TFunction): string => t('analytics.explore.status.noSubmission')
 
 // Anomaly board colours: green = within recent range, yellow/amber = statistical outlier. Missing
 // reuses MISSING_COLOR / "No submission". Explicit hex to read true in both themes (like RAG).
 export const ANOMALY_COLORS = { Normal: '#16a34a', Anomaly: '#d97706' } as const
-export const ANOMALY_LABELS = { Normal: 'No anomalies', Anomaly: 'Anomaly' } as const
+export const anomalyLabel = (state: 'Normal' | 'Anomaly', t: TFunction): string =>
+  t(`analytics.explore.status.${state === 'Normal' ? 'normal' : 'anomaly'}`)
 
 // Defaults and choices for the anomaly detector controls (shared by the Trend toggle and the
 // Anomalies tab). Mirror the server-side defaults in AnomalyDetector.
@@ -49,9 +51,8 @@ export const EVENT_KIND_CHART_COLORS: Record<EventKind, string> = {
 }
 
 export const AGGREGATIONS: ExploreAggregation[] = ['Average', 'Sum', 'Min', 'Max', 'Count']
-export const AGG_LABELS: Record<ExploreAggregation, string> = {
-  Average: 'Average', Sum: 'Sum', Min: 'Minimum', Max: 'Maximum', Count: 'Sample count',
-}
+export const aggregationLabel = (aggregation: ExploreAggregation, t: TFunction): string =>
+  t(`analytics.explore.aggregation.${aggregation.toLowerCase()}`)
 
 // A small categorical palette that reads acceptably in both light and dark themes. Cycled when
 // there are more services than colours.
@@ -228,11 +229,12 @@ export function buildExportRows(
   activeSeries: ExploreValueSeries | undefined,
   services: ServiceRef[],
   agg: ExploreAggregation,
+  t: TFunction,
   anomaly: boolean = false,
   combined: boolean = false,
 ): { headers: string[]; rows: (string | number)[][]; name: string } {
   if (view === 'snapshot') {
-    const headers = ['Service', ...values.map(v => `${v.label || v.valueName}${v.unit ? ` (${v.unit})` : ''}`)]
+    const headers = [t('analytics.common.service'), ...values.map(v => `${v.label || v.valueName}${v.unit ? ` (${v.unit})` : ''}`)]
     const latest = values.map(v => {
       const b = v.buckets[v.buckets.length - 1]
       const m = new Map<string, number>()
@@ -247,23 +249,28 @@ export function buildExportRows(
   }
   if (!activeSeries) return { headers: [], rows: [], name: view }
   if (view === 'compare') {
-    const headers = ['Service', AGG_LABELS[agg]]
+    const headers = [t('analytics.common.service'), aggregationLabel(agg, t)]
     const rows = compareRows(activeSeries, services, agg).map(r => [r.name, r.value])
     return { headers, rows, name: `compare-${activeSeries.valueName}` }
   }
   // trend — when anomaly highlighting is on in combined mode, the single overall line lets us add
   // unambiguous z / anomaly columns. (Per-service anomalies stay on the chart markers/tooltips.)
   if (anomaly && combined) {
-    const headers = ['Period', 'All services', 'z', 'Anomaly']
+    const headers = [
+      t('analytics.common.period'),
+      t('analytics.common.allServices'),
+      'z',
+      t('analytics.explore.status.anomaly'),
+    ]
     const rows = activeSeries.buckets.map(b => [
       formatPeriodLabel(b.periodStart, activeSeries.cadence),
       round(b.value),
       b.z === null || b.z === undefined ? '' : round(b.z),
-      b.isAnomaly ? 'yes' : '',
+      b.isAnomaly ? t('analytics.common.yes') : '',
     ])
     return { headers, rows, name: `trend-${activeSeries.valueName}` }
   }
-  const headers = ['Period', ...services.map(s => s.serviceLabel || s.serviceName)]
+  const headers = [t('analytics.common.period'), ...services.map(s => s.serviceLabel || s.serviceName)]
   const rows = activeSeries.buckets.map(b => {
     const byService = new Map(b.services.map(p => [p.serviceId, p.value]))
     return [

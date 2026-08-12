@@ -64,7 +64,10 @@ public static class BackupFormat
     public static IReadOnlyDictionary<string, List<BsonDocument>> Read(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
-            throw new ValidationException(new[] { "The backup file is empty." });
+            throw new ValidationException(new[]
+            {
+                new Diagnostic(DiagnosticCodes.Configuration.BackupEmpty, "The backup file is empty."),
+            });
 
         BsonDocument root;
         try
@@ -73,18 +76,43 @@ public static class BackupFormat
         }
         catch (Exception ex)
         {
-            throw new ValidationException(new[] { $"The backup file is not valid JSON: {ex.Message}" });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Configuration.BackupInvalidJson,
+                    $"The backup file is not valid JSON: {ex.Message}",
+                    ("detail", ex.Message)),
+            });
         }
 
         if (!root.TryGetValue("format", out var fmt) || !fmt.IsString || fmt.AsString != Marker)
-            throw new ValidationException(new[] { "This file is not an Ingest backup (missing or wrong format marker)." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Configuration.BackupInvalidMarker,
+                    "This file is not an Ingest backup (missing or wrong format marker).",
+                    ("expectedFormat", Marker),
+                    ("actualFormat", fmt?.IsString == true ? fmt.AsString : null)),
+            });
 
         var version = root.TryGetValue("version", out var v) && v.IsNumeric ? v.ToInt32() : 0;
         if (version <= 0 || version > Version)
-            throw new ValidationException(new[] { $"Unsupported backup version '{version}'. This server understands up to version {Version}." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Configuration.BackupUnsupportedVersion,
+                    $"Unsupported backup version '{version}'. This server understands up to version {Version}.",
+                    ("version", version),
+                    ("maximumVersion", Version)),
+            });
 
         if (!root.TryGetValue("collections", out var collsVal) || collsVal is not BsonDocument colls)
-            throw new ValidationException(new[] { "The backup file has no 'collections' section." });
+            throw new ValidationException(new[]
+            {
+                new Diagnostic(
+                    DiagnosticCodes.Configuration.BackupMissingCollections,
+                    "The backup file has no 'collections' section."),
+            });
 
         var result = new Dictionary<string, List<BsonDocument>>();
         foreach (var name in Collections)

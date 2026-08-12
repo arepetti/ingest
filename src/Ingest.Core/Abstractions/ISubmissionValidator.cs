@@ -1,4 +1,5 @@
 using Ingest.Core.Entities;
+using Ingest.Core.Common;
 
 namespace Ingest.Core.Abstractions;
 
@@ -28,7 +29,16 @@ public sealed record SubmissionValidationResult(
     bool IsValid,
     IReadOnlyList<string> Errors,
     IReadOnlyList<SubmissionWarning> Warnings,
-    IReadOnlySet<SampleRef> DiscardedSamples);
+    IReadOnlySet<SampleRef> DiscardedSamples)
+{
+    /// <summary>Structured counterparts to <see cref="Errors"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> ErrorDetails { get; init; } =
+        Errors.Select(x => Diagnostics.Common.LegacyValidation(x, "submissions")).ToList();
+
+    /// <summary>Structured counterparts to <see cref="Warnings"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> WarningDetails =>
+        Warnings.Select(x => x.ToDiagnostic()).ToList();
+}
 
 /// <summary>
 /// Optional toggles that relax parts of the validation pipeline. The default ("run everything")

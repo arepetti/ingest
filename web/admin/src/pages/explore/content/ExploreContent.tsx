@@ -2,10 +2,10 @@ import { type RefObject } from 'react'
 import {
   Card, CardHeader, MessageBar, MessageBarBody, Switch, Text,
 } from '@fluentui/react-components'
+import { useTranslation } from 'react-i18next'
 import type { ExploreAggregation, ExploreValueSeries, IngestEvent, SchemaValue } from '../../../api/types'
-import { cadenceLabel } from '../../../utils/cadence'
 import {
-  AGG_LABELS, eventsForServices, fmt, rollup, useExploreStyles, valueTitle, type ExploreView, type ServiceRef,
+  aggregationLabel, eventsForServices, fmt, rollup, useExploreStyles, valueTitle, type ExploreView, type ServiceRef,
 } from '../shared'
 import { AnomalySettings } from '../AnomalySettings'
 import { TrendView } from './TrendView'
@@ -66,21 +66,22 @@ export function ExploreContent({
   onToggleTable: (v: boolean) => void
 }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
 
   if (!schemaName) {
-    return <Card className={styles.card}><div className={styles.empty}>Pick a schema to start exploring.</div></Card>
+    return <Card className={styles.card}><div className={styles.empty}>{t('analytics.explore.content.pickSchema')}</div></Card>
   }
   if (noNumeric) {
     return (
       <MessageBar intent="info">
         <MessageBarBody>
-          This schema has no numeric values, so there's nothing to chart. Add a Number or Integer value to explore it.
+          {t('analytics.explore.content.noNumeric')}
         </MessageBarBody>
       </MessageBar>
     )
   }
   if (isLoading) {
-    return <Card className={styles.card}><div className={styles.empty}>Loading…</div></Card>
+    return <Card className={styles.card}><div className={styles.empty}>{t('analytics.common.loading')}</div></Card>
   }
   if (view === 'snapshot') {
     return <SnapshotView values={values} services={services} agg={agg} />
@@ -93,24 +94,31 @@ export function ExploreContent({
         <div className={styles.cardHeaderRow}>
           <CardHeader
             className={styles.cardHeader}
-            header={<Text weight="semibold">{view === 'trend' ? 'Trend over time' : 'Compare services'}</Text>}
+            header={<Text weight="semibold">{t(view === 'trend' ? 'analytics.explore.content.trendOverTime' : 'analytics.explore.views.compare')}</Text>}
             description={
               <span className={styles.cardSub}>
-                {AGG_LABELS[agg]} of {valueTitle(activeSeries, activeValueName)}
-                {activeSeries?.cadence ? ` · per ${cadenceLabel(activeSeries.cadence).toLowerCase()} period` : ''}
+                {t('analytics.explore.content.aggregationOf', {
+                  aggregation: aggregationLabel(agg, t),
+                  value: valueTitle(activeSeries, activeValueName),
+                })}
+                {activeSeries?.cadence
+                  ? ` · ${t('analytics.explore.content.perCadencePeriod', {
+                    cadence: t(`analytics.cadence.${activeSeries.cadence.toLowerCase()}`).toLowerCase(),
+                  })}`
+                  : ''}
               </span>
             }
           />
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             {view === 'trend' && (
-              <Switch label="Combine services" checked={combined} onChange={(_, d) => onToggleCombined(!!d.checked)} />
+              <Switch label={t('analytics.explore.content.combineServices')} checked={combined} onChange={(_, d) => onToggleCombined(!!d.checked)} />
             )}
             {view === 'trend' && !asTable && (
-              <Switch label="Projection" checked={projecting} onChange={(_, d) => onToggleProjection(!!d.checked)} />
+              <Switch label={t('analytics.explore.content.projection')} checked={projecting} onChange={(_, d) => onToggleProjection(!!d.checked)} />
             )}
-            <Switch label="View as table" checked={asTable} onChange={(_, d) => onToggleTable(!!d.checked)} />
+            <Switch label={t('analytics.explore.content.viewAsTable')} checked={asTable} onChange={(_, d) => onToggleTable(!!d.checked)} />
             {view === 'trend' && !asTable && canShowEvents && (
-              <Switch label="Show events" checked={eventsOn} onChange={(_, d) => onToggleEvents(!!d.checked)} />
+              <Switch label={t('analytics.explore.content.showEvents')} checked={eventsOn} onChange={(_, d) => onToggleEvents(!!d.checked)} />
             )}
             {view === 'trend' && (
               <AnomalySettings
@@ -128,7 +136,7 @@ export function ExploreContent({
         </div>
 
         {!activeSeries || activeSeries.buckets.length === 0 ? (
-          <div className={styles.empty}>No samples for this selection.</div>
+          <div className={styles.empty}>{t('analytics.explore.content.noSamples')}</div>
         ) : view === 'trend' ? (
           <TrendView
             series={activeSeries}
@@ -164,6 +172,7 @@ function StatRow({ series, agg, serviceCount }: {
   serviceCount: number
 }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
   if (!series || series.buckets.length === 0) return null
   const totalSamples = series.buckets.reduce((acc, b) => acc + b.count, 0)
   const latest = series.buckets[series.buckets.length - 1]
@@ -172,19 +181,19 @@ function StatRow({ series, agg, serviceCount }: {
   return (
     <div className={styles.statRow}>
       <Card className={styles.stat}>
-        <span className={styles.statLabel}>Overall {AGG_LABELS[agg].toLowerCase()}</span>
+        <span className={styles.statLabel}>{t('analytics.explore.content.overallAggregation', { aggregation: aggregationLabel(agg, t) })}</span>
         <span className={styles.statValue}>{fmt(overall)}{unit}</span>
       </Card>
       <Card className={styles.stat}>
-        <span className={styles.statLabel}>Latest period</span>
+        <span className={styles.statLabel}>{t('analytics.explore.content.latestPeriod')}</span>
         <span className={styles.statValue}>{fmt(latest.value)}{unit}</span>
       </Card>
       <Card className={styles.stat}>
-        <span className={styles.statLabel}>Samples</span>
+        <span className={styles.statLabel}>{t('analytics.explore.content.samples')}</span>
         <span className={styles.statValue}>{totalSamples}</span>
       </Card>
       <Card className={styles.stat}>
-        <span className={styles.statLabel}>Periods / services</span>
+        <span className={styles.statLabel}>{t('analytics.explore.content.periodsServices')}</span>
         <span className={styles.statValue}>{series.buckets.length} / {serviceCount}</span>
       </Card>
     </div>

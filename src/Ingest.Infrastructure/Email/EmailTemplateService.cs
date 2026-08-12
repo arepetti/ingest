@@ -67,13 +67,16 @@ public sealed class EmailTemplateService : IEmailTemplateService
     {
         var template = await GetAsync(key, ct);
 
-        var errors = new List<string>();
+        var errors = new List<Diagnostic>();
         ValidateLiquid("Subject", update.Subject, errors);
         ValidateLiquid("Text body", update.TextBody, errors);
         if (!string.IsNullOrWhiteSpace(update.HtmlBody)) ValidateLiquid("HTML body", update.HtmlBody, errors);
-        if (string.IsNullOrWhiteSpace(update.Subject)) errors.Add("Subject is required.");
-        if (string.IsNullOrWhiteSpace(update.TextBody)) errors.Add("Text body is required.");
-        if (errors.Count > 0) throw new ValidationException(errors);
+        if (string.IsNullOrWhiteSpace(update.Subject))
+            errors.Add(new Diagnostic(DiagnosticCodes.Email.SubjectRequired, "Subject is required."));
+        if (string.IsNullOrWhiteSpace(update.TextBody))
+            errors.Add(new Diagnostic(DiagnosticCodes.Email.TextBodyRequired, "Text body is required."));
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
 
         template.Name = update.Name?.Trim() ?? template.Name;
         template.Description = update.Description;
@@ -88,10 +91,15 @@ public sealed class EmailTemplateService : IEmailTemplateService
         return template;
     }
 
-    private static void ValidateLiquid(string field, string? template, List<string> errors)
+    private static void ValidateLiquid(string field, string? template, List<Diagnostic> errors)
     {
         if (string.IsNullOrEmpty(template)) return;
         if (!_parser.TryParse(template, out _, out var error))
-            errors.Add($"{field}: Liquid failed to parse: {error}");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Email.TemplateParseFailed,
+                $"{field}: Liquid failed to parse: {error}",
+                ("field", field),
+                ("detail", error),
+                ("engine", "Liquid")));
     }
 }

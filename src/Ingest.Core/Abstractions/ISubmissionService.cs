@@ -10,7 +10,12 @@ namespace Ingest.Core.Abstractions;
 /// expressions and notices about samples that were discarded by <c>EnabledIf</c> /
 /// <c>VisibleIf</c>. Always non-null; empty when nothing of note happened.
 /// </param>
-public sealed record SubmissionWriteResult(Submission Submission, IReadOnlyList<string> Warnings);
+public sealed record SubmissionWriteResult(Submission Submission, IReadOnlyList<string> Warnings)
+{
+    /// <summary>Structured counterparts to <see cref="Warnings"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> WarningDetails { get; init; } =
+        (Submission.Warnings ?? new()).Select(x => x.ToDiagnostic()).ToList();
+}
 
 /// <summary>
 /// Outcome of a validate-only (dry-run) submission pass: the full create/replace pipeline runs —
@@ -31,7 +36,16 @@ public sealed record SubmissionValidationOutcome(
     IReadOnlyList<string> Warnings,
     IReadOnlyList<SampleRef> DiscardedSamples,
     ApprovalStatus ApprovalStatus,
-    IReadOnlyList<ApproverSpec> RequiredApprovers);
+    IReadOnlyList<ApproverSpec> RequiredApprovers)
+{
+    /// <summary>Structured counterparts to <see cref="Errors"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> ErrorDetails { get; init; } =
+        Errors.Select(x => Diagnostics.Common.LegacyValidation(x, "submissions")).ToList();
+
+    /// <summary>Structured counterparts to <see cref="Warnings"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> WarningDetails { get; init; } =
+        Warnings.Select(x => Diagnostics.Common.LegacyValidation(x, "submissions")).ToList();
+}
 
 /// <summary>
 /// Submission lifecycle for both service-driven and admin-driven flows. Owns every non-validation

@@ -1,3 +1,5 @@
+import i18n from '../i18n'
+
 const STORAGE_KEY = 'ingest.apiKey'
 
 export function getApiKey(): string | null {
@@ -9,8 +11,22 @@ export function setApiKey(value: string | null) {
   else localStorage.removeItem(STORAGE_KEY)
 }
 
+export interface ApiDiagnostic {
+  code: string
+  message?: string
+  params: Record<string, unknown>
+}
+
+interface ApiErrorOptions {
+  title?: string
+  code?: string
+  params?: Record<string, unknown>
+  errorDetails?: ApiDiagnostic[]
+}
+
 export class ApiError extends Error {
   status: number
+  title: string
   /**
    * Human-readable summary, ready to drop into a `MessageBar`. When the server returned a list
    * of validation errors they're joined with newlines (one per line) — render with
@@ -23,12 +39,74 @@ export class ApiError extends Error {
    * validation failure or didn't carry per-error details.
    */
   errors: string[]
-  constructor(status: number, detail: string, errors: string[] = []) {
+  code?: string
+  params: Record<string, unknown>
+  errorDetails: ApiDiagnostic[]
+
+  constructor(status: number, detail: string, errors: string[] = [], options: ApiErrorOptions = {}) {
     super(`${status} ${detail}`)
+    this.name = 'ApiError'
     this.status = status
+    this.title = options.title ?? ''
     this.detail = detail
     this.errors = errors
+    this.code = options.code
+    this.params = options.params ?? {}
+    this.errorDetails = options.errorDetails ?? []
   }
+}
+
+const diagnosticKey = (code: string) => `apiMessages.${code}`
+
+function genericError(): string {
+  return i18n.t('apiErrors.unexpected')
+}
+
+/**
+ * Localize a structured server diagnostic with the currently active i18n language. Unknown codes
+ * never leak their machine identifier: the paired legacy string, diagnostic message, or a generic
+ * localized fallback is used instead.
+ */
+export function localizeDiagnostic(
+  diagnostic: ApiDiagnostic | null | undefined,
+  legacyFallback?: string | null,
+): string {
+  const fallback = legacyFallback?.trim() || diagnostic?.message?.trim() || genericError()
+  if (!diagnostic?.code || !i18n.isInitialized) return fallback
+
+  const key = diagnosticKey(diagnostic.code)
+  if (!i18n.exists(key, { lng: i18n.resolvedLanguage ?? i18n.language })) return fallback
+
+  const localized = i18n.t(key, {
+    ...diagnostic.params,
+    message: fallback,
+  })
+  return /\{\{\s*[^}]+\s*\}\}/.test(localized) ? fallback : localized
+}
+
+/**
+ * Localize a details array while preserving compatibility strings. The arrays are contractually
+ * parallel, but old/mixed servers can return different lengths, so unmatched entries from either
+ * side remain visible.
+ */
+export function localizeDiagnostics(
+  details: readonly ApiDiagnostic[] | null | undefined,
+  legacyMessages: readonly string[] | null | undefined = [],
+): string[] {
+  const structured = details ?? []
+  const legacy = (legacyMessages ?? []).map(message =>
+    typeof message === 'string' ? message.trim() : '')
+  if (structured.length === 0) return legacy.filter(message => message.length > 0)
+
+  const localized: string[] = []
+  const length = Math.max(structured.length, legacy.length)
+  for (let index = 0; index < length; index++) {
+    const diagnostic = structured[index]
+    const fallback = legacy[index]
+    if (diagnostic) localized.push(localizeDiagnostic(diagnostic, fallback))
+    else if (fallback) localized.push(fallback)
+  }
+  return localized
 }
 
 /**
@@ -42,6 +120,12 @@ export class ApiError extends Error {
  */
 export function formatApiError(e: unknown): string {
   if (e instanceof ApiError) {
+    if (e.errorDetails.length > 0) {
+      return localizeDiagnostics(e.errorDetails, e.errors).join('\n')
+    }
+    if (e.code) {
+      return localizeDiagnostic({ code: e.code, message: e.detail, params: e.params }, e.detail)
+    }
     // When the server told us *what* is wrong with specific errors, those are all the user
     // needs to act on — the generic "your request was invalid" prefix would just be noise.
     if (e.errors.length > 0) return e.errors.join('\n')
@@ -51,8 +135,8 @@ export function formatApiError(e: unknown): string {
     const detail = e.detail?.trim()
     return detail && !sameMeaning(detail, summary) ? `${summary} — ${detail}` : summary
   }
-  if (e instanceof Error) return e.message || 'Something went wrong.'
-  return String(e)
+  if (e instanceof Error) return e.message || genericError()
+  return genericError()
 }
 
 /**
@@ -60,26 +144,13 @@ export function formatApiError(e: unknown): string {
  * what likely happened, and (where the user can do something about it) a hint at the fix.
  */
 function statusSummary(status: number): string {
-  switch (status) {
-    case 400: return 'The request was invalid.'
-    case 401: return "Your API key wasn't accepted."
-    case 403: return "You don't have permission to do this."
-    case 404: return 'That item could not be found.'
-    case 408: return 'The request took too long. Please try again.'
-    case 409: return 'This conflicts with another change. Reload and try again.'
-    case 410: return 'That item is no longer available.'
-    case 413: return 'The request is too large.'
-    case 415: return 'That type of content is not supported.'
-    case 422: return 'The data could not be processed.'
-    case 429: return 'Too many requests — please wait a moment and try again.'
-    case 500: return 'Something went wrong on the server. Please try again.'
-    case 502:
-    case 503:
-    case 504: return "The server isn't responding right now. Please try again shortly."
-  }
-  if (status >= 500) return 'Something went wrong on the server. Please try again.'
-  if (status >= 400) return 'The request failed.'
-  return 'Something unexpected happened.'
+  const key = [400, 401, 403, 404, 408, 409, 410, 413, 415, 422, 429, 500, 502, 503, 504]
+    .includes(status)
+    ? String(status)
+    : status >= 500 ? 'server'
+      : status >= 400 ? 'request'
+        : 'unexpected'
+  return i18n.t(`apiErrors.status.${key}`)
 }
 
 // Cheap "are these two strings saying basically the same thing?" check used to avoid pairing
@@ -124,6 +195,29 @@ function extractErrors(parsed: unknown): string[] {
   return []
 }
 
+function extractParams(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return { ...(value as Record<string, unknown>) }
+}
+
+function extractDiagnostic(value: unknown, fallbackMessage = ''): ApiDiagnostic | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  const code = typeof record.code === 'string' ? record.code.trim() : ''
+  if (!code) return undefined
+  const message = typeof record.message === 'string' && record.message.trim()
+    ? record.message
+    : fallbackMessage || undefined
+  return { code, message, params: extractParams(record.params) }
+}
+
+function extractDiagnostics(value: unknown): ApiDiagnostic[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map(item => extractDiagnostic(item))
+    .filter((item): item is ApiDiagnostic => item !== undefined)
+}
+
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const key = getApiKey()
@@ -142,12 +236,21 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   if (!res.ok) {
     let detail = res.statusText
     let errors: string[] = []
+    let title = ''
+    let code: string | undefined
+    let params: Record<string, unknown> = {}
+    let errorDetails: ApiDiagnostic[] = []
     try {
       const text = await res.text()
       if (text) {
         try {
           const parsed = JSON.parse(text) as Record<string, unknown>
           errors = extractErrors(parsed)
+          title = typeof parsed.title === 'string' ? parsed.title : ''
+          errorDetails = extractDiagnostics(parsed.errorDetails)
+          const topDiagnostic = extractDiagnostic(parsed)
+          code = topDiagnostic?.code
+          params = topDiagnostic?.params ?? {}
           // Validation errors take priority: they're the actionable bit the user needs to see.
           // The generic `title` ("Validation failed", "One or more validation errors occurred.")
           // and `detail` (often just a duplicate of the title) are kept as the fallback for
@@ -156,15 +259,14 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
             detail = errors.join('\n')
           } else {
             const d = typeof parsed.detail === 'string' ? parsed.detail : ''
-            const t = typeof parsed.title === 'string' ? parsed.title : ''
-            detail = d || t || text
+            detail = d || title || text
           }
         } catch {
           detail = text
         }
       }
     } catch { /* ignore */ }
-    throw new ApiError(res.status, detail, errors)
+    throw new ApiError(res.status, detail, errors, { title, code, params, errorDetails })
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()

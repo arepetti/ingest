@@ -10,6 +10,7 @@
  *    the schema editor uses to keep the tray / inline error banner in sync as the admin edits.
  */
 import type { Schema, SchemaLayoutNode, SchemaValue } from '../api/types'
+import type { TFunction } from 'i18next'
 
 /** A single item emitted by `walkLayout`. */
 export type RenderItem =
@@ -131,7 +132,7 @@ export interface LayoutValidationIssue {
  * Client-side mirror of the server's layout validator. The server is authoritative; this lives
  * here so the editor can show errors as the admin edits, without waiting for a save round-trip.
  */
-export function validateLayout(schema: Schema): LayoutValidationIssue[] {
+export function validateLayout(schema: Schema, t?: TFunction): LayoutValidationIssue[] {
   const issues: LayoutValidationIssue[] = []
   const valueNames = new Set(schema.values.map(v => v.name.toLowerCase()))
   const seenRefs = new Set<string>()
@@ -141,33 +142,35 @@ export function validateLayout(schema: Schema): LayoutValidationIssue[] {
   if (unassigned.length > 0) {
     issues.push({
       severity: 'warning',
-      message: `${unassigned.length} value${unassigned.length === 1 ? '' : 's'} not placed in the layout — they will render before the sections.`,
+      message: t
+        ? t('schemasSubmissions.layout.unassignedWarning', { count: unassigned.length })
+        : `${unassigned.length} value${unassigned.length === 1 ? '' : 's'} not placed in the layout — they will render before the sections.`,
     })
   }
   return issues
 
   function visit(nodes: SchemaLayoutNode[], depth: number) {
     if (depth > 32) {
-      issues.push({ severity: 'error', message: 'Layout is nested too deep (max 32 levels).' })
+      issues.push({ severity: 'error', message: t ? t('schemasSubmissions.layout.tooDeep') : 'Layout is nested too deep (max 32 levels).' })
       return
     }
     for (const n of nodes) {
       if (n.kind === 'value') {
         if (!n.valueName?.trim()) {
-          issues.push({ severity: 'error', message: 'A layout value node is missing its target.' })
+          issues.push({ severity: 'error', message: t ? t('schemasSubmissions.layout.missingTarget') : 'A layout value node is missing its target.' })
           continue
         }
         const key = n.valueName.toLowerCase()
         if (!valueNames.has(key)) {
-          issues.push({ severity: 'error', message: `Layout references unknown value "${n.valueName}".` })
+          issues.push({ severity: 'error', message: t ? t('schemasSubmissions.layout.unknownValue', { name: n.valueName }) : `Layout references unknown value "${n.valueName}".` })
           continue
         }
         if (!seenRefs.add(key)) {
-          issues.push({ severity: 'error', message: `Value "${n.valueName}" appears more than once in the layout.` })
+          issues.push({ severity: 'error', message: t ? t('schemasSubmissions.layout.duplicateValue', { name: n.valueName }) : `Value "${n.valueName}" appears more than once in the layout.` })
         }
       } else if (n.kind === 'section') {
         if (!n.caption?.trim()) {
-          issues.push({ severity: 'error', message: 'A section is missing its caption.' })
+          issues.push({ severity: 'error', message: t ? t('schemasSubmissions.layout.missingCaption') : 'A section is missing its caption.' })
         }
         visit(n.items ?? [], depth + 1)
       }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Ingest.Api.Auth;
+using Ingest.Api.Common;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Common;
 using Ingest.Core.Entities;
@@ -75,15 +76,15 @@ public sealed class IntegrationsTeamsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Messages([FromBody] JsonElement activity, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
 
         var connection = await _integrations.GetConnectionAsync(ct);
         if (!connection.IsConfigured || string.IsNullOrWhiteSpace(connection.AppId))
-            return Unauthorized();
+            return Unauthorized(DiagnosticProblem.Unauthorized("teams_connection_not_configured"));
 
         var authHeader = Request.Headers.Authorization.ToString();
         if (!await _auth.ValidateAsync(authHeader, connection.AppId!, ct))
-            return Unauthorized();
+            return Unauthorized(DiagnosticProblem.Unauthorized("invalid_connector_token"));
 
         // Always capture the conversation reference so a later proactive prompt can reach this chat.
         await CaptureConversationAsync(activity, ct);

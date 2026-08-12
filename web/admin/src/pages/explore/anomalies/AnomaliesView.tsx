@@ -2,16 +2,18 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Switch, Text } from '@fluentui/react-components'
 import { ChevronDown20Regular, ChevronRight20Regular } from '@fluentui/react-icons'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type { ExploreAnomalies, ExploreAnomalyCell, ExploreAnomalySchema } from '../../../api/types'
 import {
-  ANOMALY_COLORS, ANOMALY_LABELS, fmt, MISSING_COLOR, MISSING_LABEL,
+  anomalyLabel, ANOMALY_COLORS, fmt, MISSING_COLOR, missingLabel,
   useExploreStyles, type ExploreStyles,
 } from '../shared'
 
 const cellColor = (c: ExploreAnomalyCell) =>
   c.state === 'Anomaly' ? ANOMALY_COLORS.Anomaly : c.state === 'Normal' ? ANOMALY_COLORS.Normal : MISSING_COLOR
-const cellLabel = (c: ExploreAnomalyCell) =>
-  c.state === 'Anomaly' ? ANOMALY_LABELS.Anomaly : c.state === 'Normal' ? ANOMALY_LABELS.Normal : MISSING_LABEL
+const cellLabel = (c: ExploreAnomalyCell, t: TFunction) =>
+  c.state === 'Anomaly' ? anomalyLabel('Anomaly', t) : c.state === 'Normal' ? anomalyLabel('Normal', t) : missingLabel(t)
 
 /** Drop cells failing the keep test, then prune values and schemas left with nothing to show. */
 function filterCells(
@@ -42,12 +44,12 @@ function countStates(schema: ExploreAnomalySchema): { anomaly: number; normal: n
 }
 
 /** A short "2 anomalies · 5 normal · 1 no submission" summary for a collapsed schema card. */
-function summarize(schema: ExploreAnomalySchema): string {
+function summarize(schema: ExploreAnomalySchema, t: TFunction): string {
   const { anomaly, normal, missing } = countStates(schema)
   const parts: string[] = []
-  if (anomaly) parts.push(`${anomaly} ${anomaly === 1 ? 'anomaly' : 'anomalies'}`)
-  if (normal) parts.push(`${normal} normal`)
-  if (missing) parts.push(`${missing} no submission`)
+  if (anomaly) parts.push(t('analytics.explore.anomaly.summaryAnomaly', { count: anomaly }))
+  if (normal) parts.push(t('analytics.explore.anomaly.summaryNormal', { count: normal }))
+  if (missing) parts.push(t('analytics.explore.anomaly.summaryMissing', { count: missing }))
   return parts.join(' · ')
 }
 
@@ -73,15 +75,16 @@ export function AnomaliesView({
   robust: boolean
 }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
 
   if (isLoading) {
-    return <Card className={styles.card}><div className={styles.empty}>Loading…</div></Card>
+    return <Card className={styles.card}><div className={styles.empty}>{t('analytics.common.loading')}</div></Card>
   }
   if (!data || data.schemas.length === 0) {
     return (
       <Card className={styles.card}>
         <div className={styles.empty}>
-          No numeric KPIs to scan yet. Pick one or more schemas with numeric values to check the latest period for anomalies.
+          {t('analytics.explore.anomaly.empty')}
         </div>
       </Card>
     )
@@ -115,27 +118,31 @@ export function AnomaliesView({
         <div className={styles.scLegend}>
           <span className={styles.scLegendItem}>
             <span className={styles.scDot} style={{ backgroundColor: ANOMALY_COLORS.Normal }} />
-            {ANOMALY_LABELS.Normal}
+            {anomalyLabel('Normal', t)}
           </span>
           <span className={styles.scLegendItem}>
             <span className={styles.scDot} style={{ backgroundColor: ANOMALY_COLORS.Anomaly }} />
-            {ANOMALY_LABELS.Anomaly}
+            {anomalyLabel('Anomaly', t)}
           </span>
           <span className={styles.scLegendItem}>
             <span className={styles.scDot} style={{ backgroundColor: MISSING_COLOR }} />
-            {MISSING_LABEL}
+            {missingLabel(t)}
           </span>
         </div>
         <div className={styles.scSwitches}>
-          <Switch label="Hide normal" checked={hideNormal} onChange={(_, d) => onToggleHideNormal(!!d.checked)} />
+          <Switch label={t('analytics.explore.anomaly.hideNormal')} checked={hideNormal} onChange={(_, d) => onToggleHideNormal(!!d.checked)} />
           {hasMissing && (
-            <Switch label="Hide missing" checked={hideMissing} onChange={(_, d) => onToggleHideMissing(!!d.checked)} />
+            <Switch label={t('analytics.explore.status.hideMissing')} checked={hideMissing} onChange={(_, d) => onToggleHideMissing(!!d.checked)} />
           )}
         </div>
       </div>
       {schemas.length === 0 ? (
         <Card className={styles.card}>
-          <div className={styles.empty}>No anomalies in the {period === 'closed' ? 'latest closed' : 'current'} period.</div>
+          <div className={styles.empty}>
+            {t('analytics.explore.anomaly.noneInPeriod', {
+              period: t(period === 'closed' ? 'analytics.explore.filters.latestClosed' : 'analytics.explore.filters.current'),
+            })}
+          </div>
         </Card>
       ) : schemas.map(schema => (
         <SchemaCard
@@ -162,6 +169,7 @@ function SchemaCard({ schema, serviceLabel, analysisLink, styles }: {
   styles: ExploreStyles
 }) {
   const counts = countStates(schema)
+  const { t } = useTranslation()
   const allMissing = counts.anomaly === 0 && counts.normal === 0
   const [expanded, setExpanded] = useState(!allMissing)
 
@@ -176,7 +184,7 @@ function SchemaCard({ schema, serviceLabel, analysisLink, styles }: {
         >
           {expanded ? <ChevronDown20Regular /> : <ChevronRight20Regular />}
           <Text weight="semibold" size={400}>{schema.schemaLabel || schema.schemaName}</Text>
-          {!expanded && <span className={styles.scCollapseSummary}>{summarize(schema)}</span>}
+          {!expanded && <span className={styles.scCollapseSummary}>{summarize(schema, t)}</span>}
         </button>
         {expanded && schema.values.map(v => (
           <div key={v.valueName} className={styles.scValueGroup}>
@@ -192,7 +200,7 @@ function SchemaCard({ schema, serviceLabel, analysisLink, styles }: {
                         <span className={styles.scService}>{serviceLabel.get(c.serviceId) ?? c.serviceId}</span>
                         <span className={styles.scMeta}>
                           {c.value === null ? (
-                            MISSING_LABEL
+                            missingLabel(t)
                           ) : (
                             <>
                               <span className={styles.scValueNum}>{fmt(c.value)}</span>{v.unit ? ` ${v.unit}` : ''}
@@ -209,7 +217,7 @@ function SchemaCard({ schema, serviceLabel, analysisLink, styles }: {
                       to={analysisLink(schema.schemaName, v.valueName, c.serviceId)}
                       className={styles.scCard}
                       style={{ borderLeftColor: cellColor(c) }}
-                      title={`Open in Analysis · ${cellLabel(c)}`}
+                      title={t('analytics.explore.anomaly.openAnalysis', { state: cellLabel(c, t) })}
                     >
                       {body}
                     </Link>
@@ -218,7 +226,7 @@ function SchemaCard({ schema, serviceLabel, analysisLink, styles }: {
                       key={c.serviceId}
                       className={styles.scCard}
                       style={{ borderLeftColor: cellColor(c), cursor: 'default' }}
-                      title={cellLabel(c)}
+                      title={cellLabel(c, t)}
                     >
                       {body}
                     </div>

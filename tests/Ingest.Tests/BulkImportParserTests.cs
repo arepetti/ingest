@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Common;
 using Ingest.Infrastructure.Services;
 
 namespace Ingest.Tests;
@@ -73,6 +74,9 @@ public class BulkImportParserTests
         Assert.Empty(result.Submissions);
         Assert.Single(result.Errors);
         Assert.Contains("Invalid JSON", result.Errors[0]);
+        var detail = Assert.Single(result.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Imports.InvalidJson, detail.Code);
+        Assert.NotNull(detail.Params["detail"]);
     }
 
     [Fact]
@@ -84,6 +88,9 @@ public class BulkImportParserTests
 
         Assert.Empty(result.Submissions);
         Assert.Contains(result.Errors, e => e.Contains("missing a 'samples'"));
+        var detail = Assert.Single(result.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Imports.SamplesMissing, detail.Code);
+        Assert.Equal(1, detail.Params["submissionNumber"]);
     }
 
     [Fact]
@@ -157,6 +164,9 @@ public class BulkImportParserTests
 
         Assert.Empty(result.Submissions);
         Assert.Contains(result.Errors, e => e.Contains("Missing required column 'value'"));
+        var detail = Assert.Single(result.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Imports.MissingColumn, detail.Code);
+        Assert.Equal("value", detail.Params["column"]);
     }
 
     [Fact]
@@ -171,6 +181,10 @@ public class BulkImportParserTests
 
         Assert.Empty(result.Submissions);
         Assert.Contains(result.Errors, e => e.Contains("Row 2") && e.Contains("not a valid timestamp"));
+        var detail = Assert.Single(result.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Imports.RowTimestampInvalid, detail.Code);
+        Assert.Equal(2, detail.Params["row"]);
+        Assert.Equal("not-a-date", detail.Params["timestamp"]);
     }
 
     [Fact]

@@ -3,10 +3,8 @@ import {
   Tooltip as FluentTooltip,
 } from '@fluentui/react-components'
 import { ChevronDown20Regular, Info16Regular } from '@fluentui/react-icons'
+import { useTranslation } from 'react-i18next'
 import { ANOMALY_THRESHOLDS, ANOMALY_WINDOWS, useExploreStyles } from './shared'
-
-const ROBUST_HELP =
-  'Robust mode resists a few extreme spikes skewing the baseline. Standard mode uses the mean and standard deviation.'
 
 interface Tuning {
   window: number
@@ -26,10 +24,11 @@ export function AnomalyFields({ window, threshold, robust, onWindow, onThreshold
   disabled?: boolean
 }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
   return (
     <>
       <div className={styles.field}>
-        <span className={styles.fieldLabel}>History window (periods)</span>
+        <span className={styles.fieldLabel}>{t('analytics.explore.anomaly.historyWindow')}</span>
         <Dropdown
           className={styles.dropdown}
           disabled={disabled}
@@ -42,7 +41,7 @@ export function AnomalyFields({ window, threshold, robust, onWindow, onThreshold
       </div>
 
       <div className={styles.field}>
-        <span className={styles.fieldLabel}>Sensitivity (|z| threshold)</span>
+        <span className={styles.fieldLabel}>{t('analytics.explore.anomaly.sensitivity')}</span>
         <Dropdown
           className={styles.dropdown}
           disabled={disabled}
@@ -56,20 +55,20 @@ export function AnomalyFields({ window, threshold, robust, onWindow, onThreshold
 
       <div className={styles.field}>
         <span className={styles.fieldLabel}>
-          Baseline mode
-          <FluentTooltip relationship="description" content={ROBUST_HELP}>
-            <Info16Regular className={styles.infoIcon} tabIndex={0} aria-label="What does Robust mode do?" />
+          {t('analytics.explore.anomaly.baselineMode')}
+          <FluentTooltip relationship="description" content={t('analytics.explore.anomaly.robustHelp')}>
+            <Info16Regular className={styles.infoIcon} tabIndex={0} aria-label={t('analytics.explore.anomaly.robustAria')} />
           </FluentTooltip>
         </span>
         <Dropdown
           className={styles.dropdown}
           disabled={disabled}
           selectedOptions={[robust ? 'robust' : 'standard']}
-          value={robust ? 'Robust (median / MAD)' : 'Standard (mean / SD)'}
+          value={robust ? t('analytics.explore.anomaly.robust') : t('analytics.explore.anomaly.standard')}
           onOptionSelect={(_, d) => d.optionValue && onRobust(d.optionValue === 'robust')}
         >
-          <Option value="standard">Standard (mean / SD)</Option>
-          <Option value="robust">Robust (median / MAD)</Option>
+          <Option value="standard">{t('analytics.explore.anomaly.standard')}</Option>
+          <Option value="robust">{t('analytics.explore.anomaly.robust')}</Option>
         </Dropdown>
       </div>
     </>
@@ -86,18 +85,19 @@ export function AnomalySettings({ enabled, onToggleEnabled, ...tuning }: Tuning 
   onToggleEnabled: (b: boolean) => void
 }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
   return (
     <Popover positioning="below-end" withArrow>
       <PopoverTrigger disableButtonEnhancement>
         <Button appearance="outline" size="medium" iconPosition="after" icon={<ChevronDown20Regular />}>
-          Anomalies
+          {t('analytics.explore.tabs.anomalies')}
         </Button>
       </PopoverTrigger>
       <PopoverSurface>
         <div className={styles.popover}>
-          <Text weight="semibold">Anomaly detection</Text>
+          <Text weight="semibold">{t('analytics.explore.anomaly.detection')}</Text>
           <Switch
-            label="Highlight anomalies"
+            label={t('analytics.explore.anomaly.highlight')}
             checked={enabled}
             onChange={(_, d) => onToggleEnabled(!!d.checked)}
           />

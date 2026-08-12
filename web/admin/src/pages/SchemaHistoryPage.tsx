@@ -16,6 +16,7 @@ import type { SchemaValueHistory } from '../api/types'
 import { ragBandRects } from '../utils/targetBand'
 import { cadenceLabel } from '../utils/cadence'
 import { formatPeriodLabel } from '../utils/periodFormat'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -42,6 +43,7 @@ interface ChartRow {
 
 export function SchemaHistoryPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { name } = useParams<{ name: string }>()
   const { data, isLoading, error } = useSchemaHistory(name)
 
@@ -49,18 +51,18 @@ export function SchemaHistoryPage() {
     <div className={s.root}>
       <div className={s.header}>
         <Button as="a" appearance="subtle" icon={<ArrowLeft20Regular />}>
-          <Link to="/schemas">Back</Link>
+          <Link to="/schemas">{t('schemasSubmissions.common.back')}</Link>
         </Button>
-        <Title2>Historical data{data?.label || data?.schemaName ? ` — ${data?.label || data?.schemaName}` : ''}</Title2>
+        <Title2>{t('schemasSubmissions.schemaHistory.title')}{data?.label || data?.schemaName ? ` — ${data?.label || data?.schemaName}` : ''}</Title2>
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{formatApiError(error)}</MessageBarBody></AutoScrollMessageBar>}
-      {isLoading && <div>Loading...</div>}
+      {isLoading && <div>{t('schemasSubmissions.common.loading')}</div>}
 
       {data && data.values.length === 0 && (
         <MessageBar intent="info">
           <MessageBarBody>
-            This schema has no numeric values, so there's nothing to chart. Add a Number or Integer value to see a timeline.
+            {t('schemasSubmissions.schemaHistory.noNumericValues')}
           </MessageBarBody>
         </MessageBar>
       )}
@@ -78,6 +80,7 @@ export function SchemaHistoryPage() {
 
 function ValueChartCard({ value }: { value: SchemaValueHistory }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const rows = useMemo(() => toChartRows(value), [value])
   const bandRects = useMemo(() => ragBandRects(value), [value])
   const yAxisLabel = value.unit ? `${value.label || value.valueName} (${value.unit})` : (value.label || value.valueName)
@@ -89,14 +92,14 @@ function ValueChartCard({ value }: { value: SchemaValueHistory }) {
         header={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Text weight="semibold">{value.label || value.valueName}</Text>
-            <Badge appearance="outline" size="small">{value.type}</Badge>
-            <Badge appearance="outline" color="informative" size="small">{cadenceLabel(value.cadence)}</Badge>
+            <Badge appearance="outline" size="small">{t(`schemasSubmissions.common.valueType.${value.type}`)}</Badge>
+            <Badge appearance="outline" color="informative" size="small">{cadenceLabel(value.cadence, t)}</Badge>
           </div>
         }
-        description={<span className={s.cardSub}>{rows.length} bucket(s) · whiskers show min/max, dot shows the average</span>}
+        description={<span className={s.cardSub}>{t('schemasSubmissions.schemaHistory.bucketDescription', { count: rows.length })}</span>}
       />
       {rows.length === 0 ? (
-        <div className={s.empty}>No samples submitted yet.</div>
+        <div className={s.empty}>{t('schemasSubmissions.schemaHistory.noSamples')}</div>
       ) : (
         <ResponsiveContainer width="100%" height={240}>
           <ComposedChart data={rows} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
@@ -119,7 +122,7 @@ function ValueChartCard({ value }: { value: SchemaValueHistory }) {
               formatter={(_v, _n, item: { payload?: ChartRow }) => {
                 const r = item.payload
                 if (!r) return ['', '']
-                return [`${r.min.toFixed(2)} / ${r.avg.toFixed(2)} / ${r.max.toFixed(2)} (n=${r.count})`, 'min / avg / max']
+                return [`${r.min.toFixed(2)} / ${r.avg.toFixed(2)} / ${r.max.toFixed(2)} (n=${r.count})`, t('schemasSubmissions.schemaHistory.minAvgMax')]
               }}
               labelFormatter={(_l, items) => {
                 const r = (items?.[0]?.payload) as ChartRow | undefined

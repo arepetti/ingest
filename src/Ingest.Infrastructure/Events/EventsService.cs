@@ -133,14 +133,14 @@ public sealed class EventsService : IEventsService
     /// </summary>
     private async Task ValidateAsync(Event ev, CancellationToken ct)
     {
-        var errors = new List<string>();
+        var errors = new List<Diagnostic>();
 
         ev.Label = ev.Label?.Trim() ?? string.Empty;
         if (string.IsNullOrEmpty(ev.Label))
-            errors.Add("Label is required.");
+            errors.Add(new Diagnostic(DiagnosticCodes.Events.LabelRequired, "Label is required."));
 
         if (ev.Timestamp == default)
-            errors.Add("Timestamp is required.");
+            errors.Add(new Diagnostic(DiagnosticCodes.Events.TimestampRequired, "Timestamp is required."));
         else
             ev.Timestamp = DateTime.SpecifyKind(ev.Timestamp, DateTimeKind.Utc);
 
@@ -151,7 +151,11 @@ public sealed class EventsService : IEventsService
         if (ev.Kind == EventKind.Interval)
         {
             if (ev.Duration is null || ev.Duration <= TimeSpan.Zero)
-                errors.Add("Duration is required for interval events.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Events.IntervalDurationRequired,
+                    "Duration is required for interval events.",
+                    ("eventKind", ev.Kind.ToString()),
+                    ("duration", ev.Duration)));
         }
         else
         {
@@ -172,7 +176,10 @@ public sealed class EventsService : IEventsService
                     unknown.Add(id);
             }
             if (unknown.Count > 0)
-                errors.Add($"Affected services must be existing service accounts. Unknown or non-service ids: {string.Join(", ", unknown)}.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Events.InvalidServiceIds,
+                    $"Affected services must be existing service accounts. Unknown or non-service ids: {string.Join(", ", unknown)}.",
+                    ("serviceIds", unknown)));
         }
         ev.ServiceIds = serviceIds;
 

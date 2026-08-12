@@ -123,7 +123,14 @@ public static class RequestHelpers
             if (string.Equals(raw, "cadence", StringComparison.OrdinalIgnoreCase))
                 skipCadence = true;
             else
-                throw new ValidationException(new[] { $"Unknown 'omit' value '{raw}'. Supported values: cadence." });
+                throw new ValidationException(new[]
+                {
+                    Diagnostic.Create(
+                        DiagnosticCodes.Api.UnsupportedOmit,
+                        $"Unknown 'omit' value '{raw}'. Supported values: cadence.",
+                        ("value", raw),
+                        ("supported", new[] { "cadence" })),
+                });
         }
 
         return new SubmissionValidationOptions(SkipCadence: skipCadence);

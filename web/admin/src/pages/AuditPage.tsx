@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   Badge, Dropdown, Option, Tab, TabList, Tooltip,
@@ -11,7 +13,8 @@ import { ArrowClockwise20Regular, ArrowDownload20Regular, MoreHorizontal20Regula
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { AuditChangeAvatar, StatusAvatar } from '../components/Avatars'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
-import { PeriodFilter } from '../components/PeriodFilter'
+import { LocalizedTime } from '../components/LocalizedTime'
+import { AnalyticsPeriodFilter } from './analytics/AnalyticsPeriodFilter'
 import { RowActions } from '../components/RowActions'
 import { usePeriodFilter, type PeriodFilterState } from '../utils/usePeriodFilter'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
@@ -20,9 +23,8 @@ import {
   useAuditLog, useCapabilities, useEmailOutbox, useDrainEmail,
   useWebhookDeliveries, useRedeliverWebhook, useDrainWebhooks,
 } from '../api/hooks'
-import { formatApiError } from '../api/client'
+import { formatApiError, localizeDiagnostic } from '../api/client'
 import { downloadFromUrl } from '../utils/download'
-import { formatDateTime } from '../utils/format'
 import type {
   AuditChangeType, AuditTargetType, AuditLog, EmailStatus, EmailMessage,
   WebhookDelivery, WebhookDeliveryStatus,
@@ -32,13 +34,12 @@ const CHANGE_TYPES: AuditChangeType[] = ['Create', 'Edit', 'Delete', 'Approve', 
 const TARGET_TYPES: AuditTargetType[] = ['User', 'Account', 'Schema', 'ApiKey', 'Submission', 'Report', 'SchemaHistory', 'ApprovalRule', 'Settings', 'Backup', 'Event', 'CommentThread', 'Comment']
 
 /** Friendly labels for target types whose raw enum name doesn't read well in the UI. */
-const TARGET_TYPE_LABELS: Partial<Record<AuditTargetType, string>> = {
-  ApiKey: 'API key',
-  SchemaHistory: 'Schema history',
-  ApprovalRule: 'Approval rule',
-  CommentThread: 'Comment thread',
-}
-const targetTypeLabel = (t: AuditTargetType): string => TARGET_TYPE_LABELS[t] ?? t
+const targetTypeLabel = (type: AuditTargetType, t: TFunction): string =>
+  t(`analytics.audit.targetTypes.${type.charAt(0).toLowerCase()}${type.slice(1)}`)
+const changeTypeLabel = (change: AuditChangeType, t: TFunction): string =>
+  t(`analytics.audit.changeTypes.${change.toLowerCase()}`)
+const statusLabel = (status: EmailStatus | WebhookDeliveryStatus, t: TFunction): string =>
+  t(`analytics.audit.statuses.${status.toLowerCase()}`)
 const EMAIL_STATUSES: EmailStatus[] = ['Pending', 'Sending', 'Sent', 'Failed']
 const WEBHOOK_STATUSES: WebhookDeliveryStatus[] = ['Pending', 'Sending', 'Sent', 'Failed']
 
@@ -64,30 +65,11 @@ const useStyles = makeStyles({
 
 const ALL = '__all__'
 
-const EMAIL_EXPORT_COLUMNS: ExportColumn<EmailMessage>[] = [
-  { header: 'Created', value: m => m.createdAt },
-  { header: 'To', value: m => (m.toName ? `${m.toName} <${m.toAddress}>` : m.toAddress) },
-  { header: 'Subject', value: m => m.subject },
-  { header: 'Status', value: m => m.status },
-  { header: 'Attempts', value: m => m.attempts },
-  { header: 'Sent', value: m => m.sentAt ?? '' },
-]
-
-const WEBHOOK_EXPORT_COLUMNS: ExportColumn<WebhookDelivery>[] = [
-  { header: 'Created', value: d => d.createdAt },
-  { header: 'Event', value: d => d.event },
-  { header: 'URL', value: d => d.url },
-  { header: 'Status', value: d => d.status },
-  { header: 'Attempts', value: d => d.attempts },
-  { header: 'Delivered', value: d => d.deliveredAt ?? '' },
-  { header: 'Last status code', value: d => d.lastStatusCode ?? '' },
-  { header: 'Last error', value: d => d.lastError ?? '' },
-]
-
 type AuditTab = 'changes' | 'emails' | 'webhooks'
 
 export function AuditPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { me, has } = useCapabilities()
   const [tab, setTab] = useState<AuditTab>('changes')
   // The email/webhook tabs read the notification + webhook stores, so they need the matching read
@@ -120,15 +102,38 @@ export function AuditPage() {
   const [changesExporting, setChangesExporting] = useState(false)
   const drain = useDrainEmail()
   const webhookDrain = useDrainWebhooks()
+  const emailExportColumns = useMemo<ExportColumn<EmailMessage>[]>(() => [
+    { header: t('analytics.audit.columns.created'), value: m => m.createdAt },
+    { header: t('analytics.audit.columns.to'), value: m => (m.toName ? `${m.toName} <${m.toAddress}>` : m.toAddress) },
+    { header: t('analytics.audit.columns.subject'), value: m => m.subject },
+    { header: t('analytics.audit.columns.status'), value: m => statusLabel(m.status, t) },
+    { header: t('analytics.audit.columns.attempts'), value: m => m.attempts },
+    { header: t('analytics.audit.columns.sent'), value: m => m.sentAt ?? '' },
+  ], [t])
+  const webhookExportColumns = useMemo<ExportColumn<WebhookDelivery>[]>(() => [
+    { header: t('analytics.audit.columns.created'), value: d => d.createdAt },
+    { header: t('analytics.audit.columns.event'), value: d => d.event },
+    { header: t('analytics.audit.columns.url'), value: d => d.url },
+    { header: t('analytics.audit.columns.status'), value: d => statusLabel(d.status, t) },
+    { header: t('analytics.audit.columns.attempts'), value: d => d.attempts },
+    { header: t('analytics.audit.columns.delivered'), value: d => d.deliveredAt ?? '' },
+    { header: t('analytics.audit.columns.lastStatusCode'), value: d => d.lastStatusCode ?? '' },
+    {
+      header: t('analytics.audit.columns.lastError'),
+      value: d => d.lastErrorDetail
+        ? localizeDiagnostic(d.lastErrorDetail, d.lastError)
+        : d.lastError ?? '',
+    },
+  ], [t])
   const emailsExport = useCsvExport({
     filename: 'sent-emails.csv',
-    columns: EMAIL_EXPORT_COLUMNS,
+    columns: emailExportColumns,
     fetchAll: () => fetchAllEmailOutbox({ status, from: emailsPeriod.from, to: emailsPeriod.to }),
     onError: setPageError,
   })
   const webhooksExport = useCsvExport({
     filename: 'webhook-deliveries.csv',
-    columns: WEBHOOK_EXPORT_COLUMNS,
+    columns: webhookExportColumns,
     fetchAll: () => fetchAllWebhookDeliveries({ status: webhookStatus, from: webhooksPeriod.from, to: webhooksPeriod.to }),
     onError: setPageError,
   })
@@ -171,14 +176,14 @@ export function AuditPage() {
   return (
     <div className={s.root}>
       <div className={s.header}>
-        <Title2>Audit</Title2>
+        <Title2>{t('analytics.audit.title')}</Title2>
         <Menu>
           <MenuTrigger disableButtonEnhancement>
-            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('analytics.common.moreActions')} />
           </MenuTrigger>
           <MenuPopover>
             <MenuList>
-              <MenuItem icon={<ArrowClockwise20Regular />} onClick={onRefresh}>Refresh</MenuItem>
+              <MenuItem icon={<ArrowClockwise20Regular />} onClick={onRefresh}>{t('analytics.common.refresh')}</MenuItem>
               <MenuDivider />
               {tab === 'changes' && (
                 <MenuItem
@@ -186,7 +191,7 @@ export function AuditPage() {
                   disabled={changesExporting}
                   onClick={onExportChanges}
                 >
-                  {changesExporting ? 'Exporting…' : 'Export CSV'}
+                  {changesExporting ? t('analytics.common.exporting') : t('analytics.common.exportCsv')}
                 </MenuItem>
               )}
               {tab === 'emails' && emailEnabled && (
@@ -196,11 +201,11 @@ export function AuditPage() {
                     disabled={emailsExport.exporting}
                     onClick={emailsExport.exportList}
                   >
-                    {emailsExport.exporting ? 'Exporting…' : 'Export CSV'}
+                    {emailsExport.exporting ? t('analytics.common.exporting') : t('analytics.common.exportCsv')}
                   </MenuItem>
                   {canDrainEmail && (
                     <MenuItem icon={<Send20Regular />} disabled={drain.isPending} onClick={onDrain}>
-                      {drain.isPending ? 'Sending…' : 'Send pending now'}
+                      {drain.isPending ? t('analytics.common.sending') : t('analytics.audit.actions.sendPending')}
                     </MenuItem>
                   )}
                 </>
@@ -212,11 +217,11 @@ export function AuditPage() {
                     disabled={webhooksExport.exporting}
                     onClick={webhooksExport.exportList}
                   >
-                    {webhooksExport.exporting ? 'Exporting…' : 'Export CSV'}
+                    {webhooksExport.exporting ? t('analytics.common.exporting') : t('analytics.common.exportCsv')}
                   </MenuItem>
                   {canDrainWebhooks && (
                     <MenuItem icon={<Send20Regular />} disabled={webhookDrain.isPending} onClick={onWebhookDrain}>
-                      {webhookDrain.isPending ? 'Sending…' : 'Send pending now'}
+                      {webhookDrain.isPending ? t('analytics.common.sending') : t('analytics.audit.actions.sendPending')}
                     </MenuItem>
                   )}
                 </>
@@ -227,15 +232,15 @@ export function AuditPage() {
       </div>
 
       <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as AuditTab)}>
-        <Tab value="changes">Changes</Tab>
-        {emailEnabled && <Tab value="emails">Sent emails</Tab>}
-        {webhooksEnabled && <Tab value="webhooks">Webhook deliveries</Tab>}
+        <Tab value="changes">{t('analytics.audit.tabs.changes')}</Tab>
+        {emailEnabled && <Tab value="emails">{t('analytics.audit.tabs.sentEmails')}</Tab>}
+        {webhooksEnabled && <Tab value="webhooks">{t('analytics.audit.tabs.webhookDeliveries')}</Tab>}
       </TabList>
 
       {pageError && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Could not complete the action</MessageBarTitle>
+            <MessageBarTitle>{t('analytics.audit.actionError')}</MessageBarTitle>
             {pageError}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -270,6 +275,7 @@ function ChangesTab({
   period: PeriodFilterState
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
@@ -282,42 +288,42 @@ function ChangesTab({
     <>
       <div className={s.filters}>
         <div className={s.field}>
-          <span className={s.fieldLabel}>Change type</span>
+          <span className={s.fieldLabel}>{t('analytics.audit.filters.changeType')}</span>
           <Dropdown
             className={s.filterDropdown}
             selectedOptions={[change ?? ALL]}
-            value={change ?? 'All'}
+            value={change ? changeTypeLabel(change, t) : t('analytics.common.all')}
             onOptionSelect={(_, d) => {
               setChange(d.optionValue === ALL ? undefined : (d.optionValue as AuditChangeType))
               setPage(1)
             }}
           >
-            <Option value={ALL}>All</Option>
-            {CHANGE_TYPES.map(c => <Option key={c} value={c}>{c}</Option>)}
+            <Option value={ALL}>{t('analytics.common.all')}</Option>
+            {CHANGE_TYPES.map(c => <Option key={c} value={c}>{changeTypeLabel(c, t)}</Option>)}
           </Dropdown>
         </div>
         <div className={s.field}>
-          <span className={s.fieldLabel}>Target type</span>
+          <span className={s.fieldLabel}>{t('analytics.audit.filters.targetType')}</span>
           <Dropdown
             className={s.filterDropdown}
             selectedOptions={[targetType ?? ALL]}
-            value={targetType ? targetTypeLabel(targetType) : 'All'}
+            value={targetType ? targetTypeLabel(targetType, t) : t('analytics.common.all')}
             onOptionSelect={(_, d) => {
               setTargetType(d.optionValue === ALL ? undefined : (d.optionValue as AuditTargetType))
               setPage(1)
             }}
           >
-            <Option value={ALL}>All</Option>
-            {TARGET_TYPES.map(t => <Option key={t} value={t}>{targetTypeLabel(t)}</Option>)}
+            <Option value={ALL}>{t('analytics.common.all')}</Option>
+            {TARGET_TYPES.map(type => <Option key={type} value={type}>{targetTypeLabel(type, t)}</Option>)}
           </Dropdown>
         </div>
-        <PeriodFilter state={period} onChange={() => setPage(1)} />
+        <AnalyticsPeriodFilter state={period} onChange={() => setPage(1)} />
       </div>
 
       {error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Failed to load</MessageBarTitle>
+            <MessageBarTitle>{t('analytics.common.failedToLoad')}</MessageBarTitle>
             {formatApiError(error)}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -326,30 +332,30 @@ function ChangesTab({
       <Table size="small" className={s.table}>
         <TableHeader>
           <TableRow>
-            <TableHeaderCell className={s.colTime}>Timestamp</TableHeaderCell>
-            <TableHeaderCell className={s.colChange}>Change</TableHeaderCell>
-            <TableHeaderCell className={s.colTarget}>Target type</TableHeaderCell>
-            <TableHeaderCell>Target</TableHeaderCell>
-            <TableHeaderCell>Changed by</TableHeaderCell>
-            <TableHeaderCell>Note</TableHeaderCell>
+            <TableHeaderCell className={s.colTime}>{t('analytics.audit.columns.timestamp')}</TableHeaderCell>
+            <TableHeaderCell className={s.colChange}>{t('analytics.audit.columns.change')}</TableHeaderCell>
+            <TableHeaderCell className={s.colTarget}>{t('analytics.audit.filters.targetType')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.audit.columns.target')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.audit.columns.changedBy')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.audit.columns.note')}</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={6}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={6}>{t('analytics.common.loading')}</GridMessageRow>}
           {!isLoading && items.length === 0 && (
-            <GridMessageRow colSpan={6}>No changes recorded.</GridMessageRow>
+            <GridMessageRow colSpan={6}>{t('analytics.audit.empty.changes')}</GridMessageRow>
           )}
           {items.map(entry => (
             <TableRow key={entry.id} className={s.row}>
               <TableCell className={s.colTime}>
                 <TableCellLayout media={<AuditChangeAvatar change={entry.change} targetType={entry.targetType} />}>
-                  <span className={s.truncate}>{formatDateTime(entry.timestamp)}</span>
+                  <LocalizedTime className={s.truncate} value={entry.timestamp} />
                 </TableCellLayout>
               </TableCell>
               <TableCell className={s.colChange}>
                 <ChangeBadge change={entry.change} />
               </TableCell>
-              <TableCell className={s.colTarget}>{targetTypeLabel(entry.targetType)}</TableCell>
+              <TableCell className={s.colTarget}>{targetTypeLabel(entry.targetType, t)}</TableCell>
               <TableCell className={s.cellId}><IdentityCell name={entry.targetName} id={entry.targetId} /></TableCell>
               <TableCell className={s.cellId}><IdentityCell name={entry.actorName} id={entry.actorId} /></TableCell>
               <TableCell className={s.cellId}>
@@ -381,6 +387,7 @@ function SentEmailsTab({
   period: PeriodFilterState
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
@@ -392,27 +399,27 @@ function SentEmailsTab({
     <>
       <div className={s.filters}>
         <div className={s.field}>
-          <span className={s.fieldLabel}>Status</span>
+          <span className={s.fieldLabel}>{t('analytics.audit.columns.status')}</span>
           <Dropdown
             className={s.filterDropdown}
             selectedOptions={[status ?? ALL]}
-            value={status ?? 'All'}
+            value={status ? statusLabel(status, t) : t('analytics.common.all')}
             onOptionSelect={(_, d) => {
               setStatus(d.optionValue === ALL ? undefined : (d.optionValue as EmailStatus))
               setPage(1)
             }}
           >
-            <Option value={ALL}>All</Option>
-            {EMAIL_STATUSES.map(st => <Option key={st} value={st}>{st}</Option>)}
+            <Option value={ALL}>{t('analytics.common.all')}</Option>
+            {EMAIL_STATUSES.map(st => <Option key={st} value={st}>{statusLabel(st, t)}</Option>)}
           </Dropdown>
         </div>
-        <PeriodFilter state={period} onChange={() => setPage(1)} />
+        <AnalyticsPeriodFilter state={period} onChange={() => setPage(1)} />
       </div>
 
       {error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Failed to load</MessageBarTitle>
+            <MessageBarTitle>{t('analytics.common.failedToLoad')}</MessageBarTitle>
             {formatApiError(error)}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -421,24 +428,24 @@ function SentEmailsTab({
       <Table size="small" className={s.table}>
         <TableHeader>
           <TableRow>
-            <TableHeaderCell className={s.colTime}>Created</TableHeaderCell>
-            <TableHeaderCell>To</TableHeaderCell>
-            <TableHeaderCell>Subject</TableHeaderCell>
-            <TableHeaderCell className={s.colStatus}>Status</TableHeaderCell>
-            <TableHeaderCell className={s.colAttempts}>Attempts</TableHeaderCell>
-            <TableHeaderCell className={s.colTime}>Sent</TableHeaderCell>
+            <TableHeaderCell className={s.colTime}>{t('analytics.audit.columns.created')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.audit.columns.to')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.audit.columns.subject')}</TableHeaderCell>
+            <TableHeaderCell className={s.colStatus}>{t('analytics.audit.columns.status')}</TableHeaderCell>
+            <TableHeaderCell className={s.colAttempts}>{t('analytics.audit.columns.attempts')}</TableHeaderCell>
+            <TableHeaderCell className={s.colTime}>{t('analytics.audit.columns.sent')}</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={6}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={6}>{t('analytics.common.loading')}</GridMessageRow>}
           {!isLoading && items.length === 0 && (
-            <GridMessageRow colSpan={6}>No emails recorded.</GridMessageRow>
+            <GridMessageRow colSpan={6}>{t('analytics.audit.empty.emails')}</GridMessageRow>
           )}
           {items.map(m => (
             <TableRow key={m.id} className={s.row}>
               <TableCell className={s.colTime}>
-                <TableCellLayout media={<StatusAvatar status={m.status} name={m.toName || m.toAddress} label="Email" />}>
-                  <span className={s.truncate}>{formatDateTime(m.createdAt)}</span>
+                <TableCellLayout media={<StatusAvatar status={m.status} name={m.toName || m.toAddress} label={t('analytics.audit.email')} />}>
+                  <LocalizedTime className={s.truncate} value={m.createdAt} />
                 </TableCellLayout>
               </TableCell>
               <TableCell className={s.cellId}>
@@ -450,7 +457,7 @@ function SentEmailsTab({
               <TableCell className={s.colStatus}><EmailStatusBadge message={m} /></TableCell>
               <TableCell className={s.colAttempts}>{m.attempts}</TableCell>
               <TableCell className={s.colTime}>
-                <span className={s.truncate}>{m.sentAt ? formatDateTime(m.sentAt) : '—'}</span>
+                <LocalizedTime className={s.truncate} value={m.sentAt} />
               </TableCell>
             </TableRow>
           ))}
@@ -477,6 +484,7 @@ function WebhookDeliveriesTab({
   setError: (message: string | null) => void
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
@@ -498,27 +506,27 @@ function WebhookDeliveriesTab({
     <>
       <div className={s.filters}>
         <div className={s.field}>
-          <span className={s.fieldLabel}>Status</span>
+          <span className={s.fieldLabel}>{t('analytics.audit.columns.status')}</span>
           <Dropdown
             className={s.filterDropdown}
             selectedOptions={[status ?? ALL]}
-            value={status ?? 'All'}
+            value={status ? statusLabel(status, t) : t('analytics.common.all')}
             onOptionSelect={(_, d) => {
               setStatus(d.optionValue === ALL ? undefined : (d.optionValue as WebhookDeliveryStatus))
               setPage(1)
             }}
           >
-            <Option value={ALL}>All</Option>
-            {WEBHOOK_STATUSES.map(st => <Option key={st} value={st}>{st}</Option>)}
+            <Option value={ALL}>{t('analytics.common.all')}</Option>
+            {WEBHOOK_STATUSES.map(st => <Option key={st} value={st}>{statusLabel(st, t)}</Option>)}
           </Dropdown>
         </div>
-        <PeriodFilter state={period} onChange={() => setPage(1)} />
+        <AnalyticsPeriodFilter state={period} onChange={() => setPage(1)} />
       </div>
 
       {error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Failed to load</MessageBarTitle>
+            <MessageBarTitle>{t('analytics.common.failedToLoad')}</MessageBarTitle>
             {formatApiError(error)}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -527,25 +535,25 @@ function WebhookDeliveriesTab({
       <Table size="small" className={s.table}>
         <TableHeader>
           <TableRow>
-            <TableHeaderCell className={s.colTime}>Created</TableHeaderCell>
-            <TableHeaderCell>Event</TableHeaderCell>
-            <TableHeaderCell>URL</TableHeaderCell>
-            <TableHeaderCell className={s.colStatus}>Status</TableHeaderCell>
-            <TableHeaderCell className={s.colAttempts}>Attempts</TableHeaderCell>
-            <TableHeaderCell className={s.colTime}>Delivered</TableHeaderCell>
-            <TableHeaderCell className={s.colActions} aria-label="Actions" />
+            <TableHeaderCell className={s.colTime}>{t('analytics.audit.columns.created')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.audit.columns.event')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.audit.columns.url')}</TableHeaderCell>
+            <TableHeaderCell className={s.colStatus}>{t('analytics.audit.columns.status')}</TableHeaderCell>
+            <TableHeaderCell className={s.colAttempts}>{t('analytics.audit.columns.attempts')}</TableHeaderCell>
+            <TableHeaderCell className={s.colTime}>{t('analytics.audit.columns.delivered')}</TableHeaderCell>
+            <TableHeaderCell className={s.colActions} aria-label={t('analytics.common.actions')} />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={7}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={7}>{t('analytics.common.loading')}</GridMessageRow>}
           {!isLoading && items.length === 0 && (
-            <GridMessageRow colSpan={7}>No deliveries recorded.</GridMessageRow>
+            <GridMessageRow colSpan={7}>{t('analytics.audit.empty.deliveries')}</GridMessageRow>
           )}
           {items.map(d => (
             <TableRow key={d.id} className={s.row}>
               <TableCell className={s.colTime}>
-                <TableCellLayout media={<StatusAvatar status={d.status} name={d.event} label="Delivery" />}>
-                  <span className={s.truncate}>{formatDateTime(d.createdAt)}</span>
+                <TableCellLayout media={<StatusAvatar status={d.status} name={d.event} label={t('analytics.audit.delivery')} />}>
+                  <LocalizedTime className={s.truncate} value={d.createdAt} />
                 </TableCellLayout>
               </TableCell>
               <TableCell className={s.cellId}><span className={`${s.truncate} ${s.mono}`}>{d.event}</span></TableCell>
@@ -557,14 +565,14 @@ function WebhookDeliveriesTab({
               <TableCell className={s.colStatus}><WebhookStatusBadge delivery={d} /></TableCell>
               <TableCell className={s.colAttempts}>{d.attempts}</TableCell>
               <TableCell className={s.colTime}>
-                <span className={s.truncate}>{d.deliveredAt ? formatDateTime(d.deliveredAt) : '—'}</span>
+                <LocalizedTime className={s.truncate} value={d.deliveredAt} />
               </TableCell>
               <TableCell className={s.colActions} onClick={ev => ev.stopPropagation()}>
                 <RowActions
-                  ariaLabel={`Actions for delivery ${d.id}`}
+                  ariaLabel={t('analytics.audit.deliveryActionsAria', { id: d.id })}
                   actions={[
                     {
-                      key: 'redeliver', label: 'Redeliver', icon: <Send20Regular />,
+                      key: 'redeliver', label: t('analytics.audit.actions.redeliver'), icon: <Send20Regular />,
                       disabled: redeliver.isPending || d.status === 'Sending',
                       onClick: () => onRedeliver(d.id),
                     },
@@ -588,36 +596,45 @@ function WebhookDeliveriesTab({
 }
 
 function WebhookStatusBadge({ delivery }: { delivery: WebhookDelivery }) {
+  const { t } = useTranslation()
   const color = delivery.status === 'Sent' ? 'success'
     : delivery.status === 'Failed' ? 'danger'
     : delivery.status === 'Sending' ? 'brand'
     : 'warning'
-  const badge = <Badge appearance="outline" color={color}>{delivery.status}</Badge>
+  const badge = <Badge appearance="outline" color={color}>{statusLabel(delivery.status, t)}</Badge>
   if (delivery.lastError) {
-    const detail = delivery.lastStatusCode ? `HTTP ${delivery.lastStatusCode}: ${delivery.lastError}` : delivery.lastError
+    const message = delivery.lastErrorDetail
+      ? localizeDiagnostic(delivery.lastErrorDetail, delivery.lastError)
+      : delivery.lastError
+    const detail = delivery.lastStatusCode ? `HTTP ${delivery.lastStatusCode}: ${message}` : message
     return <Tooltip content={detail} relationship="label">{badge}</Tooltip>
   }
   return badge
 }
 
 function EmailStatusBadge({ message }: { message: EmailMessage }) {
+  const { t } = useTranslation()
   const color = message.status === 'Sent' ? 'success'
     : message.status === 'Failed' ? 'danger'
     : message.status === 'Sending' ? 'brand'
     : 'warning'
-  const badge = <Badge appearance="outline" color={color}>{message.status}</Badge>
+  const badge = <Badge appearance="outline" color={color}>{statusLabel(message.status, t)}</Badge>
   if (message.status === 'Failed' && message.lastError) {
-    return <Tooltip content={message.lastError} relationship="label">{badge}</Tooltip>
+    const detail = message.lastErrorDetail
+      ? localizeDiagnostic(message.lastErrorDetail, message.lastError)
+      : message.lastError
+    return <Tooltip content={detail} relationship="label">{badge}</Tooltip>
   }
   return badge
 }
 
 function ChangeBadge({ change }: { change: AuditLog['change'] }) {
+  const { t } = useTranslation()
   const color =
     change === 'Create' || change === 'Approve' ? 'success'
     : change === 'Delete' || change === 'Reject' ? 'danger'
     : 'brand'
-  return <Badge appearance="outline" color={color}>{change}</Badge>
+  return <Badge appearance="outline" color={color}>{changeTypeLabel(change, t)}</Badge>
 }
 
 /**

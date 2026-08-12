@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Badge, Body1, Button, Card, Checkbox, Dropdown, Drawer, DrawerBody, Field, Input,
   Menu, MenuButton, MenuItem, MenuList, MenuPopover, MenuTrigger,
@@ -24,12 +25,6 @@ import {
   useApprovalRules, useCreateApprovalRule, useUpdateApprovalRule, useDeleteApprovalRule,
 } from '../api/hooks'
 import type { Account, ApprovalPolicy, ApprovalRule, ApprovalSourceScope, UpsertApprovalRuleRequest } from '../api/types'
-
-const sourceLabels: Record<ApprovalSourceScope, string> = {
-  Both: 'manual + API',
-  ManualOnly: 'manual only',
-  ApiOnly: 'API only',
-}
 
 const useStyles = makeStyles({
   card: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' },
@@ -100,6 +95,7 @@ function emptyDraft(): RuleDraft {
  */
 export function ApprovalRulesSection() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { has } = useCapabilities()
   const canManage = has('settings:manage')
   const { data: rules, isLoading, refetch } = useApprovalRules()
@@ -120,27 +116,32 @@ export function ApprovalRulesSection() {
     () => (approverAccountsPage?.items ?? []).filter(a => accountHasCapability(a, 'submissions:approve') && !a.isDeleted),
     [approverAccountsPage],
   )
+  const sourceLabels: Record<ApprovalSourceScope, string> = {
+    Both: t('settings.approvalRules.sources.both'),
+    ManualOnly: t('settings.approvalRules.sources.manualOnly'),
+    ApiOnly: t('settings.approvalRules.sources.apiOnly'),
+  }
 
   function serviceSummary(rule: ApprovalRule): string {
-    if (rule.serviceIds.length === 0) return 'All services'
-    return rule.serviceIds.map(id => servicesById.get(id)?.label || servicesById.get(id)?.name || '(removed)').join(', ')
+    if (rule.serviceIds.length === 0) return t('settings.common.allServices')
+    return rule.serviceIds.map(id => servicesById.get(id)?.label || servicesById.get(id)?.name || t('settings.common.removed')).join(', ')
   }
   function schemaSummary(rule: ApprovalRule): string {
-    if (rule.schemaIds.length === 0) return 'All schemas'
-    return rule.schemaIds.map(id => schemasById.get(id)?.label || schemasById.get(id)?.name || '(removed)').join(', ')
+    if (rule.schemaIds.length === 0) return t('settings.common.allSchemas')
+    return rule.schemaIds.map(id => schemasById.get(id)?.label || schemasById.get(id)?.name || t('settings.common.removed')).join(', ')
   }
   function approvalSummary(rule: ApprovalRule): string {
-    if (rule.policy.mode === 'UseGlobalDefault') return 'Use global default'
-    if (rule.policy.mode === 'None') return 'No approval'
-    return `Required (${sourceLabels[rule.policy.appliesToSources]})`
+    if (rule.policy.mode === 'UseGlobalDefault') return t('settings.approvalRules.useGlobalDefault')
+    if (rule.policy.mode === 'None') return t('settings.approvalRules.noApproval')
+    return t('settings.approvalRules.requiredSummary', { source: sourceLabels[rule.policy.appliesToSources] })
   }
 
   async function onDelete(rule: ApprovalRule) {
-    if (!confirmDelete('approval rule', rule.label || serviceSummary(rule))) return
+    if (!confirmDelete(t('settings.approvalRules.deleteType'), rule.label || serviceSummary(rule))) return
     setBanner(null)
     try {
       await del.mutateAsync(rule.id)
-      setBanner({ intent: 'success', text: 'Rule deleted.' })
+      setBanner({ intent: 'success', text: t('settings.approvalRules.deleted') })
     } catch (err) { setBanner({ intent: 'error', text: formatApiError(err) }) }
   }
 
@@ -155,7 +156,7 @@ export function ApprovalRulesSection() {
     }
     try {
       await update.mutateAsync({ id: rule.id, req })
-      setBanner({ intent: 'success', text: rule.enabled ? 'Rule disabled.' : 'Rule enabled.' })
+      setBanner({ intent: 'success', text: rule.enabled ? t('settings.approvalRules.disabledMessage') : t('settings.approvalRules.enabledMessage') })
     } catch (err) { setBanner({ intent: 'error', text: formatApiError(err) }) }
   }
 
@@ -165,30 +166,27 @@ export function ApprovalRulesSection() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <Card className={s.card}>
         <div className={s.titleRow}>
-          <Title3 className={s.sectionTitle}>Rules</Title3>
+          <Title3 className={s.sectionTitle}>{t('settings.approvalRules.title')}</Title3>
           <div className={s.headerActions}>
             {canManage && (
               <Button appearance="primary" icon={<Add20Regular />} onClick={() => setEditing(emptyDraft())}>
-                Add rule
+                {t('settings.approvalRules.add')}
               </Button>
             )}
             <Menu>
               <MenuTrigger disableButtonEnhancement>
-                <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+                <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('settings.common.moreActions')} />
               </MenuTrigger>
               <MenuPopover>
                 <MenuList>
-                  <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                  <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>{t('settings.common.refresh')}</MenuItem>
                 </MenuList>
               </MenuPopover>
             </Menu>
           </div>
         </div>
         <Body1 className={s.help}>
-          Require approval for specific services and schemas, on top of each schema's own policy.
-          Leave a side set to “All” to cover every service or every schema. A rule scoped to API
-          submissions can force a person to review and fill in partially-automated feeds before
-          they go live.
+          {t('settings.approvalRules.description')}
         </Body1>
 
         {banner && (
@@ -200,24 +198,26 @@ export function ApprovalRulesSection() {
         <Table size="small" className={s.table}>
           <TableHeader>
             <TableRow>
-              <TableHeaderCell>Label</TableHeaderCell>
-              <TableHeaderCell>Services</TableHeaderCell>
-              <TableHeaderCell>Schemas</TableHeaderCell>
-              <TableHeaderCell className={s.colApproval}>Approval</TableHeaderCell>
-              <TableHeaderCell className={s.colStatus}>Status</TableHeaderCell>
-              <TableHeaderCell className={s.colActions} aria-label="Actions" />
+              <TableHeaderCell>{t('settings.common.label')}</TableHeaderCell>
+              <TableHeaderCell>{t('settings.common.services')}</TableHeaderCell>
+              <TableHeaderCell>{t('settings.common.schemas')}</TableHeaderCell>
+              <TableHeaderCell className={s.colApproval}>{t('settings.approvalRules.approval')}</TableHeaderCell>
+              <TableHeaderCell className={s.colStatus}>{t('settings.common.status')}</TableHeaderCell>
+              <TableHeaderCell className={s.colActions} aria-label={t('settings.common.actions')} />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && <GridMessageRow colSpan={6}>Loading…</GridMessageRow>}
+            {isLoading && <GridMessageRow colSpan={6}>{t('settings.common.loading')}</GridMessageRow>}
             {!isLoading && items.length === 0 && (
-              <GridMessageRow colSpan={6}>No rules yet{canManage ? ' — click “Add rule” to create one.' : '.'}</GridMessageRow>
+              <GridMessageRow colSpan={6}>
+                {canManage ? t('settings.approvalRules.emptyManage') : t('settings.approvalRules.emptyReadOnly')}
+              </GridMessageRow>
             )}
             {items.map(rule => (
               <TableRow
                 key={rule.id}
                 className={`${s.row} ${s.rowClickable}`}
-                {...clickableRowProps(() => canManage && setEditing(toDraft(rule)), `Edit rule ${rule.label || serviceSummary(rule)}`)}
+                {...clickableRowProps(() => canManage && setEditing(toDraft(rule)), t('settings.approvalRules.editAria', { name: rule.label || serviceSummary(rule) }))}
               >
                 <TableCell className={s.cellTrunc}>
                   {rule.label
@@ -239,23 +239,23 @@ export function ApprovalRulesSection() {
                 </TableCell>
                 <TableCell className={s.colStatus}>
                   <Badge appearance="outline" color={rule.enabled ? 'success' : 'informative'}>
-                    {rule.enabled ? 'Enabled' : 'Disabled'}
+                    {rule.enabled ? t('settings.common.enabled') : t('settings.common.disabled')}
                   </Badge>
                 </TableCell>
                 <TableCell className={s.colActions} onClick={ev => ev.stopPropagation()}>
                   {canManage && (
                     <RowActions
-                      ariaLabel={`Actions for rule ${rule.label || serviceSummary(rule)}`}
+                      ariaLabel={t('settings.approvalRules.actionsAria', { name: rule.label || serviceSummary(rule) })}
                       actions={[
-                        { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => setEditing(toDraft(rule)) },
+                        { key: 'edit', label: t('settings.common.edit'), icon: <Edit20Regular />, onClick: () => setEditing(toDraft(rule)) },
                         {
                           key: 'toggle',
-                          label: rule.enabled ? 'Disable' : 'Enable',
+                          label: rule.enabled ? t('settings.common.disable') : t('settings.common.enable'),
                           icon: rule.enabled ? <PauseCircle20Regular /> : <PlayCircle20Regular />,
                           disabled: update.isPending,
                           onClick: () => onToggleEnabled(rule),
                         },
-                        { key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => onDelete(rule) },
+                        { key: 'delete', label: t('settings.common.delete'), icon: <Delete20Regular />, destructive: true, onClick: () => onDelete(rule) },
                       ]}
                     />
                   )}
@@ -275,7 +275,7 @@ export function ApprovalRulesSection() {
         className={s.drawer}
       >
         <DrawerHeaderWithClose
-          title={editing?.id ? 'Edit rule' : 'Add rule'}
+          title={editing?.id ? t('settings.approvalRules.edit') : t('settings.approvalRules.add')}
           onClose={() => setEditing(null)}
         />
         <DrawerBody>
@@ -309,6 +309,7 @@ function RuleEditor({
   onSaved: (text: string) => void
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const isNew = !draft.id
   const create = useCreateApprovalRule()
   const update = useUpdateApprovalRule()
@@ -331,10 +332,10 @@ function RuleEditor({
 
   async function onSave() {
     setError(null)
-    if (!allServices && serviceIds.length === 0) { setError('Pick at least one service, or choose “All services”.'); return }
-    if (!allSchemas && schemaIds.length === 0) { setError('Pick at least one schema, or choose “All schemas”.'); return }
+    if (!allServices && serviceIds.length === 0) { setError(t('settings.common.serviceRequired')); return }
+    if (!allSchemas && schemaIds.length === 0) { setError(t('settings.common.schemaRequired')); return }
     if (policy.mode === 'Required' && !policy.approvers.some(a => a.requirement === 'Required')) {
-      setError('Add at least one Required approver.'); return
+      setError(t('settings.approval.requiredApproverValidation')); return
     }
 
     const req: UpsertApprovalRuleRequest = {
@@ -347,7 +348,7 @@ function RuleEditor({
     try {
       if (isNew) await create.mutateAsync(req)
       else await update.mutateAsync({ id: draft.id!, req })
-      onSaved(isNew ? 'Rule created.' : 'Rule saved.')
+      onSaved(isNew ? t('settings.approvalRules.created') : t('settings.approvalRules.saved'))
     } catch (e) {
       setError(formatApiError(e))
     }
@@ -359,18 +360,18 @@ function RuleEditor({
     <div className={s.drawerForm}>
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
 
-      <Field label="Label" hint="Optional name shown only in this list.">
-        <Input value={label} onChange={(_, d) => setLabel(d.value)} placeholder="e.g. Finance feeds need sign-off" />
+      <Field label={t('settings.common.label')} hint={t('settings.common.optionalListName')}>
+        <Input value={label} onChange={(_, d) => setLabel(d.value)} placeholder={t('settings.approvalRules.labelPlaceholder')} />
       </Field>
 
-      <Switch label="Enabled" checked={enabled} onChange={(_, d) => setEnabled(d.checked)} />
+      <Switch label={t('settings.common.enabled')} checked={enabled} onChange={(_, d) => setEnabled(d.checked)} />
 
-      <Field label="Services">
-        <Checkbox label="All services" checked={allServices} onChange={(_, d) => setAllServices(!!d.checked)} />
+      <Field label={t('settings.common.services')}>
+        <Checkbox label={t('settings.common.allServices')} checked={allServices} onChange={(_, d) => setAllServices(!!d.checked)} />
         {!allServices && (
           <Dropdown
             multiselect
-            placeholder="Select services"
+            placeholder={t('settings.common.selectServices')}
             selectedOptions={serviceIds}
             value={serviceIds.map(id => servicesById.get(id)?.label || servicesById.get(id)?.name || id).join(', ')}
             onOptionSelect={(_, d) => setServiceIds(d.selectedOptions)}
@@ -382,12 +383,12 @@ function RuleEditor({
         )}
       </Field>
 
-      <Field label="Schemas">
-        <Checkbox label="All schemas" checked={allSchemas} onChange={(_, d) => setAllSchemas(!!d.checked)} />
+      <Field label={t('settings.common.schemas')}>
+        <Checkbox label={t('settings.common.allSchemas')} checked={allSchemas} onChange={(_, d) => setAllSchemas(!!d.checked)} />
         {!allSchemas && (
           <Dropdown
             multiselect
-            placeholder="Select schemas"
+            placeholder={t('settings.common.selectSchemas')}
             selectedOptions={schemaIds}
             value={schemaIds.map(id => schemasById.get(id)?.label || id).join(', ')}
             onOptionSelect={(_, d) => setSchemaIds(d.selectedOptions)}
@@ -403,14 +404,14 @@ function RuleEditor({
         policy={policy}
         accounts={approverAccounts}
         onChange={patchPolicy}
-        heading="Approval"
+        heading={t('settings.approvalRules.approval')}
       />
 
       <div className={s.actions}>
         <Button appearance="primary" disabled={pending} onClick={onSave}>
-          {pending ? 'Saving…' : isNew ? 'Create rule' : 'Save changes'}
+          {pending ? t('settings.common.saving') : isNew ? t('settings.approvalRules.create') : t('settings.common.saveChanges')}
         </Button>
-        <Button appearance="secondary" disabled={pending} onClick={onClose}>Cancel</Button>
+        <Button appearance="secondary" disabled={pending} onClick={onClose}>{t('settings.common.cancel')}</Button>
       </div>
     </div>
   )

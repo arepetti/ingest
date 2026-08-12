@@ -9,6 +9,8 @@ import { ChevronDown16Regular, SignOut20Regular } from '@fluentui/react-icons'
 import { api, setApiKey } from '../api/client'
 import { useAccounts, useReports, useSchemas } from '../api/hooks'
 import type { Me } from '../api/types'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 const useStyles = makeStyles({
   // The bar is hosted inside a flex column main area whose body has overflow:auto, so it stays
@@ -73,97 +75,98 @@ interface Crumb {
  * Submission ids stay as the generic "Submission" label — submissions don't carry a name we
  * could surface without an extra fetch per breadcrumb render.
  */
-function buildBreadcrumbs(pathname: string, labels: LabelLookups): Crumb[] {
+function buildBreadcrumbs(pathname: string, labels: LabelLookups, t: TFunction): Crumb[] {
   // The "Home" anchor is always the first crumb. Even on `/` itself we keep it so the bar's
   // structure is consistent across every page — there it just renders as the current crumb.
-  const home: Crumb = { label: 'Home', to: '/' }
+  const home: Crumb = { label: t('shell.breadcrumbs.home'), to: '/' }
   const schemaLabel = (name: string) => labels.schemas[name] || decodeURIComponent(name)
   const accountLabel = (name: string) => labels.accounts[name] || decodeURIComponent(name)
   const reportLabel = (name: string) => labels.reports[name] || decodeURIComponent(name)
 
   // Order matters — match the most specific route first.
   const rules: Array<{ re: RegExp; build: (m: RegExpMatchArray) => Crumb[] }> = [
-    { re: /^\/$/, build: () => [{ label: 'Home' }] },
+    { re: /^\/$/, build: () => [{ label: t('shell.breadcrumbs.home') }] },
 
-    { re: /^\/schemas$/, build: () => [home, { label: 'Schemas' }] },
+    { re: /^\/schemas$/, build: () => [home, { label: t('shell.navigation.schemas') }] },
     {
       re: /^\/schemas\/new$/,
-      build: () => [home, { label: 'Schemas', to: '/schemas' }, { label: 'New' }],
+      build: () => [home, { label: t('shell.navigation.schemas'), to: '/schemas' }, { label: t('shell.breadcrumbs.new') }],
     },
     {
       re: /^\/schemas\/([^/]+)\/edit$/,
       build: (m) => [
         home,
-        { label: 'Schemas', to: '/schemas' },
+        { label: t('shell.navigation.schemas'), to: '/schemas' },
         { label: schemaLabel(m[1]) },
-        { label: 'Edit' },
+        { label: t('shell.breadcrumbs.edit') },
       ],
     },
     {
       re: /^\/schemas\/([^/]+)\/history$/,
       build: (m) => [
         home,
-        { label: 'Schemas', to: '/schemas' },
+        { label: t('shell.navigation.schemas'), to: '/schemas' },
         { label: schemaLabel(m[1]) },
-        { label: 'Historical data' },
+        { label: t('shell.breadcrumbs.historicalData') },
       ],
     },
 
-    { re: /^\/services$/, build: () => [home, { label: 'Accounts' }] },
+    { re: /^\/services$/, build: () => [home, { label: t('shell.navigation.accounts') }] },
     {
       re: /^\/services\/([^/]+)\/status$/,
       build: (m) => [
         home,
-        { label: 'Accounts', to: '/services' },
+        { label: t('shell.navigation.accounts'), to: '/services' },
         { label: accountLabel(m[1]) },
-        { label: 'Status' },
+        { label: t('shell.breadcrumbs.status') },
       ],
     },
 
-    { re: /^\/submissions$/, build: () => [home, { label: 'Submissions' }] },
+    { re: /^\/submissions$/, build: () => [home, { label: t('shell.navigation.submissions') }] },
     {
       re: /^\/submissions\/new$/,
-      build: () => [home, { label: 'Submissions', to: '/submissions' }, { label: 'New' }],
+      build: () => [home, { label: t('shell.navigation.submissions'), to: '/submissions' }, { label: t('shell.breadcrumbs.new') }],
     },
     {
       re: /^\/submissions\/([^/]+)\/edit$/,
       build: (m) => [
         home,
-        { label: 'Submissions', to: '/submissions' },
-        { label: 'Submission', to: `/submissions/${encodeURIComponent(m[1])}` },
-        { label: 'Edit' },
+        { label: t('shell.navigation.submissions'), to: '/submissions' },
+        { label: t('shell.breadcrumbs.submission'), to: `/submissions/${encodeURIComponent(m[1])}` },
+        { label: t('shell.breadcrumbs.edit') },
       ],
     },
     {
       re: /^\/submissions\/([^/]+)\/view$/,
       build: (m) => [
         home,
-        { label: 'Submissions', to: '/submissions' },
-        { label: 'Submission', to: `/submissions/${encodeURIComponent(m[1])}` },
-        { label: 'View' },
+        { label: t('shell.navigation.submissions'), to: '/submissions' },
+        { label: t('shell.breadcrumbs.submission'), to: `/submissions/${encodeURIComponent(m[1])}` },
+        { label: t('shell.breadcrumbs.view') },
       ],
     },
     {
       re: /^\/submissions\/([^/]+)$/,
-      build: () => [home, { label: 'Submissions', to: '/submissions' }, { label: 'Submission' }],
+      build: () => [home, { label: t('shell.navigation.submissions'), to: '/submissions' }, { label: t('shell.breadcrumbs.submission') }],
     },
 
-    { re: /^\/reports$/, build: () => [home, { label: 'Reports' }] },
+    { re: /^\/reports$/, build: () => [home, { label: t('shell.navigation.reports') }] },
     {
       re: /^\/reports\/([^/]+)$/,
       build: (m) => [
         home,
-        { label: 'Reports', to: '/reports' },
+        { label: t('shell.navigation.reports'), to: '/reports' },
         { label: reportLabel(m[1]) },
       ],
     },
 
-    { re: /^\/audit$/, build: () => [home, { label: 'Audit' }] },
-
-    { re: /^\/missing$/, build: () => [home, { label: 'Missing submissions' }] },
-    { re: /^\/explore$/, build: () => [home, { label: 'Explore' }] },
-    { re: /^\/tools$/, build: () => [home, { label: 'Tools' }] },
-    { re: /^\/settings$/, build: () => [home, { label: 'Settings' }] },
+    { re: /^\/audit$/, build: () => [home, { label: t('shell.navigation.audit') }] },
+    { re: /^\/events$/, build: () => [home, { label: t('shell.navigation.events') }] },
+    { re: /^\/missing$/, build: () => [home, { label: t('shell.breadcrumbs.missingSubmissions') }] },
+    { re: /^\/explore$/, build: () => [home, { label: t('shell.navigation.explore') }] },
+    { re: /^\/tools$/, build: () => [home, { label: t('shell.navigation.tools') }] },
+    { re: /^\/settings$/, build: () => [home, { label: t('shell.navigation.settings') }] },
+    { re: /^\/search$/, build: () => [home, { label: t('shell.search.title') }] },
   ]
 
   for (const r of rules) {
@@ -171,7 +174,7 @@ function buildBreadcrumbs(pathname: string, labels: LabelLookups): Crumb[] {
     if (m) return r.build(m)
   }
   // Unknown route — surface "Home" alone so the bar isn't empty.
-  return [{ label: 'Home' }]
+  return [{ label: t('shell.breadcrumbs.home') }]
 }
 
 /** Name → friendly label maps used to rewrite dynamic breadcrumb segments. */
@@ -188,6 +191,7 @@ interface LabelLookups {
  */
 export function TopBar({ me }: { me?: Me }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const { pathname } = useLocation()
 
@@ -247,7 +251,7 @@ export function TopBar({ me }: { me?: Me }) {
     nav('/login', { replace: true })
   }
 
-  const crumbs = buildBreadcrumbs(pathname, labels)
+  const crumbs = buildBreadcrumbs(pathname, labels, t)
   const displayName = me?.label || me?.name || ''
 
   // When the session is confined to a subset of services, surface a badge so the operator always
@@ -261,13 +265,13 @@ export function TopBar({ me }: { me?: Me }) {
     })
     .filter((n): n is string => !!n)
   const scopeTooltip = scopeNames.length > 0
-    ? `This session can only see: ${scopeNames.join(', ')}`
-    : `This session is limited to ${scopeIds.length} service${scopeIds.length === 1 ? '' : 's'}.`
+    ? t('shell.topBar.scope.names', { names: scopeNames.join(', ') })
+    : t('shell.topBar.scope.count', { count: scopeIds.length })
 
   return (
     <header className={s.root}>
       <div className={s.crumbs}>
-        <Breadcrumb aria-label="Page location" size="medium">
+        <Breadcrumb aria-label={t('shell.topBar.pageLocation')} size="medium">
           {crumbs.map((c, i) => {
             const isLast = i === crumbs.length - 1
             return (
@@ -287,8 +291,8 @@ export function TopBar({ me }: { me?: Me }) {
         <SearchBox
           ref={searchRef}
           className={s.searchBox}
-          placeholder="Search…"
-          aria-label="Search (Ctrl+K)"
+          placeholder={t('shell.topBar.searchPlaceholder')}
+          aria-label={t('shell.topBar.searchAriaLabel')}
           value={term}
           onChange={(_, d) => setTerm(d.value)}
           onKeyDown={e => { if (e.key === 'Enter') submitSearch() }}
@@ -296,7 +300,7 @@ export function TopBar({ me }: { me?: Me }) {
         {scoped && (
           <Tooltip content={scopeTooltip} relationship="description" positioning="below">
             <Badge appearance="tint" color="brand">
-              Limited view · {scopeIds.length} service{scopeIds.length === 1 ? '' : 's'}
+              {t('shell.topBar.scope.badge', { count: scopeIds.length })}
             </Badge>
           </Tooltip>
         )}
@@ -305,7 +309,9 @@ export function TopBar({ me }: { me?: Me }) {
             {/* Tooltip carries the role: the visible bar mentions only label/name so it doesn't
                 feel cluttered, but the role is one hover away. */}
             <Tooltip
-              content={me?.role ? `Role: ${me.role}` : 'Account'}
+              content={me?.role
+                ? t('shell.topBar.role', { role: t(`shell.account.roles.${me.role}`) })
+                : t('shell.account.label')}
               relationship="description"
               positioning="below-end"
             >
@@ -314,13 +320,17 @@ export function TopBar({ me }: { me?: Me }) {
                 className={s.accountButton}
                 icon={<ChevronDown16Regular />}
                 iconPosition="after"
-                aria-label={displayName ? `Account menu for ${displayName}` : 'Account menu'}
+                aria-label={displayName
+                  ? t('shell.topBar.accountMenuFor', { name: displayName })
+                  : t('shell.topBar.accountMenu')}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <Avatar name={displayName || 'Account'} size={28} />
+                  <Avatar name={displayName || t('shell.account.label')} size={28} />
                   <span className={s.accountName}>
                     <Text weight="semibold" size={200}>{displayName || '...'}</Text>
-                    {me?.role ? <span className={s.accountRole}>{me.role}</span> : null}
+                    {me?.role
+                      ? <span className={s.accountRole}>{t(`shell.account.roles.${me.role}`)}</span>
+                      : null}
                   </span>
                 </span>
               </Button>
@@ -328,7 +338,9 @@ export function TopBar({ me }: { me?: Me }) {
           </MenuTrigger>
           <MenuPopover>
             <MenuList>
-              <MenuItem icon={<SignOut20Regular />} onClick={logout}>Sign out</MenuItem>
+              <MenuItem icon={<SignOut20Regular />} onClick={logout}>
+                {t('shell.topBar.signOut')}
+              </MenuItem>
             </MenuList>
           </MenuPopover>
         </Menu>

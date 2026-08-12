@@ -58,7 +58,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
     public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted, CancellationToken ct)
     {
         var a = await service.GetAsync(id, includeDeleted ?? false, ct);
-        return a is null ? NotFound() : Ok(AccountDto.From(a));
+        return a is null ? NotFound(DiagnosticProblem.NotFound("Account", id)) : Ok(AccountDto.From(a));
     }
 
     /// <summary>Create a new account.</summary>
@@ -112,7 +112,7 @@ public sealed class AccountsController(IAccountService service) : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateAccountRequest req, CancellationToken ct)
     {
         var updated = await service.UpdateAsync(id, new AccountUpdate(req.Label, req.Description, req.Email, req.Role, req.Enabled, ToExternalLogins(req.ExternalLogins), req.Capabilities, req.AssignedServiceIds, req.Area), ct);
-        return updated is null ? NotFound() : Ok(AccountDto.From(updated));
+        return updated is null ? NotFound(DiagnosticProblem.NotFound("Account", id)) : Ok(AccountDto.From(updated));
     }
 
     /// <summary>Map the wire SSO links onto domain entities. Returns <c>null</c> when none were supplied so the service can tell "leave untouched" from "clear".</summary>

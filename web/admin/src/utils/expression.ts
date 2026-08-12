@@ -15,7 +15,12 @@
  * something the runtime doesn't know about, the editor falls back to "show + no warning" so
  * data never silently disappears.
  */
-import { getApiKey } from '../api/client'
+import {
+  ApiError, formatApiError, getApiKey, localizeDiagnostic, localizeDiagnostics,
+  type ApiDiagnostic,
+} from '../api/client'
+import type { TFunction } from 'i18next'
+import i18n from '../i18n'
 
 /** Media type the translator endpoint is asked to produce. The server returns the equivalent
  *  JavaScript expression in the response body; we wrap it in a Function on this side. */
@@ -57,7 +62,10 @@ async function fetchAndCompile(expression: string): Promise<CacheEntry> {
     })
     if (!resp.ok) {
       const detail = await safeReadProblemDetail(resp)
-      const entry: CacheEntry = { status: 'failed', error: detail || `HTTP ${resp.status}` }
+      const entry: CacheEntry = {
+        status: 'failed',
+        error: detail || formatApiError(new ApiError(resp.status, resp.statusText)),
+      }
       cache.set(expression, entry)
       return entry
     }
@@ -73,7 +81,7 @@ async function fetchAndCompile(expression: string): Promise<CacheEntry> {
     cache.set(expression, entry)
     return entry
   } catch (e) {
-    const entry: CacheEntry = { status: 'failed', error: String(e) }
+    const entry: CacheEntry = { status: 'failed', error: formatApiError(e) }
     cache.set(expression, entry)
     return entry
   }
@@ -86,8 +94,28 @@ async function safeReadProblemDetail(resp: Response): Promise<string | null> {
     const text = await resp.text()
     if (!text) return null
     try {
-      const parsed = JSON.parse(text)
-      return parsed.detail ?? parsed.title ?? text
+      const parsed = JSON.parse(text) as Record<string, unknown>
+      const detail = typeof parsed.detail === 'string'
+        ? parsed.detail
+        : typeof parsed.title === 'string' ? parsed.title : text
+      const legacy = Array.isArray(parsed.errors)
+        ? parsed.errors.filter((item): item is string => typeof item === 'string')
+        : []
+      const details = Array.isArray(parsed.errorDetails)
+        ? parsed.errorDetails.filter((item): item is ApiDiagnostic =>
+            !!item && typeof item === 'object' && typeof (item as { code?: unknown }).code === 'string')
+        : []
+      if (details.length > 0) return localizeDiagnostics(details, legacy).join('\n')
+      if (typeof parsed.code === 'string') {
+        return localizeDiagnostic({
+          code: parsed.code,
+          message: detail,
+          params: parsed.params && typeof parsed.params === 'object' && !Array.isArray(parsed.params)
+            ? parsed.params as Record<string, unknown>
+            : {},
+        }, detail)
+      }
+      return legacy.length > 0 ? legacy.join('\n') : detail
     } catch {
       return text
     }
@@ -100,9 +128,16 @@ async function safeReadProblemDetail(resp: Response): Promise<string | null> {
  * Translate `expression` (or return the cached compilation). Resolves with a
  * `CacheEntry` regardless of outcome; inspect `status` to tell success from failure.
  */
-export function translateExpression(expression: string): Promise<CacheEntry> {
+export function translateExpression(
+  expression: string,
+  t?: TFunction,
+): Promise<CacheEntry> {
   const key = expression.trim()
-  if (!key) return Promise.resolve({ status: 'failed', error: 'Expression is empty.' })
+  if (!key) {
+    const error = (t ?? (i18n.isInitialized ? i18n.t : undefined))?.('shell.expression.empty')
+      ?? 'Expression is empty.'
+    return Promise.resolve({ status: 'failed', error })
+  }
   const hit = cache.get(key)
   if (hit) return Promise.resolve(hit)
   const inflight = pending.get(key)
@@ -117,14 +152,17 @@ export function translateExpression(expression: string): Promise<CacheEntry> {
  * Returns when all translations have settled (either compiled or failed) so callers can flip
  * a re-render flag immediately after.
  */
-export async function prefetchExpressions(expressions: Iterable<string | null | undefined>): Promise<void> {
+export async function prefetchExpressions(
+  expressions: Iterable<string | null | undefined>,
+  t?: TFunction,
+): Promise<void> {
   const seen = new Set<string>()
   const promises: Promise<unknown>[] = []
   for (const e of expressions) {
     const k = (e ?? '').trim()
     if (!k || seen.has(k)) continue
     seen.add(k)
-    promises.push(translateExpression(k))
+    promises.push(translateExpression(k, t))
   }
   await Promise.all(promises)
 }
@@ -229,6 +267,12 @@ function likeMatch(value: unknown, pattern: unknown): boolean {
   return new RegExp('^' + re + '$').test(s)
 }
 
+function runtimeTypeLabel(value: unknown): string {
+  const type = typeof value
+  return (i18n.isInitialized ? i18n.t(`shell.expression.runtime.types.${type}`) : undefined)
+    ?? type
+}
+
 function callBuiltin(name: string, args: unknown[]): unknown {
   switch (name.toLowerCase()) {
     case 'isnull': return args.length === 0 || args[0] === null || args[0] === undefined
@@ -281,19 +325,36 @@ function callBuiltin(name: string, args: unknown[]): unknown {
         if (a === null || a === undefined) continue
         if (typeof a === 'boolean') { sum += a ? 1 : 0; count++; continue }
         if (typeof a === 'number') {
-          if (!Number.isFinite(a)) throw new Error(`average() expects numeric or boolean arguments, got number.`)
+          if (!Number.isFinite(a)) {
+            throw new Error(
+              (i18n.isInitialized
+                ? i18n.t('shell.expression.runtime.averageArgument', { type: runtimeTypeLabel(a) })
+                : undefined)
+              ?? 'average() expects numeric or boolean arguments, got number.',
+            )
+          }
           sum += a
           count++
           continue
         }
-        throw new Error(`average() expects numeric or boolean arguments, got ${typeof a}.`)
+        throw new Error(
+          (i18n.isInitialized
+            ? i18n.t('shell.expression.runtime.averageArgument', { type: runtimeTypeLabel(a) })
+            : undefined)
+          ?? `average() expects numeric or boolean arguments, got ${typeof a}.`,
+        )
       }
       return count === 0 ? null : sum / count
     }
     case 'higher_than': {
       // Mirrors NCalcExpressionEvaluator.HigherThan: true when value exceeds reference by more
       // than percentage% (percentage as a whole number, e.g. 50 == 50%). Null args ⇒ false.
-      if (args.length < 3) throw new Error('higher_than() expects (value, reference, percentage).')
+      if (args.length < 3) {
+        throw new Error(
+          (i18n.isInitialized ? i18n.t('shell.expression.runtime.higherThanArity') : undefined)
+            ?? 'higher_than() expects (value, reference, percentage).',
+        )
+      }
       if (args[0] === null || args[0] === undefined ||
           args[1] === null || args[1] === undefined ||
           args[2] === null || args[2] === undefined) return false
@@ -301,7 +362,10 @@ function callBuiltin(name: string, args: unknown[]): unknown {
       const reference = toNumber(args[1])
       const percentage = toNumber(args[2])
       if (value === null || reference === null || percentage === null)
-        throw new Error('higher_than() expects numeric arguments.')
+        throw new Error(
+          (i18n.isInitialized ? i18n.t('shell.expression.runtime.higherThanNumeric') : undefined)
+            ?? 'higher_than() expects numeric arguments.',
+        )
       return value > reference * (1 + percentage / 100)
     }
     case 'latest':
@@ -421,18 +485,34 @@ async function fetchValidate(expression: string): Promise<ExpressionSyntaxResult
       // Protocol errors (empty body, over-length) come back as 4xx — treat them as "we don't
       // know" so the editor doesn't draw a red squiggle for a transport hiccup.
       const detail = await safeReadProblemDetail(resp)
-      const result: ExpressionSyntaxResult = { ok: false, error: detail || `HTTP ${resp.status}` }
+      const result: ExpressionSyntaxResult = {
+        ok: false,
+        error: detail || formatApiError(new ApiError(resp.status, resp.statusText)),
+      }
       syntaxCache.set(expression, result)
       return result
     }
-    const body = await resp.json() as { ok: boolean; error?: string; position?: number }
+    const body = await resp.json() as {
+      ok: boolean
+      error?: string
+      errorDetail?: ApiDiagnostic | null
+      position?: number
+    }
     const result: ExpressionSyntaxResult = body.ok
       ? { ok: true }
-      : { ok: false, error: body.error ?? 'Invalid expression.', position: body.position }
+      : {
+          ok: false,
+          error: body.errorDetail
+            ? localizeDiagnostic(body.errorDetail, body.error)
+            : body.error
+            ?? (i18n.isInitialized ? i18n.t('shell.expression.invalid') : undefined)
+            ?? 'Invalid expression.',
+          position: body.position,
+        }
     syntaxCache.set(expression, result)
     return result
   } catch (e) {
-    const result: ExpressionSyntaxResult = { ok: false, error: String(e) }
+    const result: ExpressionSyntaxResult = { ok: false, error: formatApiError(e) }
     syntaxCache.set(expression, result)
     return result
   }
@@ -444,9 +524,16 @@ async function fetchValidate(expression: string): Promise<ExpressionSyntaxResult
  * error message suitable for inline rendering. Unknown identifiers / function names are
  * deliberately not flagged — the schema-save round-trip catches those.
  */
-export function validateExpression(expression: string): Promise<ExpressionSyntaxResult> {
+export function validateExpression(
+  expression: string,
+  t?: TFunction,
+): Promise<ExpressionSyntaxResult> {
   const key = expression.trim()
-  if (!key) return Promise.resolve({ ok: false, error: 'Expression is empty.' })
+  if (!key) {
+    const error = (t ?? (i18n.isInitialized ? i18n.t : undefined))?.('shell.expression.empty')
+      ?? 'Expression is empty.'
+    return Promise.resolve({ ok: false, error })
+  }
   const hit = syntaxCache.get(key)
   if (hit) return Promise.resolve(hit)
   const inflight = syntaxPending.get(key)

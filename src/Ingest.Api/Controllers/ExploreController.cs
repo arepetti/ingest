@@ -3,6 +3,7 @@ using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Analytics;
+using Ingest.Core.Common;
 using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -58,7 +59,13 @@ public sealed class ExploreController(IExploreService explore) : ControllerBase
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(schema))
-            return BadRequest(new { error = "The 'schema' query parameter is required." });
+        {
+            const string message = "The 'schema' query parameter is required.";
+            return BadRequest(DiagnosticProblem.BadRequest(Diagnostic.Create(
+                DiagnosticCodes.Api.MissingRequiredParameter,
+                message,
+                ("parameter", "schema"))));
+        }
 
         // Confine the request to the caller's assigned services. A scoped caller asking only for
         // services outside its scope gets an empty (but well-formed) series rather than a leak.
@@ -73,7 +80,9 @@ public sealed class ExploreController(IExploreService explore) : ControllerBase
             anomalyThreshold ?? AnomalyDetector.DefaultThreshold,
             anomalyRobust);
         var result = await explore.GetSeriesAsync(query, ct);
-        return result is null ? NotFound() : Ok(ExploreSeriesResponse.FromResult(result));
+        return result is null
+            ? NotFound(DiagnosticProblem.NotFound("Schema", schema))
+            : Ok(ExploreSeriesResponse.FromResult(result));
     }
 
     /// <summary>

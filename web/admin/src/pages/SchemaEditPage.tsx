@@ -22,10 +22,10 @@ import { SchemaPreviewDialog } from '../components/SchemaPreviewDialog'
 import { SchemaDependencyGraphDialog } from '../components/SchemaDependencyGraphDialog'
 import { SchemaCommentsDrawer } from '../components/SchemaCommentsDrawer'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { cadenceLabel } from '../utils/cadence'
 import { ApprovalPolicyEditor } from '../components/ApprovalPolicyEditor'
 import { confirmDelete } from '../utils/confirm'
-import { formatDateTime } from '../utils/format'
 import { validateExpression, type ExpressionSyntaxResult } from '../utils/expression'
 import { emptySchema, emptyValue, isValidValueName, toRequest } from '../utils/schema'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
@@ -33,6 +33,7 @@ import { RowActions } from '../components/RowActions'
 import { SchemaValueAvatar } from '../components/Avatars'
 import { ExpressionField } from '../components/ExpressionField'
 import { clickableRowProps } from '../utils/a11y'
+import { Trans, useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -120,6 +121,7 @@ type SchemaTab = 'general' | 'values' | 'validations' | 'approvals' | 'layout'
  */
 export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const location = useLocation()
   const { name, entryId } = useParams<{ name?: string; entryId?: string }>()
@@ -246,10 +248,9 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
     const isExisting = !!target && lockedValueNames.has(target.name)
     if (isExisting) {
       const ok = confirmDelete(
-        'value',
+        t('schemasSubmissions.schemaEdit.deleteType'),
         target!.label || target!.name,
-        'Removing a value can break validation rules and reject or alter existing submissions. ' +
-          'Consider disabling it instead (uncheck "Enabled") to keep historical data intact.\n\nRemove it anyway?',
+        t('schemasSubmissions.schemaEdit.removeValueWarning'),
       )
       if (!ok) return
     }
@@ -342,7 +343,11 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
   const notFound = (isEdit && !hydrated && !schemasQuery.isLoading && !existing)
     || (isSnapshot && !hydrated && !snapshotQuery.isLoading && !snapshotQuery.data)
 
-  const title = isSnapshot ? 'View schema version' : isEdit ? 'Edit schema' : 'New schema'
+  const title = isSnapshot
+    ? t('schemasSubmissions.schemaEdit.viewVersionTitle')
+    : isEdit
+      ? t('schemasSubmissions.schemaEdit.editTitle')
+      : t('schemasSubmissions.schemas.new')
 
   // Synthesise a full `Schema` from the in-progress request so the layout editor and the preview
   // dialog can share one definition. Just enough of a Schema for their needs — pulling the actual
@@ -372,40 +377,40 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
     <div className={s.root}>
       <div className={s.toolbar}>
         <div className={s.headerLeft}>
-          <Button appearance="subtle" icon={<ArrowLeft20Regular />} onClick={() => nav(isSnapshot ? `/schemas/${encodeURIComponent(name!)}/versions` : '/schemas')}>Back</Button>
+          <Button appearance="subtle" icon={<ArrowLeft20Regular />} onClick={() => nav(isSnapshot ? `/schemas/${encodeURIComponent(name!)}/versions` : '/schemas')}>{t('schemasSubmissions.common.back')}</Button>
           <Title2>{title}</Title2>
         </div>
         {req && (
           <Toolbar>
             <ToolbarButton icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>
-              Preview
+              {t('schemasSubmissions.common.preview')}
             </ToolbarButton>
             <ToolbarButton icon={<FlowchartCircle20Regular />} onClick={() => setDependenciesOpen(true)}>
-              Dependencies
+              {t('schemasSubmissions.schemaEdit.dependencies')}
             </ToolbarButton>
             {has('comments:read') && schemaId && (
               <ToolbarButton icon={<Chat20Regular />} onClick={() => setCommentsOpen(true)}>
-                Comments
+                {t('schemasSubmissions.comments.title')}
                 {openCommentCount > 0 && <Badge appearance="filled" color="informative" size="small" style={{ marginLeft: '6px' }}>{openCommentCount}</Badge>}
               </ToolbarButton>
             )}
             {!readOnly && (
               <ToolbarButton appearance="primary" disabled={isBusy} onClick={onSave}>
-                {isEdit ? 'Save changes' : 'Create schema'}
+                {isEdit ? t('schemasSubmissions.common.saveChanges') : t('schemasSubmissions.schemaEdit.create')}
               </ToolbarButton>
             )}
           </Toolbar>
         )}
       </div>
 
-      {loading && <Spinner label="Loading schema…" />}
+      {loading && <Spinner label={t('schemasSubmissions.schemaEdit.loading')} />}
       {notFound && (
         <MessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Schema not found</MessageBarTitle>
+            <MessageBarTitle>{t('schemasSubmissions.schemaEdit.notFound')}</MessageBarTitle>
             {isSnapshot
-              ? 'This version snapshot no longer exists. It may have been deleted from the history.'
-              : <>No schema named “{name}” exists. It may have been deleted.</>}
+              ? t('schemasSubmissions.schemaEdit.snapshotMissing')
+              : t('schemasSubmissions.schemaEdit.schemaMissing', { name })}
           </MessageBarBody>
         </MessageBar>
       )}
@@ -413,10 +418,17 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
       {req && isSnapshot && snapshotQuery.data && (
         <MessageBar intent="info">
           <MessageBarBody>
-            <MessageBarTitle>Read-only snapshot</MessageBarTitle>
-            Version {snapshotQuery.data.newVersion} saved {formatDateTime(snapshotQuery.data.changeDate)}
-            {snapshotQuery.data.authorName ? ` by ${snapshotQuery.data.authorName}` : ''}. This is a
-            historical view and cannot be edited — it does not affect the current schema.
+            <MessageBarTitle>{t('schemasSubmissions.schemaEdit.readOnlySnapshot')}</MessageBarTitle>
+            <Trans
+              i18nKey="schemasSubmissions.schemaEdit.snapshotHelp"
+              values={{
+                version: snapshotQuery.data.newVersion,
+                author: snapshotQuery.data.authorName
+                  ? t('schemasSubmissions.common.by', { name: snapshotQuery.data.authorName })
+                  : '',
+              }}
+              components={{ savedAt: <LocalizedTime value={snapshotQuery.data.changeDate} /> }}
+            />
           </MessageBarBody>
         </MessageBar>
       )}
@@ -425,40 +437,40 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
         <Card>
           <div className={s.form}>
             <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as SchemaTab)}>
-              <Tab value="general">General</Tab>
-              <Tab value="values">Values</Tab>
-              <Tab value="validations">Validations</Tab>
-              {approvalEnabled && <Tab value="approvals">Approvals</Tab>}
-              <Tab value="layout">Layout</Tab>
+              <Tab value="general">{t('schemasSubmissions.schemaEdit.tabs.general')}</Tab>
+              <Tab value="values">{t('schemasSubmissions.common.values')}</Tab>
+              <Tab value="validations">{t('schemasSubmissions.schemaEdit.tabs.validations')}</Tab>
+              {approvalEnabled && <Tab value="approvals">{t('schemasSubmissions.schemaEdit.tabs.approvals')}</Tab>}
+              <Tab value="layout">{t('schemasSubmissions.schemaEdit.tabs.layout')}</Tab>
             </TabList>
 
             {tab === 'general' && (
             <div className={s.tabPanel}>
             <div className={s.twoCol}>
               <Field
-                label="Name"
+                label={t('schemasSubmissions.common.name')}
                 required
-                hint={isEdit ? 'The schema name is fixed after creation — changing it could break validation rules and existing submissions.' : undefined}
+                hint={isEdit ? t('schemasSubmissions.schemaEdit.nameFixed') : undefined}
               >
                 <Input value={req.name} disabled={isEdit || readOnly} onChange={(_, v) => patchReq({ name: v.value })} />
               </Field>
-              <Field label="Label">
+              <Field label={t('schemasSubmissions.common.label')}>
                 <Input value={req.label ?? ''} disabled={readOnly} onChange={(_, v) => patchReq({ label: v.value })} />
               </Field>
             </div>
 
-            <Field label="Description">
+            <Field label={t('schemasSubmissions.common.description')}>
               <Textarea value={req.description ?? ''} disabled={readOnly} onChange={(_, v) => patchReq({ description: v.value })} />
             </Field>
 
             <div className={s.flagsRow}>
-              <Checkbox label="Enabled (Published)" checked={req.enabled} disabled={readOnly} onChange={(_, d) => patchReq({ enabled: !!d.checked })} />
-              <Checkbox label="Modifiable" checked={req.modifiable} disabled={readOnly} onChange={(_, d) => patchReq({ modifiable: !!d.checked })} />
+              <Checkbox label={t('schemasSubmissions.schemaEdit.enabledPublished')} checked={req.enabled} disabled={readOnly} onChange={(_, d) => patchReq({ enabled: !!d.checked })} />
+              <Checkbox label={t('schemasSubmissions.common.modifiable')} checked={req.modifiable} disabled={readOnly} onChange={(_, d) => patchReq({ modifiable: !!d.checked })} />
             </div>
 
             <Field
-              label="Version"
-              hint="Bump when introducing new values. Cannot decrease. Each value's 'Since version' must be ≤ this."
+              label={t('schemasSubmissions.common.version')}
+              hint={t('schemasSubmissions.schemaEdit.versionHint')}
             >
               <Input
                 type="number"
@@ -471,10 +483,10 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
               />
             </Field>
 
-            <div className={s.sectionLabel}>Audience</div>
-            <Checkbox label="Global (visible to all services)" checked={req.isGlobal} disabled={readOnly} onChange={(_, d) => patchReq({ isGlobal: !!d.checked })} />
+            <div className={s.sectionLabel}>{t('schemasSubmissions.schemas.audience')}</div>
+            <Checkbox label={t('schemasSubmissions.schemas.globalAudience')} checked={req.isGlobal} disabled={readOnly} onChange={(_, d) => patchReq({ isGlobal: !!d.checked })} />
             {!req.isGlobal && (
-              <Field label="Visible to services">
+              <Field label={t('schemasSubmissions.schemaEdit.visibleServices')}>
                 <Dropdown
                   multiselect
                   disabled={readOnly}
@@ -489,7 +501,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
               </Field>
             )}
 
-            <Field label="Notes">
+            <Field label={t('schemasSubmissions.common.notes')}>
               <Textarea value={req.notes ?? ''} disabled={readOnly} onChange={(_, v) => patchReq({ notes: v.value })} />
             </Field>
             </div>
@@ -497,12 +509,14 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
 
             {tab === 'validations' && (
             <div className={s.tabPanel}>
-            <div className={s.sectionLabel}>Submission validations</div>
-            <Field hint="Each rule runs once per submission against every value in the schema. Add several to enforce multiple cross-value invariants.">
+            <div className={s.sectionLabel}>{t('schemasSubmissions.schemas.submissionValidations')}</div>
+            <Field hint={t('schemasSubmissions.schemaEdit.validationsHint')}>
               <div className={s.rulesList}>
                 {req.submissionValidations.length === 0 && (
                   <Body1 style={{ color: tokens.colorNeutralForeground3, fontSize: 12 }}>
-                    No rules yet. {readOnly ? '' : 'Use “Add rule” to create one.'}
+                    {readOnly
+                      ? t('schemasSubmissions.schemaEdit.noRules')
+                      : t('schemasSubmissions.schemaEdit.noRulesAdd')}
                   </Body1>
                 )}
                 {req.submissionValidations.map((rule, i) => (
@@ -514,18 +528,18 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
                         disabled={readOnly}
                         lint
                         identifiers={req.values.map(v => v.name)}
-                        placeholder="e.g. if(expenses > revenue, 'expenses cannot exceed revenue', null)"
-                        ariaLabel={`Submission validation rule ${i + 1}`}
+                        placeholder={t('schemasSubmissions.schemaEdit.validationPlaceholder')}
+                        ariaLabel={t('schemasSubmissions.schemas.validationRule', { number: i + 1 })}
                         onChange={(v) => patchValidation(i, v)}
                       />
                     </div>
                     {!readOnly && (
-                      <Tooltip content="Remove rule" relationship="label">
+                      <Tooltip content={t('schemasSubmissions.schemaEdit.removeRule')} relationship="label">
                         <Button
                           appearance="subtle"
                           icon={<Dismiss16Regular />}
                           onClick={() => removeValidation(i)}
-                          aria-label="Remove rule"
+                          aria-label={t('schemasSubmissions.schemaEdit.removeRule')}
                         />
                       </Tooltip>
                     )}
@@ -534,7 +548,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
                 {!readOnly && (
                   <div>
                     <Button appearance="subtle" icon={<Add20Regular />} size="small" onClick={addValidation}>
-                      Add rule
+                      {t('schemasSubmissions.schemaEdit.addRule')}
                     </Button>
                   </div>
                 )}
@@ -558,34 +572,34 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
             {tab === 'values' && (
             <div className={s.tabPanel}>
             <div className={s.valuesToolbar} style={{ justifyContent: 'flex-end' }}>
-              {!readOnly && <Button appearance="primary" icon={<Add20Regular />} size="small" onClick={addValue}>Add value</Button>}
+              {!readOnly && <Button appearance="primary" icon={<Add20Regular />} size="small" onClick={addValue}>{t('schemasSubmissions.schemaEdit.addValue')}</Button>}
             </div>
 
             {req.values.length === 0 ? (
               <MessageBar intent="info">
-                <MessageBarBody>A schema needs at least one value to be useful.</MessageBarBody>
+                <MessageBarBody>{t('schemasSubmissions.schemaEdit.needsValue')}</MessageBarBody>
               </MessageBar>
             ) : (
               <Table size="small" className={s.valuesTable}>
                 <TableHeader>
                   <TableRow>
-                    <TableHeaderCell>Name</TableHeaderCell>
-                    <TableHeaderCell className={s.colMeta}>Type</TableHeaderCell>
-                    <TableHeaderCell className={s.colMeta}>Cadence</TableHeaderCell>
-                    <TableHeaderCell className={s.colMeta}>Kind</TableHeaderCell>
-                    <TableHeaderCell className={s.colFlag}>Enabled</TableHeaderCell>
-                    <TableHeaderCell className={s.colFlag}>Required</TableHeaderCell>
-                    {!readOnly && <TableHeaderCell className={s.actionsHeader}>Actions</TableHeaderCell>}
+                    <TableHeaderCell>{t('schemasSubmissions.common.name')}</TableHeaderCell>
+                    <TableHeaderCell className={s.colMeta}>{t('schemasSubmissions.common.type')}</TableHeaderCell>
+                    <TableHeaderCell className={s.colMeta}>{t('schemasSubmissions.common.cadenceLabel')}</TableHeaderCell>
+                    <TableHeaderCell className={s.colMeta}>{t('schemasSubmissions.schemaEdit.kind')}</TableHeaderCell>
+                    <TableHeaderCell className={s.colFlag}>{t('schemasSubmissions.common.enabled')}</TableHeaderCell>
+                    <TableHeaderCell className={s.colFlag}>{t('schemasSubmissions.sampleFields.required')}</TableHeaderCell>
+                    {!readOnly && <TableHeaderCell className={s.actionsHeader}>{t('schemasSubmissions.common.actions')}</TableHeaderCell>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {req.values.map((v, i) => {
-                    const display = v.label || v.name || `(value #${i + 1})`
+                    const display = v.label || v.name || t('schemasSubmissions.schemaEdit.valueNumber', { number: i + 1 })
                     return (
                       <TableRow
                         key={i}
                         className={`${s.row} ${s.rowClickable}`}
-                        {...clickableRowProps(() => { setEditingValueIndex(i); setValueDrawerExpanded(false) }, `Edit value ${display}`)}
+                        {...clickableRowProps(() => { setEditingValueIndex(i); setValueDrawerExpanded(false) }, t('schemasSubmissions.schemaEdit.editValue', { name: display }))}
                       >
                         <TableCell className={s.nameCell}>
                           <TableCellLayout media={<SchemaValueAvatar type={v.type} enabled={v.enabled} />} description={v.label && v.name ? v.name : undefined}>
@@ -594,22 +608,22 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
                             </Tooltip>
                           </TableCellLayout>
                         </TableCell>
-                        <TableCell className={s.colMeta}>{v.type}</TableCell>
-                        <TableCell className={s.colMeta}>{cadenceLabel(v.cadence)}</TableCell>
-                        <TableCell className={s.colMeta}>{v.kind === 'Calculated' ? 'Calculated' : 'User-defined'}</TableCell>
+                        <TableCell className={s.colMeta}>{t(`schemasSubmissions.common.valueType.${v.type}`)}</TableCell>
+                        <TableCell className={s.colMeta}>{cadenceLabel(v.cadence, t)}</TableCell>
+                        <TableCell className={s.colMeta}>{v.kind === 'Calculated' ? t('schemasSubmissions.schemaEdit.calculated') : t('schemasSubmissions.schemaEdit.userDefined')}</TableCell>
                         <TableCell className={s.colFlag}>
                           <Badge appearance="outline" color={v.enabled ? 'success' : 'subtle'}>
-                            {v.enabled ? 'Enabled' : 'Disabled'}
+                            {v.enabled ? t('schemasSubmissions.common.enabled') : t('schemasSubmissions.common.disabled')}
                           </Badge>
                         </TableCell>
-                        <TableCell className={s.colFlag}>{v.required ? 'Yes' : 'No'}</TableCell>
+                        <TableCell className={s.colFlag}>{v.required ? t('schemasSubmissions.common.yes') : t('schemasSubmissions.common.no')}</TableCell>
                         {!readOnly && (
                           <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
                             <RowActions
-                              ariaLabel={`Actions for ${display}`}
+                              ariaLabel={t('schemasSubmissions.common.actionsFor', { name: display })}
                               actions={[
-                                { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => setEditingValueIndex(i) },
-                                { key: 'delete', label: 'Remove', icon: <Delete20Regular />, destructive: true, onClick: () => removeValue(i) },
+                                { key: 'edit', label: t('schemasSubmissions.common.edit'), icon: <Edit20Regular />, onClick: () => setEditingValueIndex(i) },
+                                { key: 'delete', label: t('schemasSubmissions.common.remove'), icon: <Delete20Regular />, destructive: true, onClick: () => removeValue(i) },
                               ]}
                             />
                           </TableCell>
@@ -625,7 +639,7 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
 
             {tab === 'layout' && (
             <div className={s.tabPanel}>
-            <Field hint="Drag values into sections to group them. This affects the submission form layout only — the server treats submissions as flat lists.">
+            <Field hint={t('schemasSubmissions.schemaEdit.layoutHint')}>
               {/* `inert` makes the whole subtree non-interactive in the read-only snapshot view. */}
               <div className={readOnly ? s.readOnlyLayout : undefined} {...(readOnly ? { inert: true } : {})}>
                 <LayoutTreeEditor
@@ -647,10 +661,10 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
               <>
                 <Divider />
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <Button onClick={() => nav('/schemas')}>Cancel</Button>
-                  <Button appearance="secondary" icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>Preview</Button>
+                  <Button onClick={() => nav('/schemas')}>{t('schemasSubmissions.common.cancel')}</Button>
+                  <Button appearance="secondary" icon={<Eye20Regular />} onClick={() => setPreviewOpen(true)}>{t('schemasSubmissions.common.preview')}</Button>
                   <Button appearance="primary" disabled={isBusy} onClick={onSave}>
-                    {isEdit ? 'Save changes' : 'Create schema'}
+                    {isEdit ? t('schemasSubmissions.common.saveChanges') : t('schemasSubmissions.schemaEdit.create')}
                   </Button>
                 </div>
               </>
@@ -671,15 +685,15 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
         >
           <DrawerHeaderWithClose
             title={editingValueIndex !== null
-              ? (req.values[editingValueIndex]?.label || req.values[editingValueIndex]?.name || 'Value details')
-              : 'Value details'}
+              ? (req.values[editingValueIndex]?.label || req.values[editingValueIndex]?.name || t('schemasSubmissions.schemaEdit.valueDetails'))
+              : t('schemasSubmissions.schemaEdit.valueDetails')}
             onClose={closeValueDrawer}
             expanded={valueDrawerExpanded}
             onToggleExpand={() => setValueDrawerExpanded(e => !e)}
           />
           {!readOnly && editingValueIndex !== null && (
             <Toolbar className={s.drawerToolbar}>
-              <ToolbarButton icon={<Delete20Regular />} onClick={() => removeValue(editingValueIndex)}>Remove</ToolbarButton>
+              <ToolbarButton icon={<Delete20Regular />} onClick={() => removeValue(editingValueIndex)}>{t('schemasSubmissions.common.remove')}</ToolbarButton>
             </Toolbar>
           )}
           <DrawerBody>
@@ -702,29 +716,28 @@ export function SchemaEditPage({ readOnly = false }: { readOnly?: boolean }) {
       <Dialog open={versionDialogOpen} onOpenChange={(_, d) => setVersionDialogOpen(d.open)}>
         <DialogSurface>
           <DialogBody>
-            <DialogTitle>Publish changes</DialogTitle>
+            <DialogTitle>{t('schemasSubmissions.schemaEdit.publishChanges')}</DialogTitle>
             <DialogContent>
               <Body1 style={{ display: 'block', marginBottom: 12 }}>
-                You changed this published schema but didn’t update the version number. What would you
-                like to do?
+                {t('schemasSubmissions.schemaEdit.publishHelp')}
               </Body1>
               <RadioGroup value={publishChoice} onChange={(_, d) => setPublishChoice(d.value as PublishChoice)}>
                 <div className={s.dialogOptions}>
-                  <Radio value="increment" label={`Automatically increment the version number (to ${originalVersion + 1})`} />
-                  <Radio value="asis" label="Publish as-is without changing the version" />
-                  <Radio value="draft" label="Move the schema back to Draft and apply the changes" disabled={submissionCount > 0} />
+                  <Radio value="increment" label={t('schemasSubmissions.schemaEdit.incrementVersion', { version: originalVersion + 1 })} />
+                  <Radio value="asis" label={t('schemasSubmissions.schemaEdit.publishAsIs')} />
+                  <Radio value="draft" label={t('schemasSubmissions.schemaEdit.moveToDraft')} disabled={submissionCount > 0} />
                   {submissionCount > 0 && (
                     <span className={s.optionHint}>
-                      Unavailable — {submissionCount} submission{submissionCount === 1 ? '' : 's'} already exist for this schema.
+                      {t('schemasSubmissions.schemaEdit.draftUnavailable', { count: submissionCount })}
                     </span>
                   )}
-                  <Radio value="discard" label="Discard the changes" />
+                  <Radio value="discard" label={t('schemasSubmissions.schemaEdit.discardChanges')} />
                 </div>
               </RadioGroup>
             </DialogContent>
             <DialogActions>
-              <Button appearance="secondary" onClick={() => setVersionDialogOpen(false)}>Cancel and keep editing</Button>
-              <Button appearance="primary" disabled={isBusy} onClick={onPublishContinue}>Continue</Button>
+              <Button appearance="secondary" onClick={() => setVersionDialogOpen(false)}>{t('schemasSubmissions.schemaEdit.cancelEditing')}</Button>
+              <Button appearance="primary" disabled={isBusy} onClick={onPublishContinue}>{t('schemasSubmissions.common.continue')}</Button>
             </DialogActions>
           </DialogBody>
         </DialogSurface>
@@ -770,6 +783,7 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
   valueNames: string[]
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const calculated = value.kind === 'Calculated'
   const kinds: SchemaValueKind[] = ['UserDefined', 'Calculated']
   // Sibling names (everything but this value) for the calculated Expression; the gating/warning
@@ -780,35 +794,35 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
     <>
       <div className={s.twoCol}>
         <Field
-          label="Name"
+          label={t('schemasSubmissions.common.name')}
           required
           hint={nameLocked
-            ? 'The name is fixed after creation — it is referenced by validation rules and existing submissions. Add a new value if you need a different name.'
-            : 'Used as the identifier in validation rules. Must start with a letter or underscore and contain only letters, digits, and underscores.'}
+            ? t('schemasSubmissions.schemaEdit.valueNameFixed')
+            : t('schemasSubmissions.schemaEdit.valueNameHint')}
           validationState={nameLocked || isValidValueName(value.name) ? 'none' : 'error'}
-          validationMessage={nameLocked || isValidValueName(value.name) ? undefined : 'Must be a valid identifier: letters, digits and underscores only; cannot start with a digit.'}
+          validationMessage={nameLocked || isValidValueName(value.name) ? undefined : t('schemasSubmissions.schemaEdit.valueNameValidation')}
         >
           <Input value={value.name} disabled={nameLocked || disabled} onChange={(_, v) => onChange({ name: v.value })} />
         </Field>
-        <Field label="Label">
+        <Field label={t('schemasSubmissions.common.label')}>
           <Input value={value.label ?? ''} disabled={disabled} onChange={(_, v) => onChange({ label: v.value })} />
         </Field>
       </div>
 
-      <Field label="Description">
+      <Field label={t('schemasSubmissions.common.description')}>
         <Textarea value={value.description ?? ''} disabled={disabled} onChange={(_, v) => onChange({ description: v.value })} />
       </Field>
 
       <Field
-        label="Caption"
-        hint="Optional heading rendered above this value in the submission form and view (think section title). Display-only; clients ignore it."
+        label={t('schemasSubmissions.schemaEdit.caption')}
+        hint={t('schemasSubmissions.schemaEdit.captionHint')}
       >
         <Input value={value.caption ?? ''} disabled={disabled} onChange={(_, v) => onChange({ caption: v.value })} />
       </Field>
 
       <Field
-        label="Since version"
-        hint={`Optional. When set and equal to the schema's current version (${schemaVersion}), the SPA shows a "New" tag next to this value for one cadence period. Leave empty for "always present".`}
+        label={t('schemasSubmissions.schemaEdit.sinceVersion')}
+        hint={t('schemasSubmissions.schemaEdit.sinceVersionHint', { version: schemaVersion })}
       >
         <Input
           type="number"
@@ -822,9 +836,9 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
         />
       </Field>
 
-      <Field label="Kind" hint="Calculated values are computed from sibling values in the same submission and are never submitted.">
+      <Field label={t('schemasSubmissions.schemaEdit.kind')} hint={t('schemasSubmissions.schemaEdit.kindHint')}>
         <Dropdown
-          value={calculated ? 'Calculated' : 'User-defined'}
+          value={calculated ? t('schemasSubmissions.schemaEdit.calculated') : t('schemasSubmissions.schemaEdit.userDefined')}
           disabled={disabled}
           selectedOptions={[value.kind ?? 'UserDefined']}
           onOptionSelect={(_, d) => {
@@ -836,14 +850,14 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
             })
           }}
         >
-          {kinds.map(k => <Option key={k} value={k}>{k === 'UserDefined' ? 'User-defined' : 'Calculated'}</Option>)}
+          {kinds.map(k => <Option key={k} value={k}>{k === 'UserDefined' ? t('schemasSubmissions.schemaEdit.userDefined') : t('schemasSubmissions.schemaEdit.calculated')}</Option>)}
         </Dropdown>
       </Field>
 
       {calculated && (
         <RuleTextarea
-          label="Expression"
-          hint="NCalc formula referencing sibling values in the same submission only (e.g. average(a, b)). Chaining to other calculated values is allowed."
+          label={t('schemasSubmissions.schemaEdit.expression')}
+          hint={t('schemasSubmissions.schemaEdit.expressionHint')}
           rows={3}
           disabled={disabled}
           identifiers={siblingNames}
@@ -853,36 +867,36 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
       )}
 
       <div className={s.twoCol}>
-        <Field label="Type">
-          <Dropdown value={value.type} disabled={disabled} selectedOptions={[value.type]} onOptionSelect={(_, d) => onChange({ type: d.optionValue as SchemaValueType })}>
-            {types.map(t => <Option key={t} value={t}>{t}</Option>)}
+        <Field label={t('schemasSubmissions.common.type')}>
+          <Dropdown value={t(`schemasSubmissions.common.valueType.${value.type}`)} disabled={disabled} selectedOptions={[value.type]} onOptionSelect={(_, d) => onChange({ type: d.optionValue as SchemaValueType })}>
+            {types.map(type => <Option key={type} value={type}>{t(`schemasSubmissions.common.valueType.${type}`)}</Option>)}
           </Dropdown>
         </Field>
-        <Field label="Cadence">
-          <Dropdown value={value.cadence} disabled={disabled} selectedOptions={[value.cadence]} onOptionSelect={(_, d) => onChange({ cadence: d.optionValue as Cadence })}>
-            {cadences.map(c => <Option key={c} value={c} text={cadenceLabel(c)}>{cadenceLabel(c)}</Option>)}
+        <Field label={t('schemasSubmissions.common.cadenceLabel')}>
+          <Dropdown value={cadenceLabel(value.cadence, t)} disabled={disabled} selectedOptions={[value.cadence]} onOptionSelect={(_, d) => onChange({ cadence: d.optionValue as Cadence })}>
+            {cadences.map(c => <Option key={c} value={c} text={cadenceLabel(c, t)}>{cadenceLabel(c, t)}</Option>)}
           </Dropdown>
         </Field>
       </div>
 
-      <Field label="Unit">
+      <Field label={t('schemasSubmissions.schemaEdit.unit')}>
         <Input value={value.unit ?? ''} disabled={disabled} onChange={(_, v) => onChange({ unit: v.value })} />
       </Field>
 
       <div className={s.flagsRow}>
-        <Checkbox label="Required" checked={value.required} disabled={disabled || calculated} onChange={(_, d) => onChange({ required: !!d.checked })} />
-        <Checkbox label="Modifiable" checked={value.modifiable} disabled={disabled || calculated} onChange={(_, d) => onChange({ modifiable: !!d.checked })} />
-        <Checkbox label="Enabled" checked={value.enabled} disabled={disabled} onChange={(_, d) => onChange({ enabled: !!d.checked })} />
+        <Checkbox label={t('schemasSubmissions.sampleFields.required')} checked={value.required} disabled={disabled || calculated} onChange={(_, d) => onChange({ required: !!d.checked })} />
+        <Checkbox label={t('schemasSubmissions.common.modifiable')} checked={value.modifiable} disabled={disabled || calculated} onChange={(_, d) => onChange({ modifiable: !!d.checked })} />
+        <Checkbox label={t('schemasSubmissions.common.enabled')} checked={value.enabled} disabled={disabled} onChange={(_, d) => onChange({ enabled: !!d.checked })} />
       </div>
 
       {!calculated && (value.type === 'Integer' || value.type === 'Number') && (
         <>
-          <div className={s.sectionLabel}>Numeric constraints</div>
+          <div className={s.sectionLabel}>{t('schemasSubmissions.schemaEdit.numericConstraints')}</div>
           <div className={s.twoCol}>
-            <Field label="Min">
+            <Field label={t('schemasSubmissions.schemaEdit.min')}>
               <Input type="number" disabled={disabled} value={value.min?.toString() ?? ''} onChange={(_, v) => onChange({ min: v.value === '' ? null : Number(v.value) })} />
             </Field>
-            <Field label="Max">
+            <Field label={t('schemasSubmissions.schemaEdit.max')}>
               <Input type="number" disabled={disabled} value={value.max?.toString() ?? ''} onChange={(_, v) => onChange({ max: v.value === '' ? null : Number(v.value) })} />
             </Field>
           </div>
@@ -891,24 +905,21 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
 
       {(value.type === 'Integer' || value.type === 'Number') && (
         <>
-          <div className={s.sectionLabel}>Target band (RAG, optional)</div>
+          <div className={s.sectionLabel}>{t('schemasSubmissions.schemaEdit.targetBand')}</div>
           <div className={s.bandHelp}>
-            Reporting-only Red/Amber/Green ranges shown as shaded bands on charts — never enforced. The
-            acceptable (amber) range is the outer band; the ideal (green) range sits inside it. Outside
-            the amber range is red. Each edge is optional, but a green edge needs the matching amber edge
-            on the same side, and edges must read low-to-high: amber min ≤ green min ≤ green max ≤ amber max.
+            {t('schemasSubmissions.schemaEdit.targetBandHelp')}
           </div>
           <div className={s.twoCol}>
-            <Field label="Acceptable (amber) min" hint="Below this is red. Outer lower edge.">
+            <Field label={t('schemasSubmissions.schemaEdit.amberMin')} hint={t('schemasSubmissions.schemaEdit.amberMinHint')}>
               <Input type="number" disabled={disabled} value={value.amberMin?.toString() ?? ''} onChange={(_, v) => onChange({ amberMin: v.value === '' ? null : Number(v.value) })} />
             </Field>
-            <Field label="Acceptable (amber) max" hint="Above this is red. Outer upper edge.">
+            <Field label={t('schemasSubmissions.schemaEdit.amberMax')} hint={t('schemasSubmissions.schemaEdit.amberMaxHint')}>
               <Input type="number" disabled={disabled} value={value.amberMax?.toString() ?? ''} onChange={(_, v) => onChange({ amberMax: v.value === '' ? null : Number(v.value) })} />
             </Field>
-            <Field label="Ideal (green) min" hint="Inner lower edge. Needs an amber min.">
+            <Field label={t('schemasSubmissions.schemaEdit.greenMin')} hint={t('schemasSubmissions.schemaEdit.greenMinHint')}>
               <Input type="number" disabled={disabled} value={value.greenMin?.toString() ?? ''} onChange={(_, v) => onChange({ greenMin: v.value === '' ? null : Number(v.value) })} />
             </Field>
-            <Field label="Ideal (green) max" hint="Inner upper edge. Needs an amber max.">
+            <Field label={t('schemasSubmissions.schemaEdit.greenMax')} hint={t('schemasSubmissions.schemaEdit.greenMaxHint')}>
               <Input type="number" disabled={disabled} value={value.greenMax?.toString() ?? ''} onChange={(_, v) => onChange({ greenMax: v.value === '' ? null : Number(v.value) })} />
             </Field>
           </div>
@@ -917,12 +928,12 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
 
       {!calculated && value.type === 'Date' && (
         <>
-          <div className={s.sectionLabel}>Date constraints</div>
+          <div className={s.sectionLabel}>{t('schemasSubmissions.schemaEdit.dateConstraints')}</div>
           <div className={s.twoCol}>
-            <Field label="Min date (ISO)">
+            <Field label={t('schemasSubmissions.schemaEdit.minDate')}>
               <Input disabled={disabled} value={value.minDate ?? ''} onChange={(_, v) => onChange({ minDate: v.value || null })} />
             </Field>
-            <Field label="Max date (ISO)">
+            <Field label={t('schemasSubmissions.schemaEdit.maxDate')}>
               <Input disabled={disabled} value={value.maxDate ?? ''} onChange={(_, v) => onChange({ maxDate: v.value || null })} />
             </Field>
           </div>
@@ -931,26 +942,26 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
 
       {!calculated && value.type === 'String' && (
         <>
-          <div className={s.sectionLabel}>String constraints</div>
+          <div className={s.sectionLabel}>{t('schemasSubmissions.schemaEdit.stringConstraints')}</div>
           <div className={s.twoCol}>
-            <Field label="Min length">
+            <Field label={t('schemasSubmissions.schemaEdit.minLength')}>
               <Input type="number" disabled={disabled} value={value.minLength?.toString() ?? ''} onChange={(_, v) => onChange({ minLength: v.value === '' ? null : Number(v.value) })} />
             </Field>
-            <Field label="Max length">
+            <Field label={t('schemasSubmissions.schemaEdit.maxLength')}>
               <Input type="number" disabled={disabled} value={value.maxLength?.toString() ?? ''} onChange={(_, v) => onChange({ maxLength: v.value === '' ? null : Number(v.value) })} />
             </Field>
           </div>
-          <Field label="Regex pattern">
+          <Field label={t('schemasSubmissions.schemaEdit.regexPattern')}>
             <Input disabled={disabled} value={value.regexPattern ?? ''} onChange={(_, v) => onChange({ regexPattern: v.value })} />
           </Field>
         </>
       )}
 
-      <div className={s.sectionLabel}>Validation</div>
+      <div className={s.sectionLabel}>{t('schemasSubmissions.schemaEdit.validation')}</div>
       {!calculated && (
         <RuleTextarea
-          label="Value validation"
-          hint="Runs against the submitted sample. Vars include value, minimum, maximum. Whitespace and line breaks are ignored."
+          label={t('schemasSubmissions.schemaEdit.valueValidation')}
+          hint={t('schemasSubmissions.schemaEdit.valueValidationHint')}
           rows={3}
           disabled={disabled}
           identifiers={validationVars}
@@ -959,8 +970,8 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
         />
       )}
       <RuleTextarea
-        label="Warning"
-        hint="Optional rule that produces a non-blocking warning when true or when it returns a non-empty string."
+        label={t('schemasSubmissions.schemaEdit.warning')}
+        hint={t('schemasSubmissions.schemaEdit.warningHint')}
         rows={3}
         disabled={disabled}
         identifiers={validationVars}
@@ -968,10 +979,10 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
         onChange={(v) => onChange({ warning: v })}
       />
 
-      <div className={s.sectionLabel}>Conditional display</div>
+      <div className={s.sectionLabel}>{t('schemasSubmissions.schemaEdit.conditionalDisplay')}</div>
       <RuleTextarea
-        label="Enabled if"
-        hint="When false (or null) the value is disabled in the UI and a submitted sample is dropped with a warning. Empty = always enabled."
+        label={t('schemasSubmissions.schemaEdit.enabledIf')}
+        hint={t('schemasSubmissions.schemaEdit.enabledIfHint')}
         rows={2}
         disabled={disabled}
         identifiers={validationVars}
@@ -979,8 +990,8 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
         onChange={(v) => onChange({ enabledIf: v })}
       />
       <RuleTextarea
-        label="Visible if"
-        hint="When false (or null) the value is hidden in the UI. Server-side behaves like Enabled if. Empty = always visible."
+        label={t('schemasSubmissions.schemaEdit.visibleIf')}
+        hint={t('schemasSubmissions.schemaEdit.visibleIfHint')}
         rows={2}
         disabled={disabled}
         identifiers={validationVars}
@@ -988,7 +999,7 @@ function ValueEditor({ value, schemaVersion, nameLocked, disabled, onChange, val
         onChange={(v) => onChange({ visibleIf: v })}
       />
 
-      <Field label="Notes">
+      <Field label={t('schemasSubmissions.common.notes')}>
         <Textarea value={value.notes ?? ''} disabled={disabled} onChange={(_, v) => onChange({ notes: v.value })} />
       </Field>
     </>
@@ -1016,6 +1027,7 @@ function RuleTextarea({
   placeholder?: string
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const [status, setStatus] = useState<'idle' | 'checking' | ExpressionSyntaxResult>('idle')
 
   useEffect(() => {
@@ -1040,14 +1052,14 @@ function RuleTextarea({
   let statusClass = s.ruleStatusChecking
   let statusContent: ReactNode = null
   if (status === 'checking') {
-    statusContent = <><Spinner size="extra-tiny" /> Checking…</>
+    statusContent = <><Spinner size="extra-tiny" /> {t('schemasSubmissions.schemaEdit.checking')}</>
   } else if (status !== 'idle') {
     if (status.ok) {
       statusClass = s.ruleStatusOk
-      statusContent = <><CheckmarkCircle16Regular /> Valid syntax</>
+      statusContent = <><CheckmarkCircle16Regular /> {t('schemasSubmissions.schemaEdit.validSyntax')}</>
     } else {
       statusClass = s.ruleStatusError
-      statusContent = <><ErrorCircle16Regular /> Syntax error: {status.error}</>
+      statusContent = <><ErrorCircle16Regular /> {t('schemasSubmissions.schemaEdit.syntaxError')} {status.error}</>
     }
   }
 

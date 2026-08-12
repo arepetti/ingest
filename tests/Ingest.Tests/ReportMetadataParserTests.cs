@@ -95,6 +95,10 @@ public class ReportMetadataParserTests
         var content = "---\ntype: ContinuousLive\n---\nbody";
         var ex = Assert.Throws<ValidationException>(() => ReportMetadataParser.Parse(content));
         Assert.Contains(ex.Errors, e => e.Contains("type", StringComparison.OrdinalIgnoreCase));
+        var detail = Assert.Single(ex.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Reports.FrontMatterTypeInvalid, detail.Code);
+        Assert.Equal("ContinuousLive", detail.Params["actualType"]);
+        Assert.Equal(new[] { "Single", "Aggregate" }, Assert.IsType<string[]>(detail.Params["allowedTypes"]));
     }
 
     [Fact]
@@ -103,6 +107,7 @@ public class ReportMetadataParserTests
         var content = "---\ntype: Aggregate\nbody without closing fence";
         var ex = Assert.Throws<ValidationException>(() => ReportMetadataParser.Parse(content));
         Assert.Contains(ex.Errors, e => e.Contains("front matter", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(DiagnosticCodes.Reports.FrontMatterUnclosed, Assert.Single(ex.ErrorDetails).Code);
     }
 
     [Fact]

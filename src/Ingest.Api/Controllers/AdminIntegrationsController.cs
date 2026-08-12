@@ -57,7 +57,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> List(CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         var list = await _integrations.ListAsync(ct);
         return Ok(list.Select(IntegrationDto.From).ToList());
     }
@@ -70,7 +70,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         return Ok(IntegrationDto.From(await _integrations.GetAsync(id, ct)));
     }
 
@@ -85,7 +85,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] IntegrationRequest req, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         var created = await _integrations.CreateAsync(req.ToEntity(), ct);
         return Created($"/api/admin/integrations/{created.Id}", IntegrationDto.From(created));
     }
@@ -101,7 +101,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] IntegrationRequest req, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         var updated = await _integrations.UpdateAsync(id, req.ToEntity(), ct);
         return Ok(IntegrationDto.From(updated));
     }
@@ -115,7 +115,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         await _integrations.DeleteAsync(id, ct);
         return NoContent();
     }
@@ -128,7 +128,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetConnection(CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         return Ok(TeamsConnectionDto.From(await _integrations.GetConnectionAsync(ct)));
     }
 
@@ -141,7 +141,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateConnection([FromBody] UpdateTeamsConnectionRequest req, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         var updated = await _integrations.UpdateConnectionAsync(
             new TeamsConnectionUpdate(req.AppId, req.TenantId, req.SingleTenant, req.UpdatePassword, req.Password), ct);
         await _audit.RecordAsync(AuditTargetType.Settings, AuditChangeType.Edit, AuditTargets.TeamsConnection, "Microsoft Teams connection", ct);
@@ -157,7 +157,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> TestConnection(CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         var connection = await _integrations.GetConnectionAsync(ct);
         var password = _protector.Unprotect(connection.AppPasswordCipher);
         if (!connection.IsConfigured || string.IsNullOrEmpty(password))
@@ -177,7 +177,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RunAll(CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         return Ok(await _run.RunAllAsync(ct));
     }
 
@@ -190,7 +190,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RunOne(Guid id, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         return Ok(await _run.RunOneAsync(id, ct));
     }
 
@@ -203,7 +203,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SendTest(Guid id, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         await _run.SendTestAsync(id, ct);
         return Accepted();
     }
@@ -217,7 +217,7 @@ public sealed class AdminIntegrationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Drain([FromQuery] int? max, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("integrations"));
         return Ok(await _dispatch.DrainAsync(max ?? 50, ct));
     }
 }

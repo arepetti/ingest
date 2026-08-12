@@ -47,7 +47,7 @@ public sealed class AdminNotificationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSettings(CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("notifications"));
         return Ok(NotificationSettingsDto.From(await _settings.GetAsync(ct)));
     }
 
@@ -60,7 +60,7 @@ public sealed class AdminNotificationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateSettings([FromBody] UpdateNotificationSettingsRequest req, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("notifications"));
         var updated = await _settings.UpdateAsync(new NotificationSettingsUpdate(
             req.Upcoming.ToUpdate(), req.Missed.ToUpdate(), req.Warnings.ToUpdate(),
             req.PendingApproval.ToUpdate(), req.Approved.ToUpdate(), req.Rejected.ToUpdate(),
@@ -79,7 +79,7 @@ public sealed class AdminNotificationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Run(CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("notifications"));
         return Ok(await _notifications.RunAsync(ct));
     }
 }

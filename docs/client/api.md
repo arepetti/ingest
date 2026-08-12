@@ -9,21 +9,49 @@ If you're just getting started — including how to obtain a key in the first pl
 ## Conventions
 
 - **Base URL** depends on your deployment. The examples use `https://ingest.example.org`.
-- **Authentication** is via API key in the `X-Api-Key` header. See [../architecture/authentication.md](../architecture/authentication.md). Every service-facing endpoint requires it; the only anonymous endpoint today is `POST /api/expressions/translate`, used internally by the admin SPA.
+- **Authentication** is via API key in the `X-Api-Key` header. See [../architecture/authentication.md](../architecture/authentication.md). Service-facing data endpoints require it. The admin SPA also uses anonymous `GET /api/bootstrap` for its non-sensitive default locale and anonymous expression endpoints for client-side validation previews.
 - **Time** is always UTC ISO-8601 strings on the wire (e.g. `2026-05-12T08:00:00Z`).
 - **Enums** are serialised as their string names. `"Service"`, not `0`.
-- **Errors** use [RFC 7807 problem-details JSON](https://www.rfc-editor.org/rfc/rfc7807):
+- **Errors** use [RFC 7807 problem-details JSON](https://www.rfc-editor.org/rfc/rfc7807). Stable diagnostic fields are additive:
   ```json
   {
     "title": "Validation failed",
     "status": 400,
-    "detail": "One or more values failed validation.",
+    "detail": "Validation failed: Value 'monthly_kpis.tonnes' below min (0).",
+    "code": "common.validation",
+    "params": { "count": 1 },
     "errors": [
       "Value 'monthly_kpis.tonnes' below min (0)."
+    ],
+    "errorDetails": [
+      {
+        "code": "submissions.value_minimum",
+        "message": "Value 'monthly_kpis.tonnes' below min (0).",
+        "params": {
+          "schemaName": "monthly_kpis",
+          "valueName": "tonnes",
+          "displayName": "monthly_kpis.tonnes",
+          "minimum": 0,
+          "actual": -1
+        }
+      }
     ]
   }
   ```
-  The `errors` extension is only present on 400 validation responses.
+  `code` and `params` describe a single problem. Validation failures additionally carry `errorDetails`, parallel to `errors`. Existing en-US `title`, `detail`, and `errors` remain for older clients and as human-readable fallbacks.
+
+### Localizing diagnostics
+
+Clients should translate stable `code` values and interpolate the named `params`; do not parse or branch on English wording. Ingest does not use `Accept-Language`, and the backend has no `.resx` message catalogs: localization is a client concern so API behavior remains language-neutral and old integrations keep receiving the same en-US text.
+
+Success payloads use the same additive pattern where diagnostics are part of the result. `errorDetails` parallels `errors`, and `warningDetails` parallels `warnings`; for example submission dry-runs can return both, while create/replace responses return `warnings` plus `warningDetails`. Each detail has `{ code, message, params }`, and corresponding legacy and structured arrays preserve order.
+
+Fallback rules matter because not all useful text belongs to the product:
+
+- If a code is known, translate it and interpolate its parameters.
+- If a code is unknown or a required interpolation value is unavailable, display the paired legacy string (`errors[n]` / `warnings[n]`), then the detail's `message`, then a generic localized failure.
+- Operator- or user-authored schema validation messages, account/schema/report/comment text, and raw third-party failure details are data, not UI resources. Keep them verbatim. Generic codes may wrap such a raw detail with localized context, but clients must not discard the actionable original text.
+- Machine codes are not suitable fallback copy and should not be shown to end users.
 
 ## Common status codes
 

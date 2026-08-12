@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   Badge, Body1, Button, Card, Checkbox, Dialog, DialogActions, DialogBody, DialogContent,
   DialogSurface, DialogTitle, Dropdown, Drawer, DrawerBody, Field, Input,
@@ -27,14 +28,14 @@ import type {
 } from '../api/types'
 
 /** Catalogue of subscribable events with their consumer-facing dotted name + a one-line gloss. */
-const EVENTS: { kind: WebhookEventKind; label: string; wire: string; desc: string }[] = [
-  { kind: 'SubmissionAccepted', label: 'Submission accepted', wire: 'submission.accepted', desc: 'A service submitted data and it was accepted.' },
-  { kind: 'SubmissionWarnings', label: 'Submission warnings', wire: 'submission.warnings', desc: 'An accepted submission carried non-blocking warnings.' },
-  { kind: 'WindowUpcoming', label: 'Window upcoming', wire: 'window.upcoming', desc: 'A submission window is approaching its close.' },
-  { kind: 'WindowMissed', label: 'Window missed', wire: 'window.missed', desc: 'A window closed without the required submission.' },
-  { kind: 'SubmissionPendingApproval', label: 'Submission pending approval', wire: 'submission.pending_approval', desc: 'A submission was accepted but is held awaiting approval.' },
-  { kind: 'SubmissionApproved', label: 'Submission approved', wire: 'submission.approved', desc: 'A pending submission was approved and is now live.' },
-  { kind: 'SubmissionRejected', label: 'Submission rejected', wire: 'submission.rejected', desc: 'A pending submission was rejected and will not go live.' },
+const EVENTS: { kind: WebhookEventKind; wire: string }[] = [
+  { kind: 'SubmissionAccepted', wire: 'submission.accepted' },
+  { kind: 'SubmissionWarnings', wire: 'submission.warnings' },
+  { kind: 'WindowUpcoming', wire: 'window.upcoming' },
+  { kind: 'WindowMissed', wire: 'window.missed' },
+  { kind: 'SubmissionPendingApproval', wire: 'submission.pending_approval' },
+  { kind: 'SubmissionApproved', wire: 'submission.approved' },
+  { kind: 'SubmissionRejected', wire: 'submission.rejected' },
 ]
 
 const ALL = '__all__'
@@ -79,6 +80,7 @@ const useStyles = makeStyles({
  */
 export function WebhooksSection() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { data: endpoints, isLoading, refetch } = useWebhookEndpoints()
   const [editing, setEditing] = useState<WebhookEndpoint | 'new' | null>(null)
   // Plaintext secret to reveal once after create/rotate (cleared when the dialog closes).
@@ -90,16 +92,16 @@ export function WebhooksSection() {
   const test = useSendWebhookTest()
 
   async function onDelete(e: WebhookEndpoint) {
-    if (!window.confirm(`Delete the webhook endpoint “${e.name}”?\n\nIts past deliveries are kept for audit.`)) return
+    if (!window.confirm(t('settings.webhooks.deleteConfirm', { name: e.name }))) return
     setBanner(null)
     try {
       await del.mutateAsync(e.id)
-      setBanner({ intent: 'success', text: `Deleted “${e.name}”.` })
+      setBanner({ intent: 'success', text: t('settings.webhooks.deleted', { name: e.name }) })
     } catch (err) { setBanner({ intent: 'error', text: formatApiError(err) }) }
   }
 
   async function onRotate(e: WebhookEndpoint) {
-    if (!window.confirm(`Generate a new signing secret for “${e.name}”?\n\nThe old secret stops working immediately.`)) return
+    if (!window.confirm(t('settings.webhooks.rotateConfirm', { name: e.name }))) return
     setBanner(null)
     try {
       const res = await rotate.mutateAsync(e.id)
@@ -111,7 +113,7 @@ export function WebhooksSection() {
     setBanner(null)
     try {
       await test.mutateAsync(e.id)
-      setBanner({ intent: 'success', text: `Test delivery queued for “${e.name}”. Check the delivery log below.` })
+      setBanner({ intent: 'success', text: t('settings.webhooks.testQueued', { name: e.name }) })
     } catch (err) { setBanner({ intent: 'error', text: formatApiError(err) }) }
   }
 
@@ -121,26 +123,25 @@ export function WebhooksSection() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <Card className={s.card}>
         <div className={s.titleRow}>
-          <Title3 className={s.sectionTitle}>Webhook endpoints</Title3>
+          <Title3 className={s.sectionTitle}>{t('settings.webhooks.title')}</Title3>
           <div className={s.headerActions}>
             <Button appearance="primary" icon={<Add20Regular />} onClick={() => setEditing('new')}>
-              Add endpoint
+              {t('settings.webhooks.add')}
             </Button>
             <Menu>
               <MenuTrigger disableButtonEnhancement>
-                <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+                <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('settings.common.moreActions')} />
               </MenuTrigger>
               <MenuPopover>
                 <MenuList>
-                  <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                  <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>{t('settings.common.refresh')}</MenuItem>
                 </MenuList>
               </MenuPopover>
             </Menu>
           </div>
         </div>
         <Body1 className={s.help}>
-          Send a signed HTTP POST to an external URL (Teams, Power Automate, your own service)
-          when a subscribed event happens — no polling required.
+          {t('settings.webhooks.description')}
         </Body1>
 
         {banner && (
@@ -152,30 +153,30 @@ export function WebhooksSection() {
         <Table size="small" className={s.table}>
           <TableHeader>
             <TableRow>
-              <TableHeaderCell>Name</TableHeaderCell>
-              <TableHeaderCell>URL</TableHeaderCell>
-              <TableHeaderCell className={s.colEvents}>Events</TableHeaderCell>
-              <TableHeaderCell className={s.colStatus}>Status</TableHeaderCell>
-              <TableHeaderCell className={s.colActions} aria-label="Actions" />
+              <TableHeaderCell>{t('settings.webhooks.name')}</TableHeaderCell>
+              <TableHeaderCell>{t('settings.webhooks.url')}</TableHeaderCell>
+              <TableHeaderCell className={s.colEvents}>{t('settings.webhooks.eventsLabel')}</TableHeaderCell>
+              <TableHeaderCell className={s.colStatus}>{t('settings.common.status')}</TableHeaderCell>
+              <TableHeaderCell className={s.colActions} aria-label={t('settings.common.actions')} />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && <GridMessageRow colSpan={5}>Loading…</GridMessageRow>}
+            {isLoading && <GridMessageRow colSpan={5}>{t('settings.common.loading')}</GridMessageRow>}
             {!isLoading && items.length === 0 && (
-              <GridMessageRow colSpan={5}>No endpoints yet. Add one to start receiving events.</GridMessageRow>
+              <GridMessageRow colSpan={5}>{t('settings.webhooks.empty')}</GridMessageRow>
             )}
             {items.map(e => (
               <TableRow
                 key={e.id}
                 className={`${s.row} ${s.rowClickable}`}
-                {...clickableRowProps(() => setEditing(e), `Edit endpoint ${e.name}`)}
+                {...clickableRowProps(() => setEditing(e), t('settings.webhooks.editAria', { name: e.name }))}
               >
                 <TableCell className={s.cellTrunc}>
                   <strong className={s.truncate}>{e.name}</strong>
                   {!e.hasSecret && (
-                    <Tooltip content="No signing secret set — deliveries are sent unsigned." relationship="label">
+                    <Tooltip content={t('settings.webhooks.unsignedHint')} relationship="label">
                       <span className={s.truncate} style={{ color: tokens.colorPaletteDarkOrangeForeground1, fontSize: tokens.fontSizeBase200 }}>
-                        unsigned
+                        {t('settings.webhooks.unsigned')}
                       </span>
                     </Tooltip>
                   )}
@@ -186,22 +187,22 @@ export function WebhooksSection() {
                   </Tooltip>
                 </TableCell>
                 <TableCell className={s.colEvents}>
-                  <Tooltip content={e.events.map(wireName).join(', ') || 'No events'} relationship="label">
-                    <span className={s.truncate}>{e.events.length} event{e.events.length === 1 ? '' : 's'}</span>
+                  <Tooltip content={e.events.map(wireName).join(', ') || t('settings.webhooks.noEvents')} relationship="label">
+                    <span className={s.truncate}>{t('settings.webhooks.eventCount', { count: e.events.length })}</span>
                   </Tooltip>
                 </TableCell>
                 <TableCell className={s.colStatus}>
                   <Badge appearance="outline" color={e.enabled ? 'success' : 'informative'}>
-                    {e.enabled ? 'Enabled' : 'Disabled'}
+                    {e.enabled ? t('settings.common.enabled') : t('settings.common.disabled')}
                   </Badge>
                 </TableCell>
                 <TableCell className={s.colActions} onClick={ev => ev.stopPropagation()}>
                   <RowActions
-                    ariaLabel={`Actions for ${e.name}`}
+                    ariaLabel={t('settings.webhooks.actionsAria', { name: e.name })}
                     actions={[
-                      { key: 'test', label: 'Send test', icon: <Send20Regular />, onClick: () => onTest(e), disabled: test.isPending },
-                      { key: 'rotate', label: e.hasSecret ? 'Rotate secret' : 'Generate secret', icon: <KeyReset20Regular />, onClick: () => onRotate(e), disabled: rotate.isPending },
-                      { key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => onDelete(e) },
+                      { key: 'test', label: t('settings.integrations.sendTest'), icon: <Send20Regular />, onClick: () => onTest(e), disabled: test.isPending },
+                      { key: 'rotate', label: e.hasSecret ? t('settings.webhooks.rotateSecret') : t('settings.webhooks.generateSecret'), icon: <KeyReset20Regular />, onClick: () => onRotate(e), disabled: rotate.isPending },
+                      { key: 'delete', label: t('settings.common.delete'), icon: <Delete20Regular />, destructive: true, onClick: () => onDelete(e) },
                     ]}
                   />
                 </TableCell>
@@ -210,8 +211,13 @@ export function WebhooksSection() {
           </TableBody>
         </Table>
         <Body1 className={s.help}>
-          Delivery history — status, retries, and manual redelivery — lives on the{' '}
-          <RouterLink to="/audit">Audit page</RouterLink> under <strong>Webhook deliveries</strong>.
+          <Trans
+            i18nKey="settings.webhooks.deliveryHistory"
+            components={{
+              auditLink: <RouterLink to="/audit" />,
+              sectionName: <strong />,
+            }}
+          />
         </Body1>
       </Card>
 
@@ -224,7 +230,9 @@ export function WebhooksSection() {
         className={s.drawer}
       >
         <DrawerHeaderWithClose
-          title={editing === 'new' ? 'Add webhook endpoint' : `Edit endpoint${editing ? ` — ${editing.name}` : ''}`}
+          title={editing === 'new'
+            ? t('settings.webhooks.addTitle')
+            : t('settings.webhooks.editTitle', { name: editing?.name ?? '' })}
           onClose={() => setEditing(null)}
         />
         <DrawerBody>
@@ -258,6 +266,7 @@ function EndpointEditor({
   onSecret: (name: string, secret: string) => void
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const isNew = endpoint === null
   const create = useCreateWebhookEndpoint()
   const update = useUpdateWebhookEndpoint()
@@ -281,9 +290,9 @@ function EndpointEditor({
 
   async function onSave() {
     setError(null)
-    if (!name.trim()) { setError('A name is required.'); return }
-    if (!/^https?:\/\//i.test(url.trim())) { setError('Enter an absolute http(s) URL.'); return }
-    if (events.length === 0) { setError('Select at least one event to subscribe to.'); return }
+    if (!name.trim()) { setError(t('settings.webhooks.nameRequired')); return }
+    if (!/^https?:\/\//i.test(url.trim())) { setError(t('settings.webhooks.urlValidation')); return }
+    if (events.length === 0) { setError(t('settings.webhooks.eventRequired')); return }
 
     const common = {
       name: name.trim(),
@@ -312,52 +321,52 @@ function EndpointEditor({
     <div className={s.drawerForm}>
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
 
-      <Field label="Name" required>
-        <Input value={name} onChange={(_, d) => setName(d.value)} placeholder="Teams – submissions channel" />
+      <Field label={t('settings.webhooks.name')} required>
+        <Input value={name} onChange={(_, d) => setName(d.value)} placeholder={t('settings.webhooks.namePlaceholder')} />
       </Field>
 
-      <Field label="Destination URL" required hint="The signed POST is sent here. Must be an absolute http(s) URL.">
-        <Input value={url} onChange={(_, d) => setUrl(d.value)} placeholder="https://example.org/hooks/ingest" />
+      <Field label={t('settings.webhooks.destinationUrl')} required hint={t('settings.webhooks.destinationUrlHint')}>
+        <Input value={url} onChange={(_, d) => setUrl(d.value)} placeholder={t('settings.webhooks.urlPlaceholder')} />
       </Field>
 
-      <Switch label="Enabled" checked={enabled} onChange={(_, d) => setEnabled(d.checked)} />
+      <Switch label={t('settings.common.enabled')} checked={enabled} onChange={(_, d) => setEnabled(d.checked)} />
 
-      <Field label="Events" required>
+      <Field label={t('settings.webhooks.eventsLabel')} required>
         <div className={s.eventList}>
           {EVENTS.map(ev => (
             <div key={ev.kind}>
               <Checkbox
-                label={`${ev.label} (${ev.wire})`}
+                label={`${t(`settings.webhooks.events.${ev.kind}.label`)} (${ev.wire})`}
                 checked={events.includes(ev.kind)}
                 onChange={(_, d) => toggleEvent(ev.kind, !!d.checked)}
               />
-              <div className={s.eventHelp}>{ev.desc}</div>
+              <div className={s.eventHelp}>{t(`settings.webhooks.events.${ev.kind}.description`)}</div>
             </div>
           ))}
         </div>
       </Field>
 
-      <Field label="Only for service" hint="Limit deliveries to one service account. Leave blank to fire for every service.">
+      <Field label={t('settings.webhooks.onlyForService')} hint={t('settings.webhooks.onlyForServiceHint')}>
         <Dropdown
-          placeholder="All services"
+          placeholder={t('settings.common.allServices')}
           selectedOptions={serviceId ? [serviceId] : []}
-          value={selectedService ? (selectedService.label || selectedService.name) : 'All services'}
+          value={selectedService ? (selectedService.label || selectedService.name) : t('settings.common.allServices')}
           onOptionSelect={(_, d) => setServiceId(d.optionValue === ALL ? '' : (d.optionValue ?? ''))}
         >
-          <Option value={ALL}>All services</Option>
+          <Option value={ALL}>{t('settings.common.allServices')}</Option>
           {services.map(a => (
             <Option key={a.id} value={a.id} text={a.label || a.name}>{a.label || a.name}</Option>
           ))}
         </Dropdown>
       </Field>
 
-      <Field label="Description" hint="Optional note shown only in this admin list.">
+      <Field label={t('settings.webhooks.descriptionLabel')} hint={t('settings.webhooks.descriptionHint')}>
         <Textarea value={description} onChange={(_, d) => setDescription(d.value)} rows={2} resize="vertical" />
       </Field>
 
       {isNew && (
         <Checkbox
-          label="Generate a signing secret (HMAC-SHA256). Shown once after saving."
+          label={t('settings.webhooks.generateOnCreate')}
           checked={generateSecret}
           onChange={(_, d) => setGenerateSecret(!!d.checked)}
         />
@@ -365,9 +374,9 @@ function EndpointEditor({
 
       <div className={s.actions}>
         <Button appearance="primary" disabled={pending} onClick={onSave}>
-          {pending ? 'Saving…' : isNew ? 'Create endpoint' : 'Save changes'}
+          {pending ? t('settings.common.saving') : isNew ? t('settings.webhooks.create') : t('settings.common.saveChanges')}
         </Button>
-        <Button appearance="secondary" disabled={pending} onClick={onClose}>Cancel</Button>
+        <Button appearance="secondary" disabled={pending} onClick={onClose}>{t('settings.common.cancel')}</Button>
       </div>
     </div>
   )
@@ -377,6 +386,7 @@ function EndpointEditor({
 
 function SecretDialog({ reveal, onClose }: { reveal: { name: string; secret: string } | null; onClose: () => void }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
   async function copy() {
@@ -391,19 +401,18 @@ function SecretDialog({ reveal, onClose }: { reveal: { name: string; secret: str
     <Dialog open={!!reveal} onOpenChange={(_, d) => { if (!d.open) { setCopied(false); onClose() } }}>
       <DialogSurface>
         <DialogBody>
-          <DialogTitle>Signing secret for “{reveal?.name}”</DialogTitle>
+          <DialogTitle>{t('settings.webhooks.secretTitle', { name: reveal?.name })}</DialogTitle>
           <DialogContent>
             <p>
-              Copy this now — it is shown <strong>once</strong> and cannot be retrieved later.
-              Use it to verify the <code>X-Ingest-Signature</code> header on each delivery.
+              {t('settings.webhooks.secretInstructions')}
             </p>
             <div className={s.secretBox}>{reveal?.secret}</div>
           </DialogContent>
           <DialogActions>
             <Button appearance="primary" icon={<Copy20Regular />} onClick={copy}>
-              {copied ? 'Copied' : 'Copy secret'}
+              {copied ? t('settings.webhooks.copied') : t('settings.webhooks.copySecret')}
             </Button>
-            <Button appearance="secondary" onClick={() => { setCopied(false); onClose() }}>Done</Button>
+            <Button appearance="secondary" onClick={() => { setCopied(false); onClose() }}>{t('settings.common.done')}</Button>
           </DialogActions>
         </DialogBody>
       </DialogSurface>

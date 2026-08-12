@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Common;
 
 namespace Ingest.Infrastructure.Services;
 
@@ -13,7 +14,27 @@ public sealed record ParsedSubmission(string? Group, IReadOnlyList<SampleInput> 
 /// <summary>Result of parsing a bulk import file: the submission groups plus any structural errors.</summary>
 /// <param name="Submissions">Parsed groups in document order. Empty when parsing failed.</param>
 /// <param name="Errors">Human-readable parse errors with row/group context. Empty on success.</param>
-public sealed record BulkImportParseResult(IReadOnlyList<ParsedSubmission> Submissions, IReadOnlyList<string> Errors);
+public sealed record BulkImportParseResult(IReadOnlyList<ParsedSubmission> Submissions, IReadOnlyList<string> Errors)
+{
+    /// <summary>Structured counterparts to <see cref="Errors"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> ErrorDetails { get; init; } =
+        Errors.Select((message, index) => Diagnostic.Create(
+            DiagnosticCodes.Imports.InvalidFile,
+            message,
+            ("index", index))).ToList();
+
+    internal static BulkImportParseResult Failure(IReadOnlyList<Diagnostic> errors) =>
+        new(Array.Empty<ParsedSubmission>(), errors.Select(x => x.Message).ToList())
+        {
+            ErrorDetails = errors,
+        };
+
+    internal static BulkImportParseResult Success(IReadOnlyList<ParsedSubmission> submissions) =>
+        new(submissions, Array.Empty<string>())
+        {
+            ErrorDetails = Array.Empty<Diagnostic>(),
+        };
+}
 
 /// <summary>
 /// Pure (no I/O) parser that turns a bulk import file into submission groups. Kept separate from
@@ -30,7 +51,11 @@ public static class BulkImportParser
     {
         BulkImportFormat.Json => ParseJson(content),
         BulkImportFormat.Csv => ParseCsv(content),
-        _ => new BulkImportParseResult(Array.Empty<ParsedSubmission>(), new[] { $"Unsupported import format '{format}'." }),
+        _ => Fail(Diagnostic.Create(
+            DiagnosticCodes.Imports.UnsupportedFormat,
+            $"Unsupported import format '{format}'.",
+            ("format", format.ToString()),
+            ("supportedFormats", Enum.GetNames<BulkImportFormat>()))),
     };
 
     // ── JSON ──────────────────────────────────────────────────────────────────────────────────
@@ -38,7 +63,7 @@ public static class BulkImportParser
     private static BulkImportParseResult ParseJson(string content)
     {
         if (string.IsNullOrWhiteSpace(content))
-            return Fail("The file is empty.");
+            return Fail(new Diagnostic(DiagnosticCodes.Imports.EmptyFile, "The file is empty."));
 
         JsonDocument doc;
         try
@@ -47,13 +72,18 @@ public static class BulkImportParser
         }
         catch (JsonException ex)
         {
-            return Fail($"Invalid JSON: {ex.Message}");
+            return Fail(Diagnostic.Create(
+                DiagnosticCodes.Imports.InvalidJson,
+                $"Invalid JSON: {ex.Message}",
+                ("detail", ex.Message),
+                ("lineNumber", ex.LineNumber),
+                ("bytePositionInLine", ex.BytePositionInLine)));
         }
 
         using (doc)
         {
             var root = doc.RootElement;
-            var errors = new List<string>();
+            var errors = new List<Diagnostic>();
             var submissions = new List<ParsedSubmission>();
 
             // Accepted shapes:
@@ -63,7 +93,10 @@ public static class BulkImportParser
             if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("submissions", out var subs))
             {
                 if (subs.ValueKind != JsonValueKind.Array)
-                    return Fail("'submissions' must be an array.");
+                    return Fail(Diagnostic.Create(
+                        DiagnosticCodes.Imports.SubmissionsNotArray,
+                        "'submissions' must be an array.",
+                        ("actualKind", subs.ValueKind.ToString())));
                 var i = 0;
                 foreach (var sub in subs.EnumerateArray())
                     AddSubmission(sub, i++, submissions, errors);
@@ -80,29 +113,41 @@ public static class BulkImportParser
             }
             else
             {
-                return Fail("Expected an array of submissions, or an object with a 'submissions' or 'samples' property.");
+                return Fail(Diagnostic.Create(
+                    DiagnosticCodes.Imports.InvalidRoot,
+                    "Expected an array of submissions, or an object with a 'submissions' or 'samples' property.",
+                    ("actualKind", root.ValueKind.ToString()),
+                    ("acceptedShapes", new[] { "array", "object.submissions", "object.samples" })));
             }
 
             if (errors.Count > 0)
-                return new BulkImportParseResult(Array.Empty<ParsedSubmission>(), errors);
+                return BulkImportParseResult.Failure(errors);
             if (submissions.Count == 0)
-                return Fail("No submissions found in the file.");
+                return Fail(new Diagnostic(DiagnosticCodes.Imports.NoSubmissions, "No submissions found in the file."));
 
-            return new BulkImportParseResult(submissions, Array.Empty<string>());
+            return BulkImportParseResult.Success(submissions);
         }
     }
 
-    private static void AddSubmission(JsonElement submission, int index, List<ParsedSubmission> into, List<string> errors)
+    private static void AddSubmission(JsonElement submission, int index, List<ParsedSubmission> into, List<Diagnostic> errors)
     {
         var where = $"Submission #{index + 1}";
         if (submission.ValueKind != JsonValueKind.Object)
         {
-            errors.Add($"{where}: expected an object with a 'samples' array.");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Imports.SubmissionNotObject,
+                $"{where}: expected an object with a 'samples' array.",
+                ("submissionNumber", index + 1),
+                ("actualKind", submission.ValueKind.ToString())));
             return;
         }
         if (!submission.TryGetProperty("samples", out var samplesEl) || samplesEl.ValueKind != JsonValueKind.Array)
         {
-            errors.Add($"{where}: missing a 'samples' array.");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Imports.SamplesMissing,
+                $"{where}: missing a 'samples' array.",
+                ("submissionNumber", index + 1),
+                ("actualKind", submission.TryGetProperty("samples", out var existing) ? existing.ValueKind.ToString() : null)));
             return;
         }
 
@@ -116,20 +161,36 @@ public static class BulkImportParser
                 var sample = sampleEl.Deserialize<SampleInput>(JsonOptions);
                 if (sample is null || string.IsNullOrWhiteSpace(sample.SchemaName) || string.IsNullOrWhiteSpace(sample.ValueName))
                 {
-                    errors.Add($"{where}, sample #{s}: 'schemaName' and 'valueName' are required.");
+                    errors.Add(Diagnostic.Create(
+                        DiagnosticCodes.Imports.SampleNamesRequired,
+                        $"{where}, sample #{s}: 'schemaName' and 'valueName' are required.",
+                        ("submissionNumber", index + 1),
+                        ("sampleNumber", s),
+                        ("schemaName", sample?.SchemaName),
+                        ("valueName", sample?.ValueName)));
                     continue;
                 }
                 samples.Add(sample);
             }
             catch (JsonException ex)
             {
-                errors.Add($"{where}, sample #{s}: {ex.Message}");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Imports.SampleInvalidJson,
+                    $"{where}, sample #{s}: {ex.Message}",
+                    ("submissionNumber", index + 1),
+                    ("sampleNumber", s),
+                    ("detail", ex.Message),
+                    ("lineNumber", ex.LineNumber),
+                    ("bytePositionInLine", ex.BytePositionInLine)));
             }
         }
 
         if (samples.Count == 0)
         {
-            errors.Add($"{where}: contains no valid samples.");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Imports.SubmissionNoSamples,
+                $"{where}: contains no valid samples.",
+                ("submissionNumber", index + 1)));
             return;
         }
         into.Add(new ParsedSubmission(null, samples));
@@ -140,11 +201,11 @@ public static class BulkImportParser
     private static BulkImportParseResult ParseCsv(string content)
     {
         if (string.IsNullOrWhiteSpace(content))
-            return Fail("The file is empty.");
+            return Fail(new Diagnostic(DiagnosticCodes.Imports.EmptyFile, "The file is empty."));
 
         var records = ReadCsvRecords(content);
         if (records.Count == 0)
-            return Fail("The file is empty.");
+            return Fail(new Diagnostic(DiagnosticCodes.Imports.EmptyFile, "The file is empty."));
 
         var header = records[0];
         var cols = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -156,7 +217,11 @@ public static class BulkImportParser
 
         foreach (var required in new[] { "schemaName", "valueName", "value", "timestamp" })
             if (!cols.ContainsKey(required))
-                return Fail($"Missing required column '{required}'. Expected a header row with: group (optional), schemaName, valueName, value, timestamp, note (optional).");
+                return Fail(Diagnostic.Create(
+                    DiagnosticCodes.Imports.MissingColumn,
+                    $"Missing required column '{required}'. Expected a header row with: group (optional), schemaName, valueName, value, timestamp, note (optional).",
+                    ("column", required),
+                    ("expectedColumns", new[] { "group", "schemaName", "valueName", "value", "timestamp", "note" })));
 
         var hasGroup = cols.TryGetValue("group", out var groupCol);
         var hasNote = cols.TryGetValue("note", out var noteCol);
@@ -165,7 +230,7 @@ public static class BulkImportParser
         var valueCol = cols["value"];
         var tsCol = cols["timestamp"];
 
-        var errors = new List<string>();
+        var errors = new List<Diagnostic>();
         // Preserve first-appearance order of group keys; key "" buckets the ungrouped rows together.
         var order = new List<string>();
         var grouped = new Dictionary<string, List<SampleInput>>(StringComparer.Ordinal);
@@ -183,12 +248,21 @@ public static class BulkImportParser
 
             if (string.IsNullOrWhiteSpace(schemaName) || string.IsNullOrWhiteSpace(valueName))
             {
-                errors.Add($"Row {line}: 'schemaName' and 'valueName' are required.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Imports.RowNamesRequired,
+                    $"Row {line}: 'schemaName' and 'valueName' are required.",
+                    ("row", line),
+                    ("schemaName", schemaName),
+                    ("valueName", valueName)));
                 continue;
             }
             if (!TryParseTimestamp(rawTs, out var ts))
             {
-                errors.Add($"Row {line}: '{rawTs}' is not a valid timestamp.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Imports.RowTimestampInvalid,
+                    $"Row {line}: '{rawTs}' is not a valid timestamp.",
+                    ("row", line),
+                    ("timestamp", rawTs)));
                 continue;
             }
 
@@ -210,16 +284,16 @@ public static class BulkImportParser
         }
 
         if (errors.Count > 0)
-            return new BulkImportParseResult(Array.Empty<ParsedSubmission>(), errors);
+            return BulkImportParseResult.Failure(errors);
 
         var submissions = order
             .Select(k => new ParsedSubmission(k.Length == 0 ? null : k, grouped[k]))
             .ToList();
 
         if (submissions.Count == 0)
-            return Fail("No data rows found in the file.");
+            return Fail(new Diagnostic(DiagnosticCodes.Imports.NoDataRows, "No data rows found in the file."));
 
-        return new BulkImportParseResult(submissions, Array.Empty<string>());
+        return BulkImportParseResult.Success(submissions);
     }
 
     private static string Field(IReadOnlyList<string> row, int index) => index < row.Count ? row[index] : string.Empty;
@@ -321,6 +395,6 @@ public static class BulkImportParser
         return records;
     }
 
-    private static BulkImportParseResult Fail(string error) =>
-        new(Array.Empty<ParsedSubmission>(), new[] { error });
+    private static BulkImportParseResult Fail(Diagnostic error) =>
+        BulkImportParseResult.Failure(new[] { error });
 }

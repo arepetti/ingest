@@ -9,6 +9,8 @@ import { cadenceLabel } from '../utils/cadence'
 import { walkLayout, type RenderItem } from '../utils/layout'
 import { fromLocalInput, toLocalInput } from '../utils/datetimeLocal'
 import type { RowState, ValueRow } from '../utils/sampleRules'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 const useStyles = makeStyles({
   valueRow: {
@@ -183,6 +185,7 @@ function SchemaValueRow({
   onChange: (patch: Partial<ValueRow>) => void
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const def = row.def
   const calculated = def.kind === 'Calculated'
   // The row is "inert" (not editable) when the page is read-only, the schema/value is disabled,
@@ -202,20 +205,20 @@ function SchemaValueRow({
         {def.description && <span className={s.valueLabelMeta}>{def.description}</span>}
         <div className={s.badges}>
           {/* Same visual treatment as the cadence badge — both are neutral metadata pills. */}
-          <Badge appearance="outline" color="informative" size="small">{friendlyTypeLabel(def.type)}</Badge>
-          <Badge appearance="outline" color="informative" size="small">{cadenceLabel(def.cadence)}</Badge>
-          {def.required && !calculated && <Badge appearance="outline" color="severe" size="small">required</Badge>}
-          {!def.required && !calculated && <Badge appearance="outline" color="subtle" size="small">optional</Badge>}
-          {calculated && <Badge appearance="outline" color="informative" size="small">calculated</Badge>}
-          {inert && <Badge appearance="outline" color="subtle" size="small">disabled</Badge>}
+          <Badge appearance="outline" color="informative" size="small">{friendlyTypeLabel(def.type, t)}</Badge>
+          <Badge appearance="outline" color="informative" size="small">{cadenceLabel(def.cadence, t)}</Badge>
+          {def.required && !calculated && <Badge appearance="outline" color="severe" size="small">{t('schemasSubmissions.sampleFields.required')}</Badge>}
+          {!def.required && !calculated && <Badge appearance="outline" color="subtle" size="small">{t('schemasSubmissions.sampleFields.optional')}</Badge>}
+          {calculated && <Badge appearance="outline" color="informative" size="small">{t('schemasSubmissions.sampleFields.calculated')}</Badge>}
+          {inert && <Badge appearance="outline" color="subtle" size="small">{t('schemasSubmissions.sampleFields.disabled')}</Badge>}
         </div>
-        <span className={s.valueLabelMeta}>{valueHint(def)}</span>
+        <span className={s.valueLabelMeta}>{valueHint(def, t)}</span>
         {state.warning && (
           <span className={s.warningInline}>{state.warning}</span>
         )}
       </div>
 
-      <Field label={`Value${def.unit ? ` (${def.unit})` : ''}`}>
+      <Field label={t('schemasSubmissions.sampleFields.value', { unit: def.unit ? ` (${def.unit})` : '' })}>
         <SampleValueInput
           valueDef={def}
           value={row.value}
@@ -226,7 +229,7 @@ function SchemaValueRow({
       </Field>
 
       {!calculated && (showNotes ? (
-        <Field label="Note">
+        <Field label={t('schemasSubmissions.sampleFields.note')}>
           <Textarea
             value={row.note}
             onChange={(_, v) => onChange({ note: v.value })}
@@ -246,7 +249,7 @@ function SchemaValueRow({
             disabled={inert}
             onClick={() => setNotesOpened(true)}
           >
-            Add notes
+            {t('schemasSubmissions.sampleFields.addNotes')}
           </Button>
         </div>
       ))}
@@ -264,12 +267,13 @@ function SampleValueInput({
   onChange: (v: unknown) => void
   disabled?: boolean
 }) {
+  const { t } = useTranslation()
   if (displayValue !== undefined) {
     return (
       <Input
         disabled
         readOnly
-        value={formatDisplayValue(displayValue, valueDef)}
+        value={formatDisplayValue(displayValue, valueDef, t)}
       />
     )
   }
@@ -283,15 +287,15 @@ function SampleValueInput({
         <Dropdown
           disabled={disabled}
           selectedOptions={value === true ? ['true'] : value === false ? ['false'] : ['']}
-          value={value === true ? 'Yes' : value === false ? 'No' : ''}
+          value={value === true ? t('schemasSubmissions.common.yes') : value === false ? t('schemasSubmissions.common.no') : ''}
           onOptionSelect={(_, d) => {
             const v = d.optionValue
             onChange(v === 'true' ? true : v === 'false' ? false : null)
           }}
         >
-          <Option value="">(not provided)</Option>
-          <Option value="true">Yes</Option>
-          <Option value="false">No</Option>
+          <Option value="">{t('schemasSubmissions.sampleFields.notProvided')}</Option>
+          <Option value="true">{t('schemasSubmissions.common.yes')}</Option>
+          <Option value="false">{t('schemasSubmissions.common.no')}</Option>
         </Dropdown>
       )
     case 'Integer':
@@ -340,10 +344,10 @@ function SampleValueInput({
   }
 }
 
-function formatDisplayValue(value: unknown, def: SchemaValue): string {
+function formatDisplayValue(value: unknown, def: SchemaValue, t: TFunction): string {
   if (value === null || value === undefined) return ''
   switch (def.type) {
-    case 'Boolean': return value === true ? 'Yes' : value === false ? 'No' : ''
+    case 'Boolean': return value === true ? t('schemasSubmissions.common.yes') : value === false ? t('schemasSubmissions.common.no') : ''
     case 'Date': return typeof value === 'string' ? value : String(value)
     default: return String(value)
   }
@@ -354,30 +358,30 @@ function formatDisplayValue(value: unknown, def: SchemaValue): string {
  * submission editor. The schema editor still shows the raw type — that audience cares about
  * the precise wire shape, this audience doesn't.
  */
-function friendlyTypeLabel(type: SchemaValueType): string {
+function friendlyTypeLabel(type: SchemaValueType, t: TFunction): string {
   switch (type) {
-    case 'String':  return 'Text'
-    case 'Integer': return 'Whole number'
-    case 'Number':  return 'Number'
-    case 'Date':    return 'Date'
-    case 'Boolean': return 'Yes/No'
+    case 'String':  return t('schemasSubmissions.common.valueType.String')
+    case 'Integer': return t('schemasSubmissions.common.valueType.Integer')
+    case 'Number':  return t('schemasSubmissions.common.valueType.Number')
+    case 'Date':    return t('schemasSubmissions.common.valueType.Date')
+    case 'Boolean': return t('schemasSubmissions.common.valueType.Boolean')
   }
 }
 
-function valueHint(v: SchemaValue): string {
+function valueHint(v: SchemaValue, t: TFunction): string {
   const bits: string[] = []
   if (v.type === 'Number' || v.type === 'Integer') {
-    if (v.min != null) bits.push(`min ${v.min}`)
-    if (v.max != null) bits.push(`max ${v.max}`)
+    if (v.min != null) bits.push(t('schemasSubmissions.sampleFields.min', { value: v.min }))
+    if (v.max != null) bits.push(t('schemasSubmissions.sampleFields.max', { value: v.max }))
   }
   if (v.type === 'String') {
-    if (v.minLength != null) bits.push(`min length ${v.minLength}`)
-    if (v.maxLength != null) bits.push(`max length ${v.maxLength}`)
-    if (v.regexPattern) bits.push(`regex: ${v.regexPattern}`)
+    if (v.minLength != null) bits.push(t('schemasSubmissions.sampleFields.minLength', { value: v.minLength }))
+    if (v.maxLength != null) bits.push(t('schemasSubmissions.sampleFields.maxLength', { value: v.maxLength }))
+    if (v.regexPattern) bits.push(t('schemasSubmissions.sampleFields.regex', { value: v.regexPattern }))
   }
   if (v.type === 'Date') {
-    if (v.minDate) bits.push(`from ${v.minDate}`)
-    if (v.maxDate) bits.push(`to ${v.maxDate}`)
+    if (v.minDate) bits.push(t('schemasSubmissions.sampleFields.from', { value: v.minDate }))
+    if (v.maxDate) bits.push(t('schemasSubmissions.sampleFields.to', { value: v.maxDate }))
   }
   return bits.join(' · ')
 }

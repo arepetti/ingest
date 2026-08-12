@@ -4,6 +4,7 @@ import { Board24Regular, CalendarLtr24Regular, ChartMultiple24Regular, DataTreem
 import { useCapabilities } from '../api/hooks'
 import { TopBar } from '../components/TopBar'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: {
@@ -105,6 +106,7 @@ interface NavEntry {
 
 export function Shell() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { me, has, hasAny } = useCapabilities()
 
   const cls = ({ isActive }: { isActive: boolean }) =>
@@ -114,22 +116,22 @@ export function Shell() {
   // account (no back-office capabilities) sees only the dashboard and its own submissions.
   const canConfigure = hasAny('settings:read', 'settings:manage', 'notifications:read', 'notifications:manage', 'webhooks:read', 'webhooks:manage')
   const navEntries: NavEntry[] = [
-    { to: '/',            label: 'Dashboard',   icon: <Board24Regular />,              show: true, end: true },
-    { to: '/submissions', label: 'Submissions', icon: <DocumentBulletList24Regular />, show: true },
-    { to: '/missing',     label: 'Missing',     icon: <Warning24Regular />,            show: has('status:read') },
-    { to: '/explore',     label: 'Explore',     icon: <ChartMultiple24Regular />,      show: has('explore:read') },
-    { to: '/reports',     label: 'Reports',     icon: <DocumentText24Regular />,       show: has('reports:read') },
+    { to: '/',            label: t('shell.navigation.dashboard'),   icon: <Board24Regular />,              show: true, end: true },
+    { to: '/submissions', label: t('shell.navigation.submissions'), icon: <DocumentBulletList24Regular />, show: true },
+    { to: '/missing',     label: t('shell.navigation.missing'),     icon: <Warning24Regular />,            show: has('status:read') },
+    { to: '/explore',     label: t('shell.navigation.explore'),     icon: <ChartMultiple24Regular />,      show: has('explore:read') },
+    { to: '/reports',     label: t('shell.navigation.reports'),     icon: <DocumentText24Regular />,       show: has('reports:read') },
     // Route stays /services for URL stability (/services/{name}/status still resolves); the label
     // is "Accounts" because the page lists every account (any kind, any role), not only services.
-    { to: '/services',    label: 'Accounts',    icon: <PeopleTeam24Regular />,         show: has('accounts:read') },
-    { to: '/schemas',     label: 'Schemas',     icon: <DataTreemap24Regular />,        show: has('schemas:read') },
-    { to: '/events',      label: 'Events',      icon: <CalendarLtr24Regular />,        show: has('events:read') },
-    { to: '/audit',       label: 'Audit',       icon: <History24Regular />,            show: has('audit:read') },
+    { to: '/services',    label: t('shell.navigation.accounts'),    icon: <PeopleTeam24Regular />,         show: has('accounts:read') },
+    { to: '/schemas',     label: t('shell.navigation.schemas'),     icon: <DataTreemap24Regular />,        show: has('schemas:read') },
+    { to: '/events',      label: t('shell.navigation.events'),      icon: <CalendarLtr24Regular />,        show: has('events:read') },
+    { to: '/audit',       label: t('shell.navigation.audit'),       icon: <History24Regular />,            show: has('audit:read') },
     // Operational utilities (backup/restore today). Pinned to the bottom, directly above Settings.
     // `marginTop: auto` on the first bottom entry pushes the whole bottom group down.
-    { to: '/tools',       label: 'Tools',       icon: <Toolbox24Regular />,            show: has('backup:read'), bottom: true },
+    { to: '/tools',       label: t('shell.navigation.tools'),       icon: <Toolbox24Regular />,            show: has('backup:read'), bottom: true },
     // Configuration hub (email, notifications, webhooks, default approval policy).
-    { to: '/settings',    label: 'Settings',    icon: <Settings24Regular />,           show: canConfigure },
+    { to: '/settings',    label: t('shell.navigation.settings'),    icon: <Settings24Regular />,           show: canConfigure },
   ]
 
   // Subtitle reflects whether any back-office nav is visible at all.
@@ -137,14 +139,16 @@ export function Shell() {
 
   return (
     <div className={s.root}>
-      <a href="#main-content" className={s.skipLink}>Skip to main content</a>
-      <aside className={s.side} aria-label="Primary">
+      <a href="#main-content" className={s.skipLink}>{t('shell.skipToContent')}</a>
+      <aside className={s.side} aria-label={t('shell.primaryAriaLabel')}>
         <Link to="/" className={s.brand}>
           <span className={s.brandTitle}>Ingest</span>
-          <span className={s.brandSub}>{isService ? 'Service console' : 'Admin console'}</span>
+          <span className={s.brandSub}>
+            {isService ? t('shell.serviceConsole') : t('shell.adminConsole')}
+          </span>
         </Link>
 
-        <nav className={s.nav} aria-label="Main navigation">
+        <nav className={s.nav} aria-label={t('shell.mainNavigationAriaLabel')}>
           {navEntries.filter(e => e.show).map(e => (
             <NavLink
               key={e.to}
@@ -164,8 +168,8 @@ export function Shell() {
         {me?.submissionsClosed && (
           <MessageBar intent="warning" className={s.closedBanner}>
             <MessageBarBody>
-              <MessageBarTitle>Submissions are closed</MessageBarTitle>
-              {me.submissionsClosedMessage || 'New submissions and edits from service accounts are temporarily paused.'}
+              <MessageBarTitle>{t('shell.submissionsClosed.title')}</MessageBarTitle>
+              {me.submissionsClosedMessage || t('shell.submissionsClosed.message')}
             </MessageBarBody>
           </MessageBar>
         )}

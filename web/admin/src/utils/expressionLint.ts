@@ -7,6 +7,8 @@
  * bound-key forms (`[name.minimum]`) — those are always treated as valid so they never mis-flag.
  */
 import { KNOWN_FUNCTION_NAMES } from './expressionFunctions'
+import type { TFunction } from 'i18next'
+import i18n from '../i18n'
 
 export interface IdentifierProblem {
   from: number
@@ -22,7 +24,12 @@ const NON_VARIABLE_WORDS: ReadonlySet<string> = new Set([
 const IDENT_START = /[A-Za-z_]/
 const IDENT_PART = /[A-Za-z0-9_]/
 
-export function findUnknownIdentifiers(text: string, knownVarsLower: ReadonlySet<string>): IdentifierProblem[] {
+export function findUnknownIdentifiers(
+  text: string,
+  knownVarsLower: ReadonlySet<string>,
+  t?: TFunction,
+): IdentifierProblem[] {
+  const translate = t ?? (i18n.isInitialized ? i18n.t : undefined)
   const problems: IdentifierProblem[] = []
   const n = text.length
   let i = 0
@@ -54,10 +61,20 @@ export function findUnknownIdentifiers(text: string, knownVarsLower: ReadonlySet
       while (j < n && /\s/.test(text[j])) j++
       if (text[j] === '(') {
         if (!KNOWN_FUNCTION_NAMES.has(lower)) {
-          problems.push({ from: start, to: i, message: `Unknown function '${word}'.` })
+          problems.push({
+            from: start,
+            to: i,
+            message: translate?.('shell.expression.lint.unknownFunction', { name: word })
+              ?? `Unknown function '${word}'.`,
+          })
         }
       } else if (!NON_VARIABLE_WORDS.has(lower) && !knownVarsLower.has(lower)) {
-        problems.push({ from: start, to: i, message: `Unknown value '${word}'.` })
+        problems.push({
+          from: start,
+          to: i,
+          message: translate?.('shell.expression.lint.unknownValue', { name: word })
+            ?? `Unknown value '${word}'.`,
+        })
       }
       continue
     }

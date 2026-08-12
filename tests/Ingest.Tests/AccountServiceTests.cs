@@ -89,6 +89,9 @@ public class AccountServiceTests
 
         var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(app));
         Assert.Contains("User-kind", ex.Message);
+        var detail = Assert.Single(ex.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Accounts.SsoLinksUserOnly, detail.Code);
+        Assert.Equal(AccountKind.Application.ToString(), detail.Params["accountKind"]);
     }
 
     [Fact]
@@ -294,6 +297,9 @@ public class AccountServiceTests
 
         var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(op));
         Assert.Contains("Unknown capabilities", ex.Message);
+        var detail = Assert.Single(ex.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Accounts.UnknownCapabilities, detail.Code);
+        Assert.Equal(new[] { "schemas:destroy" }, Assert.IsType<List<string>>(detail.Params["capabilities"]));
     }
 
     [Fact]

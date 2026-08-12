@@ -3,22 +3,11 @@ import {
   Dropdown, Field, MessageBar, MessageBarBody, MessageBarTitle, Option, Radio, RadioGroup,
   makeStyles, tokens,
 } from '@fluentui/react-components'
-import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY, SERVICE_OWNER_LABEL } from '../utils/approvers'
+import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY } from '../utils/approvers'
 import type {
   Account, ApprovalMode, ApprovalPolicy, ApprovalSourceScope, ApproverRequirement,
 } from '../api/types'
-
-const approvalModeLabels: Record<ApprovalMode, string> = {
-  None: 'No approval required',
-  UseGlobalDefault: 'Use the global default',
-  Required: 'Approval required',
-}
-
-const approvalSourceLabels: Record<ApprovalSourceScope, string> = {
-  Both: 'Both manual and API submissions',
-  ManualOnly: 'Manual (web console) submissions only',
-  ApiOnly: 'API submissions only',
-}
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   sectionLabel: { fontWeight: tokens.fontWeightSemibold, marginTop: '4px' },
@@ -38,7 +27,7 @@ const useStyles = makeStyles({
  * drawer so the two stay consistent.
  */
 export function ApprovalPolicyEditor({
-  policy, accounts, onChange, disabled, heading = 'Approval', modifiableWarning = false,
+  policy, accounts, onChange, disabled, heading, modifiableWarning = false,
 }: {
   policy: ApprovalPolicy | null
   accounts: Account[]
@@ -50,6 +39,17 @@ export function ApprovalPolicyEditor({
   modifiableWarning?: boolean
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
+  const approvalModeLabels: Record<ApprovalMode, string> = {
+    None: t('schemasSubmissions.approval.mode.none'),
+    UseGlobalDefault: t('schemasSubmissions.approval.mode.globalDefault'),
+    Required: t('schemasSubmissions.approval.mode.required'),
+  }
+  const approvalSourceLabels: Record<ApprovalSourceScope, string> = {
+    Both: t('schemasSubmissions.approval.source.both'),
+    ManualOnly: t('schemasSubmissions.approval.source.manualOnly'),
+    ApiOnly: t('schemasSubmissions.approval.source.apiOnly'),
+  }
   const mode: ApprovalMode = policy?.mode ?? 'None'
   const appliesToSources: ApprovalSourceScope = policy?.appliesToSources ?? 'Both'
   const approvers = policy?.approvers ?? []
@@ -73,10 +73,10 @@ export function ApprovalPolicyEditor({
 
   return (
     <>
-      {heading && <div className={s.sectionLabel}>{heading}</div>}
+      {heading !== null && <div className={s.sectionLabel}>{heading ?? t('schemasSubmissions.approval.heading')}</div>}
       <Field
-        label="Approval mode"
-        hint="Submissions in scope are held as Pending until approved, and excluded from the OData feed and Explore until then. Defaults to no approval for backwards compatibility."
+        label={t('schemasSubmissions.approval.modeLabel')}
+        hint={t('schemasSubmissions.approval.modeHint')}
       >
         <Dropdown
           disabled={disabled}
@@ -91,7 +91,7 @@ export function ApprovalPolicyEditor({
       </Field>
 
       {mode !== 'None' && (
-        <Field label="Applies to" hint="You can require approval for only manual entries, only API submissions, or both.">
+        <Field label={t('schemasSubmissions.approval.appliesTo')} hint={t('schemasSubmissions.approval.appliesToHint')}>
           <Dropdown
             disabled={disabled}
             value={approvalSourceLabels[appliesToSources]}
@@ -108,27 +108,27 @@ export function ApprovalPolicyEditor({
       {mode === 'UseGlobalDefault' && (
         <MessageBar intent="info">
           <MessageBarBody>
-            This follows the global default approval policy, configured in Settings → Approval.
+            {t('schemasSubmissions.approval.globalDefaultHelp')}
           </MessageBarBody>
         </MessageBar>
       )}
 
       {mode === 'Required' && (
         <Field
-          label="Approvers"
-          hint="Pick who may review: the Approver/Admin accounts below, and/or the service owner (the account that sent the submission, so a service can sign off on its own data). Mark at least one as Required; the submission goes live once every Required approver has approved."
+          label={t('schemasSubmissions.approval.approvers')}
+          hint={t('schemasSubmissions.approval.approversHint')}
           validationState={hasRequiredApprover ? 'none' : 'warning'}
-          validationMessage={hasRequiredApprover ? undefined : 'Add at least one Required approver.'}
+          validationMessage={hasRequiredApprover ? undefined : t('schemasSubmissions.approval.requiredValidation')}
         >
           <Dropdown
             multiselect
             disabled={disabled}
-            placeholder="Select approvers"
+            placeholder={t('schemasSubmissions.approval.selectApprovers')}
             selectedOptions={approvers.map(approverKey)}
-            value={approvers.map(a => approverLabel(a, accountsById)).join(', ')}
+            value={approvers.map(a => approverLabel(a, accountsById, t)).join(', ')}
             onOptionSelect={(_, d) => toggleApprover(d.optionValue!, d.selectedOptions.includes(d.optionValue!))}
           >
-            <Option value={SERVICE_OWNER_KEY}>{SERVICE_OWNER_LABEL}</Option>
+            <Option value={SERVICE_OWNER_KEY}>{t('schemasSubmissions.approval.serviceOwner')}</Option>
             {accounts.map(a => (
               <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
             ))}
@@ -142,15 +142,15 @@ export function ApprovalPolicyEditor({
             const key = approverKey(a)
             return (
               <div key={key} className={s.approverRow}>
-                <span className={s.approverName}>{approverLabel(a, accountsById)}</span>
+                <span className={s.approverName}>{approverLabel(a, accountsById, t)}</span>
                 <RadioGroup
                   layout="horizontal"
                   disabled={disabled}
                   value={a.requirement}
                   onChange={(_, d) => setRequirement(key, d.value as ApproverRequirement)}
                 >
-                  <Radio value="Required" label="Required" />
-                  <Radio value="Optional" label="Optional" />
+                  <Radio value="Required" label={t('schemasSubmissions.approval.requirement.required')} />
+                  <Radio value="Optional" label={t('schemasSubmissions.approval.requirement.optional')} />
                 </RadioGroup>
               </div>
             )
@@ -161,11 +161,8 @@ export function ApprovalPolicyEditor({
       {modifiableWarning && mode !== 'None' && (
         <MessageBar intent="warning">
           <MessageBarBody>
-            <MessageBarTitle>Heads up: this schema is modifiable</MessageBarTitle>
-            Re-submitting data for a window that already has a submission replaces it and resets its
-            approval status to Pending — even if it was previously approved. While it waits for
-            re-approval it drops out of the OData feed and Explore. If you don’t want re-submissions to
-            disturb approved data, mark the schema as not modifiable.
+            <MessageBarTitle>{t('schemasSubmissions.approval.modifiableTitle')}</MessageBarTitle>
+            {t('schemasSubmissions.approval.modifiableHelp')}
           </MessageBarBody>
         </MessageBar>
       )}

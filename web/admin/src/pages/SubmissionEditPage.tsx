@@ -13,7 +13,7 @@ import {
   useCreateMySubmission, useCapabilities, useMySchemas, useMySubmission,
   useReplaceMySubmission, useSchemas, useSubmission,
 } from '../api/hooks'
-import { formatApiError } from '../api/client'
+import { formatApiError, localizeDiagnostics } from '../api/client'
 import type {
   AdminSubmissionInput, SampleInput, Schema, Submission,
 } from '../api/types'
@@ -22,6 +22,7 @@ import { SchemaSampleFields } from '../components/SchemaSampleFields'
 import { fromLocalInput, toLocalInput } from '../utils/datetimeLocal'
 import { isFilled, useSampleRules, type ValueRow } from '../utils/sampleRules'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -49,6 +50,7 @@ export interface SubmissionEditPageProps {
 
 export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps = {}) {
   const s = useStyles()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const location = useLocation()
   const { id } = useParams<{ id?: string }>()
@@ -212,8 +214,8 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
   async function onSave(draft: boolean) {
     setSubmitError(null)
     setServerWarnings([])
-    if (!serviceId) { setSubmitError('Pick a service first.'); return }
-    if (!schema)    { setSubmitError('Pick a schema first.'); return }
+    if (!serviceId) { setSubmitError(t('schemasSubmissions.submissionEdit.pickServiceError')); return }
+    if (!schema)    { setSubmitError(t('schemasSubmissions.submissionEdit.pickSchemaError')); return }
 
     const samples = buildPayload(draft)
     if (samples === null) return
@@ -228,20 +230,20 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
       if (isService) {
         if (targetId) {
           const r = await myUpdate.mutateAsync({ id: targetId, samples, draft })
-          warnings = r.warnings ?? []
+          warnings = localizeDiagnostics(r.warningDetails, r.warnings)
         } else {
           const r = await myCreate.mutateAsync({ samples, draft })
-          warnings = r.warnings ?? []
+          warnings = localizeDiagnostics(r.warningDetails, r.warnings)
           createdId = r.id
         }
       } else {
         const payload: AdminSubmissionInput = { serviceAccountId: serviceId, samples }
         if (targetId) {
           const r = await adminUpdate.mutateAsync({ id: targetId, req: payload, draft })
-          warnings = r.warnings ?? []
+          warnings = localizeDiagnostics(r.warningDetails, r.warnings)
         } else {
           const r = await adminCreate.mutateAsync({ req: payload, draft })
-          warnings = r.warnings ?? []
+          warnings = localizeDiagnostics(r.warningDetails, r.warnings)
           createdId = r.id
         }
       }
@@ -273,8 +275,14 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
     <div className={s.root}>
       <div className={s.toolbar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Button appearance="subtle" icon={<ArrowLeft20Regular />} onClick={() => nav(-1)}>Back</Button>
-          <Title2>{readOnly ? 'View submission' : editingDraft ? 'Edit draft' : isEdit ? 'Edit submission' : 'New submission'}</Title2>
+          <Button appearance="subtle" icon={<ArrowLeft20Regular />} onClick={() => nav(-1)}>{t('schemasSubmissions.common.back')}</Button>
+          <Title2>{readOnly
+            ? t('schemasSubmissions.submissionEdit.viewTitle')
+            : editingDraft
+              ? t('schemasSubmissions.submissionEdit.editDraftTitle')
+              : isEdit
+                ? t('schemasSubmissions.submissionEdit.editTitle')
+                : t('schemasSubmissions.submissionEdit.newTitle')}</Title2>
         </div>
         {!readOnly && (
           <Toolbar>
@@ -290,20 +298,20 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
                       appearance="primary"
                       disabled={isBusy}
                     >
-                      Publish
+                      {t('schemasSubmissions.common.publish')}
                     </SplitButton>
                   )}
                 </MenuTrigger>
                 <MenuPopover>
                   <MenuList>
-                    <MenuItem onClick={() => onSave(true)}>Save as draft</MenuItem>
+                    <MenuItem onClick={() => onSave(true)}>{t('schemasSubmissions.submissionEdit.saveAsDraft')}</MenuItem>
                   </MenuList>
                 </MenuPopover>
               </Menu>
             ) : isEdit ? (
               // Editing a published submission: no draft option — it can't be pulled back to draft.
               <ToolbarButton appearance="primary" disabled={isBusy} onClick={() => onSave(false)}>
-                Save changes
+                {t('schemasSubmissions.common.saveChanges')}
               </ToolbarButton>
             ) : (
               // Create / clone: Submit is primary; the menu saves a draft instead.
@@ -316,13 +324,13 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
                       appearance="primary"
                       disabled={isBusy}
                     >
-                      Submit
+                      {t('schemasSubmissions.submissionEdit.submit')}
                     </SplitButton>
                   )}
                 </MenuTrigger>
                 <MenuPopover>
                   <MenuList>
-                    <MenuItem onClick={() => onSave(true)}>Save as draft</MenuItem>
+                    <MenuItem onClick={() => onSave(true)}>{t('schemasSubmissions.submissionEdit.saveAsDraft')}</MenuItem>
                   </MenuList>
                 </MenuPopover>
               </Menu>
@@ -334,14 +342,13 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
       {isClone && (
         <MessageBar intent="info">
           <MessageBarBody>
-            <MessageBarTitle>Cloned from an existing submission.</MessageBarTitle>
-            The service, schema and values were pre-filled and the timestamp reset to now. Review them,
-            adjust the service or schema if needed, then Submit to create a new submission.
+            <MessageBarTitle>{t('schemasSubmissions.submissionEdit.clonedTitle')}</MessageBarTitle>
+            {t('schemasSubmissions.submissionEdit.clonedHelp')}
           </MessageBarBody>
         </MessageBar>
       )}
 
-      {existing.isLoading && isEdit && <div>Loading...</div>}
+      {existing.isLoading && isEdit && <div>{t('schemasSubmissions.common.loading')}</div>}
       {existing.error && isEdit && (
         <AutoScrollMessageBar intent="error"><MessageBarBody>{formatApiError(existing.error)}</MessageBarBody></AutoScrollMessageBar>
       )}
@@ -349,9 +356,9 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
       <Card>
         <div className={s.pickers}>
           {!isService && (
-            <Field label="Service" required>
+            <Field label={t('schemasSubmissions.common.service')} required>
               <Dropdown
-                placeholder="Pick a service"
+                placeholder={t('schemasSubmissions.submissionEdit.pickService')}
                 disabled={isEdit || readOnly}
                 selectedOptions={serviceId ? [serviceId] : []}
                 value={selectedService ? (selectedService.label || selectedService.name) : ''}
@@ -368,9 +375,11 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
               </Dropdown>
             </Field>
           )}
-          <Field label="Schema" required>
+          <Field label={t('schemasSubmissions.common.schema')} required>
             <Dropdown
-              placeholder={serviceId || isService ? 'Pick a schema' : 'Pick a service first'}
+              placeholder={serviceId || isService
+                ? t('schemasSubmissions.submissionEdit.pickSchema')
+                : t('schemasSubmissions.submissionEdit.pickServiceFirst')}
               disabled={isEdit || readOnly || (!isService && !serviceId)}
               selectedOptions={schemaName ? [schemaName] : []}
               value={schema ? (schema.label || schema.name) : ''}
@@ -386,7 +395,7 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
               ))}
             </Dropdown>
           </Field>
-          <Field label="Timestamp (UTC)" required hint="Applied to every sample in this submission.">
+          <Field label={t('schemasSubmissions.submissionEdit.timestamp')} required hint={t('schemasSubmissions.submissionEdit.timestampHint')}>
             <Input
               type="datetime-local"
               disabled={readOnly}
@@ -401,8 +410,8 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
         <MessageBar intent="info">
           <MessageBarBody>
             {isService
-              ? 'Pick a schema to see the values you can submit.'
-              : 'Pick a service and a schema to start entering values.'}
+              ? t('schemasSubmissions.submissionEdit.pickSchemaHelp')
+              : t('schemasSubmissions.submissionEdit.pickServiceSchemaHelp')}
           </MessageBarBody>
         </MessageBar>
       )}
@@ -410,9 +419,8 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
       {multiSchema && (
         <MessageBar intent="warning">
           <MessageBarBody>
-            <MessageBarTitle>The source submission contained values from multiple schemas.</MessageBarTitle>
-            Saving will keep only the values for <strong>{schema?.label || schema?.name}</strong>. Pick another
-            schema first if you need those values instead.
+            <MessageBarTitle>{t('schemasSubmissions.submissionEdit.multiSchemaTitle')}</MessageBarTitle>
+            {t('schemasSubmissions.submissionEdit.multiSchemaHelp', { name: schema?.label || schema?.name })}
           </MessageBarBody>
         </MessageBar>
       )}
@@ -424,14 +432,14 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
             <div>
               <div style={{ fontWeight: 600 }}>{schema.label || schema.name}</div>
               <div style={{ color: tokens.colorNeutralForeground3, fontSize: 12 }}>
-                {schema.values.length} value(s) · leave optional ones empty to skip them
+                {t('schemasSubmissions.submissionEdit.valueCountHelp', { count: schema.values.length })}
               </div>
             </div>
           </div>
 
           {schema.values.length === 0 && (
             <MessageBar intent="warning">
-              <MessageBarBody>This schema has no values defined.</MessageBarBody>
+              <MessageBarBody>{t('schemasSubmissions.submissionEdit.noValues')}</MessageBarBody>
             </MessageBar>
           )}
 
@@ -449,7 +457,7 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
       {missingRequired.length > 0 && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Missing required values</MessageBarTitle>
+            <MessageBarTitle>{t('schemasSubmissions.submissionEdit.missingRequired')}</MessageBarTitle>
             {missingRequired.join(', ')}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -458,7 +466,7 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
       {serverWarnings.length > 0 && (
         <AutoScrollMessageBar intent="warning">
           <MessageBarBody>
-            <MessageBarTitle>Submission accepted with warnings</MessageBarTitle>
+            <MessageBarTitle>{t('schemasSubmissions.submissionEdit.acceptedWarnings')}</MessageBarTitle>
             <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
               {serverWarnings.map((w, i) => <li key={i}>{w}</li>)}
             </ul>
@@ -469,7 +477,7 @@ export function SubmissionEditPage({ readOnly = false }: SubmissionEditPageProps
       {submitError && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Could not save submission</MessageBarTitle>
+            <MessageBarTitle>{t('schemasSubmissions.submissionEdit.saveFailed')}</MessageBarTitle>
             {submitError}
           </MessageBarBody>
         </AutoScrollMessageBar>

@@ -1,3 +1,4 @@
+using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Security;
@@ -30,7 +31,7 @@ public sealed class AdminApprovalRulesController(IApprovalRulesService rules, IO
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> List(CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
+        if (!Enabled) return NotFound(DiagnosticProblem.FeatureDisabled("approval"));
         var items = await rules.ListAsync(ct);
         return Ok(items.Select(ApprovalRuleDto.From));
     }
@@ -48,7 +49,7 @@ public sealed class AdminApprovalRulesController(IApprovalRulesService rules, IO
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] UpsertApprovalRuleRequest body, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
+        if (!Enabled) return NotFound(DiagnosticProblem.FeatureDisabled("approval"));
         var created = await rules.CreateAsync(body.ToEntity(), ct);
         return CreatedAtAction(nameof(List), new { }, ApprovalRuleDto.From(created));
     }
@@ -67,7 +68,7 @@ public sealed class AdminApprovalRulesController(IApprovalRulesService rules, IO
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpsertApprovalRuleRequest body, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
+        if (!Enabled) return NotFound(DiagnosticProblem.FeatureDisabled("approval"));
         var updated = await rules.UpdateAsync(id, body.ToEntity(), ct);
         return Ok(ApprovalRuleDto.From(updated));
     }
@@ -83,7 +84,7 @@ public sealed class AdminApprovalRulesController(IApprovalRulesService rules, IO
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
+        if (!Enabled) return NotFound(DiagnosticProblem.FeatureDisabled("approval"));
         await rules.DeleteAsync(id, ct);
         return NoContent();
     }

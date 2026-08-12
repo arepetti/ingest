@@ -10,12 +10,16 @@ import {
   Open20Regular, Play20Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { formatApiError } from '../api/client'
 import {
   useReport, useRenderReport, useSchemas, useSubmissions, useMySubmissions, useCapabilities,
 } from '../api/hooks'
 import { downloadText } from '../utils/download'
+import { formatDateTime } from '../utils/format'
 import type { RenderReportRequest, ReportRenderResponse } from '../api/types'
+import { Trans, useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -69,12 +73,8 @@ const useStyles = makeStyles({
 // when switching between "browse data" and "render report".
 type Period = 'thisMonth' | 'lastWeek' | 'lastMonth' | 'lastYear' | 'custom'
 
-const periodLabels: Record<Period, string> = {
-  thisMonth: 'This month',
-  lastWeek:  'Last 7 days',
-  lastMonth: 'Last 30 days',
-  lastYear:  'Last year',
-  custom:    'Custom range',
+function periodLabel(t: TFunction, period: Period): string {
+  return t(`reports.view.periods.${period}`)
 }
 
 function periodRange(period: Period, customFrom: string, customTo: string): { from?: string; to?: string } {
@@ -104,6 +104,7 @@ function addDays(d: Date, days: number): Date {
 
 export function ReportViewPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { name } = useParams<{ name: string }>()
   const { has } = useCapabilities()
   // Without cross-service read the picker can only offer the caller's own submissions.
@@ -163,9 +164,16 @@ export function ReportViewPage() {
       .filter(matches)
       .map(s => ({
         id: s.id,
-        text: `${s.serviceName ?? s.serviceAccountId} — ${new Date(s.submittedAt).toLocaleString()} (${s.samples.length} samples)`,
+        service: s.serviceName ?? s.serviceAccountId,
+        submittedAt: s.submittedAt,
+        count: s.samples.length,
+        text: t('reports.view.submissionOption', {
+          service: s.serviceName ?? s.serviceAccountId,
+          date: formatDateTime(s.submittedAt),
+          count: s.samples.length,
+        }),
       }))
-  }, [report, submissions, schemaName])
+  }, [report, submissions, schemaName, t])
 
   const canRender = useMemo(() => {
     if (!report) return false
@@ -200,12 +208,12 @@ export function ReportViewPage() {
     <div className={s.root}>
       <div className={s.header}>
         <Button as="a" appearance="subtle" icon={<ArrowLeft20Regular />}>
-          <Link to="/reports">Back</Link>
+          <Link to="/reports">{t('reports.view.back')}</Link>
         </Button>
-        <Title2>{report?.label || report?.name || 'Report'}</Title2>
+        <Title2>{report?.label || report?.name || t('reports.singular')}</Title2>
         {report && (
           <Badge appearance="outline" color={report.type === 'Single' ? 'informative' : 'brand'}>
-            {report.type}
+            {t(report.type === 'Single' ? 'reports.types.single' : 'reports.types.aggregate')}
           </Badge>
         )}
       </div>
@@ -215,25 +223,27 @@ export function ReportViewPage() {
       {error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Could not load the report</MessageBarTitle>
+            <MessageBarTitle>{t('reports.view.loadFailed')}</MessageBarTitle>
             {formatApiError(error)}
           </MessageBarBody>
         </AutoScrollMessageBar>
       )}
 
-      {isLoading && <Spinner label="Loading report…" />}
+      {isLoading && <Spinner label={t('reports.view.loading')} />}
 
       {report && (
         <div className={s.filters}>
           {/* Schema picker: only meaningful when there's more than one option. Hidden for
               single-target reports because the choice is forced. */}
           {(report.targetSchemaNames.length !== 1) && (
-            <Field label="Schema" className={s.filterField}>
+            <Field label={t('reports.view.schema')} className={s.filterField}>
               <Dropdown
                 value={schemaName ?? ''}
                 selectedOptions={schemaName ? [schemaName] : []}
                 onOptionSelect={(_, d) => setSchemaName(d.optionValue || undefined)}
-                placeholder={report.targetSchemaNames.length === 0 ? 'Pick a schema (global report)…' : 'Pick a schema…'}
+                placeholder={t(report.targetSchemaNames.length === 0
+                  ? 'reports.view.pickGlobalSchema'
+                  : 'reports.view.pickSchema')}
               >
                 {(report.targetSchemaNames.length > 0
                   ? report.targetSchemaNames
@@ -245,41 +255,49 @@ export function ReportViewPage() {
             </Field>
           )}
 
-          <Field label="Period" className={s.filterField}>
+          <Field label={t('reports.view.period')} className={s.filterField}>
             <Dropdown
-              value={periodLabels[period]}
+              value={periodLabel(t, period)}
               selectedOptions={[period]}
               onOptionSelect={(_, d) => setPeriod((d.optionValue as Period) ?? 'thisMonth')}
             >
-              {(Object.keys(periodLabels) as Period[]).map(p => (
-                <Option key={p} value={p} text={periodLabels[p]}>{periodLabels[p]}</Option>
+              {(['thisMonth', 'lastWeek', 'lastMonth', 'lastYear', 'custom'] as Period[]).map(p => (
+                <Option key={p} value={p} text={periodLabel(t, p)}>{periodLabel(t, p)}</Option>
               ))}
             </Dropdown>
           </Field>
 
           {period === 'custom' && (
             <>
-              <Field label="From" className={s.filterField}>
+              <Field label={t('reports.view.from')} className={s.filterField}>
                 <Input type="datetime-local" value={customFrom} onChange={(_, v) => setCustomFrom(v.value)} />
               </Field>
-              <Field label="To" className={s.filterField}>
+              <Field label={t('reports.view.to')} className={s.filterField}>
                 <Input type="datetime-local" value={customTo} onChange={(_, v) => setCustomTo(v.value)} />
               </Field>
             </>
           )}
 
           {report.type === 'Single' && (
-            <Field label="Submission" className={s.filterField}>
+            <Field label={t('reports.view.submission')} className={s.filterField}>
               <Dropdown
                 value={submissionId
                   ? (submissionOptions.find(o => o.id === submissionId)?.text ?? submissionId)
                   : ''}
                 selectedOptions={submissionId ? [submissionId] : []}
                 onOptionSelect={(_, d) => setSubmissionId(d.optionValue || undefined)}
-                placeholder={submissionOptions.length === 0 ? 'No submissions match the filters' : 'Pick a submission…'}
+                placeholder={t(submissionOptions.length === 0
+                  ? 'reports.view.noMatchingSubmissions'
+                  : 'reports.view.pickSubmission')}
               >
                 {submissionOptions.map(o => (
-                  <Option key={o.id} value={o.id} text={o.text}>{o.text}</Option>
+                  <Option key={o.id} value={o.id} text={o.text}>
+                    <Trans
+                      i18nKey="reports.view.submissionOptionRich"
+                      values={{ service: o.service, count: o.count }}
+                      components={{ submittedAt: <LocalizedTime value={o.submittedAt} /> }}
+                    />
+                  </Option>
                 ))}
               </Dropdown>
             </Field>
@@ -292,7 +310,7 @@ export function ReportViewPage() {
               disabled={!canRender || render.isPending}
               onClick={onRender}
             >
-              {render.isPending ? 'Rendering…' : 'Render'}
+              {t(render.isPending ? 'reports.view.rendering' : 'reports.view.render')}
             </Button>
           </div>
         </div>
@@ -301,7 +319,7 @@ export function ReportViewPage() {
       {render.error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Render failed</MessageBarTitle>
+            <MessageBarTitle>{t('reports.view.renderFailed')}</MessageBarTitle>
             {formatApiError(render.error)}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -322,6 +340,7 @@ function ReportFrame({
   rendered, expanded, onToggleExpand,
 }: { rendered: ReportRenderResponse; expanded: boolean; onToggleExpand: () => void }) {
   const s = useStyles()
+  const { t } = useTranslation()
   // Save the exact HTML we're showing to the user as a standalone file. Done entirely
   // client-side — the server already shipped the bytes, no need for a download endpoint.
   // Filename pattern: <reportName>-YYYYMMDDhhmm.html, sanitised so anything weird in a
@@ -338,7 +357,7 @@ function ReportFrame({
   // formatted text, which is exactly the threat model we want for admin-uploaded templates.
   const frame = (
     <iframe
-      title={`Report: ${rendered.reportLabel || rendered.reportName}`}
+      title={t('reports.view.frameTitle', { name: rendered.reportLabel || rendered.reportName })}
       srcDoc={rendered.html}
       sandbox=""
       className={s.viewer}
@@ -351,10 +370,10 @@ function ReportFrame({
       <div className={s.viewerExpanded}>
         <Toolbar className={s.expandedToolbar}>
           <ToolbarButton icon={<ArrowMinimize20Regular />} onClick={onToggleExpand}>
-            Collapse
+            {t('reports.view.collapse')}
           </ToolbarButton>
           <ToolbarButton icon={<ArrowDownload20Regular />} onClick={onDownload}>
-            Download
+            {t('reports.view.download')}
           </ToolbarButton>
           <Text>{rendered.reportLabel || rendered.reportName}</Text>
         </Toolbar>
@@ -367,7 +386,7 @@ function ReportFrame({
     <div>
       <Toolbar style={{ marginBottom: 8 }}>
         <ToolbarButton icon={<ArrowMaximize20Regular />} onClick={onToggleExpand}>
-          Expand
+          {t('reports.view.expand')}
         </ToolbarButton>
         <ToolbarButton
           icon={<Open20Regular />}
@@ -377,10 +396,10 @@ function ReportFrame({
             if (w) { w.document.write(rendered.html); w.document.close() }
           }}
         >
-          Open in new tab
+          {t('reports.view.openNewTab')}
         </ToolbarButton>
         <ToolbarButton icon={<ArrowDownload20Regular />} onClick={onDownload}>
-          Download
+          {t('reports.view.download')}
         </ToolbarButton>
       </Toolbar>
       {frame}

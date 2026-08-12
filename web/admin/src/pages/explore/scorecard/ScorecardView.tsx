@@ -2,16 +2,19 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Switch, Text } from '@fluentui/react-components'
 import { ChevronDown20Regular, ChevronRight20Regular } from '@fluentui/react-icons'
+import { Trans, useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
+import { LocalizedTime } from '../../../components/LocalizedTime'
 import type { ExploreScorecard, ExploreScorecardCell, ExploreScorecardSchema, RagStatus } from '../../../api/types'
 import {
-  fmt, MISSING_COLOR, MISSING_LABEL, RAG_COLORS, RAG_LABELS, useExploreStyles, type ExploreStyles,
+  fmt, MISSING_COLOR, missingLabel, RAG_COLORS, ragLabel, useExploreStyles, type ExploreStyles,
 } from '../shared'
 
 const cellColor = (c: ExploreScorecardCell) => (c.status ? RAG_COLORS[c.status] : MISSING_COLOR)
-const cellLabel = (c: ExploreScorecardCell) => (c.status ? RAG_LABELS[c.status] : MISSING_LABEL)
+const cellLabel = (c: ExploreScorecardCell, t: TFunction) => (c.status ? ragLabel(c.status, t) : missingLabel(t))
 
 /** A short "3 on target · 1 warning · 2 no submission" summary for a collapsed schema card. */
-function summarize(schema: ExploreScorecardSchema): string {
+function summarize(schema: ExploreScorecardSchema, t: TFunction): string {
   let green = 0, amber = 0, red = 0, missing = 0
   for (const v of schema.values) {
     for (const c of v.cells) {
@@ -22,10 +25,10 @@ function summarize(schema: ExploreScorecardSchema): string {
     }
   }
   const parts: string[] = []
-  if (green) parts.push(`${green} ${RAG_LABELS.Green.toLowerCase()}`)
-  if (amber) parts.push(`${amber} ${RAG_LABELS.Amber.toLowerCase()}`)
-  if (red) parts.push(`${red} ${RAG_LABELS.Red.toLowerCase()}`)
-  if (missing) parts.push(`${missing} no submission`)
+  if (green) parts.push(t('analytics.explore.scorecard.summaryOnTarget', { count: green }))
+  if (amber) parts.push(t('analytics.explore.scorecard.summaryWarning', { count: amber }))
+  if (red) parts.push(t('analytics.explore.scorecard.summaryOffTarget', { count: red }))
+  if (missing) parts.push(t('analytics.explore.scorecard.summaryMissing', { count: missing }))
   return parts.join(' · ')
 }
 
@@ -60,15 +63,16 @@ export function ScorecardView({
   onToggleHideMissing: (v: boolean) => void
 }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
 
   if (isLoading) {
-    return <Card className={styles.card}><div className={styles.empty}>Loading…</div></Card>
+    return <Card className={styles.card}><div className={styles.empty}>{t('analytics.common.loading')}</div></Card>
   }
   if (!data || data.schemas.length === 0) {
     return (
       <Card className={styles.card}>
         <div className={styles.empty}>
-          No KPIs with a target band yet. Add an acceptable/ideal range to a numeric schema value to see it here.
+          {t('analytics.explore.scorecard.empty')}
         </div>
       </Card>
     )
@@ -89,25 +93,25 @@ export function ScorecardView({
           {(['Green', 'Amber', 'Red'] as RagStatus[]).map(st => (
             <span key={st} className={styles.scLegendItem}>
               <span className={styles.scDot} style={{ backgroundColor: RAG_COLORS[st] }} />
-              {RAG_LABELS[st]}
+              {ragLabel(st, t)}
             </span>
           ))}
           {hasMissing && (
             <span className={styles.scLegendItem}>
               <span className={styles.scDot} style={{ backgroundColor: MISSING_COLOR }} />
-              {MISSING_LABEL}
+              {missingLabel(t)}
             </span>
           )}
         </div>
         <div className={styles.scSwitches}>
-          <Switch label="Hide on-target" checked={onlyIssues} onChange={(_, d) => onToggleOnlyIssues(!!d.checked)} />
+          <Switch label={t('analytics.explore.scorecard.hideOnTarget')} checked={onlyIssues} onChange={(_, d) => onToggleOnlyIssues(!!d.checked)} />
           {hasMissing && (
-            <Switch label="Hide missing" checked={hideMissing} onChange={(_, d) => onToggleHideMissing(!!d.checked)} />
+            <Switch label={t('analytics.explore.status.hideMissing')} checked={hideMissing} onChange={(_, d) => onToggleHideMissing(!!d.checked)} />
           )}
         </div>
       </div>
       {schemas.length === 0 ? (
-        <Card className={styles.card}><div className={styles.empty}>Every KPI is on target.</div></Card>
+        <Card className={styles.card}><div className={styles.empty}>{t('analytics.explore.scorecard.allOnTarget')}</div></Card>
       ) : schemas.map(schema => (
         <SchemaCard key={schema.schemaName} schema={schema} serviceLabel={serviceLabel} styles={styles} />
       ))}
@@ -122,6 +126,7 @@ function SchemaCard({ schema, serviceLabel, styles }: {
   styles: ExploreStyles
 }) {
   const [expanded, setExpanded] = useState(true)
+  const { t } = useTranslation()
 
   return (
     <Card className={styles.card}>
@@ -134,7 +139,7 @@ function SchemaCard({ schema, serviceLabel, styles }: {
         >
           {expanded ? <ChevronDown20Regular /> : <ChevronRight20Regular />}
           <Text weight="semibold" size={400}>{schema.schemaLabel || schema.schemaName}</Text>
-          {!expanded && <span className={styles.scCollapseSummary}>{summarize(schema)}</span>}
+          {!expanded && <span className={styles.scCollapseSummary}>{summarize(schema, t)}</span>}
         </button>
         {expanded && schema.values.map(v => (
           <div key={v.valueName} className={styles.scValueGroup}>
@@ -143,7 +148,6 @@ function SchemaCard({ schema, serviceLabel, styles }: {
               {[...v.cells]
                 .sort((a, b) => (serviceLabel.get(a.serviceId) ?? '').localeCompare(serviceLabel.get(b.serviceId) ?? ''))
                 .map(c => {
-                  const periodDate = new Date(c.periodStart).toLocaleDateString(undefined, { timeZone: 'UTC' })
                   const body = (
                     <>
                       <span className={styles.scDot} style={{ backgroundColor: cellColor(c) }} />
@@ -151,11 +155,14 @@ function SchemaCard({ schema, serviceLabel, styles }: {
                         <span className={styles.scService}>{serviceLabel.get(c.serviceId) ?? c.serviceId}</span>
                         <span className={styles.scMeta}>
                           {c.value === null ? (
-                            <>{MISSING_LABEL}{' · '}{periodDate}</>
+                            <>{missingLabel(t)}{' · '}<LocalizedTime value={c.periodStart} dateOnly options={{ timeZone: 'UTC' }} /></>
                           ) : (
                             <>
                               <span className={styles.scValueNum}>{fmt(c.value)}</span>{v.unit ? ` ${v.unit}` : ''}
-                              {' · as of '}{periodDate}
+                              {' · '}<Trans
+                                i18nKey="analytics.explore.scorecard.asOf"
+                                components={{ periodDate: <LocalizedTime value={c.periodStart} dateOnly options={{ timeZone: 'UTC' }} /> }}
+                              />
                             </>
                           )}
                         </span>
@@ -168,7 +175,7 @@ function SchemaCard({ schema, serviceLabel, styles }: {
                       to={`/submissions/${c.submissionId}/view`}
                       className={styles.scCard}
                       style={{ borderLeftColor: cellColor(c) }}
-                      title={`View submission · ${cellLabel(c)}`}
+                      title={t('analytics.explore.scorecard.viewSubmission', { state: cellLabel(c, t) })}
                     >
                       {body}
                     </Link>
@@ -177,7 +184,7 @@ function SchemaCard({ schema, serviceLabel, styles }: {
                       key={c.serviceId}
                       className={styles.scCard}
                       style={{ borderLeftColor: cellColor(c), cursor: 'default' }}
-                      title={cellLabel(c)}
+                      title={cellLabel(c, t)}
                     >
                       {body}
                     </div>

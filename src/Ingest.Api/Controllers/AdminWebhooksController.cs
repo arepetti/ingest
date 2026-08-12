@@ -48,7 +48,7 @@ public sealed class AdminWebhooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> List(CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
         var list = await _endpoints.ListAsync(ct);
         return Ok(list.Select(WebhookEndpointDto.From).ToList());
     }
@@ -61,7 +61,7 @@ public sealed class AdminWebhooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
         return Ok(WebhookEndpointDto.From(await _endpoints.GetAsync(id, ct)));
     }
 
@@ -76,7 +76,7 @@ public sealed class AdminWebhooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] CreateWebhookEndpointRequest req, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
         var (endpoint, secret) = await _endpoints.CreateAsync(
             new WebhookEndpointInput(req.Name, req.Url, req.Enabled, req.Events ?? new(), req.ServiceAccountId, req.Description),
             req.GenerateSecret, ct);
@@ -95,7 +95,7 @@ public sealed class AdminWebhooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateWebhookEndpointRequest req, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
         var updated = await _endpoints.UpdateAsync(id,
             new WebhookEndpointInput(req.Name, req.Url, req.Enabled, req.Events ?? new(), req.ServiceAccountId, req.Description), ct);
         return Ok(WebhookEndpointDto.From(updated));
@@ -110,7 +110,7 @@ public sealed class AdminWebhooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
         await _endpoints.DeleteAsync(id, ct);
         return NoContent();
     }
@@ -124,7 +124,7 @@ public sealed class AdminWebhooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RotateSecret(Guid id, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
         var (endpoint, secret) = await _endpoints.RotateSecretAsync(id, ct);
         return Ok(new WebhookSecretResponse(WebhookEndpointDto.From(endpoint), secret));
     }
@@ -138,7 +138,7 @@ public sealed class AdminWebhooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SendTest(Guid id, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
         var deliveryId = await _endpoints.SendTestAsync(id, ct);
         return Accepted(new { id = deliveryId });
     }
@@ -153,7 +153,7 @@ public sealed class AdminWebhooksController : ControllerBase
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] WebhookDeliveryStatus? status,
         [FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
         var result = await _deliveries.ListAsync(RequestHelpers.ToPageRequest(page, pageSize, null, false), status, from, to, ct);
         return Ok(result.Map(WebhookDeliveryDto.From));
     }
@@ -167,8 +167,10 @@ public sealed class AdminWebhooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Redeliver(Guid deliveryId, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
-        return await _deliveries.RequeueAsync(deliveryId, ct) ? Ok() : NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
+        return await _deliveries.RequeueAsync(deliveryId, ct)
+            ? Ok()
+            : NotFound(DiagnosticProblem.NotFound("Webhook delivery", deliveryId));
     }
 
     /// <summary>Manually drain the delivery outbox now. Internal trigger for an external scheduler.</summary>
@@ -180,7 +182,7 @@ public sealed class AdminWebhooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Drain([FromQuery] int? max, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("webhooks"));
         return Ok(await _dispatch.DrainAsync(max ?? 50, ct));
     }
 }

@@ -29,21 +29,15 @@ public sealed class SubmissionValidator : ISubmissionValidator
     private readonly IAppConfigurationService _appConfig;
     private readonly bool _approvalEnabled;
 
-    /// <summary>Marker embedded in the "already submitted for this period" cadence error.</summary>
-    internal const string DuplicatePeriodMarker = "already submitted for this";
-
-    /// <summary>Marker embedded in the "already has a submission awaiting approval" cadence error.</summary>
-    internal const string PendingDuplicateMarker = "already has a submission awaiting approval";
-
     /// <summary>
     /// True when <paramref name="error"/> is a cadence-duplicate rejection — i.e. a sample that
     /// already has a live (or pending) submission in its reporting window. Callers that want
     /// idempotent behaviour (bulk import) use this to treat such a submission as "already there"
     /// rather than a genuine failure.
     /// </summary>
-    internal static bool IsDuplicatePeriodError(string error) =>
-        error.Contains(DuplicatePeriodMarker, StringComparison.Ordinal) ||
-        error.Contains(PendingDuplicateMarker, StringComparison.Ordinal);
+    internal static bool IsDuplicatePeriodError(Diagnostic error) =>
+        error.Code is DiagnosticCodes.Submissions.DuplicatePeriod or
+            DiagnosticCodes.Submissions.PendingDuplicatePeriod;
 
     /// <summary>Create a new <see cref="SubmissionValidator"/>.</summary>
     /// <param name="schemas">Schema repository used to fetch the caller's visible schemas.</param>
@@ -79,7 +73,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         CancellationToken ct = default)
     {
         var skipCadence = options?.SkipCadence == true;
-        var errors = new List<string>();
+        var errors = new List<Diagnostic>();
         var warnings = new List<SubmissionWarning>();
         var discarded = new HashSet<SampleRef>();
         var visible = (await _schemas.ListVisibleToAsync(service.Id, ct))
@@ -127,12 +121,20 @@ public sealed class SubmissionValidator : ISubmissionValidator
             if (!visible.TryGetValue(sample.SchemaName, out var schema))
             {
                 // No schema entity yet — best we can do is echo what the caller sent.
-                errors.Add($"Schema '{sample.SchemaName}' is not assigned to this service.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Submissions.SchemaNotAssigned,
+                    $"Schema '{sample.SchemaName}' is not assigned to this service.",
+                    ("schemaName", sample.SchemaName),
+                    ("serviceId", service.Id)));
                 continue;
             }
             if (!schema.Enabled)
             {
-                errors.Add($"Schema '{Display(schema)}' is currently disabled.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Submissions.SchemaDisabled,
+                    $"Schema '{Display(schema)}' is currently disabled.",
+                    ("schemaName", schema.Name),
+                    ("schemaLabel", schema.Label)));
                 continue;
             }
 
@@ -140,17 +142,31 @@ public sealed class SubmissionValidator : ISubmissionValidator
                 string.Equals(v.Name, sample.ValueName, StringComparison.OrdinalIgnoreCase));
             if (value is null)
             {
-                errors.Add($"Value '{sample.ValueName}' is not defined in schema '{Display(schema)}'.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Submissions.ValueNotDefined,
+                    $"Value '{sample.ValueName}' is not defined in schema '{Display(schema)}'.",
+                    ("schemaName", schema.Name),
+                    ("schemaLabel", schema.Label),
+                    ("valueName", sample.ValueName)));
                 continue;
             }
             if (value.IsCalculated)
             {
-                errors.Add($"Value '{sample.ValueName}' is calculated and cannot be submitted.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Submissions.CalculatedValueSubmitted,
+                    $"Value '{sample.ValueName}' is calculated and cannot be submitted.",
+                    ("schemaName", schema.Name),
+                    ("valueName", value.Name)));
                 continue;
             }
             if (!value.Enabled)
             {
-                errors.Add($"Value '{Display(schema, value)}' is currently disabled.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Submissions.ValueDisabled,
+                    $"Value '{Display(schema, value)}' is currently disabled.",
+                    ("schemaName", schema.Name),
+                    ("valueName", value.Name),
+                    ("displayName", Display(schema, value))));
                 continue;
             }
 
@@ -218,7 +234,12 @@ public sealed class SubmissionValidator : ISubmissionValidator
                     string.Equals(s.SchemaName, schema.Name, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(s.ValueName, value.Name, StringComparison.OrdinalIgnoreCase));
                 if (existingSample is not null && !SameSample(existingSample, sample))
-                    errors.Add($"Value '{Display(schema, value)}' is not modifiable; existing sample cannot be changed.");
+                    errors.Add(Diagnostic.Create(
+                        DiagnosticCodes.Submissions.ValueNotModifiable,
+                        $"Value '{Display(schema, value)}' is not modifiable; existing sample cannot be changed.",
+                        ("schemaName", schema.Name),
+                        ("valueName", value.Name),
+                        ("displayName", Display(schema, value))));
             }
 
             // Per-value Warning expression. Runs only on surviving samples that already passed
@@ -264,13 +285,25 @@ public sealed class SubmissionValidator : ISubmissionValidator
                 try { outcome = _evaluator.EvaluateValidation(expr, parameters, customFns); }
                 catch (Exception ex)
                 {
-                    errors.Add($"Schema '{Display(schema)}' submission validation error: {ex.Message}");
+                    errors.Add(Diagnostic.Create(
+                        DiagnosticCodes.Submissions.SchemaValidationError,
+                        $"Schema '{Display(schema)}' submission validation error: {ex.Message}",
+                        ("schemaName", schema.Name),
+                        ("schemaLabel", schema.Label),
+                        ("detail", ex.Message)));
                     continue;
                 }
 
                 if (!outcome.IsValid)
-                    errors.Add($"Schema '{Display(schema)}' submission validation failed: " +
-                               (outcome.ErrorMessage ?? expr));
+                {
+                    var detail = outcome.ErrorMessage ?? expr;
+                    errors.Add(Diagnostic.Create(
+                        DiagnosticCodes.Submissions.SchemaValidationFailed,
+                        $"Schema '{Display(schema)}' submission validation failed: {detail}",
+                        ("schemaName", schema.Name),
+                        ("schemaLabel", schema.Label),
+                        ("detail", detail)));
+                }
             }
         }
 
@@ -312,12 +345,24 @@ public sealed class SubmissionValidator : ISubmissionValidator
                     var fns = BuildHistoryFunctions(history.Latest, history.Previous, v.Name);
                     if (IsConditionFalseSilent(v.EnabledIf, context, fns)) continue;
                     if (IsConditionFalseSilent(v.VisibleIf, context, fns)) continue;
-                    errors.Add($"Required value '{Display(schema, v)}' missing.");
+                    errors.Add(Diagnostic.Create(
+                        DiagnosticCodes.Submissions.RequiredValueMissing,
+                        $"Required value '{Display(schema, v)}' missing.",
+                        ("schemaName", schema.Name),
+                        ("valueName", v.Name),
+                        ("displayName", Display(schema, v))));
                 }
             }
         }
 
-        return new SubmissionValidationResult(errors.Count == 0, errors, warnings, discarded);
+        return new SubmissionValidationResult(
+            errors.Count == 0,
+            errors.Select(x => x.Message).ToList(),
+            warnings,
+            discarded)
+        {
+            ErrorDetails = errors,
+        };
     }
 
     /// <summary>
@@ -366,7 +411,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         IReadOnlyDictionary<string, object?> context,
         IReadOnlyDictionary<string, Func<object?[], object?>> customFns,
         List<SubmissionWarning> warnings,
-        List<string> errors)
+        List<Diagnostic> errors)
     {
         if (string.IsNullOrWhiteSpace(expression)) return false;
 
@@ -375,7 +420,13 @@ public sealed class SubmissionValidator : ISubmissionValidator
         catch (Exception ex)
         {
             // A broken gating rule shouldn't silently swallow data: surface as an error.
-            errors.Add($"Value '{Display(schema, value)}' {ruleName} evaluation error: {ex.Message}");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Submissions.GatingEvaluationError,
+                $"Value '{Display(schema, value)}' {ruleName} evaluation error: {ex.Message}",
+                ("schemaName", schema.Name),
+                ("valueName", value.Name),
+                ("rule", ruleName),
+                ("detail", ex.Message)));
             return false;
         }
 
@@ -384,9 +435,24 @@ public sealed class SubmissionValidator : ISubmissionValidator
         // why their value didn't make it.
         if (!outcome.IsValid)
         {
-            warnings.Add(new SubmissionWarning(value.Name, outcome.ErrorMessage is { Length: > 0 } msg
-                ? $"Sample '{Display(schema, value)}' discarded: {msg}"
-                : $"Sample '{Display(schema, value)}' discarded by {ruleName}."));
+            var detail = outcome.ErrorMessage is { Length: > 0 } msg ? msg : null;
+            var message = detail is not null
+                ? $"Sample '{Display(schema, value)}' discarded: {detail}"
+                : $"Sample '{Display(schema, value)}' discarded by {ruleName}.";
+            var code = detail is not null
+                ? DiagnosticCodes.Submissions.SampleDiscardedWithMessage
+                : DiagnosticCodes.Submissions.SampleDiscardedByRule;
+            warnings.Add(new SubmissionWarning(
+                value.Name,
+                message,
+                code,
+                Diagnostic.Create(
+                    code,
+                    message,
+                    ("schemaName", schema.Name),
+                    ("valueName", value.Name),
+                    ("rule", ruleName),
+                    ("detail", detail)).Params));
             return true;
         }
         return false;
@@ -428,47 +494,135 @@ public sealed class SubmissionValidator : ISubmissionValidator
     private static bool SameSample(Sample a, Sample b) =>
         Equals(a.Value, b.Value) && a.Timestamp == b.Timestamp && a.Note == b.Note;
 
-    private static void ValidateValueShape(Schema schema, SchemaValue def, Sample sample, List<string> errors)
+    private static void ValidateValueShape(Schema schema, SchemaValue def, Sample sample, List<Diagnostic> errors)
     {
         var key = Display(schema, def);
+        Diagnostic Shape(string code, string message, params (string Name, object? Value)[] parameters) =>
+            Diagnostic.Create(
+                code,
+                message,
+                new[]
+                {
+                    ("schemaName", (object?)schema.Name),
+                    ("valueName", def.Name),
+                    ("displayName", key),
+                }.Concat(parameters).ToArray());
 
         if (sample.Value is null)
         {
-            if (def.Required) errors.Add($"Value '{key}' requires a value.");
+            if (def.Required)
+                errors.Add(Shape(
+                    DiagnosticCodes.Submissions.ValueRequired,
+                    $"Value '{key}' requires a value."));
             return;
         }
 
         switch (def.Type)
         {
             case SchemaValueType.String:
-                if (sample.Value is not string str) { errors.Add($"Value '{key}' expects string."); return; }
-                if (def.MinLength is { } min && str.Length < min) errors.Add($"Value '{key}' shorter than {min}.");
-                if (def.MaxLength is { } max && str.Length > max) errors.Add($"Value '{key}' longer than {max}.");
+                if (sample.Value is not string str)
+                {
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueType,
+                        $"Value '{key}' expects string.",
+                        ("expectedType", "string")));
+                    return;
+                }
+                if (def.MinLength is { } min && str.Length < min)
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueMinimumLength,
+                        $"Value '{key}' shorter than {min}.",
+                        ("minimum", min),
+                        ("actual", str.Length)));
+                if (def.MaxLength is { } max && str.Length > max)
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueMaximumLength,
+                        $"Value '{key}' longer than {max}.",
+                        ("maximum", max),
+                        ("actual", str.Length)));
                 if (!string.IsNullOrWhiteSpace(def.RegexPattern) &&
                     !Regex.IsMatch(str, def.RegexPattern, RegexOptions.None, TimeSpan.FromMilliseconds(200)))
-                    errors.Add($"Value '{key}' does not match regex.");
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueRegex,
+                        $"Value '{key}' does not match regex.",
+                        ("pattern", def.RegexPattern)));
                 break;
 
             case SchemaValueType.Integer:
-                if (!TryToLong(sample.Value, out var l)) { errors.Add($"Value '{key}' expects integer."); return; }
-                if (def.Min is { } imin && l < imin) errors.Add($"Value '{key}' below min ({imin}).");
-                if (def.Max is { } imax && l > imax) errors.Add($"Value '{key}' above max ({imax}).");
+                if (!TryToLong(sample.Value, out var l))
+                {
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueType,
+                        $"Value '{key}' expects integer.",
+                        ("expectedType", "integer")));
+                    return;
+                }
+                if (def.Min is { } imin && l < imin)
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueMinimum,
+                        $"Value '{key}' below min ({imin}).",
+                        ("minimum", imin),
+                        ("actual", l)));
+                if (def.Max is { } imax && l > imax)
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueMaximum,
+                        $"Value '{key}' above max ({imax}).",
+                        ("maximum", imax),
+                        ("actual", l)));
                 break;
 
             case SchemaValueType.Number:
-                if (!TryToDouble(sample.Value, out var d)) { errors.Add($"Value '{key}' expects number."); return; }
-                if (def.Min is { } nmin && d < nmin) errors.Add($"Value '{key}' below min ({nmin}).");
-                if (def.Max is { } nmax && d > nmax) errors.Add($"Value '{key}' above max ({nmax}).");
+                if (!TryToDouble(sample.Value, out var d))
+                {
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueType,
+                        $"Value '{key}' expects number.",
+                        ("expectedType", "number")));
+                    return;
+                }
+                if (def.Min is { } nmin && d < nmin)
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueMinimum,
+                        $"Value '{key}' below min ({nmin}).",
+                        ("minimum", nmin),
+                        ("actual", d)));
+                if (def.Max is { } nmax && d > nmax)
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueMaximum,
+                        $"Value '{key}' above max ({nmax}).",
+                        ("maximum", nmax),
+                        ("actual", d)));
                 break;
 
             case SchemaValueType.Date:
-                if (!TryToDate(sample.Value, out var dt)) { errors.Add($"Value '{key}' expects date."); return; }
-                if (def.MinDate is { } dmin && dt < dmin) errors.Add($"Value '{key}' before {dmin:o}.");
-                if (def.MaxDate is { } dmax && dt > dmax) errors.Add($"Value '{key}' after {dmax:o}.");
+                if (!TryToDate(sample.Value, out var dt))
+                {
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueType,
+                        $"Value '{key}' expects date.",
+                        ("expectedType", "date")));
+                    return;
+                }
+                if (def.MinDate is { } dmin && dt < dmin)
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueBeforeMinimumDate,
+                        $"Value '{key}' before {dmin:o}.",
+                        ("minimum", dmin),
+                        ("actual", dt)));
+                if (def.MaxDate is { } dmax && dt > dmax)
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueAfterMaximumDate,
+                        $"Value '{key}' after {dmax:o}.",
+                        ("maximum", dmax),
+                        ("actual", dt)));
                 break;
 
             case SchemaValueType.Boolean:
-                if (sample.Value is not bool) errors.Add($"Value '{key}' expects boolean.");
+                if (sample.Value is not bool)
+                    errors.Add(Shape(
+                        DiagnosticCodes.Submissions.ValueType,
+                        $"Value '{key}' expects boolean.",
+                        ("expectedType", "boolean")));
                 break;
         }
     }
@@ -480,7 +634,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         Sample sample,
         IReadOnlyDictionary<string, object?> schemaContext,
         SchemaHistory history,
-        List<string> errors)
+        List<Diagnostic> errors)
     {
         if (string.IsNullOrWhiteSpace(def.ValueValidation)) return;
         var key = Display(schema, def);
@@ -491,12 +645,27 @@ public sealed class SubmissionValidator : ISubmissionValidator
         try { outcome = _evaluator.EvaluateValidation(def.ValueValidation, schemaContext, customFns); }
         catch (Exception ex)
         {
-            errors.Add($"Value '{key}' value-validation error: {ex.Message}");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Submissions.ValueValidationError,
+                $"Value '{key}' value-validation error: {ex.Message}",
+                ("schemaName", schema.Name),
+                ("valueName", def.Name),
+                ("displayName", key),
+                ("detail", ex.Message)));
             return;
         }
 
         if (!outcome.IsValid)
-            errors.Add($"Value '{key}' value-validation failed: " + (outcome.ErrorMessage ?? "expression returned false"));
+        {
+            var detail = outcome.ErrorMessage ?? "expression returned false";
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Submissions.ValueValidationFailed,
+                $"Value '{key}' value-validation failed: {detail}",
+                ("schemaName", schema.Name),
+                ("valueName", def.Name),
+                ("displayName", key),
+                ("detail", detail)));
+        }
     }
 
     private void EvaluateValueWarning(
@@ -520,7 +689,18 @@ public sealed class SubmissionValidator : ISubmissionValidator
         try { raw = _evaluator.Evaluate(def.Warning, schemaContext, customFns); }
         catch (Exception ex)
         {
-            warnings.Add(new SubmissionWarning(def.Name, $"Value '{key}' warning rule evaluation error: {ex.Message}"));
+            var message = $"Value '{key}' warning rule evaluation error: {ex.Message}";
+            warnings.Add(new SubmissionWarning(
+                def.Name,
+                message,
+                DiagnosticCodes.Submissions.WarningRuleError,
+                Diagnostic.Create(
+                    DiagnosticCodes.Submissions.WarningRuleError,
+                    message,
+                    ("schemaName", schema.Name),
+                    ("valueName", def.Name),
+                    ("displayName", key),
+                    ("detail", ex.Message)).Params));
             return;
         }
 
@@ -528,9 +708,38 @@ public sealed class SubmissionValidator : ISubmissionValidator
         {
             case null: return;
             case bool b when !b: return;
-            case bool: warnings.Add(new SubmissionWarning(def.Name, $"Sample '{key}': warning rule triggered.")); return;
+            case bool:
+            {
+                var message = $"Sample '{key}': warning rule triggered.";
+                warnings.Add(new SubmissionWarning(
+                    def.Name,
+                    message,
+                    DiagnosticCodes.Submissions.WarningRuleTriggered,
+                    Diagnostic.Create(
+                        DiagnosticCodes.Submissions.WarningRuleTriggered,
+                        message,
+                        ("schemaName", schema.Name),
+                        ("valueName", def.Name),
+                        ("displayName", key)).Params));
+                return;
+            }
             case string s when string.IsNullOrWhiteSpace(s): return;
-            case string s: warnings.Add(new SubmissionWarning(def.Name, $"Sample '{key}': {s}")); return;
+            case string s:
+            {
+                var message = $"Sample '{key}': {s}";
+                warnings.Add(new SubmissionWarning(
+                    def.Name,
+                    message,
+                    DiagnosticCodes.Submissions.WarningRuleMessage,
+                    Diagnostic.Create(
+                        DiagnosticCodes.Submissions.WarningRuleMessage,
+                        message,
+                        ("schemaName", schema.Name),
+                        ("valueName", def.Name),
+                        ("displayName", key),
+                        ("detail", s)).Params));
+                return;
+            }
             default: return; // numbers / dates aren't meaningful here; quietly ignore
         }
     }
@@ -700,7 +909,7 @@ public sealed class SubmissionValidator : ISubmissionValidator
         bool isReplacement,
         Submission? existing,
         CadenceAnchors anchors,
-        List<string> errors,
+        List<Diagnostic> errors,
         CancellationToken ct)
     {
         var (start, end) = CadenceCalculator.BucketFor(def.Cadence, sample.Timestamp, anchors);
@@ -720,7 +929,16 @@ public sealed class SubmissionValidator : ISubmissionValidator
         var existsInPeriod = await _ctx.Samples.Find(filter).AnyAsync(ct);
         if (existsInPeriod)
         {
-            errors.Add($"Value '{Display(schema, def)}' {DuplicatePeriodMarker} {def.Cadence.ToString().ToLowerInvariant()} period.");
+            var cadence = def.Cadence.ToString().ToLowerInvariant();
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Submissions.DuplicatePeriod,
+                $"Value '{Display(schema, def)}' already submitted for this {cadence} period.",
+                ("schemaName", schema.Name),
+                ("valueName", def.Name),
+                ("displayName", Display(schema, def)),
+                ("cadence", cadence),
+                ("periodStart", start),
+                ("periodEnd", end)));
             return;
         }
 
@@ -745,7 +963,18 @@ public sealed class SubmissionValidator : ISubmissionValidator
                     Builders<Submission>.Filter.Ne(s => s.Id, existing.Id));
 
             if (await _ctx.Submissions.Find(pendingFilter).AnyAsync(ct))
-                errors.Add($"Value '{Display(schema, def)}' {PendingDuplicateMarker} for this {def.Cadence.ToString().ToLowerInvariant()} period; replace that submission instead.");
+            {
+                var cadence = def.Cadence.ToString().ToLowerInvariant();
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Submissions.PendingDuplicatePeriod,
+                    $"Value '{Display(schema, def)}' already has a submission awaiting approval for this {cadence} period; replace that submission instead.",
+                    ("schemaName", schema.Name),
+                    ("valueName", def.Name),
+                    ("displayName", Display(schema, def)),
+                    ("cadence", cadence),
+                    ("periodStart", start),
+                    ("periodEnd", end)));
+            }
         }
     }
 

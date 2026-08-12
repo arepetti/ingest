@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Badge, Body1, Button, Card, Checkbox, Dropdown, Drawer, DrawerBody, Field, Input, Option, Radio, RadioGroup, Spinner,
   Switch,
@@ -15,6 +16,7 @@ import {
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { SectionedLayout } from '../components/SectionedLayout'
 import type { LayoutSection } from '../components/SectionedLayout'
 import { WebhooksSection } from '../components/WebhooksSection'
@@ -34,9 +36,14 @@ import {
 } from '../api/hooks'
 import { accountHasCapability } from '../api/capabilities'
 import { formatApiError } from '../api/client'
-import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY, SERVICE_OWNER_LABEL } from '../utils/approvers'
-import { cadenceLabel } from '../utils/cadence'
-import { formatDateTime } from '../utils/format'
+import { approverFromKey, approverKey, approverLabel, SERVICE_OWNER_KEY } from '../utils/approvers'
+import {
+  FALLBACK_LOCALE,
+  getLocaleCatalog,
+  getSupportedLocale,
+  localeCatalogs,
+  setLocale,
+} from '../i18n'
 import type {
   Account, ApprovalMode, ApprovalPolicy, ApprovalSourceScope, ApproverRequirement,
   Cadence, CadenceWindow, CadenceWindows, CadencePreviewEntry,
@@ -98,22 +105,18 @@ const useStyles = makeStyles({
 
 // --- Approval (global default policy) ------------------------------------------------------
 
-const approvalSourceLabels: Record<ApprovalSourceScope, string> = {
-  Both: 'Both manual and API submissions',
-  ManualOnly: 'Manual (web console) submissions only',
-  ApiOnly: 'API submissions only',
-}
-
 function ApprovalSettingsSection() {
+  const { t } = useTranslation()
   const { data, isLoading } = useApprovalSettings()
   const { data: accountsPage } = useAccounts()
-  if (isLoading || !data) return <Spinner label="Loading…" />
+  if (isLoading || !data) return <Spinner label={t('settings.common.loading')} />
   const approvers = (accountsPage?.items ?? []).filter(a => accountHasCapability(a, 'submissions:approve') && !a.isDeleted)
   return <ApprovalSettingsForm initial={data} accounts={approvers} />
 }
 
 function ApprovalSettingsForm({ initial, accounts }: { initial: ApprovalPolicy; accounts: Account[] }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const update = useUpdateApprovalSettings()
   // The global default may only be "no approval" or "approval required" — `UseGlobalDefault` is a
   // per-schema concept (a schema deferring to *this* policy) and is normalised to None here.
@@ -125,6 +128,13 @@ function ApprovalSettingsForm({ initial, accounts }: { initial: ApprovalPolicy; 
 
   const accountsById = new Map(accounts.map(a => [a.id, a]))
   const hasRequiredApprover = approvers.some(a => a.requirement === 'Required')
+  const approvalSourceLabels: Record<ApprovalSourceScope, string> = {
+    Both: t('settings.approval.sources.both'),
+    ManualOnly: t('settings.approval.sources.manualOnly'),
+    ApiOnly: t('settings.approval.sources.apiOnly'),
+  }
+  const displayApproverLabel = (a: ApprovalPolicy['approvers'][number]) =>
+    a.kind === 'ServiceOwner' ? t('settings.approval.serviceOwner') : approverLabel(a, accountsById)
 
   function toggleApprover(key: string, selected: boolean) {
     if (selected) {
@@ -151,26 +161,25 @@ function ApprovalSettingsForm({ initial, accounts }: { initial: ApprovalPolicy; 
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Default approval policy</Title3>
+        <Title3 className={s.sectionTitle}>{t('settings.approval.title')}</Title3>
         <Body1 className={s.help}>
-          Schemas set to “Use the global default” fall back to this policy. Changing it affects only
-          new submissions; in-flight ones keep the approvers they were created with.
+          {t('settings.approval.description')}
         </Body1>
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Approval policy saved.</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('settings.approval.saved')}</MessageBarBody></AutoScrollMessageBar>}
 
-      <Field label="When a schema defers to the default">
+      <Field label={t('settings.approval.defaultBehavior')}>
         <RadioGroup value={mode} onChange={(_, d) => setMode(d.value as ApprovalMode)}>
-          <Radio value="None" label="Don’t require approval" />
-          <Radio value="Required" label="Require approval" />
+          <Radio value="None" label={t('settings.approval.dontRequire')} />
+          <Radio value="Required" label={t('settings.approval.require')} />
         </RadioGroup>
       </Field>
 
       {mode === 'Required' && (
         <>
-          <Field label="Applies to">
+          <Field label={t('settings.approval.appliesTo')}>
             <Dropdown
               value={approvalSourceLabels[appliesToSources]}
               selectedOptions={[appliesToSources]}
@@ -183,19 +192,19 @@ function ApprovalSettingsForm({ initial, accounts }: { initial: ApprovalPolicy; 
           </Field>
 
           <Field
-            label="Approvers"
-            hint="Approver/Admin accounts who may review, and/or the service owner (the account that sent the submission). Mark at least one as Required."
+            label={t('settings.approval.approvers')}
+            hint={t('settings.approval.approversHint')}
             validationState={hasRequiredApprover ? 'none' : 'warning'}
-            validationMessage={hasRequiredApprover ? undefined : 'Add at least one Required approver.'}
+            validationMessage={hasRequiredApprover ? undefined : t('settings.approval.requiredApproverValidation')}
           >
             <Dropdown
               multiselect
-              placeholder="Select approvers"
+              placeholder={t('settings.approval.selectApprovers')}
               selectedOptions={approvers.map(approverKey)}
-              value={approvers.map(a => approverLabel(a, accountsById)).join(', ')}
+              value={approvers.map(displayApproverLabel).join(', ')}
               onOptionSelect={(_, d) => toggleApprover(d.optionValue!, d.selectedOptions.includes(d.optionValue!))}
             >
-              <Option value={SERVICE_OWNER_KEY}>{SERVICE_OWNER_LABEL}</Option>
+              <Option value={SERVICE_OWNER_KEY}>{t('settings.approval.serviceOwner')}</Option>
               {accounts.map(a => (
                 <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
               ))}
@@ -208,10 +217,10 @@ function ApprovalSettingsForm({ initial, accounts }: { initial: ApprovalPolicy; 
                 const key = approverKey(a)
                 return (
                   <div key={key} className={s.approverRow}>
-                    <span className={s.approverName}>{approverLabel(a, accountsById)}</span>
+                    <span className={s.approverName}>{displayApproverLabel(a)}</span>
                     <RadioGroup layout="horizontal" value={a.requirement} onChange={(_, d) => setRequirement(key, d.value as ApproverRequirement)}>
-                      <Radio value="Required" label="Required" />
-                      <Radio value="Optional" label="Optional" />
+                      <Radio value="Required" label={t('settings.approval.required')} />
+                      <Radio value="Optional" label={t('settings.approval.optional')} />
                     </RadioGroup>
                   </div>
                 )
@@ -223,7 +232,7 @@ function ApprovalSettingsForm({ initial, accounts }: { initial: ApprovalPolicy; 
 
       <div className={s.actions}>
         <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
-          {update.isPending ? 'Saving…' : 'Save'}
+          {update.isPending ? t('settings.common.saving') : t('settings.common.save')}
         </Button>
       </div>
     </Card>
@@ -231,9 +240,10 @@ function ApprovalSettingsForm({ initial, accounts }: { initial: ApprovalPolicy; 
 }
 
 export function SettingsPage() {
+  const { t } = useTranslation()
   const { me, hasAny, isLoading } = useCapabilities()
 
-  if (isLoading) return <Spinner label="Loading…" />
+  if (isLoading) return <Spinner label={t('settings.common.loading')} />
 
   const canConfigureSettings = hasAny('settings:read', 'settings:manage')
   const canConfigureNotifications = hasAny('notifications:read', 'notifications:manage')
@@ -243,7 +253,7 @@ export function SettingsPage() {
   if (!canConfigureSettings && !canConfigureNotifications && !canConfigureWebhooks && !canConfigureIntegrations) {
     return (
       <AutoScrollMessageBar intent="error">
-        <MessageBarBody>You don't have permission to manage any settings.</MessageBarBody>
+        <MessageBarBody>{t('settings.permissionDenied')}</MessageBarBody>
       </AutoScrollMessageBar>
     )
   }
@@ -254,27 +264,33 @@ export function SettingsPage() {
   const integrationsEnabled = me?.integrationsEnabled === true
 
   const sections: LayoutSection[] = [
-    { id: 'general', label: 'General', group: 'General', icon: <Settings24Regular />, render: () => <GeneralSettingsSection /> },
+    {
+      id: 'general',
+      label: t('settings.general.navigationLabel'),
+      group: t('settings.general.navigationGroup'),
+      icon: <Settings24Regular />,
+      render: () => <GeneralSettingsSection />,
+    },
     ...(canConfigureSettings ? [
-      { id: 'areas', label: 'Areas', group: 'Configuration', icon: <Tag24Regular />, render: () => <AreasSettingsSection /> },
-      { id: 'submission-periods', label: 'Submission periods', group: 'Configuration', icon: <CalendarLtr24Regular />, render: () => <SubmissionPeriodsSection /> },
-      { id: 'ingestion', label: 'Ingestion', group: 'Configuration', icon: <PauseCircle24Regular />, render: () => <IngestionSection /> },
+      { id: 'areas', label: t('settings.navigation.areas'), group: t('settings.navigation.configuration'), icon: <Tag24Regular />, render: () => <AreasSettingsSection /> },
+      { id: 'submission-periods', label: t('settings.navigation.submissionPeriods'), group: t('settings.navigation.configuration'), icon: <CalendarLtr24Regular />, render: () => <SubmissionPeriodsSection /> },
+      { id: 'ingestion', label: t('settings.navigation.ingestion'), group: t('settings.navigation.configuration'), icon: <PauseCircle24Regular />, render: () => <IngestionSection /> },
     ] as LayoutSection[] : []),
     ...(approvalEnabled && canConfigureSettings ? [
-      { id: 'approval', label: 'Approval', group: 'Approvals', icon: <CheckmarkCircle24Regular />, render: () => <ApprovalSettingsSection /> },
-      { id: 'rules', label: 'Rules', group: 'Approvals', icon: <ClipboardTaskListLtr24Regular />, render: () => <ApprovalRulesSection /> },
+      { id: 'approval', label: t('settings.navigation.approval'), group: t('settings.navigation.approvals'), icon: <CheckmarkCircle24Regular />, render: () => <ApprovalSettingsSection /> },
+      { id: 'rules', label: t('settings.navigation.rules'), group: t('settings.navigation.approvals'), icon: <ClipboardTaskListLtr24Regular />, render: () => <ApprovalRulesSection /> },
     ] as LayoutSection[] : []),
     ...(emailEnabled && canConfigureNotifications ? [
-      { id: 'email', label: 'Email', group: 'Notifications', icon: <Mail24Regular />, render: () => <EmailSettingsSection /> },
-      { id: 'templates', label: 'Email templates', group: 'Notifications', icon: <DocumentText24Regular />, render: () => <EmailTemplatesSection /> },
-      { id: 'notifications', label: 'Notifications', group: 'Notifications', icon: <Alert24Regular />, render: () => <NotificationsSection /> },
+      { id: 'email', label: t('settings.navigation.email'), group: t('settings.navigation.notifications'), icon: <Mail24Regular />, render: () => <EmailSettingsSection /> },
+      { id: 'templates', label: t('settings.navigation.emailTemplates'), group: t('settings.navigation.notifications'), icon: <DocumentText24Regular />, render: () => <EmailTemplatesSection /> },
+      { id: 'notifications', label: t('settings.navigation.notifications'), group: t('settings.navigation.notifications'), icon: <Alert24Regular />, render: () => <NotificationsSection /> },
     ] as LayoutSection[] : []),
     ...(webhooksEnabled && canConfigureWebhooks ? [
-      { id: 'webhooks', label: 'Webhooks', group: 'Integrations', icon: <PlugConnected24Regular />, render: () => <WebhooksSection /> },
+      { id: 'webhooks', label: t('settings.navigation.webhooks'), group: t('settings.navigation.integrations'), icon: <PlugConnected24Regular />, render: () => <WebhooksSection /> },
     ] as LayoutSection[] : []),
     ...(integrationsEnabled && canConfigureIntegrations ? [
-      { id: 'integrations', label: 'Teams notifications', group: 'Integrations', icon: <PeopleTeam24Regular />, render: () => <IntegrationsSection /> },
-      { id: 'teams-connection', label: 'Teams connection', group: 'Integrations', icon: <Key24Regular />, render: () => <TeamsConnectionSection /> },
+      { id: 'integrations', label: t('settings.navigation.teamsNotifications'), group: t('settings.navigation.integrations'), icon: <PeopleTeam24Regular />, render: () => <IntegrationsSection /> },
+      { id: 'teams-connection', label: t('settings.navigation.teamsConnection'), group: t('settings.navigation.integrations'), icon: <Key24Regular />, render: () => <TeamsConnectionSection /> },
     ] as LayoutSection[] : []),
   ]
 
@@ -282,54 +298,65 @@ export function SettingsPage() {
     return (
       <AutoScrollMessageBar intent="info">
         <MessageBarBody>
-          No configurable settings are enabled. Turn on email, webhooks, integrations, or the
-          approval workflow in the server configuration to manage them here.
+          {t('settings.noneEnabled')}
         </MessageBarBody>
       </AutoScrollMessageBar>
     )
   }
 
-  return <SectionedLayout title="Settings" sections={sections} />
+  return <SectionedLayout title={t('settings.title')} sections={sections} />
 }
 
 // --- General (console preferences) --------------------------------------------------------
 
 /**
- * Console-wide preferences. These are intentionally UI-only placeholders for now — the app ships
- * a single language and a single theme, so the controls exist to establish the section and aren't
- * wired to anything. Extra options (and persistence) will follow as more are actually supported.
+ * Console-wide preferences. Language catalogs are discovered automatically; theme remains a
+ * UI-only placeholder until additional themes are supported.
  */
 function GeneralSettingsSection() {
   const s = useStyles()
-  const [language, setLanguage] = useState('en-US')
+  const { t, i18n } = useTranslation()
   const [theme, setTheme] = useState('light')
+  const language = getSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ?? FALLBACK_LOCALE
+  const selectedCatalog = getLocaleCatalog(language)
 
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>General</Title3>
+        <Title3 className={s.sectionTitle}>{t('settings.general.title')}</Title3>
         <Body1 className={s.help}>
-          Preferences for the admin console.
+          {t('settings.general.description')}
         </Body1>
       </div>
 
-      <Field label="Language">
+      <Field label={t('settings.general.language')}>
         <Dropdown
-          value="English (US)"
+          value={selectedCatalog
+            ? `${selectedCatalog.nativeLabel} — ${selectedCatalog.englishLabel}`
+            : language}
           selectedOptions={[language]}
-          onOptionSelect={(_, d) => setLanguage(d.optionValue as string)}
+          onOptionSelect={(_, d) => void setLocale(d.optionValue)}
         >
-          <Option value="en-US">English (US)</Option>
+          {localeCatalogs.map(catalog => (
+            <Option
+              key={catalog.locale}
+              value={catalog.locale}
+              text={`${catalog.nativeLabel} — ${catalog.englishLabel}`}
+              title={catalog.description}
+            >
+              {catalog.nativeLabel} — {catalog.englishLabel}
+            </Option>
+          ))}
         </Dropdown>
       </Field>
 
-      <Field label="Theme">
+      <Field label={t('settings.general.theme')}>
         <Dropdown
-          value="Light"
+          value={t('settings.general.lightTheme')}
           selectedOptions={[theme]}
           onOptionSelect={(_, d) => setTheme(d.optionValue as string)}
         >
-          <Option value="light">Light</Option>
+          <Option value="light">{t('settings.general.lightTheme')}</Option>
         </Dropdown>
       </Field>
     </Card>
@@ -339,13 +366,15 @@ function GeneralSettingsSection() {
 // --- Areas (configurable grouping tags) ---------------------------------------------------
 
 function AreasSettingsSection() {
+  const { t } = useTranslation()
   const { data, isLoading } = useAreasConfiguration()
-  if (isLoading || !data) return <Spinner label="Loading…" />
+  if (isLoading || !data) return <Spinner label={t('settings.common.loading')} />
   return <AreasSettingsForm initial={data.areas} key={data.areas.join('|')} />
 }
 
 function AreasSettingsForm({ initial }: { initial: string[] }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const { has } = useCapabilities()
   const canManage = has('settings:manage')
   const update = useUpdateAreasConfiguration()
@@ -383,19 +412,17 @@ function AreasSettingsForm({ initial }: { initial: string[] }) {
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Areas</Title3>
+        <Title3 className={s.sectionTitle}>{t('settings.areas.title')}</Title3>
         <Body1 className={s.help}>
-          Optional grouping tags offered when editing an account. With one or more areas defined the
-          account editor shows a dropdown; leave the list empty to let editors type a free-text area.
-          Areas are informative only — changing them never affects existing accounts.
+          {t('settings.areas.description')}
         </Body1>
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Areas saved.</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('settings.areas.saved')}</MessageBarBody></AutoScrollMessageBar>}
 
       {items.length === 0 ? (
-        <Body1 className={s.help}>No areas defined — the account editor uses a free-text field.</Body1>
+        <Body1 className={s.help}>{t('settings.areas.empty')}</Body1>
       ) : (
         <div className={s.areaList}>
           {items.map((item, index) => (
@@ -403,15 +430,15 @@ function AreasSettingsForm({ initial }: { initial: string[] }) {
               <span className={s.areaName}>{item}</span>
               <div className={s.areaActions}>
                 <Button
-                  size="small" appearance="subtle" icon={<ArrowUp20Regular />} aria-label={`Move ${item} up`}
+                  size="small" appearance="subtle" icon={<ArrowUp20Regular />} aria-label={t('settings.areas.moveUp', { name: item })}
                   disabled={!canManage || index === 0} onClick={() => move(index, -1)}
                 />
                 <Button
-                  size="small" appearance="subtle" icon={<ArrowDown20Regular />} aria-label={`Move ${item} down`}
+                  size="small" appearance="subtle" icon={<ArrowDown20Regular />} aria-label={t('settings.areas.moveDown', { name: item })}
                   disabled={!canManage || index === items.length - 1} onClick={() => move(index, 1)}
                 />
                 <Button
-                  size="small" appearance="subtle" icon={<Delete20Regular />} aria-label={`Remove ${item}`}
+                  size="small" appearance="subtle" icon={<Delete20Regular />} aria-label={t('settings.areas.remove', { name: item })}
                   disabled={!canManage} onClick={() => remove(index)}
                 />
               </div>
@@ -423,22 +450,22 @@ function AreasSettingsForm({ initial }: { initial: string[] }) {
       {canManage && (
         <>
           <div className={s.row}>
-            <Field label="Add an area" className={s.grow}>
+            <Field label={t('settings.areas.addLabel')} className={s.grow}>
               <Input
                 value={draft}
                 onChange={(_, d) => setDraft(d.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDraft() } }}
-                placeholder="e.g. North region"
+                placeholder={t('settings.areas.placeholder')}
               />
             </Field>
             <div className={s.addButtonWrap}>
-              <Button icon={<Add20Regular />} onClick={addDraft} disabled={!draft.trim()}>Add</Button>
+              <Button icon={<Add20Regular />} onClick={addDraft} disabled={!draft.trim()}>{t('settings.common.add')}</Button>
             </div>
           </div>
 
           <div className={s.actions}>
             <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
-              {update.isPending ? 'Saving…' : 'Save'}
+              {update.isPending ? t('settings.common.saving') : t('settings.common.save')}
             </Button>
           </div>
         </>
@@ -471,13 +498,15 @@ function SubmissionPeriodsSection() {
 }
 
 function SubmissionPeriodsAnchorsSection() {
+  const { t } = useTranslation()
   const { data, isLoading } = useSubmissionWindow()
-  if (isLoading || !data) return <Spinner label="Loading…" />
+  if (isLoading || !data) return <Spinner label={t('settings.common.loading')} />
   return <SubmissionPeriodsForm initial={data} key={JSON.stringify(data)} />
 }
 
 function SubmissionPeriodsForm({ initial }: { initial: SubmissionWindowConfig }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const { has } = useCapabilities()
   const canManage = has('settings:manage')
   const update = useUpdateSubmissionWindow()
@@ -487,6 +516,10 @@ function SubmissionPeriodsForm({ initial }: { initial: SubmissionWindowConfig })
   const [fortnightAnchor, setFortnightAnchor] = useState(toDateInput(initial.fortnightAnchor))
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const monthLabels = MONTH_NAMES.map(month => t(`settings.common.months.${month.toLowerCase()}`))
+  const weekDayLabels = Object.fromEntries(
+    WEEK_DAYS.map(day => [day, t(`settings.common.weekDays.${day.toLowerCase()}`)]),
+  ) as Record<WeekDay, string>
 
   async function onSave() {
     setError(null); setSaved(false)
@@ -504,43 +537,41 @@ function SubmissionPeriodsForm({ initial }: { initial: SubmissionWindowConfig })
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Submission periods</Title3>
+        <Title3 className={s.sectionTitle}>{t('settings.submissionPeriods.title')}</Title3>
         <Body1 className={s.help}>
-          Where each reporting period starts and ends. Changing these takes effect immediately for
-          new submissions and open-period checks; periods already recorded keep the boundaries they
-          were written with.
+          {t('settings.submissionPeriods.description')}
         </Body1>
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Submission periods saved.</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('settings.submissionPeriods.saved')}</MessageBarBody></AutoScrollMessageBar>}
 
       <div className={s.rowTop}>
-        <Field label="Fiscal year starts in" hint="Also anchors quarterly and half-yearly periods." className={s.grow}>
+        <Field label={t('settings.submissionPeriods.fiscalYearStart')} hint={t('settings.submissionPeriods.fiscalYearHint')} className={s.grow}>
           <Dropdown
             disabled={!canManage}
-            value={MONTH_NAMES[fiscalYearStartMonth - 1]}
+            value={monthLabels[fiscalYearStartMonth - 1]}
             selectedOptions={[String(fiscalYearStartMonth)]}
             onOptionSelect={(_, d) => setFiscalYearStartMonth(Number(d.optionValue))}
           >
-            {MONTH_NAMES.map((m, i) => <Option key={m} value={String(i + 1)}>{m}</Option>)}
+            {MONTH_NAMES.map((m, i) => <Option key={m} value={String(i + 1)}>{monthLabels[i]}</Option>)}
           </Dropdown>
         </Field>
 
-        <Field label="Week starts on" className={s.grow}>
+        <Field label={t('settings.submissionPeriods.weekStart')} className={s.grow}>
           <Dropdown
             disabled={!canManage}
-            value={weekStartDay}
+            value={weekDayLabels[weekStartDay]}
             selectedOptions={[weekStartDay]}
             onOptionSelect={(_, d) => setWeekStartDay(d.optionValue as WeekDay)}
           >
-            {WEEK_DAYS.map(d => <Option key={d} value={d}>{d}</Option>)}
+            {WEEK_DAYS.map(d => <Option key={d} value={d}>{weekDayLabels[d]}</Option>)}
           </Dropdown>
         </Field>
       </div>
 
       <div className={s.rowTop}>
-        <Field label="Month starts on day" hint="1-28." className={s.grow}>
+        <Field label={t('settings.submissionPeriods.monthStart')} hint={t('settings.submissionPeriods.monthStartHint')} className={s.grow}>
           <Input
             type="number" min={1} max={28} disabled={!canManage}
             value={String(monthStartDay)}
@@ -548,7 +579,7 @@ function SubmissionPeriodsForm({ initial }: { initial: SubmissionWindowConfig })
           />
         </Field>
 
-        <Field label="Fortnight anchor" hint="Any date on a fortnight boundary; only the date matters." className={s.grow}>
+        <Field label={t('settings.submissionPeriods.fortnightAnchor')} hint={t('settings.submissionPeriods.fortnightAnchorHint')} className={s.grow}>
           <Input type="date" disabled={!canManage} value={fortnightAnchor} onChange={(_, d) => setFortnightAnchor(d.value)} />
         </Field>
       </div>
@@ -556,7 +587,7 @@ function SubmissionPeriodsForm({ initial }: { initial: SubmissionWindowConfig })
       {canManage && (
         <div className={s.actions}>
           <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
-            {update.isPending ? 'Saving…' : 'Save'}
+            {update.isPending ? t('settings.common.saving') : t('settings.common.save')}
           </Button>
         </div>
       )}
@@ -575,13 +606,15 @@ const CADENCE_WINDOW_KEYS: Record<Cadence, keyof CadenceWindows> = {
 }
 
 function CadenceWindowsSection() {
+  const { t } = useTranslation()
   const { data, isLoading } = useCadenceWindows()
-  if (isLoading || !data) return <Spinner label="Loading…" />
+  if (isLoading || !data) return <Spinner label={t('settings.common.loading')} />
   return <CadenceWindowsForm initial={data} key={JSON.stringify(data)} />
 }
 
 function CadenceWindowsForm({ initial }: { initial: CadenceWindows }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const { has } = useCapabilities()
   const canManage = has('settings:manage')
   const update = useUpdateCadenceWindows()
@@ -608,25 +641,21 @@ function CadenceWindowsForm({ initial }: { initial: CadenceWindows }) {
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Submission windows</Title3>
+        <Title3 className={s.sectionTitle}>{t('settings.submissionWindows.title')}</Title3>
         <Body1 className={s.help}>
-          How long before/after each cadence's period a service may actually create or edit a
-          submission for it. <strong>Open offset</strong> delays when the window opens after the
-          period starts; <strong>Grace period</strong> extends how long it stays open after the
-          period ends. Both default to 0 hours — the window is exactly the period — until set here.
-          "Missed submission" reporting and reminders also wait for the grace period to elapse.
+          {t('settings.submissionWindows.description')}
         </Body1>
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Submission windows saved.</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('settings.submissionWindows.saved')}</MessageBarBody></AutoScrollMessageBar>}
 
       <Table className={s.table}>
         <TableHeader>
           <TableRow>
-            <TableHeaderCell>Cadence</TableHeaderCell>
-            <TableHeaderCell>Open offset (hours)</TableHeaderCell>
-            <TableHeaderCell>Grace period (hours)</TableHeaderCell>
+            <TableHeaderCell>{t('settings.common.cadence')}</TableHeaderCell>
+            <TableHeaderCell>{t('settings.submissionWindows.openOffset')}</TableHeaderCell>
+            <TableHeaderCell>{t('settings.submissionWindows.gracePeriod')}</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -634,7 +663,7 @@ function CadenceWindowsForm({ initial }: { initial: CadenceWindows }) {
             const w = windows[CADENCE_WINDOW_KEYS[cadence]]
             return (
               <TableRow key={cadence}>
-                <TableCell>{cadenceLabel(cadence)}</TableCell>
+                <TableCell>{t(`settings.common.cadences.${cadence}`)}</TableCell>
                 <TableCell>
                   <Input
                     type="number" min={0} disabled={!canManage}
@@ -658,7 +687,7 @@ function CadenceWindowsForm({ initial }: { initial: CadenceWindows }) {
       {canManage && (
         <div className={s.actions}>
           <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
-            {update.isPending ? 'Saving…' : 'Save'}
+            {update.isPending ? t('settings.common.saving') : t('settings.common.save')}
           </Button>
         </div>
       )}
@@ -669,15 +698,16 @@ function CadenceWindowsForm({ initial }: { initial: CadenceWindows }) {
 /** Read-only, live "now" snapshot of every cadence's resolved period and submission window. */
 function CadencePreviewSection() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { data, isLoading, isFetching, refetch } = useCadencePreview()
 
   return (
     <Card className={s.card}>
       <div className={s.sectionHeader}>
         <div>
-          <Title3 className={s.sectionTitle}>Current periods</Title3>
+          <Title3 className={s.sectionTitle}>{t('settings.currentPeriods.title')}</Title3>
           <Body1 className={s.help}>
-            What the settings above resolve to right now — a live snapshot, not something that updates on its own.
+            {t('settings.currentPeriods.description')}
           </Body1>
         </div>
         <Button
@@ -686,25 +716,25 @@ function CadencePreviewSection() {
           disabled={isFetching}
           onClick={() => refetch()}
         >
-          Refresh
+          {t('settings.common.refresh')}
         </Button>
       </div>
 
-      {isLoading || !data ? <Spinner label="Loading…" /> : (
+      {isLoading || !data ? <Spinner label={t('settings.common.loading')} /> : (
         <Table className={s.table}>
           <TableHeader>
             <TableRow>
-              <TableHeaderCell>Cadence</TableHeaderCell>
-              <TableHeaderCell>Period</TableHeaderCell>
-              <TableHeaderCell>Window</TableHeaderCell>
+              <TableHeaderCell>{t('settings.common.cadence')}</TableHeaderCell>
+              <TableHeaderCell>{t('settings.currentPeriods.period')}</TableHeaderCell>
+              <TableHeaderCell>{t('settings.currentPeriods.window')}</TableHeaderCell>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.map((entry: CadencePreviewEntry) => (
               <TableRow key={entry.cadence}>
-                <TableCell>{cadenceLabel(entry.cadence)}</TableCell>
-                <TableCell>{formatDateTime(entry.periodStart)} – {formatDateTime(entry.periodEnd)}</TableCell>
-                <TableCell>{formatDateTime(entry.windowStart)} – {formatDateTime(entry.windowEnd)}</TableCell>
+                <TableCell>{t(`settings.common.cadences.${entry.cadence}`)}</TableCell>
+                <TableCell><LocalizedTime value={entry.periodStart} /> – <LocalizedTime value={entry.periodEnd} /></TableCell>
+                <TableCell><LocalizedTime value={entry.windowStart} /> – <LocalizedTime value={entry.windowEnd} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -717,13 +747,15 @@ function CadencePreviewSection() {
 // --- Ingestion (global kill switch) --------------------------------------------------------
 
 function IngestionSection() {
+  const { t } = useTranslation()
   const { data, isLoading } = useIngestionStatus()
-  if (isLoading || !data) return <Spinner label="Loading…" />
+  if (isLoading || !data) return <Spinner label={t('settings.common.loading')} />
   return <IngestionForm initial={data} key={`${data.closed}|${data.message ?? ''}`} />
 }
 
 function IngestionForm({ initial }: { initial: { closed: boolean; message?: string | null } }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const { has } = useCapabilities()
   const canManage = has('settings:manage')
   const update = useUpdateIngestionStatus()
@@ -745,42 +777,39 @@ function IngestionForm({ initial }: { initial: { closed: boolean; message?: stri
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Ingestion</Title3>
+        <Title3 className={s.sectionTitle}>{t('settings.ingestion.title')}</Title3>
         <Body1 className={s.help}>
-          A global kill switch for disaster recovery. Closing submissions blocks service-facing
-          ingestion — service accounts, bulk import and the Teams integration — while everything
-          else (reads, OData, admin create/edit for remediation, schemas, settings) stays available.
-          A banner with the message below is shown to everyone while closed.
+          {t('settings.ingestion.description')}
         </Body1>
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Ingestion status saved.</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('settings.ingestion.saved')}</MessageBarBody></AutoScrollMessageBar>}
 
       <Field>
         <Switch
           disabled={!canManage}
           checked={closed}
           onChange={(_, d) => setClosed(d.checked)}
-          label="Close all submissions"
+          label={t('settings.ingestion.closeAll')}
         />
       </Field>
 
-      <Field label="Banner message (optional)" hint="Shown to everyone while submissions are closed.">
+      <Field label={t('settings.ingestion.bannerLabel')} hint={t('settings.ingestion.bannerHint')}>
         <Textarea
           disabled={!canManage}
           value={message}
           maxLength={500}
           rows={3}
           onChange={(_, d) => setMessage(d.value)}
-          placeholder="e.g. Submissions are paused while we investigate a data issue. Expected back up by 5pm UTC."
+          placeholder={t('settings.ingestion.bannerPlaceholder')}
         />
       </Field>
 
       {canManage && (
         <div className={s.actions}>
           <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
-            {update.isPending ? 'Saving…' : 'Save'}
+            {update.isPending ? t('settings.common.saving') : t('settings.common.save')}
           </Button>
         </div>
       )}
@@ -791,13 +820,15 @@ function IngestionForm({ initial }: { initial: { closed: boolean; message?: stri
 // --- Email (SMTP) settings ----------------------------------------------------------------
 
 function EmailSettingsSection() {
+  const { t } = useTranslation()
   const { data, isLoading } = useEmailSettings()
-  if (isLoading || !data) return <Spinner label="Loading…" />
+  if (isLoading || !data) return <Spinner label={t('settings.common.loading')} />
   return <EmailSettingsForm initial={data} key={data.host + '|' + data.fromAddress} />
 }
 
 function EmailSettingsForm({ initial }: { initial: EmailSettings }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const update = useUpdateEmailSettings()
   const [host, setHost] = useState(initial.host)
   const [port, setPort] = useState(String(initial.port || 587))
@@ -834,57 +865,56 @@ function EmailSettingsForm({ initial }: { initial: EmailSettings }) {
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Email server (SMTP)</Title3>
+        <Title3 className={s.sectionTitle}>{t('settings.email.title')}</Title3>
         <Body1 className={s.help}>
-          Where outgoing mail is sent from. Stored in the database; the password is encrypted at
-          rest and never shown again.{' '}
+          {t('settings.email.description')}{' '}
           {initial.configured
-            ? <Badge appearance="tint" color="success">Configured</Badge>
-            : <Badge appearance="tint" color="warning">Not configured</Badge>}
+            ? <Badge appearance="tint" color="success">{t('settings.common.configured')}</Badge>
+            : <Badge appearance="tint" color="warning">{t('settings.common.notConfigured')}</Badge>}
         </Body1>
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Settings saved.</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('settings.email.saved')}</MessageBarBody></AutoScrollMessageBar>}
 
       <div className={s.row}>
-        <Field label="Host" required className={s.grow}>
-          <Input value={host} onChange={(_, d) => setHost(d.value)} placeholder="smtp.example.org" />
+        <Field label={t('settings.email.host')} required className={s.grow}>
+          <Input value={host} onChange={(_, d) => setHost(d.value)} placeholder={t('settings.email.hostPlaceholder')} />
         </Field>
-        <Field label="Port" required>
+        <Field label={t('settings.email.port')} required>
           <Input type="number" value={port} onChange={(_, d) => setPort(d.value)} style={{ width: '110px' }} />
         </Field>
       </div>
 
-      <Switch label="Use TLS (STARTTLS)" checked={useStartTls} onChange={(_, d) => setUseStartTls(d.checked)} />
+      <Switch label={t('settings.email.useTls')} checked={useStartTls} onChange={(_, d) => setUseStartTls(d.checked)} />
 
       <div className={s.row}>
-        <Field label="From address" required className={s.grow}>
-          <Input value={fromAddress} onChange={(_, d) => setFromAddress(d.value)} placeholder="ingest@example.org" />
+        <Field label={t('settings.email.fromAddress')} required className={s.grow}>
+          <Input value={fromAddress} onChange={(_, d) => setFromAddress(d.value)} placeholder={t('settings.email.fromAddressPlaceholder')} />
         </Field>
-        <Field label="From name" className={s.grow}>
-          <Input value={fromName} onChange={(_, d) => setFromName(d.value)} placeholder="Ingest" />
+        <Field label={t('settings.email.fromName')} className={s.grow}>
+          <Input value={fromName} onChange={(_, d) => setFromName(d.value)} placeholder={t('settings.email.fromNamePlaceholder')} />
         </Field>
       </div>
 
-      <Field label="Username" className={s.grow}>
-        <Input value={username} onChange={(_, d) => setUsername(d.value)} placeholder="(blank = anonymous relay)" />
+      <Field label={t('settings.email.username')} className={s.grow}>
+        <Input value={username} onChange={(_, d) => setUsername(d.value)} placeholder={t('settings.email.usernamePlaceholder')} />
       </Field>
 
       <Checkbox
-        label={initial.hasPassword ? 'Change the stored password' : 'Set a password'}
+        label={initial.hasPassword ? t('settings.email.changePassword') : t('settings.email.setPassword')}
         checked={changePassword}
         onChange={(_, d) => setChangePassword(!!d.checked)}
       />
       {changePassword && (
-        <Field label="Password" hint="Leave blank to clear the stored password.">
+        <Field label={t('settings.email.password')} hint={t('settings.email.passwordHint')}>
           <Input type="password" value={password} onChange={(_, d) => setPassword(d.value)} />
         </Field>
       )}
 
       <div className={s.actions}>
         <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
-          {update.isPending ? 'Saving…' : 'Save'}
+          {update.isPending ? t('settings.common.saving') : t('settings.common.save')}
         </Button>
       </div>
     </Card>
@@ -895,11 +925,12 @@ function EmailSettingsForm({ initial }: { initial: EmailSettings }) {
 
 function EmailTemplatesSection() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { data, isLoading } = useEmailTemplates()
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
 
-  if (isLoading || !data) return <Spinner label="Loading…" />
+  if (isLoading || !data) return <Spinner label={t('settings.common.loading')} />
 
   const editing = data.find(t => t.key === editingKey) ?? null
   function close() { setEditingKey(null); setExpanded(false) }
@@ -908,39 +939,42 @@ function EmailTemplatesSection() {
     <>
       <Card className={s.cardWide}>
         <div>
-          <Title3 className={s.sectionTitle}>Email templates</Title3>
+          <Title3 className={s.sectionTitle}>{t('settings.emailTemplates.title')}</Title3>
           <Body1 className={s.help}>
-            Liquid templates used to build notification emails. Select one to edit its subject and body.
+            {t('settings.emailTemplates.description')}
           </Body1>
         </div>
 
         {data.length === 0 ? (
-          <AutoScrollMessageBar intent="info"><MessageBarBody>No templates yet.</MessageBarBody></AutoScrollMessageBar>
+          <AutoScrollMessageBar intent="info"><MessageBarBody>{t('settings.emailTemplates.empty')}</MessageBarBody></AutoScrollMessageBar>
         ) : (
           <Table size="small" className={s.table}>
             <TableHeader>
               <TableRow>
-                <TableHeaderCell>Template</TableHeaderCell>
-                <TableHeaderCell className={s.colSubject}>Subject</TableHeaderCell>
-                <TableHeaderCell className={s.colFormat}>Format</TableHeaderCell>
+                <TableHeaderCell>{t('settings.emailTemplates.template')}</TableHeaderCell>
+                <TableHeaderCell className={s.colSubject}>{t('settings.emailTemplates.subject')}</TableHeaderCell>
+                <TableHeaderCell className={s.colFormat}>{t('settings.emailTemplates.format')}</TableHeaderCell>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map(t => (
+              {data.map(template => (
                 <TableRow
-                  key={t.key}
+                  key={template.key}
                   className={`${s.tableRow} ${s.rowClickable}`}
-                  {...clickableRowProps(() => { setEditingKey(t.key); setExpanded(false) }, `Edit template ${t.name}`)}
+                  {...clickableRowProps(
+                    () => { setEditingKey(template.key); setExpanded(false) },
+                    t('settings.emailTemplates.editAria', { name: template.name }),
+                  )}
                 >
                   <TableCell className={s.nameCell}>
-                    <strong className={s.truncate}>{t.name}</strong>
+                    <strong className={s.truncate}>{template.name}</strong>
                   </TableCell>
                   <TableCell className={s.colSubject}>
-                    <span className={s.truncate}>{t.subject}</span>
+                    <span className={s.truncate}>{template.subject}</span>
                   </TableCell>
                   <TableCell className={s.colFormat}>
-                    <Badge appearance="outline" color={t.htmlBody ? 'brand' : 'informative'}>
-                      {t.htmlBody ? 'HTML + text' : 'Text'}
+                    <Badge appearance="outline" color={template.htmlBody ? 'brand' : 'informative'}>
+                      {template.htmlBody ? t('settings.emailTemplates.htmlAndText') : t('settings.emailTemplates.text')}
                     </Badge>
                   </TableCell>
                 </TableRow>
@@ -960,7 +994,7 @@ function EmailTemplatesSection() {
         style={expanded ? { width: DRAWER_EXPANDED_WIDTH } : undefined}
       >
         <DrawerHeaderWithClose
-          title={editing ? `Edit template — ${editing.name}` : 'Edit template'}
+          title={editing ? t('settings.emailTemplates.editNamed', { name: editing.name }) : t('settings.emailTemplates.edit')}
           onClose={close}
           expanded={expanded}
           onToggleExpand={() => setExpanded(e => !e)}
@@ -979,6 +1013,7 @@ function EmailTemplatesSection() {
 
 function TemplateEditor({ template }: { template: EmailTemplate }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const update = useUpdateEmailTemplate()
   const [subject, setSubject] = useState(template.subject)
   const [textBody, setTextBody] = useState(template.textBody)
@@ -1009,20 +1044,20 @@ function TemplateEditor({ template }: { template: EmailTemplate }) {
     <>
       {template.description && <Body1 className={s.help}>{template.description}</Body1>}
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Template saved.</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('settings.emailTemplates.saved')}</MessageBarBody></AutoScrollMessageBar>}
 
-      <Field label="Subject" required>
+      <Field label={t('settings.emailTemplates.subject')} required>
         <Input value={subject} onChange={(_, d) => setSubject(d.value)} />
       </Field>
-      <Field label="Text body" required hint="Plain-text fallback. Liquid is supported.">
+      <Field label={t('settings.emailTemplates.textBody')} required hint={t('settings.emailTemplates.textBodyHint')}>
         <Textarea value={textBody} onChange={(_, d) => setTextBody(d.value)} rows={8} resize="vertical" />
       </Field>
-      <Field label="HTML body" hint="Optional. Leave blank to send text only.">
+      <Field label={t('settings.emailTemplates.htmlBody')} hint={t('settings.emailTemplates.htmlBodyHint')}>
         <Textarea value={htmlBody} onChange={(_, d) => setHtmlBody(d.value)} rows={8} resize="vertical" />
       </Field>
       <div className={s.actions}>
         <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
-          {update.isPending ? 'Saving…' : 'Save template'}
+          {update.isPending ? t('settings.common.saving') : t('settings.emailTemplates.save')}
         </Button>
       </div>
     </>
@@ -1032,13 +1067,15 @@ function TemplateEditor({ template }: { template: EmailTemplate }) {
 // --- Notifications ------------------------------------------------------------------------
 
 function NotificationsSection() {
+  const { t } = useTranslation()
   const { data, isLoading } = useNotificationSettings()
-  if (isLoading || !data) return <Spinner label="Loading…" />
+  if (isLoading || !data) return <Spinner label={t('settings.common.loading')} />
   return <NotificationsForm initial={data} />
 }
 
 function NotificationsForm({ initial }: { initial: NotificationSettings }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const update = useUpdateNotificationSettings()
   const run = useRunNotifications()
   const { data: accountsPage } = useAccounts()
@@ -1082,7 +1119,12 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
     setError(null); setRunResult(null)
     try {
       const r = await run.mutateAsync()
-      setRunResult(`Queued ${r.totalQueued} email(s): ${r.upcomingQueued} upcoming, ${r.missedQueued} missed, ${r.warningsQueued} warnings.`)
+      setRunResult(t('settings.notifications.runResult', {
+        total: r.totalQueued,
+        upcoming: r.upcomingQueued,
+        missed: r.missedQueued,
+        warnings: r.warningsQueued,
+      }))
     } catch (e) {
       setError(formatApiError(e))
     }
@@ -1091,49 +1133,48 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Notifications</Title3>
+        <Title3 className={s.sectionTitle}>{t('settings.notifications.title')}</Title3>
         <Body1 className={s.help}>
-          Choose which events generate emails and who receives them. Each trigger can notify the
-          service&apos;s own contact email, the recipient list below, or both.
+          {t('settings.notifications.description')}
         </Body1>
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Notification settings saved.</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('settings.notifications.saved')}</MessageBarBody></AutoScrollMessageBar>}
       {runResult && <AutoScrollMessageBar intent="success"><MessageBarBody>{runResult}</MessageBarBody></AutoScrollMessageBar>}
 
-      <RuleEditor title="Upcoming submission reminder" rule={upcoming} onChange={setUpcoming} />
+      <RuleEditor title={t('settings.notifications.upcoming')} rule={upcoming} onChange={setUpcoming} />
       {upcoming.enabled && (
-        <Field label="Lead time (hours before the window closes)">
+        <Field label={t('settings.notifications.leadTime')}>
           <Input type="number" value={leadHours} onChange={(_, d) => setLeadHours(d.value)} style={{ width: '120px' }} />
         </Field>
       )}
-      <RuleEditor title="Missed submission alert" rule={missed} onChange={setMissed} />
-      <RuleEditor title="Submission with warnings notice" rule={warnings} onChange={setWarnings} />
+      <RuleEditor title={t('settings.notifications.missed')} rule={missed} onChange={setMissed} />
+      <RuleEditor title={t('settings.notifications.warnings')} rule={warnings} onChange={setWarnings} />
       <RuleEditor
-        title="Draft saved nudge"
+        title={t('settings.notifications.draftSaved')}
         rule={draftSaved}
         onChange={setDraftSaved}
-        hint="Sent on every draft save (no dedupe) to nudge collaborators. The email shows a relative path you paste after your console's address — it isn't a clickable link."
+        hint={t('settings.notifications.draftSavedHint')}
       />
 
       {approvalEnabled && (
         <>
           <RuleEditor
-            title="Submission pending approval notice"
+            title={t('settings.notifications.pendingApproval')}
             rule={pendingApproval}
             onChange={setPendingApproval}
-            hint="The submission's designated approvers are always emailed; these switches add the submitter and/or admin list."
+            hint={t('settings.notifications.pendingApprovalHint')}
           />
-          <RuleEditor title="Submission approved notice" rule={approved} onChange={setApproved} />
-          <RuleEditor title="Submission rejected notice" rule={rejected} onChange={setRejected} />
+          <RuleEditor title={t('settings.notifications.approved')} rule={approved} onChange={setApproved} />
+          <RuleEditor title={t('settings.notifications.rejected')} rule={rejected} onChange={setRejected} />
         </>
       )}
 
-      <Field label="Admin / operator recipient list" hint="Accounts (with an email) that receive the copy when a trigger has 'admin list' on.">
+      <Field label={t('settings.notifications.recipientList')} hint={t('settings.notifications.recipientListHint')}>
         <Dropdown
           multiselect
-          placeholder={eligible.length === 0 ? 'No eligible accounts (operators/admins need an email)' : 'Select recipients…'}
+          placeholder={eligible.length === 0 ? t('settings.notifications.noEligibleAccounts') : t('settings.notifications.selectRecipients')}
           selectedOptions={recipients}
           value={recipients
             .map(id => eligible.find(a => a.id === id))
@@ -1152,10 +1193,10 @@ function NotificationsForm({ initial }: { initial: NotificationSettings }) {
 
       <div className={s.actions}>
         <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
-          {update.isPending ? 'Saving…' : 'Save'}
+          {update.isPending ? t('settings.common.saving') : t('settings.common.save')}
         </Button>
         <Button disabled={run.isPending} onClick={onRun}>
-          {run.isPending ? 'Running…' : 'Run now'}
+          {run.isPending ? t('settings.notifications.running') : t('settings.notifications.runNow')}
         </Button>
       </div>
     </Card>
@@ -1169,6 +1210,7 @@ function RuleEditor({ title, rule, onChange, hint }: {
   hint?: string
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   return (
     <div className={s.ruleBlock}>
       <Switch label={title} checked={rule.enabled} onChange={(_, d) => onChange({ ...rule, enabled: d.checked })} />
@@ -1176,12 +1218,12 @@ function RuleEditor({ title, rule, onChange, hint }: {
         <div className={s.ruleChildren}>
           {hint && <Body1 className={s.help}>{hint}</Body1>}
           <Checkbox
-            label="Notify the service account"
+            label={t('settings.notifications.notifyService')}
             checked={rule.notifyServiceAccount}
             onChange={(_, d) => onChange({ ...rule, notifyServiceAccount: !!d.checked })}
           />
           <Checkbox
-            label="Notify the admin/operator list"
+            label={t('settings.notifications.notifyAdminList')}
             checked={rule.notifyAdminList}
             onChange={(_, d) => onChange({ ...rule, notifyAdminList: !!d.checked })}
           />

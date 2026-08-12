@@ -25,16 +25,17 @@ import { SchemaAvatar } from '../components/Avatars'
 import { schemaRequiresApproval } from '../utils/approvers'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import { ValueLabel } from '../components/ValueLabel'
 import { ExpressionField } from '../components/ExpressionField'
 import { cadenceLabel } from '../utils/cadence'
 import { confirmDelete } from '../utils/confirm'
-import { formatDate, formatDateTime } from '../utils/format'
 import { clickableRowProps } from '../utils/a11y'
 import { downloadFromUrl, downloadJson, pickJsonFile } from '../utils/download'
 import { emptySchema, toRequest } from '../utils/schema'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+import { Trans, useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -107,19 +108,9 @@ const useStyles = makeStyles({
   rulesOl: { margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' },
 })
 
-const SCHEMA_EXPORT_COLUMNS: ExportColumn<Schema>[] = [
-  { header: 'Name', value: sc => sc.name },
-  { header: 'Label', value: sc => sc.label ?? '' },
-  { header: 'Values', value: sc => sc.values.length },
-  { header: 'Enabled', value: sc => (sc.enabled ? 'Enabled' : 'Disabled') },
-  { header: 'Modifiable', value: sc => (sc.modifiable ? 'Yes' : 'No') },
-  { header: 'Audience', value: sc => (sc.isGlobal ? 'Global' : `${sc.serviceIds.length} service(s)`) },
-  { header: 'Created', value: sc => sc.createdAt },
-  { header: 'Created by', value: sc => sc.createdBy ?? '' },
-]
-
 export function SchemasPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const { me, has } = useCapabilities()
   const canManage = has('schemas:manage')
@@ -145,9 +136,19 @@ export function SchemasPage() {
   // their errors (clone, "download example").
   const [actionError, setActionError] = useState<string | null>(null)
   const [viewerExpanded, setViewerExpanded] = useState(false)
+  const schemaExportColumns: ExportColumn<Schema>[] = [
+    { header: t('schemasSubmissions.common.name'), value: sc => sc.name },
+    { header: t('schemasSubmissions.common.label'), value: sc => sc.label ?? '' },
+    { header: t('schemasSubmissions.common.values'), value: sc => sc.values.length },
+    { header: t('schemasSubmissions.common.enabled'), value: sc => sc.enabled ? t('schemasSubmissions.common.enabled') : t('schemasSubmissions.common.disabled') },
+    { header: t('schemasSubmissions.common.modifiable'), value: sc => sc.modifiable ? t('schemasSubmissions.common.yes') : t('schemasSubmissions.common.no') },
+    { header: t('schemasSubmissions.schemas.audience'), value: sc => sc.isGlobal ? t('schemasSubmissions.common.global') : t('schemasSubmissions.schemas.serviceCount', { count: sc.serviceIds.length }) },
+    { header: t('schemasSubmissions.common.created'), value: sc => sc.createdAt },
+    { header: t('schemasSubmissions.common.createdBy'), value: sc => sc.createdBy ?? '' },
+  ]
   const schemasExport = useCsvExport({
     filename: 'schemas.csv',
-    columns: SCHEMA_EXPORT_COLUMNS,
+    columns: schemaExportColumns,
     fetchAll: () => fetchAllSchemas(),
     onError: setActionError,
   })
@@ -178,13 +179,13 @@ export function SchemasPage() {
     nav(`/schemas/${encodeURIComponent(sc.name)}/versions`)
   }
   function deleteFromView(sc: Schema) {
-    if (!confirmDelete('schema', sc.label || sc.name)) return
+    if (!confirmDelete(t('schemasSubmissions.schemas.deleteType'), sc.label || sc.name)) return
     setViewing(null)
     del.mutate(sc.id)
   }
 
   function deleteFromRow(sc: Schema) {
-    if (!confirmDelete('schema', sc.label || sc.name)) return
+    if (!confirmDelete(t('schemasSubmissions.schemas.deleteType'), sc.label || sc.name)) return
     del.mutate(sc.id)
   }
 
@@ -192,7 +193,7 @@ export function SchemasPage() {
     setImportError(null)
     try {
       const parsed = await pickJsonFile()
-      if (!parsed || typeof parsed !== 'object') throw new Error('JSON root must be an object.')
+      if (!parsed || typeof parsed !== 'object') throw new Error(t('schemasSubmissions.schemas.jsonObjectError'))
       // Fill in the required defaults so the server's UpsertSchemaRequest contract is
       // satisfied even for slimmer files (e.g. exported from an older version), then hand the
       // prefilled payload to the editor page via router state.
@@ -239,25 +240,25 @@ export function SchemasPage() {
   return (
     <div className={s.root}>
       <div className={s.toolbar}>
-        <Title2>Schemas</Title2>
+        <Title2>{t('schemasSubmissions.schemas.title')}</Title2>
         <Toolbar className={s.toolbarActions}>
-          {canManage && <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>New schema</ToolbarButton>}
+          {canManage && <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>{t('schemasSubmissions.schemas.new')}</ToolbarButton>}
           <Menu>
             <MenuTrigger disableButtonEnhancement>
-              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('schemasSubmissions.common.moreActions')} />
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
-                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>{t('schemasSubmissions.common.refresh')}</MenuItem>
                 <MenuDivider />
                 <MenuItem
                   icon={<ArrowDownload20Regular />}
                   disabled={schemasExport.exporting}
                   onClick={schemasExport.exportList}
                 >
-                  {schemasExport.exporting ? 'Exporting…' : 'Export this list'}
+                  {schemasExport.exporting ? t('schemasSubmissions.common.exporting') : t('schemasSubmissions.common.exportList')}
                 </MenuItem>
-                <MenuItem icon={<ArrowUpload20Regular />} onClick={onUploadSchema}>Upload schema</MenuItem>
+                <MenuItem icon={<ArrowUpload20Regular />} onClick={onUploadSchema}>{t('schemasSubmissions.schemas.upload')}</MenuItem>
               </MenuList>
             </MenuPopover>
           </Menu>
@@ -267,7 +268,7 @@ export function SchemasPage() {
       {error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Failed to load</MessageBarTitle>
+            <MessageBarTitle>{t('schemasSubmissions.common.loadFailed')}</MessageBarTitle>
             {formatApiError(error)}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -276,10 +277,10 @@ export function SchemasPage() {
       {importError && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Could not import schema</MessageBarTitle>
+            <MessageBarTitle>{t('schemasSubmissions.schemas.importFailed')}</MessageBarTitle>
             {importError}
             {' '}
-            <Button appearance="transparent" size="small" onClick={() => setImportError(null)}>Dismiss</Button>
+            <Button appearance="transparent" size="small" onClick={() => setImportError(null)}>{t('schemasSubmissions.common.dismiss')}</Button>
           </MessageBarBody>
         </AutoScrollMessageBar>
       )}
@@ -289,7 +290,7 @@ export function SchemasPage() {
           <MessageBarBody>
             {actionError}
             {' '}
-            <Button appearance="transparent" size="small" onClick={() => setActionError(null)}>Dismiss</Button>
+            <Button appearance="transparent" size="small" onClick={() => setActionError(null)}>{t('schemasSubmissions.common.dismiss')}</Button>
           </MessageBarBody>
         </AutoScrollMessageBar>
       )}
@@ -297,27 +298,27 @@ export function SchemasPage() {
       <Table size="small" className={s.table}>
         <TableHeader>
           <TableRow>
-            <TableHeaderCell>Name</TableHeaderCell>
-            <TableHeaderCell className={s.colValues}>Values</TableHeaderCell>
-            <TableHeaderCell className={s.colEnabled}>Enabled</TableHeaderCell>
-            <TableHeaderCell className={s.colModifiable}>Modifiable</TableHeaderCell>
-            <TableHeaderCell className={s.colAudience}>Audience</TableHeaderCell>
-            <TableHeaderCell className={s.colCreated}>Created</TableHeaderCell>
-            <TableHeaderCell className={s.colCreatedBy}>Created by</TableHeaderCell>
-            {canReadComments && <TableHeaderCell className={s.colComments}>Comments</TableHeaderCell>}
-            <TableHeaderCell className={`${s.colActions} ${s.actionsHeader}`}>Actions</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.name')}</TableHeaderCell>
+            <TableHeaderCell className={s.colValues}>{t('schemasSubmissions.common.values')}</TableHeaderCell>
+            <TableHeaderCell className={s.colEnabled}>{t('schemasSubmissions.common.enabled')}</TableHeaderCell>
+            <TableHeaderCell className={s.colModifiable}>{t('schemasSubmissions.common.modifiable')}</TableHeaderCell>
+            <TableHeaderCell className={s.colAudience}>{t('schemasSubmissions.schemas.audience')}</TableHeaderCell>
+            <TableHeaderCell className={s.colCreated}>{t('schemasSubmissions.common.created')}</TableHeaderCell>
+            <TableHeaderCell className={s.colCreatedBy}>{t('schemasSubmissions.common.createdBy')}</TableHeaderCell>
+            {canReadComments && <TableHeaderCell className={s.colComments}>{t('schemasSubmissions.comments.title')}</TableHeaderCell>}
+            <TableHeaderCell className={`${s.colActions} ${s.actionsHeader}`}>{t('schemasSubmissions.common.actions')}</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={columnCount}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={columnCount}>{t('schemasSubmissions.common.loading')}</GridMessageRow>}
           {!isLoading && items.length === 0 && (
-            <GridMessageRow colSpan={columnCount}>No schemas yet — click “New schema” to create one.</GridMessageRow>
+            <GridMessageRow colSpan={columnCount}>{t('schemasSubmissions.schemas.empty')}</GridMessageRow>
           )}
           {items.map(sc => (
             <TableRow
               key={sc.id}
               className={`${s.row} ${s.rowClickable}`}
-              {...clickableRowProps(() => setViewing(sc), `View schema ${sc.label || sc.name}`)}
+              {...clickableRowProps(() => setViewing(sc), t('schemasSubmissions.schemas.viewSchema', { name: sc.label || sc.name }))}
             >
               <TableCell className={s.nameCell}>
                 <TableCellLayout media={<SchemaAvatar schema={sc} />}>
@@ -326,8 +327,8 @@ export function SchemasPage() {
                       <strong className={s.truncate} style={{ flex: 1, minWidth: 0 }}>{sc.label || sc.name}</strong>
                     </Tooltip>
                     {schemaRequiresApproval(sc, { approvalEnabled, globalDefaultRequired }) && (
-                      <Tooltip content="Requires approval" relationship="label">
-                        <ShieldCheckmark16Regular className={s.approvalMarker} aria-label="Requires approval" />
+                      <Tooltip content={t('schemasSubmissions.common.requiresApproval')} relationship="label">
+                        <ShieldCheckmark16Regular className={s.approvalMarker} aria-label={t('schemasSubmissions.common.requiresApproval')} />
                       </Tooltip>
                     )}
                   </span>
@@ -336,14 +337,14 @@ export function SchemasPage() {
               <TableCell>{sc.values.length}</TableCell>
               <TableCell>
                 <Badge appearance="outline" color={sc.enabled ? 'success' : 'subtle'}>
-                  {sc.enabled ? 'Enabled' : 'Disabled'}
+                  {sc.enabled ? t('schemasSubmissions.common.enabled') : t('schemasSubmissions.common.disabled')}
                 </Badge>
               </TableCell>
-              <TableCell>{sc.modifiable ? 'Yes' : 'No'}</TableCell>
-              <TableCell>{sc.isGlobal ? 'Global' : `${sc.serviceIds.length} service(s)`}</TableCell>
+              <TableCell>{sc.modifiable ? t('schemasSubmissions.common.yes') : t('schemasSubmissions.common.no')}</TableCell>
+              <TableCell>{sc.isGlobal ? t('schemasSubmissions.common.global') : t('schemasSubmissions.schemas.serviceCount', { count: sc.serviceIds.length })}</TableCell>
               <TableCell className={s.colCreated}>
-                <Tooltip content={formatDateTime(sc.createdAt)} relationship="label">
-                  <span className={s.truncate}>{formatDate(sc.createdAt)}</span>
+                <Tooltip content={<LocalizedTime value={sc.createdAt} />} relationship="label">
+                  <LocalizedTime className={s.truncate} value={sc.createdAt} dateOnly />
                 </Tooltip>
               </TableCell>
               <TableCell className={s.colCreatedBy}>
@@ -362,29 +363,29 @@ export function SchemasPage() {
               )}
               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
                 <RowActions
-                  ariaLabel={`Actions for ${sc.name}`}
+                  ariaLabel={t('schemasSubmissions.common.actionsFor', { name: sc.name })}
                   actions={[
                     // Editing/cloning/deleting are gated by schemas:manage; for read-only viewers we
                     // still surface the (read) history views so the menu stays useful.
                     ...(canManage ? [
-                      { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => openEdit(sc) },
-                      { key: 'clone', label: 'Clone', icon: <Copy20Regular />, onClick: () => onCloneSchema(sc) },
+                      { key: 'edit', label: t('schemasSubmissions.common.edit'), icon: <Edit20Regular />, onClick: () => openEdit(sc) },
+                      { key: 'clone', label: t('schemasSubmissions.common.clone'), icon: <Copy20Regular />, onClick: () => onCloneSchema(sc) },
                     ] : []),
                     ...(canTest ? [
-                      { key: 'test', label: 'Test submission', icon: <CloudCheckmark20Regular />, onClick: () => setTesting(sc) },
+                      { key: 'test', label: t('schemasSubmissions.schemas.testSubmission'), icon: <CloudCheckmark20Regular />, onClick: () => setTesting(sc) },
                     ] : []),
                     {
                       key: 'history',
-                      label: 'View historical data',
+                      label: t('schemasSubmissions.schemas.viewHistoricalData'),
                       icon: <ChartMultiple20Regular />,
                       onClick: () => nav(`/schemas/${encodeURIComponent(sc.name)}/history`),
                     }, {
                       key: 'versions',
-                      label: 'View version history',
+                      label: t('schemasSubmissions.schemas.viewVersionHistory'),
                       icon: <History20Regular />,
                       onClick: () => nav(`/schemas/${encodeURIComponent(sc.name)}/versions`),
                     },
-                    ...(canManage ? [{ key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(sc) }] : []),
+                    ...(canManage ? [{ key: 'delete', label: t('schemasSubmissions.common.delete'), icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(sc) }] : []),
                   ]}
                 />
               </TableCell>
@@ -411,15 +412,15 @@ export function SchemasPage() {
         style={viewerExpanded ? { width: DRAWER_EXPANDED_WIDTH } : undefined}
       >
         <DrawerHeaderWithClose
-          title={viewing ? (viewing.label || viewing.name) : 'Schema'}
+          title={viewing ? (viewing.label || viewing.name) : t('schemasSubmissions.common.schema')}
           onClose={() => { setViewing(null); setViewerExpanded(false) }}
           expanded={viewerExpanded}
           onToggleExpand={() => setViewerExpanded(e => !e)}
         />
         {viewing && (
           <Toolbar className={s.drawerToolbar}>
-            {canManage && <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>Edit</ToolbarButton>}
-            {canManage && <ToolbarButton icon={<Copy20Regular />} onClick={() => onCloneSchema(viewing)}>Clone</ToolbarButton>}
+            {canManage && <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>{t('schemasSubmissions.common.edit')}</ToolbarButton>}
+            {canManage && <ToolbarButton icon={<Copy20Regular />} onClick={() => onCloneSchema(viewing)}>{t('schemasSubmissions.common.clone')}</ToolbarButton>}
             {/* Download: default is "schema as JSON"; chevron exposes "example submission". */}
             <Menu positioning="below-end">
               <MenuTrigger disableButtonEnhancement>
@@ -430,20 +431,20 @@ export function SchemasPage() {
                     appearance="subtle"
                     icon={<ArrowDownload20Regular />}
                   >
-                    Download
+                    {t('schemasSubmissions.common.download')}
                   </SplitButton>
                 )}
               </MenuTrigger>
               <MenuPopover>
                 <MenuList>
                   <MenuItem icon={<ArrowDownload20Regular />} onClick={() => onDownloadSchemaJson(viewing)}>
-                    Schema as JSON
+                    {t('schemasSubmissions.schemas.schemaJson')}
                   </MenuItem>
                   <MenuItem icon={<ArrowDownload20Regular />} onClick={() => onDownloadExample(viewing)}>
-                    Example submission (JSON)
+                    {t('schemasSubmissions.schemas.exampleJson')}
                   </MenuItem>
                   <MenuItem icon={<DocumentPdf20Regular />} onClick={() => onExportSchemaPdf(viewing)}>
-                    Schema as PDF
+                    {t('schemasSubmissions.schemas.schemaPdf')}
                   </MenuItem>
                 </MenuList>
               </MenuPopover>
@@ -459,22 +460,22 @@ export function SchemasPage() {
                     appearance="subtle"
                     icon={<ChartMultiple20Regular />}
                   >
-                    View historical data
+                    {t('schemasSubmissions.schemas.viewHistoricalData')}
                   </SplitButton>
                 )}
               </MenuTrigger>
               <MenuPopover>
                 <MenuList>
                   <MenuItem icon={<ChartMultiple20Regular />} onClick={() => historyFromView(viewing)}>
-                    View historical data
+                    {t('schemasSubmissions.schemas.viewHistoricalData')}
                   </MenuItem>
                   <MenuItem icon={<History20Regular />} onClick={() => versionsFromView(viewing)}>
-                    View version history
+                    {t('schemasSubmissions.schemas.viewVersionHistory')}
                   </MenuItem>
                 </MenuList>
               </MenuPopover>
             </Menu>
-            {canManage && <ToolbarButton icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>Delete</ToolbarButton>}
+            {canManage && <ToolbarButton icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>{t('schemasSubmissions.common.delete')}</ToolbarButton>}
           </Toolbar>
         )}
         <DrawerBody>
@@ -502,54 +503,55 @@ export function SchemasPage() {
 
 function SchemaViewBody({ schema, services, requiresApproval }: { schema: Schema; services: Account[]; requiresApproval: boolean }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const audience = schema.isGlobal
-    ? 'Global (visible to all services)'
+    ? t('schemasSubmissions.schemas.globalAudience')
     : (schema.serviceIds
         .map(id => {
           const a = services.find(x => x.id === id)
           return a?.label || a?.name || id
         })
-        .join(', ') || '(no services)')
+        .join(', ') || t('schemasSubmissions.schemas.noServices'))
 
   return (
     <div className={s.drawerForm}>
       <div className={s.twoCol}>
-        <Field label="Name"><Body1>{schema.name}</Body1></Field>
-        <Field label="Label"><Body1>{schema.label || '—'}</Body1></Field>
+        <Field label={t('schemasSubmissions.common.name')}><Body1>{schema.name}</Body1></Field>
+        <Field label={t('schemasSubmissions.common.label')}><Body1>{schema.label || '—'}</Body1></Field>
       </div>
-      {schema.description && <Field label="Description"><Body1>{schema.description}</Body1></Field>}
+      {schema.description && <Field label={t('schemasSubmissions.common.description')}><Body1>{schema.description}</Body1></Field>}
       <div className={s.flagsRow}>
         <Badge appearance="outline" color={schema.enabled ? 'success' : 'subtle'}>
-          {schema.enabled ? 'Enabled' : 'Disabled'}
+          {schema.enabled ? t('schemasSubmissions.common.enabled') : t('schemasSubmissions.common.disabled')}
         </Badge>
         <Badge appearance="outline" color={schema.modifiable ? 'informative' : 'subtle'}>
-          {schema.modifiable ? 'Modifiable' : 'Frozen'}
+          {schema.modifiable ? t('schemasSubmissions.common.modifiable') : t('schemasSubmissions.schemas.frozen')}
         </Badge>
         {requiresApproval && (
           <Badge appearance="outline" color="brand" icon={<ShieldCheckmark16Regular />}>
-            Requires approval
+            {t('schemasSubmissions.common.requiresApproval')}
           </Badge>
         )}
       </div>
       {requiresApproval && schema.modifiable && (
         <MessageBar intent="warning">
           <MessageBarBody>
-            <MessageBarTitle>Modifiable and approval-gated</MessageBarTitle>
-            Re-submitting data for a window that already has a submission replaces it and resets
-            approval to Pending — even if it was previously approved — so the earlier values are
-            withdrawn from live reporting and ultimately overwritten. Mark the schema (or value) as
-            not modifiable if approved figures should never change mid-cycle.
+            <MessageBarTitle>{t('schemasSubmissions.schemas.modifiableApprovalTitle')}</MessageBarTitle>
+            {t('schemasSubmissions.schemas.modifiableApprovalHelp')}
           </MessageBarBody>
         </MessageBar>
       )}
       <div className={s.twoCol}>
-        <Field label="Audience"><Body1>{audience}</Body1></Field>
-        <Field label="Version">
+        <Field label={t('schemasSubmissions.schemas.audience')}><Body1>{audience}</Body1></Field>
+        <Field label={t('schemasSubmissions.common.version')}>
           <Body1>
             {schema.version}
             {schema.versionModifiedAt && (
               <span style={{ color: tokens.colorNeutralForeground3 }}>
-                {' '}· bumped {new Date(schema.versionModifiedAt).toLocaleString()}
+                {' '}· <Trans
+                  i18nKey="schemasSubmissions.schemas.bumpedAt"
+                  components={{ bumpedAt: <LocalizedTime value={schema.versionModifiedAt} /> }}
+                />
               </span>
             )}
           </Body1>
@@ -557,56 +559,56 @@ function SchemaViewBody({ schema, services, requiresApproval }: { schema: Schema
       </div>
       {schema.submissionValidations.length > 0 && (
         <div>
-          <div className={s.sectionLabel}>Submission validations</div>
+          <div className={s.sectionLabel}>{t('schemasSubmissions.schemas.submissionValidations')}</div>
           <ol className={s.rulesOl}>
             {schema.submissionValidations.map((v, i) => (
               <li key={i}>
-                <ExpressionField value={v} disabled rows={1} onChange={() => {}} ariaLabel={`Submission validation rule ${i + 1}`} />
+                <ExpressionField value={v} disabled rows={1} onChange={() => {}} ariaLabel={t('schemasSubmissions.schemas.validationRule', { number: i + 1 })} />
               </li>
             ))}
           </ol>
         </div>
       )}
-      {schema.notes && <Field label="Notes"><Body1>{schema.notes}</Body1></Field>}
+      {schema.notes && <Field label={t('schemasSubmissions.common.notes')}><Body1>{schema.notes}</Body1></Field>}
 
       <Divider />
 
-      <div className={s.sectionLabel}>Values ({schema.values.length})</div>
+      <div className={s.sectionLabel}>{t('schemasSubmissions.schemas.valuesCount', { count: schema.values.length })}</div>
       {schema.values.length === 0 ? (
-        <MessageBar intent="info"><MessageBarBody>No values defined.</MessageBarBody></MessageBar>
+        <MessageBar intent="info"><MessageBarBody>{t('schemasSubmissions.schemas.noValuesDefined')}</MessageBarBody></MessageBar>
       ) : (
         <Table size="small" className={s.valuesTable}>
           <TableHeader>
             <TableRow>
-              <TableHeaderCell>Label</TableHeaderCell>
-              <TableHeaderCell>Type</TableHeaderCell>
-              <TableHeaderCell>Cadence</TableHeaderCell>
+              <TableHeaderCell>{t('schemasSubmissions.common.label')}</TableHeaderCell>
+              <TableHeaderCell>{t('schemasSubmissions.common.type')}</TableHeaderCell>
+              <TableHeaderCell>{t('schemasSubmissions.common.cadenceLabel')}</TableHeaderCell>
             </TableRow>
           </TableHeader>
           <TableBody>
             {schema.values.map((v, i) => (
               <TableRow key={i}>
                 <TableCell><ValueLabel value={v} schema={schema} /></TableCell>
-                <TableCell>{v.type}</TableCell>
-                <TableCell>{cadenceLabel(v.cadence)}</TableCell>
+                <TableCell>{t(`schemasSubmissions.common.valueType.${v.type}`)}</TableCell>
+                <TableCell>{cadenceLabel(v.cadence, t)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
 
-      <div className={s.sectionLabel}>Audit</div>
+      <div className={s.sectionLabel}>{t('schemasSubmissions.common.audit')}</div>
       <div className={s.twoCol}>
-        <Field label="Created">
+        <Field label={t('schemasSubmissions.common.created')}>
           <Body1>
-            {new Date(schema.createdAt).toLocaleString()}
-            {schema.createdBy ? ` · by ${schema.createdBy}` : ''}
+            <LocalizedTime value={schema.createdAt} />
+            {schema.createdBy ? ` · ${t('schemasSubmissions.common.by', { name: schema.createdBy })}` : ''}
           </Body1>
         </Field>
-        <Field label="Modified">
+        <Field label={t('schemasSubmissions.common.modified')}>
           <Body1>
-            {new Date(schema.modifiedAt).toLocaleString()}
-            {schema.modifiedBy ? ` · by ${schema.modifiedBy}` : ''}
+            <LocalizedTime value={schema.modifiedAt} />
+            {schema.modifiedBy ? ` · ${t('schemasSubmissions.common.by', { name: schema.modifiedBy })}` : ''}
           </Body1>
         </Field>
       </div>

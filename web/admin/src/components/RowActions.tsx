@@ -3,6 +3,7 @@ import {
 } from '@fluentui/react-components'
 import { MoreVertical20Regular } from '@fluentui/react-icons'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export interface RowAction {
   /** Unique key — used for React keys and aria attributes. */
@@ -23,12 +24,17 @@ export interface RowAction {
  * Three-vertical-dot menu used as the last column in data grids.
  * Each action becomes a single menu item with optional leading icon and an optional destructive tint.
  */
-export function RowActions({ actions, ariaLabel = 'Row actions' }: { actions: RowAction[]; ariaLabel?: string }) {
+export function RowActions({ actions, ariaLabel }: { actions: RowAction[]; ariaLabel?: string }) {
+  const { t } = useTranslation()
   if (actions.length === 0) return null
   return (
     <Menu>
       <MenuTrigger disableButtonEnhancement>
-        <MenuButton appearance="subtle" icon={<MoreVertical20Regular />} aria-label={ariaLabel} />
+        <MenuButton
+          appearance="subtle"
+          icon={<MoreVertical20Regular />}
+          aria-label={ariaLabel ?? t('shell.rowActions.ariaLabel')}
+        />
       </MenuTrigger>
       <MenuPopover>
         <MenuList>

@@ -7,11 +7,12 @@ import {
 } from '@fluentui/react-components'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
-import { formatApiError } from '../api/client'
-import { formatDateTime } from '../utils/format'
+import { LocalizedTime } from '../components/LocalizedTime'
+import { formatApiError, localizeDiagnostics } from '../api/client'
 import { ArrowLeft20Regular, Edit20Regular } from '@fluentui/react-icons'
 import { useCapabilities, useMySubmission, useSubmission, useSubmissionHistory } from '../api/hooks'
 import type { AuditLog } from '../api/types'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -25,6 +26,7 @@ const useStyles = makeStyles({
 
 export function SubmissionDetailPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { has } = useCapabilities()
@@ -39,52 +41,53 @@ export function SubmissionDetailPage() {
   // The history endpoint is operator/admin-only; service callers never see the tab.
   const showHistory = !isService
   const [tab, setTab] = useState<'details' | 'history'>('details')
+  const localizedWarnings = data ? localizeDiagnostics(data.warningDetails, data.warnings) : []
 
   return (
     <div className={s.root}>
       <div className={s.header}>
         <div className={s.headerLeft}>
           <Button as="a" appearance="subtle" icon={<ArrowLeft20Regular />}>
-            <Link to="/submissions">Back</Link>
+            <Link to="/submissions">{t('schemasSubmissions.common.back')}</Link>
           </Button>
-          <Title2>Submission</Title2>
+          <Title2>{t('schemasSubmissions.common.submission')}</Title2>
         </div>
         {data && (
           <Button appearance="primary" icon={<Edit20Regular />} onClick={() => nav(`/submissions/${data.id}/edit`)}>
-            Edit
+            {t('schemasSubmissions.common.edit')}
           </Button>
         )}
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{formatApiError(error)}</MessageBarBody></AutoScrollMessageBar>}
 
-      {isLoading && <div>Loading...</div>}
+      {isLoading && <div>{t('schemasSubmissions.common.loading')}</div>}
 
       {data && (
         <>
           <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as 'details' | 'history')}>
-            <Tab value="details">Details</Tab>
-            {showHistory && <Tab value="history">History</Tab>}
+            <Tab value="details">{t('schemasSubmissions.submissionDetail.details')}</Tab>
+            {showHistory && <Tab value="history">{t('schemasSubmissions.common.history')}</Tab>}
           </TabList>
 
           {tab === 'details' && (
             <div className={s.tabBody}>
               <Card>
                 <div className={s.meta}>
-                  <div><strong>ID</strong><br /><code>{data.id}</code></div>
-                  <div><strong>Service</strong><br />{data.serviceName}</div>
-                  <div><strong>Submitted at</strong><br />{new Date(data.submittedAt).toLocaleString()}</div>
-                  <div><strong>Replaced at</strong><br />{data.replacedAt ? new Date(data.replacedAt).toLocaleString() : '—'}</div>
-                  <div><strong>Samples</strong><br />{data.samples.length}</div>
-                  <div><strong>Warnings</strong><br />{data.warnings?.length ?? 0}</div>
+                  <div><strong>{t('schemasSubmissions.common.id')}</strong><br /><code>{data.id}</code></div>
+                  <div><strong>{t('schemasSubmissions.common.service')}</strong><br />{data.serviceName}</div>
+                  <div><strong>{t('schemasSubmissions.common.submittedAt')}</strong><br /><LocalizedTime value={data.submittedAt} /></div>
+                  <div><strong>{t('schemasSubmissions.common.replacedAt')}</strong><br /><LocalizedTime value={data.replacedAt} /></div>
+                  <div><strong>{t('schemasSubmissions.common.samples')}</strong><br />{data.samples.length}</div>
+                  <div><strong>{t('schemasSubmissions.common.warnings')}</strong><br />{localizedWarnings.length}</div>
                 </div>
               </Card>
 
-              {(data.warnings?.length ?? 0) > 0 && (
+              {localizedWarnings.length > 0 && (
                 <AutoScrollMessageBar intent="warning">
                   <MessageBarBody>
                     <ul className={s.warningsList}>
-                      {data.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                      {localizedWarnings.map((w, i) => <li key={i}>{w}</li>)}
                     </ul>
                   </MessageBarBody>
                 </AutoScrollMessageBar>
@@ -93,11 +96,11 @@ export function SubmissionDetailPage() {
               <Table size="small">
                 <TableHeader>
                   <TableRow>
-                    <TableHeaderCell>Schema</TableHeaderCell>
-                    <TableHeaderCell>Value</TableHeaderCell>
-                    <TableHeaderCell>Sample</TableHeaderCell>
-                    <TableHeaderCell>Timestamp</TableHeaderCell>
-                    <TableHeaderCell>Note</TableHeaderCell>
+                    <TableHeaderCell>{t('schemasSubmissions.common.schema')}</TableHeaderCell>
+                    <TableHeaderCell>{t('schemasSubmissions.common.value')}</TableHeaderCell>
+                    <TableHeaderCell>{t('schemasSubmissions.common.sample')}</TableHeaderCell>
+                    <TableHeaderCell>{t('schemasSubmissions.common.timestamp')}</TableHeaderCell>
+                    <TableHeaderCell>{t('schemasSubmissions.common.note')}</TableHeaderCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -106,7 +109,7 @@ export function SubmissionDetailPage() {
                       <TableCell>{sample.schemaName}</TableCell>
                       <TableCell>{sample.valueName}</TableCell>
                       <TableCell><code>{formatValue(sample.value)}</code></TableCell>
-                      <TableCell>{new Date(sample.timestamp).toLocaleString()}</TableCell>
+                      <TableCell><LocalizedTime value={sample.timestamp} /></TableCell>
                       <TableCell>{sample.note ?? '—'}</TableCell>
                     </TableRow>
                   ))}
@@ -124,6 +127,7 @@ export function SubmissionDetailPage() {
 
 function HistoryTab({ id }: { id: string }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const { data, isLoading, error } = useSubmissionHistory(id, { page, pageSize })
@@ -137,19 +141,19 @@ function HistoryTab({ id }: { id: string }) {
       <Table size="small">
         <TableHeader>
           <TableRow>
-            <TableHeaderCell>Timestamp</TableHeaderCell>
-            <TableHeaderCell>Change</TableHeaderCell>
-            <TableHeaderCell>Changed by</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.timestamp')}</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.submissionDetail.change')}</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.submissionDetail.changedBy')}</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={3}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={3}>{t('schemasSubmissions.common.loading')}</GridMessageRow>}
           {!isLoading && items.length === 0 && (
-            <GridMessageRow colSpan={3}>No changes recorded.</GridMessageRow>
+            <GridMessageRow colSpan={3}>{t('schemasSubmissions.submissionDetail.noChanges')}</GridMessageRow>
           )}
           {items.map(entry => (
             <TableRow key={entry.id}>
-              <TableCell>{formatDateTime(entry.timestamp)}</TableCell>
+              <TableCell><LocalizedTime value={entry.timestamp} /></TableCell>
               <TableCell><ChangeBadge change={entry.change} /></TableCell>
               <TableCell>
                 {entry.actorName ?? (entry.actorId
@@ -173,8 +177,9 @@ function HistoryTab({ id }: { id: string }) {
 }
 
 function ChangeBadge({ change }: { change: AuditLog['change'] }) {
+  const { t } = useTranslation()
   const color = change === 'Create' ? 'success' : change === 'Delete' ? 'danger' : 'brand'
-  return <Badge appearance="outline" color={color}>{change}</Badge>
+  return <Badge appearance="outline" color={color}>{t(`schemasSubmissions.submissionDetail.changeType.${change}`)}</Badge>
 }
 
 function formatValue(v: unknown): string {

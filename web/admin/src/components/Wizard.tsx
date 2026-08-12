@@ -4,6 +4,7 @@ import {
   MessageBar, MessageBarBody, Spinner, makeStyles, tokens,
 } from '@fluentui/react-components'
 import { CheckmarkCircle20Filled } from '@fluentui/react-icons'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   surface: { minWidth: '560px', maxWidth: '640px' },
@@ -49,7 +50,7 @@ export interface WizardStep {
  */
 export function Wizard({
   open, title, steps, onClose, onFinish,
-  finishLabel = 'Finish', busy = false, error, result,
+  finishLabel, busy = false, error, result,
 }: {
   open: boolean
   title: string
@@ -66,6 +67,7 @@ export function Wizard({
   result?: ReactNode
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const [index, setIndex] = useState(0)
 
   // Reset to the first step whenever the wizard (re)opens so a second run starts clean.
@@ -135,18 +137,24 @@ export function Wizard({
           </DialogContent>
           <DialogActions>
             {showingResult ? (
-              <Button appearance="primary" onClick={onClose}>Close</Button>
+              <Button appearance="primary" onClick={onClose}>{t('shell.common.close')}</Button>
             ) : (
               <>
-                <Button appearance="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-                {index > 0 && <Button appearance="secondary" onClick={back} disabled={busy}>Back</Button>}
+                <Button appearance="secondary" onClick={onClose} disabled={busy}>
+                  {t('shell.common.cancel')}
+                </Button>
+                {index > 0 && (
+                  <Button appearance="secondary" onClick={back} disabled={busy}>
+                    {t('shell.wizard.back')}
+                  </Button>
+                )}
                 <Button
                   appearance="primary"
                   onClick={next}
                   disabled={!canProceed || busy}
                   icon={busy ? <Spinner size="tiny" /> : undefined}
                 >
-                  {isLast ? finishLabel : 'Next'}
+                  {isLast ? (finishLabel ?? t('shell.wizard.finish')) : t('shell.wizard.next')}
                 </Button>
               </>
             )}

@@ -95,7 +95,14 @@ public sealed class ApiKeyService : IApiKeyService
         if (string.IsNullOrEmpty(trimmed)) return null;
 
         if (trimmed.Length > MaxDescriptionLength)
-            throw new ValidationException(new[] { $"API key description cannot be longer than {MaxDescriptionLength} characters." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Accounts.ApiKeyDescriptionTooLong,
+                    $"API key description cannot be longer than {MaxDescriptionLength} characters.",
+                    ("maxLength", MaxDescriptionLength),
+                    ("actualLength", trimmed.Length)),
+            });
 
         return trimmed;
     }
@@ -118,10 +125,25 @@ public sealed class ApiKeyService : IApiKeyService
 
         var now = _audit.UtcNow;
         if (utc <= now)
-            throw new ValidationException(new[] { "API key expiry must be in the future." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Accounts.ApiKeyExpiryNotFuture,
+                    "API key expiry must be in the future.",
+                    ("expiry", utc),
+                    ("now", now)),
+            });
 
         if (utc > now.AddYears(MaxLifetimeYears))
-            throw new ValidationException(new[] { $"API key expiry cannot be more than {MaxLifetimeYears} years in the future." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Accounts.ApiKeyExpiryTooDistant,
+                    $"API key expiry cannot be more than {MaxLifetimeYears} years in the future.",
+                    ("expiry", utc),
+                    ("now", now),
+                    ("maxLifetimeYears", MaxLifetimeYears)),
+            });
 
         return utc;
     }

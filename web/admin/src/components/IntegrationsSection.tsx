@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Badge, Body1, Button, Card, Checkbox, Dropdown, Drawer, DrawerBody, Field, Input,
   Menu, MenuButton, MenuItem, MenuList, MenuPopover, MenuTrigger,
@@ -16,7 +17,7 @@ import { GridMessageRow } from './GridPager'
 import { RowActions } from './RowActions'
 import { clickableRowProps } from '../utils/a11y'
 import { confirmDelete } from '../utils/confirm'
-import { formatApiError } from '../api/client'
+import { formatApiError, localizeDiagnostic } from '../api/client'
 import {
   useAccounts, useSchemas, useCapabilities,
   useIntegrations, useCreateIntegration, useUpdateIntegration, useDeleteIntegration,
@@ -29,37 +30,18 @@ import type {
 
 const WEEKDAYS: Weekday[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-const FREQUENCIES: { value: IntegrationFrequency; label: string }[] = [
-  { value: 'Daily', label: 'Daily' },
-  { value: 'Weekly', label: 'Weekly' },
-  { value: 'Monthly', label: 'Monthly' },
-  { value: 'Quarterly', label: 'Quarterly' },
-  { value: 'SemiAnnually', label: 'Semi-annually' },
-  { value: 'Yearly', label: 'Yearly' },
-]
+const FREQUENCIES: IntegrationFrequency[] = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'SemiAnnually', 'Yearly']
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
-const frequencyLabel = (f: IntegrationFrequency): string => FREQUENCIES.find(x => x.value === f)?.label ?? f
-
 /** The special day-of-month value used by the dropdown to mean "last day of the month". */
 const LAST_DAY = 'last'
 
 /** Day-of-month options offered in the editor: 1-31 plus a "Last day" sentinel. */
 const DAY_OF_MONTH_OPTIONS = [...Array.from({ length: 31 }, (_, i) => String(i + 1)), LAST_DAY]
-
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] || s[v] || s[0])
-}
-
-function dayOfMonthLabel(lastDay: boolean, day: number): string {
-  return lastDay ? 'the last day' : ordinal(day)
-}
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -97,13 +79,15 @@ const useStyles = makeStyles({
  * rest and never returned. A "Test connection" button verifies the credentials against Entra.
  */
 export function TeamsConnectionSection() {
+  const { t } = useTranslation()
   const { data, isLoading } = useTeamsConnection()
-  if (isLoading || !data) return <Spinner label="Loading…" />
+  if (isLoading || !data) return <Spinner label={t('settings.common.loading')} />
   return <TeamsConnectionForm initial={data} key={(data.appId ?? '') + '|' + (data.tenantId ?? '')} />
 }
 
 function TeamsConnectionForm({ initial }: { initial: TeamsConnection }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const { has } = useCapabilities()
   const canManage = has('integrations:manage')
   const update = useUpdateTeamsConnection()
@@ -141,8 +125,13 @@ function TeamsConnectionForm({ initial }: { initial: TeamsConnection }) {
     try {
       const r = await test.mutateAsync()
       setTestResult(r.ok
-        ? { ok: true, text: 'Connection succeeded — credentials are valid.' }
-        : { ok: false, text: r.error || 'Connection failed.' })
+        ? { ok: true, text: t('settings.teamsConnection.testSucceeded') }
+        : {
+            ok: false,
+            text: r.errorDetail
+              ? localizeDiagnostic(r.errorDetail, r.error)
+              : r.error || t('settings.teamsConnection.testFailed'),
+          })
     } catch (e) {
       setError(formatApiError(e))
     }
@@ -151,48 +140,46 @@ function TeamsConnectionForm({ initial }: { initial: TeamsConnection }) {
   return (
     <Card className={s.cardNarrow}>
       <div>
-        <Title3 className={s.sectionTitle}>Microsoft Teams connection</Title3>
+        <Title3 className={s.sectionTitle}>{t('settings.teamsConnection.title')}</Title3>
         <Body1 className={s.help}>
-          The bot app registration used to send prompts to Teams. Stored in the database; the bot
-          secret is encrypted at rest and never shown again. See the setup guide for how to register
-          the bot in Azure.{' '}
+          {t('settings.teamsConnection.description')}{' '}
           {initial.isConfigured
-            ? <Badge appearance="tint" color="success">Configured</Badge>
-            : <Badge appearance="tint" color="warning">Not configured</Badge>}
+            ? <Badge appearance="tint" color="success">{t('settings.common.configured')}</Badge>
+            : <Badge appearance="tint" color="warning">{t('settings.common.notConfigured')}</Badge>}
         </Body1>
       </div>
 
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>Connection saved.</MessageBarBody></AutoScrollMessageBar>}
+      {saved && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('settings.teamsConnection.saved')}</MessageBarBody></AutoScrollMessageBar>}
       {testResult && (
         <AutoScrollMessageBar intent={testResult.ok ? 'success' : 'error'}>
           <MessageBarBody>{testResult.text}</MessageBarBody>
         </AutoScrollMessageBar>
       )}
 
-      <Field label="App (client) ID" required className={s.grow}>
-        <Input value={appId} onChange={(_, d) => setAppId(d.value)} placeholder="00000000-0000-0000-0000-000000000000" disabled={!canManage} />
+      <Field label={t('settings.teamsConnection.appId')} required className={s.grow}>
+        <Input value={appId} onChange={(_, d) => setAppId(d.value)} placeholder={t('settings.teamsConnection.appIdPlaceholder')} disabled={!canManage} />
       </Field>
 
-      <Field label="Tenant ID" className={s.grow} hint="Leave blank for a multi-tenant bot.">
-        <Input value={tenantId} onChange={(_, d) => setTenantId(d.value)} placeholder="(blank = multi-tenant)" disabled={!canManage} />
+      <Field label={t('settings.teamsConnection.tenantId')} className={s.grow} hint={t('settings.teamsConnection.tenantHint')}>
+        <Input value={tenantId} onChange={(_, d) => setTenantId(d.value)} placeholder={t('settings.teamsConnection.tenantPlaceholder')} disabled={!canManage} />
       </Field>
 
       <Switch
-        label="Single-tenant app registration"
+        label={t('settings.teamsConnection.singleTenant')}
         checked={singleTenant}
         onChange={(_, d) => setSingleTenant(d.checked)}
         disabled={!canManage}
       />
 
       <Checkbox
-        label={initial.hasPassword ? 'Change the stored bot secret' : 'Set the bot secret'}
+        label={initial.hasPassword ? t('settings.teamsConnection.changeSecret') : t('settings.teamsConnection.setSecret')}
         checked={changePassword}
         onChange={(_, d) => setChangePassword(!!d.checked)}
         disabled={!canManage}
       />
       {changePassword && (
-        <Field label="Bot secret (client secret)" hint="Leave blank to clear the stored secret.">
+        <Field label={t('settings.teamsConnection.secret')} hint={t('settings.teamsConnection.secretHint')}>
           <Input type="password" value={password} onChange={(_, d) => setPassword(d.value)} />
         </Field>
       )}
@@ -200,10 +187,10 @@ function TeamsConnectionForm({ initial }: { initial: TeamsConnection }) {
       {canManage && (
         <div className={s.actions}>
           <Button appearance="primary" disabled={update.isPending} onClick={onSave}>
-            {update.isPending ? 'Saving…' : 'Save'}
+            {update.isPending ? t('settings.common.saving') : t('settings.common.save')}
           </Button>
           <Button disabled={test.isPending || !initial.isConfigured} onClick={onTest}>
-            {test.isPending ? 'Testing…' : 'Test connection'}
+            {test.isPending ? t('settings.teamsConnection.testing') : t('settings.teamsConnection.test')}
           </Button>
         </div>
       )}
@@ -306,6 +293,7 @@ function pad2(n: number): string { return String(n).padStart(2, '0') }
  */
 export function IntegrationsSection() {
   const s = useStyles()
+  const { t, i18n } = useTranslation()
   const { has } = useCapabilities()
   const canManage = has('integrations:manage')
   const { data: integrations, isLoading, refetch } = useIntegrations()
@@ -324,18 +312,26 @@ export function IntegrationsSection() {
   const servicesById = useMemo(() => new Map(services.map(a => [a.id, a])), [services])
   const schemas = useMemo(() => (schemasPage?.items ?? []), [schemasPage])
   const schemasById = useMemo(() => new Map(schemas.map(sc => [sc.id, sc])), [schemas])
+  const monthLabels = MONTHS.map(month => t(`settings.common.months.${month.toLowerCase()}`))
+  const ordinalRules = new Intl.PluralRules(i18n.resolvedLanguage ?? i18n.language, { type: 'ordinal' })
+  const ordinal = (n: number) => t(`settings.integrations.ordinal.${ordinalRules.select(n)}`, { count: n })
+  const dayOfMonthLabel = (lastDay: boolean, day: number) =>
+    lastDay ? t('settings.integrations.theLastDay') : ordinal(day)
 
   function serviceSummary(i: Integration): string {
-    if (i.serviceIds.length === 0) return 'All services'
-    return i.serviceIds.map(id => servicesById.get(id)?.label || servicesById.get(id)?.name || '(removed)').join(', ')
+    if (i.serviceIds.length === 0) return t('settings.common.allServices')
+    return i.serviceIds.map(id => servicesById.get(id)?.label || servicesById.get(id)?.name || t('settings.common.removed')).join(', ')
   }
   function schemaSummary(i: Integration): string {
-    if (i.schemaIds.length === 0) return 'All schemas'
-    return i.schemaIds.map(id => schemasById.get(id)?.label || schemasById.get(id)?.name || '(removed)').join(', ')
+    if (i.schemaIds.length === 0) return t('settings.common.allSchemas')
+    return i.schemaIds.map(id => schemasById.get(id)?.label || schemasById.get(id)?.name || t('settings.common.removed')).join(', ')
   }
   function targetSummary(i: Integration): string {
-    const who = i.teams.displayName || i.teams.targetId || '(unset)'
-    return `${i.teams.kind === 'Channel' ? 'Channel' : 'User'}: ${who}`
+    const who = i.teams.displayName || i.teams.targetId || t('settings.common.unset')
+    return t('settings.integrations.targetSummary', {
+      kind: i.teams.kind === 'Channel' ? t('settings.integrations.channel') : t('settings.integrations.user'),
+      target: who,
+    })
   }
   function scheduleSummary(i: Integration): string {
     const s = i.schedule
@@ -344,27 +340,30 @@ export function IntegrationsSection() {
     switch (s.frequency) {
       case 'Weekly':
         return s.days.length === 0
-          ? `Weekly (every day), ${time}`
-          : `${s.days.map(d => d.slice(0, 3)).join(', ')}, ${time}`
+          ? t('settings.integrations.schedule.weeklyEveryDay', { time })
+          : t('settings.integrations.schedule.weeklyDays', {
+              days: s.days.map(d => t(`settings.common.weekDaysShort.${d.toLowerCase()}`)).join(', '),
+              time,
+            })
       case 'Monthly':
-        return `Monthly on ${day}, ${time}`
+        return t('settings.integrations.schedule.monthly', { day, time })
       case 'Quarterly':
-        return `Quarterly from ${MONTHS[Math.min(Math.max(s.anchorMonth, 1), 12) - 1]} on ${day}, ${time}`
+        return t('settings.integrations.schedule.quarterly', { month: monthLabels[Math.min(Math.max(s.anchorMonth, 1), 12) - 1], day, time })
       case 'SemiAnnually':
-        return `Semi-annually from ${MONTHS[Math.min(Math.max(s.anchorMonth, 1), 12) - 1]} on ${day}, ${time}`
+        return t('settings.integrations.schedule.semiAnnually', { month: monthLabels[Math.min(Math.max(s.anchorMonth, 1), 12) - 1], day, time })
       case 'Yearly':
-        return `Yearly in ${MONTHS[Math.min(Math.max(s.anchorMonth, 1), 12) - 1]} on ${day}, ${time}`
+        return t('settings.integrations.schedule.yearly', { month: monthLabels[Math.min(Math.max(s.anchorMonth, 1), 12) - 1], day, time })
       default:
-        return `Daily, ${time}`
+        return t('settings.integrations.schedule.daily', { time })
     }
   }
 
   async function onDelete(i: Integration) {
-    if (!confirmDelete('integration', i.label || targetSummary(i))) return
+    if (!confirmDelete(t('settings.integrations.deleteType'), i.label || targetSummary(i))) return
     setBanner(null)
     try {
       await del.mutateAsync(i.id)
-      setBanner({ intent: 'success', text: 'Integration deleted.' })
+      setBanner({ intent: 'success', text: t('settings.integrations.deleted') })
     } catch (err) { setBanner({ intent: 'error', text: formatApiError(err) }) }
   }
 
@@ -374,7 +373,7 @@ export function IntegrationsSection() {
     req.enabled = !i.enabled
     try {
       await update.mutateAsync({ id: i.id, req })
-      setBanner({ intent: 'success', text: i.enabled ? 'Integration disabled.' : 'Integration enabled.' })
+      setBanner({ intent: 'success', text: i.enabled ? t('settings.integrations.disabledMessage') : t('settings.integrations.enabledMessage') })
     } catch (err) { setBanner({ intent: 'error', text: formatApiError(err) }) }
   }
 
@@ -382,7 +381,7 @@ export function IntegrationsSection() {
     setBanner(null)
     try {
       const r = await run.mutateAsync(i.id)
-      setBanner({ intent: 'success', text: `Run complete — prompted ${r.prompted}, skipped ${r.skipped}.` })
+      setBanner({ intent: 'success', text: t('settings.integrations.runComplete', { prompted: r.prompted, skipped: r.skipped }) })
     } catch (err) { setBanner({ intent: 'error', text: formatApiError(err) }) }
   }
 
@@ -390,7 +389,7 @@ export function IntegrationsSection() {
     setBanner(null)
     try {
       await sendTest.mutateAsync(i.id)
-      setBanner({ intent: 'success', text: 'Test prompt enqueued.' })
+      setBanner({ intent: 'success', text: t('settings.integrations.testEnqueued') })
     } catch (err) { setBanner({ intent: 'error', text: formatApiError(err) }) }
   }
 
@@ -401,36 +400,33 @@ export function IntegrationsSection() {
     <div className={s.root}>
       <Card className={s.card}>
         <div className={s.titleRow}>
-          <Title3 className={s.sectionTitle}>Integrations</Title3>
+          <Title3 className={s.sectionTitle}>{t('settings.integrations.title')}</Title3>
           <div className={s.headerActions}>
             {canManage && (
               <Button appearance="primary" icon={<Add20Regular />} onClick={() => setEditing(emptyDraft())}>
-                Add integration
+                {t('settings.integrations.add')}
               </Button>
             )}
             <Menu>
               <MenuTrigger disableButtonEnhancement>
-                <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+                <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('settings.common.moreActions')} />
               </MenuTrigger>
               <MenuPopover>
                 <MenuList>
-                  <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                  <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>{t('settings.common.refresh')}</MenuItem>
                 </MenuList>
               </MenuPopover>
             </Menu>
           </div>
         </div>
         <Body1 className={s.help}>
-          Each integration prompts a Teams user or channel for the samples that are still outstanding
-          across the services and schemas it covers. Prompts run on a daily schedule, or on demand
-          with “Run now”. Disabled and hidden fields are omitted; warnings are surfaced inline.
+          {t('settings.integrations.description')}
         </Body1>
 
         {connection && !connectionReady && (
           <AutoScrollMessageBar intent="warning">
             <MessageBarBody>
-              The Microsoft Teams connection isn’t configured yet — set the bot credentials on the
-              “Teams connection” subpage before integrations can send prompts.
+              {t('settings.integrations.connectionWarning')}
             </MessageBarBody>
           </AutoScrollMessageBar>
         )}
@@ -444,25 +440,27 @@ export function IntegrationsSection() {
         <Table size="small" className={s.table}>
           <TableHeader>
             <TableRow>
-              <TableHeaderCell>Label</TableHeaderCell>
-              <TableHeaderCell className={s.colTarget}>Target</TableHeaderCell>
-              <TableHeaderCell>Services</TableHeaderCell>
-              <TableHeaderCell>Schemas</TableHeaderCell>
-              <TableHeaderCell className={s.colSchedule}>Schedule</TableHeaderCell>
-              <TableHeaderCell className={s.colStatus}>Status</TableHeaderCell>
-              <TableHeaderCell className={s.colActions} aria-label="Actions" />
+              <TableHeaderCell>{t('settings.common.label')}</TableHeaderCell>
+              <TableHeaderCell className={s.colTarget}>{t('settings.integrations.target')}</TableHeaderCell>
+              <TableHeaderCell>{t('settings.common.services')}</TableHeaderCell>
+              <TableHeaderCell>{t('settings.common.schemas')}</TableHeaderCell>
+              <TableHeaderCell className={s.colSchedule}>{t('settings.integrations.scheduleLabel')}</TableHeaderCell>
+              <TableHeaderCell className={s.colStatus}>{t('settings.common.status')}</TableHeaderCell>
+              <TableHeaderCell className={s.colActions} aria-label={t('settings.common.actions')} />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && <GridMessageRow colSpan={7}>Loading…</GridMessageRow>}
+            {isLoading && <GridMessageRow colSpan={7}>{t('settings.common.loading')}</GridMessageRow>}
             {!isLoading && items.length === 0 && (
-              <GridMessageRow colSpan={7}>No integrations yet{canManage ? ' — click “Add integration” to create one.' : '.'}</GridMessageRow>
+              <GridMessageRow colSpan={7}>
+                {canManage ? t('settings.integrations.emptyManage') : t('settings.integrations.emptyReadOnly')}
+              </GridMessageRow>
             )}
             {items.map(i => (
               <TableRow
                 key={i.id}
                 className={`${s.tableRow} ${s.rowClickable}`}
-                {...clickableRowProps(() => canManage && setEditing(toDraft(i)), `Edit integration ${i.label || targetSummary(i)}`)}
+                {...clickableRowProps(() => canManage && setEditing(toDraft(i)), t('settings.integrations.editAria', { name: i.label || targetSummary(i) }))}
               >
                 <TableCell className={s.cellTrunc}>
                   {i.label
@@ -489,25 +487,25 @@ export function IntegrationsSection() {
                 </TableCell>
                 <TableCell className={s.colStatus}>
                   <Badge appearance="outline" color={i.enabled ? 'success' : 'informative'}>
-                    {i.enabled ? 'Enabled' : 'Disabled'}
+                    {i.enabled ? t('settings.common.enabled') : t('settings.common.disabled')}
                   </Badge>
                 </TableCell>
                 <TableCell className={s.colActions} onClick={ev => ev.stopPropagation()}>
                   {canManage && (
                     <RowActions
-                      ariaLabel={`Actions for integration ${i.label || targetSummary(i)}`}
+                      ariaLabel={t('settings.integrations.actionsAria', { name: i.label || targetSummary(i) })}
                       actions={[
-                        { key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => setEditing(toDraft(i)) },
-                        { key: 'run', label: 'Run now', icon: <Play20Regular />, disabled: run.isPending, onClick: () => onRun(i) },
-                        { key: 'test', label: 'Send test', icon: <Send20Regular />, disabled: sendTest.isPending, onClick: () => onSendTest(i) },
+                        { key: 'edit', label: t('settings.common.edit'), icon: <Edit20Regular />, onClick: () => setEditing(toDraft(i)) },
+                        { key: 'run', label: t('settings.integrations.runNow'), icon: <Play20Regular />, disabled: run.isPending, onClick: () => onRun(i) },
+                        { key: 'test', label: t('settings.integrations.sendTest'), icon: <Send20Regular />, disabled: sendTest.isPending, onClick: () => onSendTest(i) },
                         {
                           key: 'toggle',
-                          label: i.enabled ? 'Disable' : 'Enable',
+                          label: i.enabled ? t('settings.common.disable') : t('settings.common.enable'),
                           icon: i.enabled ? <PauseCircle20Regular /> : <PlayCircle20Regular />,
                           disabled: update.isPending,
                           onClick: () => onToggleEnabled(i),
                         },
-                        { key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => onDelete(i) },
+                        { key: 'delete', label: t('settings.common.delete'), icon: <Delete20Regular />, destructive: true, onClick: () => onDelete(i) },
                       ]}
                     />
                   )}
@@ -527,7 +525,7 @@ export function IntegrationsSection() {
         className={s.drawer}
       >
         <DrawerHeaderWithClose
-          title={editing?.id ? 'Edit integration' : 'Add integration'}
+          title={editing?.id ? t('settings.integrations.edit') : t('settings.integrations.add')}
           onClose={() => setEditing(null)}
         />
         <DrawerBody>
@@ -559,6 +557,7 @@ function IntegrationEditor({
   onSaved: (text: string) => void
 }) {
   const s = useStyles()
+  const { t, i18n } = useTranslation()
   const isNew = !draft.id
   const create = useCreateIntegration()
   const update = useUpdateIntegration()
@@ -587,16 +586,19 @@ function IntegrationEditor({
 
   const servicesById = useMemo(() => new Map(services.map(a => [a.id, a])), [services])
   const schemasById = useMemo(() => new Map(schemas.map(sc => [sc.id, sc])), [schemas])
+  const monthLabels = MONTHS.map(month => t(`settings.common.months.${month.toLowerCase()}`))
+  const ordinalRules = new Intl.PluralRules(i18n.resolvedLanguage ?? i18n.language, { type: 'ordinal' })
+  const ordinal = (n: number) => t(`settings.integrations.ordinal.${ordinalRules.select(n)}`, { count: n })
 
   async function onSave() {
     setError(null)
-    if (!targetId.trim()) { setError('Enter the target user or channel id.'); return }
-    if (!allServices && serviceIds.length === 0) { setError('Pick at least one service, or choose “All services”.'); return }
-    if (!allSchemas && schemaIds.length === 0) { setError('Pick at least one schema, or choose “All schemas”.'); return }
+    if (!targetId.trim()) { setError(t('settings.integrations.targetRequired')); return }
+    if (!allServices && serviceIds.length === 0) { setError(t('settings.common.serviceRequired')); return }
+    if (!allSchemas && schemaIds.length === 0) { setError(t('settings.common.schemaRequired')); return }
     const hour = Number(hourUtc)
     const minute = Number(minuteUtc)
-    if (!Number.isInteger(hour) || hour < 0 || hour > 23) { setError('Hour must be between 0 and 23.'); return }
-    if (!Number.isInteger(minute) || minute < 0 || minute > 59) { setError('Minute must be between 0 and 59.'); return }
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) { setError(t('settings.integrations.hourValidation')); return }
+    if (!Number.isInteger(minute) || minute < 0 || minute > 59) { setError(t('settings.integrations.minuteValidation')); return }
 
     const req = draftToRequest({
       ...draft,
@@ -608,7 +610,7 @@ function IntegrationEditor({
     try {
       if (isNew) await create.mutateAsync(req)
       else await update.mutateAsync({ id: draft.id!, req })
-      onSaved(isNew ? 'Integration created.' : 'Integration saved.')
+      onSaved(isNew ? t('settings.integrations.created') : t('settings.integrations.saved'))
     } catch (e) {
       setError(formatApiError(e))
     }
@@ -620,37 +622,37 @@ function IntegrationEditor({
     <div className={s.drawerForm}>
       {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
 
-      <Field label="Label" hint="Optional name shown only in this list.">
-        <Input value={label} onChange={(_, d) => setLabel(d.value)} placeholder="e.g. Daily nudge for the ops channel" />
+      <Field label={t('settings.common.label')} hint={t('settings.common.optionalListName')}>
+        <Input value={label} onChange={(_, d) => setLabel(d.value)} placeholder={t('settings.integrations.labelPlaceholder')} />
       </Field>
 
-      <Switch label="Enabled" checked={enabled} onChange={(_, d) => setEnabled(d.checked)} />
+      <Switch label={t('settings.common.enabled')} checked={enabled} onChange={(_, d) => setEnabled(d.checked)} />
 
-      <Field label="Send to">
+      <Field label={t('settings.integrations.sendTo')}>
         <RadioGroup layout="horizontal" value={targetKind} onChange={(_, d) => setTargetKind(d.value as TeamsTargetKind)}>
-          <Radio value="User" label="A user" />
-          <Radio value="Channel" label="A channel" />
+          <Radio value="User" label={t('settings.integrations.aUser')} />
+          <Radio value="Channel" label={t('settings.integrations.aChannel')} />
         </RadioGroup>
       </Field>
 
       <Field
-        label={targetKind === 'Channel' ? 'Channel id' : 'User id (Entra object id, UPN, or email)'}
+        label={targetKind === 'Channel' ? t('settings.integrations.channelId') : t('settings.integrations.userId')}
         required
-        hint="See the setup guide for how to find this id."
+        hint={t('settings.integrations.targetIdHint')}
       >
-        <Input value={targetId} onChange={(_, d) => setTargetId(d.value)} placeholder={targetKind === 'Channel' ? '19:...@thread.tacv2' : 'user@example.org'} />
+        <Input value={targetId} onChange={(_, d) => setTargetId(d.value)} placeholder={targetKind === 'Channel' ? t('settings.integrations.channelIdPlaceholder') : t('settings.integrations.userIdPlaceholder')} />
       </Field>
 
-      <Field label="Display name" hint="Optional friendly label for this target.">
-        <Input value={displayName} onChange={(_, d) => setDisplayName(d.value)} placeholder="e.g. Ops team channel" />
+      <Field label={t('settings.integrations.displayName')} hint={t('settings.integrations.displayNameHint')}>
+        <Input value={displayName} onChange={(_, d) => setDisplayName(d.value)} placeholder={t('settings.integrations.displayNamePlaceholder')} />
       </Field>
 
-      <Field label="Services">
-        <Checkbox label="All services" checked={allServices} onChange={(_, d) => setAllServices(!!d.checked)} />
+      <Field label={t('settings.common.services')}>
+        <Checkbox label={t('settings.common.allServices')} checked={allServices} onChange={(_, d) => setAllServices(!!d.checked)} />
         {!allServices && (
           <Dropdown
             multiselect
-            placeholder="Select services"
+            placeholder={t('settings.common.selectServices')}
             selectedOptions={serviceIds}
             value={serviceIds.map(id => servicesById.get(id)?.label || servicesById.get(id)?.name || id).join(', ')}
             onOptionSelect={(_, d) => setServiceIds(d.selectedOptions)}
@@ -662,12 +664,12 @@ function IntegrationEditor({
         )}
       </Field>
 
-      <Field label="Schemas">
-        <Checkbox label="All schemas" checked={allSchemas} onChange={(_, d) => setAllSchemas(!!d.checked)} />
+      <Field label={t('settings.common.schemas')}>
+        <Checkbox label={t('settings.common.allSchemas')} checked={allSchemas} onChange={(_, d) => setAllSchemas(!!d.checked)} />
         {!allSchemas && (
           <Dropdown
             multiselect
-            placeholder="Select schemas"
+            placeholder={t('settings.common.selectSchemas')}
             selectedOptions={schemaIds}
             value={schemaIds.map(id => schemasById.get(id)?.label || id).join(', ')}
             onOptionSelect={(_, d) => setSchemaIds(d.selectedOptions)}
@@ -679,52 +681,52 @@ function IntegrationEditor({
         )}
       </Field>
 
-      <Field label="Frequency" hint="How often the pass looks for outstanding values. It also runs on demand with “Run now”.">
+      <Field label={t('settings.integrations.frequency')} hint={t('settings.integrations.frequencyHint')}>
         <Dropdown
-          value={frequencyLabel(frequency)}
+          value={t(`settings.common.cadences.${frequency}`)}
           selectedOptions={[frequency]}
           onOptionSelect={(_, d) => setFrequency(d.optionValue as IntegrationFrequency)}
         >
           {FREQUENCIES.map(f => (
-            <Option key={f.value} value={f.value} text={f.label}>{f.label}</Option>
+            <Option key={f} value={f} text={t(`settings.common.cadences.${f}`)}>{t(`settings.common.cadences.${f}`)}</Option>
           ))}
         </Dropdown>
       </Field>
 
       {frequency === 'Weekly' && (
-        <Field label="Days of the week" hint="Leave empty to run every day.">
+        <Field label={t('settings.integrations.daysOfWeek')} hint={t('settings.integrations.daysOfWeekHint')}>
           <Dropdown
             multiselect
-            placeholder="Every day"
+            placeholder={t('settings.integrations.everyDay')}
             selectedOptions={days}
-            value={days.length === 0 ? 'Every day' : days.join(', ')}
+            value={days.length === 0 ? t('settings.integrations.everyDay') : days.map(d => t(`settings.common.weekDays.${d.toLowerCase()}`)).join(', ')}
             onOptionSelect={(_, d) => setDays(d.selectedOptions as Weekday[])}
           >
             {WEEKDAYS.map(d => (
-              <Option key={d} value={d} text={d}>{d}</Option>
+              <Option key={d} value={d} text={t(`settings.common.weekDays.${d.toLowerCase()}`)}>{t(`settings.common.weekDays.${d.toLowerCase()}`)}</Option>
             ))}
           </Dropdown>
         </Field>
       )}
 
       {usesAnchorMonth && (
-        <Field label="Anchor month" hint="The period repeats from this month (e.g. quarterly from February = Feb, May, Aug, Nov).">
+        <Field label={t('settings.integrations.anchorMonth')} hint={t('settings.integrations.anchorMonthHint')}>
           <Dropdown
-            value={MONTHS[Math.min(Math.max(anchorMonth, 1), 12) - 1]}
+            value={monthLabels[Math.min(Math.max(anchorMonth, 1), 12) - 1]}
             selectedOptions={[String(anchorMonth)]}
             onOptionSelect={(_, d) => setAnchorMonth(Number(d.optionValue))}
           >
             {MONTHS.map((m, idx) => (
-              <Option key={m} value={String(idx + 1)} text={m}>{m}</Option>
+              <Option key={m} value={String(idx + 1)} text={monthLabels[idx]}>{monthLabels[idx]}</Option>
             ))}
           </Dropdown>
         </Field>
       )}
 
       {usesDayOfMonth && (
-        <Field label="Day of the month" hint="Runs on (or after) this day within the period; “Last day” runs on the final day of the month.">
+        <Field label={t('settings.integrations.dayOfMonth')} hint={t('settings.integrations.dayOfMonthHint')}>
           <Dropdown
-            value={lastDayOfMonth ? 'Last day' : ordinal(dayOfMonth)}
+            value={lastDayOfMonth ? t('settings.integrations.lastDay') : ordinal(dayOfMonth)}
             selectedOptions={[dayOfMonthValue]}
             onOptionSelect={(_, d) => {
               if (d.optionValue === LAST_DAY) { setLastDayOfMonth(true) }
@@ -732,8 +734,8 @@ function IntegrationEditor({
             }}
           >
             {DAY_OF_MONTH_OPTIONS.map(opt => (
-              <Option key={opt} value={opt} text={opt === LAST_DAY ? 'Last day' : ordinal(Number(opt))}>
-                {opt === LAST_DAY ? 'Last day' : ordinal(Number(opt))}
+              <Option key={opt} value={opt} text={opt === LAST_DAY ? t('settings.integrations.lastDay') : ordinal(Number(opt))}>
+                {opt === LAST_DAY ? t('settings.integrations.lastDay') : ordinal(Number(opt))}
               </Option>
             ))}
           </Dropdown>
@@ -741,19 +743,19 @@ function IntegrationEditor({
       )}
 
       <div className={s.row}>
-        <Field label="Hour (UTC)" required>
+        <Field label={t('settings.integrations.hourUtc')} required>
           <Input type="number" value={hourUtc} onChange={(_, d) => setHourUtc(d.value)} style={{ width: '110px' }} />
         </Field>
-        <Field label="Minute (UTC)" required>
+        <Field label={t('settings.integrations.minuteUtc')} required>
           <Input type="number" value={minuteUtc} onChange={(_, d) => setMinuteUtc(d.value)} style={{ width: '110px' }} />
         </Field>
       </div>
 
       <div className={s.actions}>
         <Button appearance="primary" disabled={pending} onClick={onSave}>
-          {pending ? 'Saving…' : isNew ? 'Create integration' : 'Save changes'}
+          {pending ? t('settings.common.saving') : isNew ? t('settings.integrations.create') : t('settings.common.saveChanges')}
         </Button>
-        <Button appearance="secondary" disabled={pending} onClick={onClose}>Cancel</Button>
+        <Button appearance="secondary" disabled={pending} onClick={onClose}>{t('settings.common.cancel')}</Button>
       </div>
     </div>
   )

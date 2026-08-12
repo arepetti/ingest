@@ -5,11 +5,11 @@ import {
   CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis,
 } from 'recharts'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useAccounts, useCapabilities, useMissingHistory, useMissingSubmissions, useMySubmissions, usePendingApprovalCount, useSchemas, useSubmissions,
 } from '../api/hooks'
 import type { Cadence, MissingByCadence, MissingSubmissionEntry } from '../api/types'
-import { cadenceLabel } from '../utils/cadence'
 import { Link } from 'react-router-dom'
 
 const useStyles = makeStyles({
@@ -84,6 +84,7 @@ const useStyles = makeStyles({
 
 export function Dashboard() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { me, has } = useCapabilities()
   // Only callers with the approve capability can act on the queue, and only when the workflow is on.
   const canApprove = !!me?.approvalEnabled && has('submissions:approve')
@@ -110,57 +111,59 @@ export function Dashboard() {
 
   return (
     <div className={s.root}>
-      <Title2>{selfService ? `Welcome, ${me?.label || me?.name || ''}` : 'Overview'}</Title2>
+      <Title2>{selfService
+        ? t('analytics.dashboard.welcome', { name: me?.label || me?.name || '' })
+        : t('analytics.dashboard.title')}</Title2>
       <div className={s.grid}>
         {canApprove && (
           <Card className={pendingCount > 0 ? `${s.pendingCard} ${s.pendingCardWarning}` : s.pendingCard}>
-            <CardHeader header={<Text weight="semibold">Pending approvals</Text>} />
+            <CardHeader header={<Text weight="semibold">{t('analytics.dashboard.cards.pendingApprovals')}</Text>} />
             <div className={pendingCount > 0 ? s.bigWarning : s.big}>{pending.isLoading ? '—' : pendingCount}</div>
             <div className={s.sub}>
-              <Link to="/submissions?approvalStatus=Pending">Review</Link>
+              <Link to="/submissions?approvalStatus=Pending">{t('analytics.dashboard.actions.review')}</Link>
             </div>
           </Card>
         )}
         {canReadAccounts && (
           <>
             <Card className={s.card}>
-              <CardHeader header={<Text weight="semibold">Services</Text>} />
+              <CardHeader header={<Text weight="semibold">{t('analytics.common.services')}</Text>} />
               <div className={s.big}>{services.data?.total ?? '—'}</div>
               <div className={s.sub}>
-                <Link to="/services">Manage</Link>
+                <Link to="/services">{t('analytics.dashboard.actions.manage')}</Link>
               </div>
             </Card>
             <Card className={s.card}>
-              <CardHeader header={<Text weight="semibold">Operators</Text>} />
+              <CardHeader header={<Text weight="semibold">{t('analytics.dashboard.cards.operators')}</Text>} />
               <div className={s.big}>{operators.data?.total ?? '—'}</div>
               <div className={s.sub}>
-                <Link to="/services">Manage</Link>
+                <Link to="/services">{t('analytics.dashboard.actions.manage')}</Link>
               </div>
             </Card>
             <Card className={s.card}>
-              <CardHeader header={<Text weight="semibold">Admins</Text>} />
+              <CardHeader header={<Text weight="semibold">{t('analytics.dashboard.cards.admins')}</Text>} />
               <div className={s.big}>{admins.data?.total ?? '—'}</div>
               <div className={s.sub}>
-                <Link to="/services">Manage</Link>
+                <Link to="/services">{t('analytics.dashboard.actions.manage')}</Link>
               </div>
             </Card>
           </>
         )}
         {canReadSchemas && (
           <Card className={s.card}>
-            <CardHeader header={<Text weight="semibold">Schemas</Text>} />
+            <CardHeader header={<Text weight="semibold">{t('analytics.explore.filters.schemas')}</Text>} />
             <div className={s.big}>{schemas.data?.total ?? '—'}</div>
             <div className={s.sub}>
-              <Link to="/schemas">Manage</Link>
+              <Link to="/schemas">{t('analytics.dashboard.actions.manage')}</Link>
             </div>
           </Card>
         )}
         {canReadSubmissions && (
           <Card className={s.card}>
-            <CardHeader header={<Text weight="semibold">Submissions</Text>} />
+            <CardHeader header={<Text weight="semibold">{t('analytics.dashboard.cards.submissions')}</Text>} />
             <div className={s.big}>{adminSubs.data?.total ?? '—'}</div>
             <div className={s.sub}>
-              <Link to="/submissions">Browse</Link>
+              <Link to="/submissions">{t('analytics.dashboard.actions.browse')}</Link>
             </div>
           </Card>
         )}
@@ -168,16 +171,16 @@ export function Dashboard() {
         {selfService && (
           <>
             <Card className={s.card}>
-              <CardHeader header={<Text weight="semibold">My submissions</Text>} />
+              <CardHeader header={<Text weight="semibold">{t('analytics.dashboard.cards.mySubmissions')}</Text>} />
               <div className={s.big}>{mySubs.data?.total ?? '—'}</div>
               <div className={s.sub}>
-                <Link to="/submissions">Browse</Link>
+                <Link to="/submissions">{t('analytics.dashboard.actions.browse')}</Link>
               </div>
             </Card>
             <Card className={s.card}>
-              <CardHeader header={<Text weight="semibold">Submit data</Text>} />
+              <CardHeader header={<Text weight="semibold">{t('analytics.dashboard.cards.submitData')}</Text>} />
               <div className={s.sub} style={{ marginTop: 8 }}>
-                <Link to="/submissions/new">New submission →</Link>
+                <Link to="/submissions/new">{t('analytics.dashboard.actions.newSubmission')}</Link>
               </div>
             </Card>
           </>
@@ -212,6 +215,7 @@ function MissingSubmissionsSection({
   buckets?: MissingByCadence[]
   styles: ReturnType<typeof useStyles>
 }) {
+  const { t } = useTranslation()
   if (loading) return null
   if (!buckets || buckets.length === 0) return null
 
@@ -221,16 +225,16 @@ function MissingSubmissionsSection({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div className={styles.sectionHeaderRow}>
-        <Subtitle2>Missing submissions</Subtitle2>
+        <Subtitle2>{t('analytics.missing.titleShort')}</Subtitle2>
         <Link to="/missing" style={{ color: tokens.colorBrandForeground1, fontSize: 13 }}>
-          View by period →
+          {t('analytics.dashboard.actions.viewByPeriod')}
         </Link>
       </div>
 
       {previous.length > 0 && (
         <MissingPeriodGroup
-          title="Overdue — previous period"
-          subtitle="These submission windows have closed."
+          title={t('analytics.dashboard.missing.overdueTitle')}
+          subtitle={t('analytics.dashboard.missing.overdueDescription')}
           buckets={previous}
           tone="previous"
           styles={styles}
@@ -239,8 +243,8 @@ function MissingSubmissionsSection({
 
       {current.length > 0 && (
         <MissingPeriodGroup
-          title="This period"
-          subtitle="Still within the submission window."
+          title={t('analytics.dashboard.missing.currentTitle')}
+          subtitle={t('analytics.dashboard.missing.currentDescription')}
           buckets={current}
           tone="current"
           styles={styles}
@@ -269,6 +273,7 @@ function MissingTrendsChart({
   styles: ReturnType<typeof useStyles>
   canReadAccounts: boolean
 }) {
+  const { t, i18n } = useTranslation()
   const [cadence, setCadence] = useState<Cadence>('Monthly')
   const [serviceId, setServiceId] = useState<string>(ALL_SERVICES)
 
@@ -280,41 +285,41 @@ function MissingTrendsChart({
 
   const rows = useMemo(
     () => (history.data?.points ?? []).map(p => ({
-      label: trendPointLabel(p.periodStart, cadence),
+      label: trendPointLabel(p.periodStart, cadence, i18n.language),
       missing: p.totalMissing,
     })),
-    [history.data, cadence],
+    [history.data, cadence, i18n.language],
   )
 
   const hasData = rows.length > 0
   const serviceName = serviceId === ALL_SERVICES
-    ? 'All services'
+    ? t('analytics.common.allServices')
     : services.data?.items.find(a => a.id === serviceId)?.label
       || services.data?.items.find(a => a.id === serviceId)?.name
-      || 'Service'
+      || t('analytics.common.service')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <Subtitle2>Missing submissions over time</Subtitle2>
+      <Subtitle2>{t('analytics.dashboard.trend.title')}</Subtitle2>
       <Card className={styles.chartCard}>
         <div className={styles.chartToolbar}>
-          <Field label="Cadence" className={styles.chartFilter}>
+          <Field label={t('analytics.common.cadence')} className={styles.chartFilter}>
             <Dropdown
               selectedOptions={[cadence]}
-              value={cadenceLabel(cadence)}
+              value={t(`analytics.cadence.${cadence.toLowerCase()}`)}
               onOptionSelect={(_, d) => d.optionValue && setCadence(d.optionValue as Cadence)}
             >
-              {TREND_CADENCES.map(c => <Option key={c} value={c}>{cadenceLabel(c)}</Option>)}
+              {TREND_CADENCES.map(c => <Option key={c} value={c}>{t(`analytics.cadence.${c.toLowerCase()}`)}</Option>)}
             </Dropdown>
           </Field>
           {canReadAccounts && (
-            <Field label="Service" className={styles.chartFilter}>
+            <Field label={t('analytics.common.service')} className={styles.chartFilter}>
               <Dropdown
                 selectedOptions={[serviceId]}
                 value={serviceName}
                 onOptionSelect={(_, d) => d.optionValue && setServiceId(d.optionValue)}
               >
-                <Option value={ALL_SERVICES}>All services</Option>
+                <Option value={ALL_SERVICES}>{t('analytics.common.allServices')}</Option>
                 {(services.data?.items ?? []).map(a => (
                   <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
                 ))}
@@ -324,9 +329,9 @@ function MissingTrendsChart({
         </div>
 
         {history.isLoading ? (
-          <div className={styles.chartEmpty}><Spinner size="tiny" label="Loading trend…" /></div>
+          <div className={styles.chartEmpty}><Spinner size="tiny" label={t('analytics.dashboard.trend.loading')} /></div>
         ) : !hasData ? (
-          <div className={styles.chartEmpty}>No trend data available.</div>
+          <div className={styles.chartEmpty}>{t('analytics.dashboard.trend.empty')}</div>
         ) : (
           <div className={styles.chartBody}>
             <ResponsiveContainer width="100%" height="100%">
@@ -338,7 +343,7 @@ function MissingTrendsChart({
                 <Line
                   type="monotone"
                   dataKey="missing"
-                  name={`Missing — ${serviceName}`}
+                  name={t('analytics.dashboard.trend.seriesName', { service: serviceName })}
                   stroke={tokens.colorBrandForeground1}
                   strokeWidth={2}
                   dot={{ r: 2 }}
@@ -358,13 +363,13 @@ function MissingTrendsChart({
  * changes within a month); monthly-and-longer windows collapse to "MMM yyyy" so a 12-point yearly
  * trend doesn't repeat the same month label.
  */
-function trendPointLabel(periodStart: string, cadence: Cadence): string {
+function trendPointLabel(periodStart: string, cadence: Cadence, locale: string): string {
   try {
     const d = new Date(periodStart)
     const subMonthly = cadence === 'Daily' || cadence === 'Weekly' || cadence === 'Fortnightly'
     const fmt = subMonthly
-      ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
-      : new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' })
+      ? new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' })
+      : new Intl.DateTimeFormat(locale, { month: 'short', year: 'numeric' })
     return fmt.format(d)
   } catch {
     return ''
@@ -410,6 +415,7 @@ function MissingCadenceCard({
   tone: MissingTone
   styles: ReturnType<typeof useStyles>
 }) {
+  const { t, i18n } = useTranslation()
   const countClass = tone === 'previous'
     ? `${styles.missingCount} ${styles.missingCountPrevious}`
     : `${styles.missingCount} ${styles.missingCountCurrent}`
@@ -418,16 +424,16 @@ function MissingCadenceCard({
       <CardHeader
         header={
           <div className={styles.missingHeaderRow}>
-            <Text weight="semibold">{cadenceLabel(bucket.cadence)}</Text>
+            <Text weight="semibold">{t(`analytics.cadence.${bucket.cadence.toLowerCase()}`)}</Text>
             <Badge appearance="outline" color={tone === 'previous' ? 'danger' : 'warning'}>
-              {windowLabel(bucket.periodStart, bucket.periodEnd)}
+              {windowLabel(bucket.periodStart, bucket.periodEnd, i18n.language)}
             </Badge>
           </div>
         }
       />
       <div className={countClass}>{bucket.entries.length}</div>
       <div className={styles.sub}>
-        {bucket.entries.length === 1 ? 'service short on submissions' : 'services short on submissions'}
+        {t('analytics.dashboard.missing.servicesShort', { count: bucket.entries.length })}
       </div>
       <div className={styles.missingList}>
         {bucket.entries.map((e) => (
@@ -474,14 +480,14 @@ function MissingEntryRow({
  * Short human-readable label for the current cadence window. Compact on purpose so it fits
  * inside the card header next to the cadence name without wrapping.
  */
-function windowLabel(start: string, end: string): string {
+function windowLabel(start: string, end: string, locale: string): string {
   try {
     const s = new Date(start)
     const e = new Date(end)
     // Weekly/monthly windows look best as "May 25 – Jun 1"; for single-day buckets collapse to "May 28".
     const sameMonth = s.getUTCMonth() === e.getUTCMonth() && s.getUTCFullYear() === e.getUTCFullYear()
     const endInclusive = new Date(e.getTime() - 1)
-    const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+    const fmt = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' })
     if (sameMonth && s.getUTCDate() === endInclusive.getUTCDate()) return fmt.format(s)
     return `${fmt.format(s)} – ${fmt.format(endInclusive)}`
   } catch {

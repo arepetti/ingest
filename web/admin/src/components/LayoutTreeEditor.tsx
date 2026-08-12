@@ -8,6 +8,7 @@ import {
 import { useCallback, useMemo, useState } from 'react'
 import type { Schema, SchemaLayoutNode, SchemaValue } from '../api/types'
 import { unassignedValues, validateLayout } from '../utils/layout'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '12px' },
@@ -110,9 +111,10 @@ export function LayoutTreeEditor({
   onChange: (next: SchemaLayoutNode[]) => void
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const layout = useMemo<SchemaLayoutNode[]>(() => schema.layout ?? [], [schema.layout])
   const unassigned = useMemo(() => unassignedValues(schema), [schema])
-  const issues = useMemo(() => validateLayout(schema), [schema])
+  const issues = useMemo(() => validateLayout(schema, t), [schema, t])
 
   // The dragged payload carries the source: either an unassigned value (by name) or a path
   // into the existing tree (so we can splice it out before reinserting).
@@ -120,9 +122,9 @@ export function LayoutTreeEditor({
 
   const set = useCallback((next: SchemaLayoutNode[]) => onChange(next), [onChange])
 
-  const addSection = () => set([...layout, { kind: 'section', caption: 'New section', items: [] }])
+  const addSection = () => set([...layout, { kind: 'section', caption: t('schemasSubmissions.layout.newSection'), items: [] }])
   const addSectionInside = (path: number[]) => {
-    set(insertAt(layout, [...path, indexOfLastChild(layout, path) + 1], { kind: 'section', caption: 'New section', items: [] }))
+    set(insertAt(layout, [...path, indexOfLastChild(layout, path) + 1], { kind: 'section', caption: t('schemasSubmissions.layout.newSection'), items: [] }))
   }
   const removeAt = (path: number[]) => set(removeAtPath(layout, path))
   const updateSection = (path: number[], patch: Partial<Extract<SchemaLayoutNode, { kind: 'section' }>>) =>
@@ -149,15 +151,15 @@ export function LayoutTreeEditor({
     <div className={s.root}>
       <div className={s.toolbar}>
         <Button appearance="primary" size="small" icon={<Add20Regular />} onClick={addSection}>
-          Add section
+          {t('schemasSubmissions.layout.addSection')}
         </Button>
       </div>
 
       <div className={s.tray}>
-        <div className={s.trayHeader}>Unassigned values ({unassigned.length})</div>
+        <div className={s.trayHeader}>{t('schemasSubmissions.layout.unassignedValues', { count: unassigned.length })}</div>
         {unassigned.length === 0 && (
           <span style={{ color: tokens.colorNeutralForeground3 }}>
-            Every value is placed in the layout.
+            {t('schemasSubmissions.layout.allPlaced')}
           </span>
         )}
         {unassigned.map((v) => <UnassignedChip key={v.name} value={v} onDragStart={() => setDragging({ kind: 'unassigned', valueName: v.name })} onDragEnd={() => setDragging(null)} dragging={dragging?.kind === 'unassigned' && dragging.valueName === v.name} />)}
@@ -166,8 +168,7 @@ export function LayoutTreeEditor({
       <div className={s.tree}>
         {layout.length === 0 && (
           <div className={s.emptyTree}>
-            Drag values from above to place them, or add a section. Values that aren't placed
-            here will still render first in submission forms (under no heading).
+            {t('schemasSubmissions.layout.emptyHelp')}
           </div>
         )}
         <DropZone
@@ -195,7 +196,9 @@ export function LayoutTreeEditor({
         <div className={s.issues}>
           {issues.map((iss, i) => (
             <div key={i} className={iss.severity === 'error' ? s.issueError : s.issueWarning}>
-              {iss.severity === 'error' ? 'Error: ' : 'Note: '}{iss.message}
+              {iss.severity === 'error'
+                ? t('schemasSubmissions.layout.errorPrefix')
+                : t('schemasSubmissions.layout.notePrefix')}{iss.message}
             </div>
           ))}
         </div>
@@ -260,6 +263,7 @@ function NodeRenderer({
   allValuesByName: Map<string, SchemaValue>
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const isDraggingMe = dragging?.kind === 'node' && samePath(dragging.path, path)
   const onMyDragStart = () => setDragging({ kind: 'node', path })
   const onMyDragEnd = () => setDragging(null)
@@ -278,8 +282,8 @@ function NodeRenderer({
           <ReOrderDotsVertical20Regular className={s.nodeHandle} />
           <DocumentBulletList20Regular className={s.nodeIcon} />
           <span className={s.nodeTitle}>{def?.label || node.valueName}</span>
-          <Tooltip content="Remove from layout" relationship="label">
-            <Button appearance="subtle" size="small" icon={<Delete16Regular />} onClick={onRemove} aria-label="Remove from layout" />
+          <Tooltip content={t('schemasSubmissions.layout.removeFromLayout')} relationship="label">
+            <Button appearance="subtle" size="small" icon={<Delete16Regular />} onClick={onRemove} aria-label={t('schemasSubmissions.layout.removeFromLayout')} />
           </Tooltip>
         </div>
       </div>
@@ -299,24 +303,24 @@ function NodeRenderer({
       <div className={s.nodeHeader}>
         <ReOrderDotsVertical20Regular className={s.nodeHandle} />
         <Folder20Regular className={s.nodeIcon} />
-        <span className={s.nodeTitle}>{node.caption || '(untitled section)'}</span>
-        <Tooltip content="Add subsection inside" relationship="label">
-          <Button appearance="subtle" size="small" icon={<Add20Regular />} onClick={onAddSection} aria-label="Add subsection" />
+        <span className={s.nodeTitle}>{node.caption || t('schemasSubmissions.layout.untitledSection')}</span>
+        <Tooltip content={t('schemasSubmissions.layout.addSubsectionInside')} relationship="label">
+          <Button appearance="subtle" size="small" icon={<Add20Regular />} onClick={onAddSection} aria-label={t('schemasSubmissions.layout.addSubsection')} />
         </Tooltip>
-        <Tooltip content="Remove section" relationship="label">
-          <Button appearance="subtle" size="small" icon={<Delete16Regular />} onClick={onRemove} aria-label="Remove section" />
+        <Tooltip content={t('schemasSubmissions.layout.removeSection')} relationship="label">
+          <Button appearance="subtle" size="small" icon={<Delete16Regular />} onClick={onRemove} aria-label={t('schemasSubmissions.layout.removeSection')} />
         </Tooltip>
       </div>
       <div className={s.sectionInputs}>
         <Input
-          aria-label="Section caption"
-          placeholder="Section heading"
+          aria-label={t('schemasSubmissions.layout.sectionCaption')}
+          placeholder={t('schemasSubmissions.layout.sectionHeading')}
           value={node.caption}
           onChange={(_, v) => onUpdate({ caption: v.value })}
         />
         <Textarea
-          aria-label="Section description"
-          placeholder="Optional sub-heading (rendered under the caption)"
+          aria-label={t('schemasSubmissions.layout.sectionDescription')}
+          placeholder={t('schemasSubmissions.layout.sectionDescriptionPlaceholder')}
           rows={2}
           value={node.description ?? ''}
           onChange={(_, v) => onUpdate({ description: v.value || null })}
@@ -343,7 +347,7 @@ function NodeRenderer({
             })}
             onAddSectionInsideChild={() => onUpdate({
               items: (node.items ?? []).map((c, j) => j === i && c.kind === 'section'
-                ? { ...c, items: [...(c.items ?? []), { kind: 'section', caption: 'New section', items: [] }] }
+                ? { ...c, items: [...(c.items ?? []), { kind: 'section', caption: t('schemasSubmissions.layout.newSection'), items: [] }] }
                 : c),
             })}
             onDropAtChild={onDropAtChild}

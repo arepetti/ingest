@@ -69,14 +69,25 @@ public sealed class EmailSettingsService : IEmailSettingsService
     /// <inheritdoc />
     public async Task<EmailSettings> UpdateAsync(EmailSettingsUpdate update, CancellationToken ct = default)
     {
-        var errors = new List<string>();
-        if (string.IsNullOrWhiteSpace(update.Host)) errors.Add("SMTP host is required.");
-        if (update.Port is < 1 or > 65535) errors.Add("SMTP port must be between 1 and 65535.");
+        var errors = new List<Diagnostic>();
+        if (string.IsNullOrWhiteSpace(update.Host))
+            errors.Add(new Diagnostic(DiagnosticCodes.Email.SmtpHostRequired, "SMTP host is required."));
+        if (update.Port is < 1 or > 65535)
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Email.SmtpPortInvalid,
+                "SMTP port must be between 1 and 65535.",
+                ("port", update.Port),
+                ("minimum", 1),
+                ("maximum", 65535)));
         if (string.IsNullOrWhiteSpace(update.FromAddress))
-            errors.Add("From address is required.");
+            errors.Add(new Diagnostic(DiagnosticCodes.Email.FromAddressRequired, "From address is required."));
         else if (!MailAddress.TryCreate(update.FromAddress.Trim(), out _))
-            errors.Add($"'{update.FromAddress}' is not a valid email address.");
-        if (errors.Count > 0) throw new ValidationException(errors);
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Email.AddressInvalid,
+                $"'{update.FromAddress}' is not a valid email address.",
+                ("address", update.FromAddress)));
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
 
         var existing = await _ctx.EmailSettings.Find(FilterDefinition<EmailSettings>.Empty).FirstOrDefaultAsync(ct);
         var now = _audit.UtcNow;

@@ -126,7 +126,11 @@ public class SchemaServiceTests
         var created = await svc.CreateAsync(NewSchema(version: 3));
         var update = NewSchema(version: 2);
 
-        await Assert.ThrowsAsync<ValidationException>(() => svc.UpdateAsync(created.Id, update));
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.UpdateAsync(created.Id, update));
+        var detail = Assert.Single(ex.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Schemas.VersionDecreased, detail.Code);
+        Assert.Equal(3, detail.Params["previousVersion"]);
+        Assert.Equal(2, detail.Params["requestedVersion"]);
     }
 
     [Fact]
@@ -224,7 +228,12 @@ public class SchemaServiceTests
         var svc = NewService(out _);
         var s = NewSchema(version: 1);
         s.Values[0].SinceVersion = 2; // > 1
-        await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(s));
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(s));
+        var detail = Assert.Single(ex.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Schemas.SinceVersionAfterSchema, detail.Code);
+        Assert.Equal("tonnes", detail.Params["valueName"]);
+        Assert.Equal(2, detail.Params["sinceVersion"]);
+        Assert.Equal(1, detail.Params["schemaVersion"]);
     }
 
     [Fact]
@@ -265,6 +274,9 @@ public class SchemaServiceTests
         });
         var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(s));
         Assert.Contains(ex.Errors, e => e.Contains("not a valid identifier"));
+        var detail = Assert.Single(ex.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Schemas.ValueNameInvalid, detail.Code);
+        Assert.Equal(badName, detail.Params["valueName"]);
     }
 
     [Theory]
@@ -321,6 +333,9 @@ public class SchemaServiceTests
         };
         var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.CreateAsync(s));
         Assert.Contains(ex.Errors, e => e.Contains("does_not_exist"));
+        var detail = Assert.Single(ex.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Schemas.LayoutUnknownValue, detail.Code);
+        Assert.Equal("does_not_exist", detail.Params["valueName"]);
     }
 
     [Fact]

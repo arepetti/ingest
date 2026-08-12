@@ -25,17 +25,24 @@ public static class ApprovalPolicyValidator
         IAccountRepository accounts,
         CancellationToken ct = default)
     {
-        var errors = new List<string>();
+        var errors = new List<Diagnostic>();
 
         if (policy.Mode == ApprovalMode.UseGlobalDefault && !allowUseGlobalDefault)
-            errors.Add("This policy cannot defer to the global default.");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Approval.GlobalDefaultNotAllowed,
+                "This policy cannot defer to the global default.",
+                ("mode", policy.Mode.ToString())));
 
         if (policy.Mode == ApprovalMode.Required)
         {
             if (policy.Approvers.Count == 0)
-                errors.Add("At least one approver is required when approval is required.");
+                errors.Add(new Diagnostic(
+                    DiagnosticCodes.Approval.ApproverRequired,
+                    "At least one approver is required when approval is required."));
             else if (!policy.Approvers.Any(a => a.Requirement == ApproverRequirement.Required))
-                errors.Add("At least one approver must be marked as required.");
+                errors.Add(new Diagnostic(
+                    DiagnosticCodes.Approval.RequiredApproverRequired,
+                    "At least one approver must be marked as required."));
 
             var seen = new HashSet<Guid>();
             var seenServiceOwner = false;
@@ -46,22 +53,31 @@ public static class ApprovalPolicyValidator
                 if (spec.Kind == ApproverKind.ServiceOwner)
                 {
                     if (seenServiceOwner)
-                        errors.Add("The service owner is listed more than once.");
+                        errors.Add(new Diagnostic(
+                            DiagnosticCodes.Approval.DuplicateServiceOwner,
+                            "The service owner is listed more than once."));
                     seenServiceOwner = true;
                     continue;
                 }
 
                 if (!seen.Add(spec.AccountId))
                 {
-                    errors.Add("The same approver is listed more than once.");
+                    errors.Add(Diagnostic.Create(
+                        DiagnosticCodes.Approval.DuplicateApprover,
+                        "The same approver is listed more than once.",
+                        ("accountId", spec.AccountId)));
                     continue;
                 }
                 var account = await accounts.GetByIdAsync(spec.AccountId, ct: ct);
                 if (account is null)
-                    errors.Add($"Approver account '{spec.AccountId}' does not exist.");
+                    errors.Add(Diagnostic.Create(
+                        DiagnosticCodes.Approval.ApproverNotFound,
+                        $"Approver account '{spec.AccountId}' does not exist.",
+                        ("accountId", spec.AccountId)));
             }
         }
 
-        if (errors.Count > 0) throw new ValidationException(errors);
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
     }
 }

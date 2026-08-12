@@ -134,7 +134,7 @@ public sealed class SubmissionService : ISubmissionService
         var existing = await _submissions.GetByIdAsync(submissionId, ct: ct)
             ?? throw new NotFoundException($"Submission '{submissionId}'");
         if (existing.ServiceAccountId != callerAccountId)
-            throw new ForbiddenException("Submission belongs to a different account.");
+            throw WrongOwner(submissionId, callerAccountId);
         EnsureDraftTransitionAllowed(existing, draft);
 
         var account = await _accounts.GetByIdAsync(existing.ServiceAccountId, ct: ct)
@@ -168,7 +168,7 @@ public sealed class SubmissionService : ISubmissionService
         var s = await _submissions.GetByIdAsync(submissionId, ct: ct);
         if (s is null) return null;
         if (s.ServiceAccountId != callerAccountId)
-            throw new ForbiddenException("Submission belongs to a different account.");
+            throw WrongOwner(submissionId, callerAccountId);
         return s;
     }
 
@@ -202,7 +202,7 @@ public sealed class SubmissionService : ISubmissionService
         var existing = await _submissions.GetByIdAsync(submissionId, ct: ct)
             ?? throw new NotFoundException($"Submission '{submissionId}'");
         if (existing.ServiceAccountId != callerAccountId)
-            throw new ForbiddenException("Submission belongs to a different account.");
+            throw WrongOwner(submissionId, callerAccountId);
         EnsureDraftTransitionAllowed(existing, draft);
 
         var account = await _accounts.GetByIdAsync(existing.ServiceAccountId, ct: ct)
@@ -336,7 +336,7 @@ public sealed class SubmissionService : ISubmissionService
     {
         var result = await _validator.ValidateAsync(account, submission, isReplacement, existing, draft, options: null, ct);
         if (!result.IsValid)
-            throw new ValidationException(result.Errors);
+            throw new ValidationException(result.ErrorDetails);
         return result;
     }
 
@@ -378,7 +378,11 @@ public sealed class SubmissionService : ISubmissionService
             WarningMessages(validation.Warnings),
             validation.DiscardedSamples.ToList(),
             submission.ApprovalStatus,
-            submission.RequiredApprovers);
+            submission.RequiredApprovers)
+        {
+            ErrorDetails = validation.ErrorDetails,
+            WarningDetails = validation.WarningDetails,
+        };
     }
 
     /// <summary>
@@ -389,11 +393,18 @@ public sealed class SubmissionService : ISubmissionService
     private static void EnsureDraftTransitionAllowed(Submission existing, bool draft)
     {
         if (draft && !existing.IsDraft)
+        {
+            const string message =
+                "This submission has already been published and cannot be returned to draft. " +
+                "Edit it directly, or clone it into a new draft.";
             throw new ValidationException(new[]
             {
-                "This submission has already been published and cannot be returned to draft. " +
-                "Edit it directly, or clone it into a new draft.",
+                Diagnostic.Create(
+                    DiagnosticCodes.Submissions.PublishedCannotBecomeDraft,
+                    message,
+                    ("submissionId", existing.Id)),
             });
+        }
     }
 
     /// <summary>
@@ -616,7 +627,14 @@ public sealed class SubmissionService : ISubmissionService
         var submission = await _submissions.GetByIdAsync(submissionId, ct: ct)
             ?? throw new NotFoundException($"Submission '{submissionId}'");
         if (submission.ApprovalStatus != ApprovalStatus.Pending)
-            throw new ValidationException(new[] { "Submission is not awaiting approval." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Submissions.NotAwaitingApproval,
+                    "Submission is not awaiting approval.",
+                    ("submissionId", submissionId),
+                    ("approvalStatus", submission.ApprovalStatus.ToString())),
+            });
 
         var approver = await _accounts.GetByIdAsync(approverAccountId, ct: ct)
             ?? throw new NotFoundException("Account");
@@ -624,7 +642,11 @@ public sealed class SubmissionService : ISubmissionService
         // Admins may always decide; otherwise the caller must be a designated approver for this submission.
         var designated = submission.RequiredApprovers.Any(a => a.AccountId == approver.Id);
         if (approver.Role != AccountRole.Admin && !designated)
-            throw new ForbiddenException("You are not a designated approver for this submission.");
+            throw new ForbiddenException(Diagnostic.Create(
+                DiagnosticCodes.Approval.NotDesignatedApprover,
+                "You are not a designated approver for this submission.",
+                ("submissionId", submissionId),
+                ("approverAccountId", approverAccountId)));
 
         return (submission, approver);
     }
@@ -736,7 +758,7 @@ public sealed class SubmissionService : ISubmissionService
     /// Samples whose schema/value can no longer be resolved are ignored — they're already in a
     /// broken state that the validator will flag separately.
     /// </summary>
-    private async Task<string?> ClosedCadenceError(Submission existing, IReadOnlyDictionary<string, Schema> visible, CancellationToken ct)
+    private async Task<Diagnostic?> ClosedCadenceError(Submission existing, IReadOnlyDictionary<string, Schema> visible, CancellationToken ct)
     {
         var now = _time.GetUtcNow().UtcDateTime;
         var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
@@ -751,9 +773,19 @@ public sealed class SubmissionService : ISubmissionService
             var (_, windowEnd) = CadenceCalculator.WindowFor(def.Cadence, sample.Timestamp, anchors, windows);
             if (windowEnd <= now)
             {
-                return $"Submission can no longer be modified: the {def.Cadence.ToString().ToLowerInvariant()} " +
-                       $"period for '{sample.SchemaName}.{sample.ValueName}' closed on {windowEnd:u}. " +
-                       $"Ask an administrator to amend it on your behalf.";
+                var cadence = def.Cadence.ToString().ToLowerInvariant();
+                var message =
+                    $"Submission can no longer be modified: the {cadence} " +
+                    $"period for '{sample.SchemaName}.{sample.ValueName}' closed on {windowEnd:u}. " +
+                    $"Ask an administrator to amend it on your behalf.";
+                return Diagnostic.Create(
+                    DiagnosticCodes.Submissions.ModifyWindowClosed,
+                    message,
+                    ("submissionId", existing.Id),
+                    ("cadence", cadence),
+                    ("schemaName", sample.SchemaName),
+                    ("valueName", sample.ValueName),
+                    ("windowEnd", windowEnd));
             }
         }
         return null;
@@ -769,7 +801,7 @@ public sealed class SubmissionService : ISubmissionService
     /// already exists. Samples whose schema/value can't be resolved are ignored — the validator
     /// flags those separately.
     /// </summary>
-    private async Task<string?> WindowNotOpenError(IEnumerable<Sample> samples, IReadOnlyDictionary<string, Schema> visible, CancellationToken ct)
+    private async Task<Diagnostic?> WindowNotOpenError(IEnumerable<Sample> samples, IReadOnlyDictionary<string, Schema> visible, CancellationToken ct)
     {
         var now = _time.GetUtcNow().UtcDateTime;
         var anchors = await _appConfig.GetCadenceAnchorsAsync(ct);
@@ -784,14 +816,32 @@ public sealed class SubmissionService : ISubmissionService
             var (windowStart, windowEnd) = CadenceCalculator.WindowFor(def.Cadence, sample.Timestamp, anchors, windows);
             if (now < windowStart)
             {
-                return $"Submission cannot be created yet: the {def.Cadence.ToString().ToLowerInvariant()} " +
-                       $"period for '{sample.SchemaName}.{sample.ValueName}' doesn't open until {windowStart:u}.";
+                var cadence = def.Cadence.ToString().ToLowerInvariant();
+                var message =
+                    $"Submission cannot be created yet: the {cadence} " +
+                    $"period for '{sample.SchemaName}.{sample.ValueName}' doesn't open until {windowStart:u}.";
+                return Diagnostic.Create(
+                    DiagnosticCodes.Submissions.CreateWindowNotOpen,
+                    message,
+                    ("cadence", cadence),
+                    ("schemaName", sample.SchemaName),
+                    ("valueName", sample.ValueName),
+                    ("windowStart", windowStart));
             }
             if (now >= windowEnd)
             {
-                return $"Submission can no longer be created: the {def.Cadence.ToString().ToLowerInvariant()} " +
-                       $"period for '{sample.SchemaName}.{sample.ValueName}' closed on {windowEnd:u}. " +
-                       $"Ask an administrator to amend it on your behalf.";
+                var cadence = def.Cadence.ToString().ToLowerInvariant();
+                var message =
+                    $"Submission can no longer be created: the {cadence} " +
+                    $"period for '{sample.SchemaName}.{sample.ValueName}' closed on {windowEnd:u}. " +
+                    $"Ask an administrator to amend it on your behalf.";
+                return Diagnostic.Create(
+                    DiagnosticCodes.Submissions.CreateWindowClosed,
+                    message,
+                    ("cadence", cadence),
+                    ("schemaName", sample.SchemaName),
+                    ("valueName", sample.ValueName),
+                    ("windowEnd", windowEnd));
             }
         }
         return null;
@@ -809,9 +859,21 @@ public sealed class SubmissionService : ISubmissionService
     {
         var status = await _appConfig.GetIngestionStatusAsync(ct);
         if (status.Closed)
-            throw new ServiceUnavailableException(
-                string.IsNullOrWhiteSpace(status.Message)
-                    ? "Submissions are temporarily closed."
-                    : status.Message!);
+        {
+            var message = string.IsNullOrWhiteSpace(status.Message)
+                ? "Submissions are temporarily closed."
+                : status.Message!;
+            throw new ServiceUnavailableException(Diagnostic.Create(
+                DiagnosticCodes.Submissions.IngestionClosed,
+                message,
+                ("configuredMessage", !string.IsNullOrWhiteSpace(status.Message))));
+        }
     }
+
+    private static ForbiddenException WrongOwner(Guid submissionId, Guid callerAccountId) =>
+        new(Diagnostic.Create(
+            DiagnosticCodes.Submissions.WrongOwner,
+            "Submission belongs to a different account.",
+            ("submissionId", submissionId),
+            ("callerAccountId", callerAccountId)));
 }

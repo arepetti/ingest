@@ -7,12 +7,14 @@ import {
 import { CheckmarkCircle20Regular, Dismiss24Regular, Warning20Regular } from '@fluentui/react-icons'
 import type { SampleInput, Schema, SchemaValue, SubmissionValidationResponse } from '../api/types'
 import { useAccounts, useValidateSubmissionPreview } from '../api/hooks'
-import { formatApiError } from '../api/client'
+import { formatApiError, localizeDiagnostics } from '../api/client'
 import { SchemaSampleFields } from './SchemaSampleFields'
 import { fromLocalInput, toLocalInput } from '../utils/datetimeLocal'
 import {
   interpretRuleResult, isFilled, safeEval, useSampleRules, type ValueRow,
 } from '../utils/sampleRules'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 const useStyles = makeStyles({
   surface: {
@@ -87,6 +89,7 @@ export function SchemaPreviewDialog({
   mode?: 'preview' | 'test'
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const serverMode = mode === 'test'
 
   // Default the sample timestamp to "now". Mirrors the submission editor's single-timestamp model;
@@ -112,13 +115,13 @@ export function SchemaPreviewDialog({
     const skip: string[] = []
     for (const v of schema.values) {
       const name = (v.name ?? '').trim()
-      if (!name) { skip.push(v.label?.trim() || '(unnamed value)'); continue }
+      if (!name) { skip.push(v.label?.trim() || t('schemasSubmissions.preview.unnamedValue')); continue }
       if (seen.has(name)) { skip.push(name); continue }
       seen.add(name)
       usable.push(v)
     }
     return { usableValues: usable, skipped: skip }
-  }, [schema])
+  }, [schema, t])
 
   // (Re)seed the row model whenever the dialog opens. Done as a render-time reset keyed on the
   // open→true transition (rather than an effect) so typed values survive incidental re-renders; the
@@ -199,7 +202,7 @@ export function SchemaPreviewDialog({
     // dropped by a conditional-display rule.
     for (const v of usableValues) {
       if (v.required && v.enabled && v.kind !== 'Calculated' && !filledNames.has(v.name) && !dropped.has(v.name)) {
-        out.push({ scope: 'required', target: v.label || v.name, message: 'required value is empty' })
+        out.push({ scope: 'required', target: v.label || v.name, message: t('schemasSubmissions.preview.findings.requiredEmpty') })
       }
     }
 
@@ -208,12 +211,12 @@ export function SchemaPreviewDialog({
     for (const r of filled) {
       const def = r.def
       const label = def.label || def.name
-      for (const m of shapeProblems(def, r.value)) out.push({ scope: 'shape', target: label, message: m })
+      for (const m of shapeProblems(def, r.value, t)) out.push({ scope: 'shape', target: label, message: m })
 
       if (def.valueValidation && def.valueValidation.trim()) {
         const verdict = interpretRuleResult(safeEval(def.valueValidation, ruleVariables))
         if (!verdict.ok) {
-          out.push({ scope: 'value', target: label, message: verdict.message || 'value validation rule rejected this value' })
+          out.push({ scope: 'value', target: label, message: verdict.message || t('schemasSubmissions.preview.findings.valueRejected') })
         }
       }
     }
@@ -223,27 +226,31 @@ export function SchemaPreviewDialog({
       if (!rule || !rule.trim()) continue
       const verdict = interpretRuleResult(safeEval(rule, ruleVariables))
       if (!verdict.ok) {
-        out.push({ scope: 'schema', message: verdict.message || 'schema-level rule rejected this submission' })
+        out.push({ scope: 'schema', message: verdict.message || t('schemasSubmissions.preview.findings.schemaRejected') })
       }
     }
 
     void statesByName
     return out
-  }, [rows, rowStates, ruleVariables, rulesReady, usableValues, previewSchema])
+  }, [rows, rowStates, ruleVariables, rulesReady, usableValues, previewSchema, t])
 
   const hasValues = usableValues.length > 0
 
   const serviceItems = services.data?.items ?? []
   const selectedService = serviceItems.find(a => a.id === serviceId)
   const sampleCount = buildServerSamples(timestamp).length
-  const title = `${serverMode ? 'Test submission' : 'Preview'}: ${schema.label || schema.name || 'Untitled schema'}`
+  const title = t(serverMode
+    ? 'schemasSubmissions.preview.testTitle'
+    : 'schemasSubmissions.preview.previewTitle', {
+    name: schema.label || schema.name || t('schemasSubmissions.common.untitledSchema'),
+  })
 
   return (
     <Dialog open={open} onOpenChange={(_, d) => { if (!d.open) onClose() }}>
       <DialogSurface className={s.surface}>
         <DialogBody className={s.body}>
           <DialogTitle
-            action={<Button appearance="subtle" aria-label="Close" icon={<Dismiss24Regular />} onClick={onClose} />}
+            action={<Button appearance="subtle" aria-label={t('schemasSubmissions.common.close')} icon={<Dismiss24Regular />} onClick={onClose} />}
           >
             {title}
           </DialogTitle>
@@ -251,20 +258,15 @@ export function SchemaPreviewDialog({
             {serverMode ? (
               <MessageBar intent="info">
                 <MessageBarBody>
-                  <MessageBarTitle>Test submission</MessageBarTitle>
-                  Runs the real server validation as the chosen service — including cadence duplicates,
-                  history rules, and the would-be approval state — without saving anything. Fill in the form,
-                  pick a service, then <strong>Validate</strong>.
+                  <MessageBarTitle>{t('schemasSubmissions.preview.testHeading')}</MessageBarTitle>
+                  {t('schemasSubmissions.preview.testHelp')}
                 </MessageBarBody>
               </MessageBar>
             ) : (
               <MessageBar intent="info">
                 <MessageBarBody>
-                  <MessageBarTitle>Best-effort preview</MessageBarTitle>
-                  This renders the form and evaluates rules <strong>in your browser</strong> against the
-                  unsaved schema. The server stays authoritative — some semantics differ here
-                  (regex dialect, and helpers like <code>sampleTimestamp()</code>/<code>serviceName()</code> aren&apos;t
-                  available client-side), so always confirm with a real submission or the API before relying on a rule.
+                  <MessageBarTitle>{t('schemasSubmissions.preview.bestEffortHeading')}</MessageBarTitle>
+                  {t('schemasSubmissions.preview.bestEffortHelp')}
                 </MessageBarBody>
               </MessageBar>
             )}
@@ -272,8 +274,7 @@ export function SchemaPreviewDialog({
             {skipped.length > 0 && (
               <MessageBar intent="warning">
                 <MessageBarBody>
-                  Skipped {skipped.length} value{skipped.length === 1 ? '' : 's'} with a blank or duplicate
-                  name: {skipped.join(', ')}. Give every value a unique name to preview it.
+                  {t('schemasSubmissions.preview.skippedValues', { count: skipped.length, names: skipped.join(', ') })}
                 </MessageBarBody>
               </MessageBar>
             )}
@@ -281,9 +282,11 @@ export function SchemaPreviewDialog({
             {serverMode && hasValues && (
               <Card className={s.formCard}>
                 <div className={s.serverControls}>
-                  <Field label="Validate as service" required className={s.serverControlField}>
+                  <Field label={t('schemasSubmissions.preview.validateAsService')} required className={s.serverControlField}>
                     <Dropdown
-                      placeholder={services.isLoading ? 'Loading services...' : 'Select a service'}
+                      placeholder={services.isLoading
+                        ? t('schemasSubmissions.preview.loadingServices')
+                        : t('schemasSubmissions.preview.selectService')}
                       value={selectedService ? (selectedService.label || selectedService.name) : ''}
                       selectedOptions={serviceId ? [serviceId] : []}
                       onOptionSelect={(_, d) => setServiceId(d.optionValue)}
@@ -295,8 +298,8 @@ export function SchemaPreviewDialog({
                       ))}
                     </Dropdown>
                   </Field>
-                  <Field label="Sample timestamp" className={s.serverControlField}
-                    hint="Used for every sample and any date/cadence/history rules.">
+                  <Field label={t('schemasSubmissions.preview.sampleTimestamp')} className={s.serverControlField}
+                    hint={t('schemasSubmissions.preview.timestampServerHint')}>
                     <Input
                       type="datetime-local"
                       value={toLocalInput(timestamp)}
@@ -305,29 +308,29 @@ export function SchemaPreviewDialog({
                   </Field>
                 </div>
                 <Checkbox
-                  label="Skip cadence (one-per-period) checks"
+                  label={t('schemasSubmissions.preview.skipCadence')}
                   checked={skipCadence}
                   onChange={(_, d) => setSkipCadence(!!d.checked)}
                 />
                 <Text className={s.muted}>
                   {sampleCount === 0
-                    ? 'No filled values yet — fill in the form below first.'
-                    : `${sampleCount} value${sampleCount === 1 ? '' : 's'} will be validated. The schema must be saved and visible to the chosen service.`}
+                    ? t('schemasSubmissions.preview.noFilledValues')
+                    : t('schemasSubmissions.preview.validationCount', { count: sampleCount })}
                 </Text>
               </Card>
             )}
 
             {!hasValues ? (
               <MessageBar intent="warning">
-                <MessageBarBody>This schema has no usable values to preview yet. Add a value first.</MessageBarBody>
+                <MessageBarBody>{t('schemasSubmissions.preview.noUsableValues')}</MessageBarBody>
               </MessageBar>
             ) : (
               <div className={s.grid}>
                 <div className={s.formCol}>
                   <Card className={s.formCard}>
                     {!serverMode && (
-                      <Field label="Sample timestamp" className={s.pickerRow}
-                        hint="Used for the samples and any date-based rules that read a Date value.">
+                      <Field label={t('schemasSubmissions.preview.sampleTimestamp')} className={s.pickerRow}
+                        hint={t('schemasSubmissions.preview.timestampPreviewHint')}>
                         <Input
                           type="datetime-local"
                           value={toLocalInput(timestamp)}
@@ -347,23 +350,23 @@ export function SchemaPreviewDialog({
 
                 <div className={s.resultsCol}>
                   <Card className={s.resultsCard}>
-                    <span className={s.resultsTitle}>Validation results</span>
+                    <span className={s.resultsTitle}>{t('schemasSubmissions.preview.validationResults')}</span>
                     {findings.length === 0 ? (
                       <div className={s.okBanner}>
                         <CheckmarkCircle20Regular />
-                        <span>No problems with the current values.</span>
+                        <span>{t('schemasSubmissions.preview.noProblems')}</span>
                       </div>
                     ) : (
                       <FindingGroupList findings={findings} styles={s} />
                     )}
                     <Text className={s.muted}>
-                      Conditional display (hide/grey) and inline warnings appear on the form to the left.
+                      {t('schemasSubmissions.preview.conditionalHelp')}
                     </Text>
 
                     {serverMode && (serverError || serverResult) && (
                       <>
                         <Divider />
-                        <span className={s.resultsTitle}>Server validation</span>
+                        <span className={s.resultsTitle}>{t('schemasSubmissions.preview.serverValidation')}</span>
                         {serverError && (
                           <MessageBar intent="error">
                             <MessageBarBody style={{ whiteSpace: 'pre-line' }}>{serverError}</MessageBarBody>
@@ -379,9 +382,9 @@ export function SchemaPreviewDialog({
           </DialogContent>
           <DialogActions className={s.actions}>
             {hasValues && (
-              <Button appearance="secondary" onClick={resetValues}>Reset values</Button>
+              <Button appearance="secondary" onClick={resetValues}>{t('schemasSubmissions.preview.resetValues')}</Button>
             )}
-            <Button appearance="secondary" onClick={onClose}>Close</Button>
+            <Button appearance="secondary" onClick={onClose}>{t('schemasSubmissions.common.close')}</Button>
             {serverMode && hasValues && (
               <Button
                 appearance="primary"
@@ -389,7 +392,7 @@ export function SchemaPreviewDialog({
                 disabled={!serviceId || validate.isPending}
                 onClick={runServer}
               >
-                Validate
+                {t('schemasSubmissions.preview.validate')}
               </Button>
             )}
           </DialogActions>
@@ -399,14 +402,14 @@ export function SchemaPreviewDialog({
   )
 }
 
-const scopeLabels: Record<Finding['scope'], string> = {
-  required: 'Missing required',
-  shape: 'Shape checks',
-  value: 'Value validation',
-  schema: 'Schema-level validation',
-}
-
 function FindingGroupList({ findings, styles }: { findings: Finding[]; styles: ReturnType<typeof useStyles> }) {
+  const { t } = useTranslation()
+  const scopeLabels: Record<Finding['scope'], string> = {
+    required: t('schemasSubmissions.preview.scopes.required'),
+    shape: t('schemasSubmissions.preview.scopes.shape'),
+    value: t('schemasSubmissions.preview.scopes.value'),
+    schema: t('schemasSubmissions.preview.scopes.schema'),
+  }
   // Group by scope so the panel reads "Missing required → Shape → Value → Schema", matching the
   // order the server evaluates them in.
   const order: Finding['scope'][] = ['required', 'shape', 'value', 'schema']
@@ -438,24 +441,27 @@ function FindingGroupList({ findings, styles }: { findings: Finding[]; styles: R
 
 /** Render the server's dry-run verdict: validity headline, would-be approval, then errors/warnings/discards. */
 function ServerVerdict({ result, styles }: { result: SubmissionValidationResponse; styles: ReturnType<typeof useStyles> }) {
+  const { t } = useTranslation()
+  const errors = localizeDiagnostics(result.errorDetails, result.errors)
+  const warnings = localizeDiagnostics(result.warningDetails, result.warnings)
   const approvalNote = result.approvalStatus === 'Pending'
-    ? `Would be held for approval (${result.requiredApprovers.length} approver${result.requiredApprovers.length === 1 ? '' : 's'} required).`
-    : 'Would be accepted immediately (no approval required).'
+    ? t('schemasSubmissions.preview.server.heldForApproval', { count: result.requiredApprovers.length })
+    : t('schemasSubmissions.preview.server.acceptedImmediately')
 
   return (
     <div className={styles.serverResults}>
       {result.valid ? (
         <div className={styles.okBanner}>
           <CheckmarkCircle20Regular />
-          <span>Valid — a real submission would be accepted.</span>
+          <span>{t('schemasSubmissions.preview.server.valid')}</span>
         </div>
       ) : (
-        <Badge appearance="tint" color="danger">Invalid — {result.errors.length} error{result.errors.length === 1 ? '' : 's'}</Badge>
+        <Badge appearance="tint" color="danger">{t('schemasSubmissions.preview.server.invalid', { count: errors.length })}</Badge>
       )}
 
-      {result.errors.length > 0 && (
+      {errors.length > 0 && (
         <ul className={styles.serverList}>
-          {result.errors.map((e, i) => (
+          {errors.map((e, i) => (
             <li key={i} className={styles.finding}>
               <Warning20Regular className={styles.findingFail} />
               <span>{e}</span>
@@ -464,11 +470,11 @@ function ServerVerdict({ result, styles }: { result: SubmissionValidationRespons
         </ul>
       )}
 
-      {result.warnings.length > 0 && (
+      {warnings.length > 0 && (
         <>
-          <Badge appearance="tint" color="warning" size="small">Warnings</Badge>
+          <Badge appearance="tint" color="warning" size="small">{t('schemasSubmissions.common.warnings')}</Badge>
           <ul className={styles.serverList}>
-            {result.warnings.map((w, i) => (
+            {warnings.map((w, i) => (
               <li key={i} className={styles.finding}>
                 <Warning20Regular className={styles.findingOk} />
                 <span>{w}</span>
@@ -480,7 +486,9 @@ function ServerVerdict({ result, styles }: { result: SubmissionValidationRespons
 
       {result.discardedSamples.length > 0 && (
         <Text className={styles.muted}>
-          Discarded by EnabledIf/VisibleIf: {result.discardedSamples.map(d => d.valueName).join(', ')}.
+          {t('schemasSubmissions.preview.server.discarded', {
+            names: result.discardedSamples.map(d => d.valueName).join(', '),
+          })}
         </Text>
       )}
 
@@ -494,35 +502,35 @@ function ServerVerdict({ result, styles }: { result: SubmissionValidationRespons
  * is evaluated with the JS engine (dialect may differ from .NET), and we only flag what we can be
  * reasonably confident about. Conditional-display and required checks are handled by the caller.
  */
-function shapeProblems(def: SchemaValue, value: unknown): string[] {
+function shapeProblems(def: SchemaValue, value: unknown, t: TFunction): string[] {
   const problems: string[] = []
   if (def.type === 'Integer' || def.type === 'Number') {
     const n = typeof value === 'number' ? value : Number(value)
     if (Number.isNaN(n)) {
-      problems.push('value is not a number')
+      problems.push(t('schemasSubmissions.preview.shape.notNumber'))
     } else {
-      if (def.type === 'Integer' && !Number.isInteger(n)) problems.push('value must be a whole number')
-      if (def.min != null && n < def.min) problems.push(`below the minimum of ${def.min}`)
-      if (def.max != null && n > def.max) problems.push(`above the maximum of ${def.max}`)
+      if (def.type === 'Integer' && !Number.isInteger(n)) problems.push(t('schemasSubmissions.preview.shape.wholeNumber'))
+      if (def.min != null && n < def.min) problems.push(t('schemasSubmissions.preview.shape.belowMinimum', { value: def.min }))
+      if (def.max != null && n > def.max) problems.push(t('schemasSubmissions.preview.shape.aboveMaximum', { value: def.max }))
     }
   } else if (def.type === 'String') {
     const str = String(value)
-    if (def.minLength != null && str.length < def.minLength) problems.push(`shorter than the minimum length of ${def.minLength}`)
-    if (def.maxLength != null && str.length > def.maxLength) problems.push(`longer than the maximum length of ${def.maxLength}`)
+    if (def.minLength != null && str.length < def.minLength) problems.push(t('schemasSubmissions.preview.shape.shorter', { value: def.minLength }))
+    if (def.maxLength != null && str.length > def.maxLength) problems.push(t('schemasSubmissions.preview.shape.longer', { value: def.maxLength }))
     if (def.regexPattern && def.regexPattern.trim()) {
       try {
-        if (!new RegExp(def.regexPattern).test(str)) problems.push(`does not match the pattern ${def.regexPattern}`)
+        if (!new RegExp(def.regexPattern).test(str)) problems.push(t('schemasSubmissions.preview.shape.pattern', { value: def.regexPattern }))
       } catch {
-        problems.push('regex pattern could not be evaluated in the browser (will be checked on the server)')
+        problems.push(t('schemasSubmissions.preview.shape.regexBrowser'))
       }
     }
   } else if (def.type === 'Date') {
     const d = typeof value === 'string' ? new Date(value) : null
     if (!d || Number.isNaN(d.getTime())) {
-      problems.push('value is not a valid date')
+      problems.push(t('schemasSubmissions.preview.shape.invalidDate'))
     } else {
-      if (def.minDate) { const min = new Date(def.minDate); if (!Number.isNaN(min.getTime()) && d < min) problems.push(`earlier than ${def.minDate}`) }
-      if (def.maxDate) { const max = new Date(def.maxDate); if (!Number.isNaN(max.getTime()) && d > max) problems.push(`later than ${def.maxDate}`) }
+      if (def.minDate) { const min = new Date(def.minDate); if (!Number.isNaN(min.getTime()) && d < min) problems.push(t('schemasSubmissions.preview.shape.earlier', { value: def.minDate })) }
+      if (def.maxDate) { const max = new Date(def.maxDate); if (!Number.isNaN(max.getTime()) && d > max) problems.push(t('schemasSubmissions.preview.shape.later', { value: def.maxDate })) }
     }
   }
   return problems

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -70,15 +71,41 @@ public sealed class AccountsBackupController(IAccountService accounts, IAuditLog
         }
         catch (JsonException ex)
         {
-            return BadRequest($"Invalid accounts file: {ex.Message}");
+            var message = $"Invalid accounts file: {ex.Message}";
+            return BadRequest(DiagnosticProblem.BadRequest(
+                Diagnostic.Create(
+                    DiagnosticCodes.Imports.AccountFileInvalidJson,
+                    message,
+                    ("detail", ex.Message),
+                    ("fileType", "accounts")),
+                "Invalid accounts file",
+                message));
         }
 
         if (file is null || !string.Equals(file.Format, Marker, StringComparison.Ordinal))
-            return BadRequest("This file is not an Ingest accounts export.");
+        {
+            const string message = "This file is not an Ingest accounts export.";
+            return BadRequest(DiagnosticProblem.BadRequest(Diagnostic.Create(
+                DiagnosticCodes.Imports.AccountFileMarker,
+                message,
+                ("expectedFormat", Marker),
+                ("actualFormat", file?.Format))));
+        }
         if (file.Version != CurrentVersion)
-            return BadRequest($"Unsupported accounts file version {file.Version}; this server expects version {CurrentVersion}.");
+        {
+            var message = $"Unsupported accounts file version {file.Version}; this server expects version {CurrentVersion}.";
+            return BadRequest(DiagnosticProblem.BadRequest(Diagnostic.Create(
+                DiagnosticCodes.Imports.AccountFileVersion,
+                message,
+                ("actualVersion", file.Version),
+                ("expectedVersion", CurrentVersion))));
+        }
         if (file.Accounts is null || file.Accounts.Count == 0)
-            return BadRequest("The accounts file contains no accounts.");
+        {
+            const string message = "The accounts file contains no accounts.";
+            return BadRequest(DiagnosticProblem.BadRequest(
+                new Diagnostic(DiagnosticCodes.Imports.AccountFileEmpty, message)));
+        }
 
         var result = await accounts.ImportAsync(file.Accounts.Select(a => a.ToEntry()).ToList(), ct);
         await audit.RecordAsync(

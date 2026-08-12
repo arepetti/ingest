@@ -1,4 +1,5 @@
 using Ingest.Core.Entities;
+using Ingest.Core.Common;
 
 namespace Ingest.Core.Abstractions;
 
@@ -44,4 +45,12 @@ public sealed record AccountBackupLogin(string Provider, string Email);
 /// <param name="Created">Number of accounts created.</param>
 /// <param name="Updated">Number of existing accounts updated.</param>
 /// <param name="Errors">Human-readable, per-account errors for entries that were skipped.</param>
-public sealed record AccountsImportResult(int Created, int Updated, IReadOnlyList<string> Errors);
+public sealed record AccountsImportResult(int Created, int Updated, IReadOnlyList<string> Errors)
+{
+    /// <summary>Structured counterparts to <see cref="Errors"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> ErrorDetails { get; init; } =
+        Errors.Select(x => Diagnostic.Create(
+            DiagnosticCodes.Imports.AccountEntry,
+            x,
+            ("domain", "accounts"))).ToList();
+}

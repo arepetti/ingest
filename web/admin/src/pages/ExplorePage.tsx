@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
   Dropdown, MessageBarBody, Option, Tab, TabList,
@@ -9,18 +10,18 @@ import {
   ArrowClockwise20Regular, ArrowDownload20Regular, Image20Regular, Info16Regular, MoreHorizontal20Regular,
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
-import { PeriodFilter } from '../components/PeriodFilter'
+import { AnalyticsPeriodFilter } from './analytics/AnalyticsPeriodFilter'
 import { ExplorePresets } from '../components/ExplorePresets'
 import { formatApiError } from '../api/client'
 import { useAccounts, useCapabilities, useEvents, useExploreAnomalies, useExploreScorecard, useExploreSeries, useSchemas } from '../api/hooks'
 import type { Account, ExploreAggregation, ExploreValueSeries, Schema, SchemaValue } from '../api/types'
-import { intervalRange, shiftIso, SHIFT_LABELS, type Interval, type ShiftKey } from '../utils/period'
+import { intervalRange, shiftIso, type Interval, type ShiftKey } from '../utils/period'
 import type { PeriodFilterState } from '../utils/usePeriodFilter'
 import { buildCsv } from '../utils/csv'
 import { downloadText } from '../utils/download'
 import { exportChartPng } from '../utils/chartExport'
 import {
-  AGG_LABELS, AGGREGATIONS, ANOMALY_THRESHOLD_DEFAULT, ANOMALY_WINDOW_DEFAULT,
+  aggregationLabel, AGGREGATIONS, ANOMALY_THRESHOLD_DEFAULT, ANOMALY_WINDOW_DEFAULT,
   buildExportRows, label, useExploreStyles,
   type ExploreView, type OuterTab,
 } from './explore/shared'
@@ -38,6 +39,7 @@ const SHIFTS: ShiftKey[] = ['1m', '6m', '1y']
  */
 export function ExplorePage() {
   const s = useExploreStyles()
+  const { t } = useTranslation()
   const [sp, setSp] = useSearchParams()
 
   // URL is the single source of truth so a filtered view is shareable by copying the address bar.
@@ -214,8 +216,8 @@ export function ExplorePage() {
   const exportCsv = () => {
     try {
       if (!series.data) return
-      const { headers, rows, name } = buildExportRows(view, series.data.values, activeSeries, seriesServices, agg, seriesAnomaly, combined)
-      if (rows.length === 0) { setExportError('Nothing to export for this view yet.'); return }
+      const { headers, rows, name } = buildExportRows(view, series.data.values, activeSeries, seriesServices, agg, t, seriesAnomaly, combined)
+      if (rows.length === 0) { setExportError(t('analytics.explore.errors.nothingToExport')); return }
       downloadText(`explore-${schemaName}-${name}.csv`, buildCsv(headers, rows), 'text/csv;charset=utf-8')
     } catch (e) {
       setExportError(formatApiError(e))
@@ -235,7 +237,7 @@ export function ExplorePage() {
   return (
     <div className={s.root}>
       <div className={s.header}>
-        <Title2>Explore</Title2>
+        <Title2>{t('analytics.explore.title')}</Title2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <ExplorePresets
             current={sp.toString()}
@@ -243,17 +245,17 @@ export function ExplorePage() {
           />
           <Menu>
             <MenuTrigger disableButtonEnhancement>
-              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('analytics.common.moreActions')} />
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
-                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => { if (isScorecard) scorecard.refetch(); else if (isAnomalies) anomalies.refetch(); else { series.refetch(); if (eventsEnabled) events.refetch() } }}>Refresh</MenuItem>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => { if (isScorecard) scorecard.refetch(); else if (isAnomalies) anomalies.refetch(); else { series.refetch(); if (eventsEnabled) events.refetch() } }}>{t('analytics.common.refresh')}</MenuItem>
                 {isAnalysis && (
                   <>
                     <MenuDivider />
-                    <MenuItem icon={<ArrowDownload20Regular />} disabled={!series.data} onClick={exportCsv}>Export CSV (this view)</MenuItem>
+                    <MenuItem icon={<ArrowDownload20Regular />} disabled={!series.data} onClick={exportCsv}>{t('analytics.explore.actions.exportCsv')}</MenuItem>
                     {view !== 'snapshot' && (
-                      <MenuItem icon={<Image20Regular />} disabled={!series.data} onClick={exportPng}>Export chart (PNG)</MenuItem>
+                      <MenuItem icon={<Image20Regular />} disabled={!series.data} onClick={exportPng}>{t('analytics.explore.actions.exportPng')}</MenuItem>
                     )}
                   </>
                 )}
@@ -264,9 +266,9 @@ export function ExplorePage() {
       </div>
 
       <TabList selectedValue={tab} onTabSelect={(_, d) => update({ tab: d.value as string })}>
-        <Tab value="scorecard">Scorecard</Tab>
-        <Tab value="analysis">Analysis</Tab>
-        <Tab value="anomalies">Anomalies</Tab>
+        <Tab value="scorecard">{t('analytics.explore.tabs.scorecard')}</Tab>
+        <Tab value="analysis">{t('analytics.explore.tabs.analysis')}</Tab>
+        <Tab value="anomalies">{t('analytics.explore.tabs.anomalies')}</Tab>
       </TabList>
 
       {(schemas.error || (isScorecard ? scorecard.error : isAnomalies ? anomalies.error : series.error)) && (
@@ -281,12 +283,12 @@ export function ExplorePage() {
       <div className={s.filters}>
         {isAnalysis && (
           <div className={s.field}>
-            <span className={s.fieldLabel}>Schema</span>
+            <span className={s.fieldLabel}>{t('analytics.common.schema')}</span>
             <Dropdown
               className={s.dropdown}
               selectedOptions={schemaName ? [schemaName] : []}
               value={schema ? label(schema) : ''}
-              placeholder="Select a schema"
+              placeholder={t('analytics.explore.filters.selectSchema')}
               onOptionSelect={(_, d) => update({ schema: d.optionValue ?? null, value: null })}
             >
               {schemaList.map(x => <Option key={x.name} value={x.name}>{label(x)}</Option>)}
@@ -297,20 +299,22 @@ export function ExplorePage() {
         {isAnomalies && (
           <div className={s.field}>
             <span className={s.fieldLabel}>
-              Schemas
+              {t('analytics.explore.filters.schemas')}
               <FluentTooltip
                 relationship="description"
-                content="Which schemas to scan for anomalies. Leave empty to scan every schema with numeric values."
+                content={t('analytics.explore.help.schemas')}
               >
-                <Info16Regular className={s.infoIcon} tabIndex={0} aria-label="What does Schemas do?" />
+                <Info16Regular className={s.infoIcon} tabIndex={0} aria-label={t('analytics.explore.help.schemasAria')} />
               </FluentTooltip>
             </span>
             <Dropdown
               className={s.dropdown}
               multiselect
               selectedOptions={anomalySchemaNames}
-              value={anomalySchemaNames.length === 0 ? 'All schemas' : `${anomalySchemaNames.length} selected`}
-              placeholder="All schemas"
+              value={anomalySchemaNames.length === 0
+                ? t('analytics.explore.filters.allSchemas')
+                : t('analytics.common.selectedCount', { count: anomalySchemaNames.length })}
+              placeholder={t('analytics.explore.filters.allSchemas')}
               onOptionSelect={(_, d) => d.optionValue && toggleAnomalySchema(d.optionValue)}
             >
               {schemaList.map(x => <Option key={x.name} value={x.name}>{label(x)}</Option>)}
@@ -320,12 +324,12 @@ export function ExplorePage() {
 
         {view !== 'snapshot' && isAnalysis && (
           <div className={s.field}>
-            <span className={s.fieldLabel}>Value</span>
+            <span className={s.fieldLabel}>{t('analytics.explore.filters.value')}</span>
             <Dropdown
               className={s.dropdown}
               selectedOptions={activeValueName ? [activeValueName] : []}
               value={numericValues.find(v => v.name === activeValueName)?.label || activeValueName}
-              placeholder="Select a value"
+              placeholder={t('analytics.explore.filters.selectValue')}
               disabled={numericValues.length === 0}
               onOptionSelect={(_, d) => update({ value: d.optionValue ?? null })}
             >
@@ -335,13 +339,15 @@ export function ExplorePage() {
         )}
 
         <div className={s.field}>
-          <span className={s.fieldLabel}>Services</span>
+          <span className={s.fieldLabel}>{t('analytics.common.services')}</span>
           <Dropdown
             className={s.dropdown}
             multiselect
             selectedOptions={selectedServiceIds}
-            value={selectedServiceIds.length === 0 ? 'All services' : `${selectedServiceIds.length} selected`}
-            placeholder="All services"
+            value={selectedServiceIds.length === 0
+              ? t('analytics.common.allServices')
+              : t('analytics.common.selectedCount', { count: selectedServiceIds.length })}
+            placeholder={t('analytics.common.allServices')}
             onOptionSelect={(_, d) => d.optionValue && toggleService(d.optionValue)}
           >
             {serviceAccounts.map(a => <Option key={a.id} value={a.id}>{label(a)}</Option>)}
@@ -351,37 +357,37 @@ export function ExplorePage() {
         {isScorecard && (
           <div className={s.field}>
             <span className={s.fieldLabel}>
-              Show
+              {t('analytics.explore.filters.show')}
               <FluentTooltip
                 relationship="description"
-                content="Latest available shows each service's most recent submission, however old. Last period shows a single period and marks services that didn't submit it as grey 'no submission' cards."
+                content={t('analytics.explore.help.show')}
               >
-                <Info16Regular className={s.infoIcon} tabIndex={0} aria-label="What does Show do?" />
+                <Info16Regular className={s.infoIcon} tabIndex={0} aria-label={t('analytics.explore.help.showAria')} />
               </FluentTooltip>
             </span>
             <Dropdown
               className={s.dropdown}
               selectedOptions={[scMode]}
-              value={scMode === 'period' ? 'Last period' : 'Latest available'}
+              value={scMode === 'period' ? t('analytics.explore.filters.lastPeriod') : t('analytics.explore.filters.latestAvailable')}
               onOptionSelect={(_, d) => update({ scmode: d.optionValue === 'period' ? 'period' : null })}
             >
-              <Option value="latest">Latest available</Option>
-              <Option value="period">Last period</Option>
+              <Option value="latest">{t('analytics.explore.filters.latestAvailable')}</Option>
+              <Option value="period">{t('analytics.explore.filters.lastPeriod')}</Option>
             </Dropdown>
           </div>
         )}
 
         {isScorecard && scMode === 'period' && (
           <div className={s.field}>
-            <span className={s.fieldLabel}>Period</span>
+            <span className={s.fieldLabel}>{t('analytics.common.period')}</span>
             <Dropdown
               className={s.dropdown}
               selectedOptions={[scPeriod]}
-              value={scPeriod === 'closed' ? 'Latest closed' : 'Current'}
+              value={scPeriod === 'closed' ? t('analytics.explore.filters.latestClosed') : t('analytics.explore.filters.current')}
               onOptionSelect={(_, d) => update({ scperiod: d.optionValue === 'closed' ? 'closed' : null })}
             >
-              <Option value="current">Current</Option>
-              <Option value="closed">Latest closed</Option>
+              <Option value="current">{t('analytics.explore.filters.current')}</Option>
+              <Option value="closed">{t('analytics.explore.filters.latestClosed')}</Option>
             </Dropdown>
           </div>
         )}
@@ -389,36 +395,36 @@ export function ExplorePage() {
         {isAnalysis && (
           <div className={s.field}>
             <span className={s.fieldLabel}>
-              Aggregation
+              {t('analytics.explore.filters.aggregation')}
               <FluentTooltip
                 relationship="description"
-                content="How the samples that fall in each period are reduced to one number — and how several services are combined into the overall figure. Average is count-weighted; Sample count just tallies how many were submitted."
+                content={t('analytics.explore.help.aggregation')}
               >
-                <Info16Regular className={s.infoIcon} tabIndex={0} aria-label="What does Aggregation do?" />
+                <Info16Regular className={s.infoIcon} tabIndex={0} aria-label={t('analytics.explore.help.aggregationAria')} />
               </FluentTooltip>
             </span>
             <Dropdown
               className={s.dropdown}
               selectedOptions={[agg]}
-              value={AGG_LABELS[agg]}
+              value={aggregationLabel(agg, t)}
               onOptionSelect={(_, d) => update({ agg: (d.optionValue as ExploreAggregation) ?? null })}
             >
-              {AGGREGATIONS.map(a => <Option key={a} value={a}>{AGG_LABELS[a]}</Option>)}
+              {AGGREGATIONS.map(a => <Option key={a} value={a}>{aggregationLabel(a, t)}</Option>)}
             </Dropdown>
           </div>
         )}
 
         {isAnomalies && (
           <div className={s.field}>
-            <span className={s.fieldLabel}>Period</span>
+            <span className={s.fieldLabel}>{t('analytics.common.period')}</span>
             <Dropdown
               className={s.dropdown}
               selectedOptions={[anomalyPeriod]}
-              value={anomalyPeriod === 'closed' ? 'Latest closed' : 'Current'}
+              value={anomalyPeriod === 'closed' ? t('analytics.explore.filters.latestClosed') : t('analytics.explore.filters.current')}
               onOptionSelect={(_, d) => update({ aperiod: d.optionValue === 'closed' ? 'closed' : null })}
             >
-              <Option value="current">Current</Option>
-              <Option value="closed">Latest closed</Option>
+              <Option value="current">{t('analytics.explore.filters.current')}</Option>
+              <Option value="closed">{t('analytics.explore.filters.latestClosed')}</Option>
             </Dropdown>
           </div>
         )}
@@ -440,28 +446,28 @@ export function ExplorePage() {
 
       {isAnalysis && (
         <div className={s.filters}>
-          <PeriodFilter state={periodState} />
+          <AnalyticsPeriodFilter state={periodState} />
 
           {view === 'trend' && (
             <div className={s.field}>
               <span className={s.fieldLabel}>
-                Compare with previous
+                {t('analytics.explore.filters.comparePrevious')}
                 <FluentTooltip
                   relationship="description"
-                  content="Overlay the same selection shifted back in time so you can read this period against an earlier one. Needs a Period range (not All time); the two windows may overlap."
+                  content={t('analytics.explore.help.comparePrevious')}
                 >
-                  <Info16Regular className={s.infoIcon} tabIndex={0} aria-label="What does Compare do?" />
+                  <Info16Regular className={s.infoIcon} tabIndex={0} aria-label={t('analytics.explore.help.compareAria')} />
                 </FluentTooltip>
               </span>
               <Dropdown
                 className={s.dropdown}
                 disabled={!canCompare}
                 selectedOptions={[comparing ? shift : 'off']}
-                value={comparing ? SHIFT_LABELS[shift as ShiftKey] : 'No'}
+                value={comparing ? t(`analytics.explore.shifts.${shift}`) : t('analytics.common.no')}
                 onOptionSelect={(_, d) => update({ shift: d.optionValue && d.optionValue !== 'off' ? d.optionValue : null })}
               >
-                <Option value="off">No</Option>
-                {SHIFTS.map(k => <Option key={k} value={k}>{SHIFT_LABELS[k]}</Option>)}
+                <Option value="off">{t('analytics.common.no')}</Option>
+                {SHIFTS.map(k => <Option key={k} value={k}>{t(`analytics.explore.shifts.${k}`)}</Option>)}
               </Dropdown>
             </div>
           )}
@@ -475,9 +481,9 @@ export function ExplorePage() {
           selectedValue={view}
           onTabSelect={(_, d) => update({ view: d.value as string })}
         >
-          <Tab value="trend">Trend</Tab>
-          <Tab value="compare">Compare services</Tab>
-          <Tab value="snapshot">Snapshot</Tab>
+          <Tab value="trend">{t('analytics.explore.views.trend')}</Tab>
+          <Tab value="compare">{t('analytics.explore.views.compare')}</Tab>
+          <Tab value="snapshot">{t('analytics.explore.views.snapshot')}</Tab>
         </TabList>
       )}
 
@@ -520,7 +526,7 @@ export function ExplorePage() {
           asTable={asTable}
           projecting={projecting}
           comparing={comparing}
-          previousLabel={comparing ? SHIFT_LABELS[shift as ShiftKey] : undefined}
+          previousLabel={comparing ? t(`analytics.explore.shifts.${shift}`) : undefined}
           chartRef={chartRef}
           events={events.data?.items ?? []}
           canShowEvents={canShowEvents}

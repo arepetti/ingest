@@ -58,7 +58,7 @@ public sealed class AdminEmailController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSettings(CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("email"));
         return Ok(EmailSettingsDto.From(await _settings.GetAsync(ct)));
     }
 
@@ -73,7 +73,7 @@ public sealed class AdminEmailController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateSettings([FromBody] UpdateEmailSettingsRequest req, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("email"));
         var updated = await _settings.UpdateAsync(
             new EmailSettingsUpdate(req.Host, req.Port, req.UseStartTls, req.Username, req.FromAddress, req.FromName, req.UpdatePassword, req.Password), ct);
         await _audit.RecordAsync(AuditTargetType.Settings, AuditChangeType.Edit, AuditTargets.EmailSettings, "Email server (SMTP)", ct);
@@ -88,7 +88,7 @@ public sealed class AdminEmailController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ListTemplates(CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("email"));
         var list = await _templates.ListAsync(ct);
         return Ok(list.Select(EmailTemplateDto.From).ToList());
     }
@@ -101,7 +101,7 @@ public sealed class AdminEmailController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetTemplate(string key, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("email"));
         return Ok(EmailTemplateDto.From(await _templates.GetAsync(key, ct)));
     }
 
@@ -116,7 +116,7 @@ public sealed class AdminEmailController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateTemplate(string key, [FromBody] UpdateEmailTemplateRequest req, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("email"));
         var updated = await _templates.UpdateAsync(key,
             new EmailTemplateUpdate(req.Name, req.Description, req.Subject, req.HtmlBody, req.TextBody), ct);
         await _audit.RecordAsync(AuditTargetType.Settings, AuditChangeType.Edit, updated.Id, $"Email template: {updated.Name}", ct);
@@ -133,7 +133,7 @@ public sealed class AdminEmailController : ControllerBase
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] EmailStatus? status,
         [FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("email"));
         var result = await _queue.ListAsync(RequestHelpers.ToPageRequest(page, pageSize, null, false), status, from, to, ct);
         return Ok(result.Map(EmailMessageDto.From));
     }
@@ -147,7 +147,7 @@ public sealed class AdminEmailController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Drain([FromQuery] int? max, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("email"));
         return Ok(await _dispatch.DrainAsync(max ?? 50, ct));
     }
 
@@ -165,13 +165,24 @@ public sealed class AdminEmailController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Send([FromBody] SendAdhocEmailRequest req, CancellationToken ct)
     {
-        if (!_enabled) return NotFound();
+        if (!_enabled) return NotFound(DiagnosticProblem.FeatureDisabled("email"));
 
         var account = await _accounts.GetAsync(req.AccountId, false, ct);
-        if (account is null) return NotFound();
+        if (account is null) return NotFound(DiagnosticProblem.NotFound("Account", req.AccountId));
         if (string.IsNullOrWhiteSpace(account.Email))
-            throw new ValidationException(new[] { $"Account '{account.Name}' has no contact email set." });
-        if (string.IsNullOrWhiteSpace(req.Subject)) throw new ValidationException(new[] { "Subject is required." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Email.AccountContactMissing,
+                    $"Account '{account.Name}' has no contact email set.",
+                    ("accountId", account.Id),
+                    ("accountName", account.Name)),
+            });
+        if (string.IsNullOrWhiteSpace(req.Subject))
+            throw new ValidationException(new[]
+            {
+                new Diagnostic(DiagnosticCodes.Email.SubjectRequired, "Subject is required."),
+            });
 
         var id = await _queue.EnqueueAsync(new EmailRequest(
             account.Email, account.Label ?? account.Name, req.Subject, req.Body ?? "",

@@ -100,7 +100,10 @@ public sealed class CommentsService : ICommentsService
         var thread = await GetRawThreadOrThrowAsync(threadId, ct);
 
         if (thread.Resolved)
-            throw new ConflictException("This thread is resolved — reopen it to add another comment.");
+            throw new ConflictException(Diagnostic.Create(
+                DiagnosticCodes.Comments.ThreadResolved,
+                "This thread is resolved — reopen it to add another comment.",
+                ("threadId", threadId)));
 
         var now = _auditContext.UtcNow;
         var comment = NewComment(normalizedText, now);
@@ -122,7 +125,12 @@ public sealed class CommentsService : ICommentsService
             ?? throw new NotFoundException("Comment");
 
         if (!callerCanManageAny && comment.CreatedByAccountId != callerAccountId)
-            throw new ForbiddenException("You can only edit your own comments.");
+            throw new ForbiddenException(Diagnostic.Create(
+                DiagnosticCodes.Comments.EditForbidden,
+                "You can only edit your own comments.",
+                ("commentId", commentId),
+                ("authorAccountId", comment.CreatedByAccountId),
+                ("callerAccountId", callerAccountId)));
 
         var now = _auditContext.UtcNow;
         comment.Text = normalizedText;
@@ -238,10 +246,24 @@ public sealed class CommentsService : ICommentsService
                 var schema = await _schemas.GetByIdAsync(targetId, includeDeleted: false, ct)
                     ?? throw new NotFoundException("Schema");
                 if (valueName is not null && !schema.Values.Any(v => v.Name == valueName))
-                    throw new ValidationException(new[] { $"'{valueName}' is not a value on this schema." });
+                    throw new ValidationException(new[]
+                    {
+                        Diagnostic.Create(
+                            DiagnosticCodes.Comments.ValueNotOnSchema,
+                            $"'{valueName}' is not a value on this schema.",
+                            ("schemaId", targetId),
+                            ("valueName", valueName)),
+                    });
                 return schema.Name;
             default:
-                throw new ValidationException(new[] { "Unsupported comment target type." });
+                throw new ValidationException(new[]
+                {
+                    Diagnostic.Create(
+                        DiagnosticCodes.Comments.TargetTypeUnsupported,
+                        "Unsupported comment target type.",
+                        ("targetType", targetType.ToString()),
+                        ("targetId", targetId)),
+                });
         }
     }
 
@@ -273,9 +295,19 @@ public sealed class CommentsService : ICommentsService
     {
         var trimmed = text?.Trim() ?? string.Empty;
         if (trimmed.Length == 0)
-            throw new ValidationException(new[] { "Comment text is required." });
+            throw new ValidationException(new[]
+            {
+                new Diagnostic(DiagnosticCodes.Comments.TextRequired, "Comment text is required."),
+            });
         if (trimmed.Length > MaxTextLength)
-            throw new ValidationException(new[] { $"Comment text exceeds the {MaxTextLength}-character limit." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Comments.TextTooLong,
+                    $"Comment text exceeds the {MaxTextLength}-character limit.",
+                    ("maxLength", MaxTextLength),
+                    ("actualLength", trimmed.Length)),
+            });
         return trimmed;
     }
 }

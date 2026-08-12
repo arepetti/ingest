@@ -41,7 +41,7 @@ public sealed class SchemasController(ISchemaService service) : ControllerBase
     public async Task<IActionResult> GetVisibleByName(string name, CancellationToken ct)
     {
         var schema = await service.GetVisibleAsync(User.CurrentAccountId(), name, ct);
-        return schema is null ? NotFound() : Ok(SchemaDto.From(schema));
+        return schema is null ? NotFound(DiagnosticProblem.NotFound("Schema", name)) : Ok(SchemaDto.From(schema));
     }
 
     /// <summary>Build an example submission body for a schema, useful for bootstrapping integrations.</summary>
@@ -65,6 +65,6 @@ public sealed class SchemasController(ISchemaService service) : ControllerBase
     public async Task<IActionResult> GetExample(string name, CancellationToken ct)
     {
         var example = await service.BuildExampleSubmissionAsync(User.CurrentAccountId(), name, ct);
-        return example is null ? NotFound() : Ok(example);
+        return example is null ? NotFound(DiagnosticProblem.NotFound("Schema", name)) : Ok(example);
     }
 }

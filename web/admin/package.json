@@ -8,7 +8,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "i18n:scaffold": "node scripts/i18n-context-scaffold.mjs",
+    "i18n:apply": "node scripts/i18n-context-apply.mjs",
+    "i18n:kit": "node scripts/i18n-kit.mjs",
+    "i18n:audit": "node scripts/i18n-context-audit.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -21,8 +25,10 @@
     "@fluentui/react-icons": "^2.0.328",
     "@lezer/highlight": "^1.2.3",
     "@tanstack/react-query": "^5.100.14",
+    "i18next": "^26.3.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-i18next": "^17.0.11",
     "react-router-dom": "^7.15.1",
     "recharts": "^3.8.1"
   },

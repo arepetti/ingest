@@ -35,4 +35,14 @@ public sealed class AuthTests : IntegrationTestBase
         var response = await bad.GetAsync("/api/me");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Bootstrap_is_anonymous_and_returns_only_normalized_default_locale()
+    {
+        using var anon = Fixture.CreateClient(apiKey: null);
+        var bootstrap = await (await anon.GetAsync("/api/bootstrap")).ReadJsonAsync();
+
+        Assert.Equal("en-US", bootstrap.GetProperty("defaultLocale").GetString());
+        Assert.Single(bootstrap.EnumerateObject());
+    }
 }

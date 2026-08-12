@@ -32,7 +32,7 @@ Toggling **Enabled** off immediately invalidates every key for this account; tog
 
 ## Permissions (capabilities)
 
-Below the role selector the editor shows a **Permissions** panel — a grouped checklist of every fine-grained capability the system understands (schemas, submissions, reports, accounts, API keys, audit, webhooks, notifications, privacy, backup and settings, each with a `read` and, where it applies, a `manage`/verb capability). This is what actually governs what the account can do and see; the role is just the template that pre-fills it.
+Below the role selector the editor shows a **Permissions** panel — a grouped checklist of every fine-grained capability the system understands (schemas, submissions, reports, accounts, API keys, audit, webhooks, notifications, privacy, backup and settings, each with a `read` and, where it applies, a `manage`/verb capability). Each box carries a one-line description of exactly what ticking it allows, so you don't have to infer the boundary from the capability's name. This is what actually governs what the account can do and see; the role is just the template that pre-fills it.
 
 - **Picking a role pre-fills the checklist** with that role's default bundle. `Operator` ticks the read-everything boxes; `Approver` ticks *view + approve submissions*; `Service` ticks nothing (a pure submitter); `Admin` holds everything.
 - **You can tick or untick any box** on a non-admin account. This is the whole point of the model: grant one trusted operator `schemas:manage` without making them an admin, or a service-desk user just `accounts:read` + `apikeys:manage`, and nothing else.

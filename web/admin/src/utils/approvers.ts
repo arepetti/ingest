@@ -1,4 +1,5 @@
 import type { Account, ApproverRequirement, ApproverSpec, Schema } from '../api/types'
+import type { TFunction } from 'i18next'
 
 /**
  * Sentinel selection key used by the approval-policy editors to represent the dynamic
@@ -28,8 +29,8 @@ export function approverFromKey(key: string, requirement: ApproverRequirement = 
 }
 
 /** Display label for an approver spec, given a lookup of the candidate accounts. */
-export function approverLabel(a: ApproverSpec, accountsById: Map<string, Account>): string {
-  if (a.kind === 'ServiceOwner') return SERVICE_OWNER_LABEL
+export function approverLabel(a: ApproverSpec, accountsById: Map<string, Account>, t?: TFunction): string {
+  if (a.kind === 'ServiceOwner') return t ? t('schemasSubmissions.approval.serviceOwner') : SERVICE_OWNER_LABEL
   return accountsById.get(a.accountId)?.label || accountsById.get(a.accountId)?.name || a.accountId
 }
 

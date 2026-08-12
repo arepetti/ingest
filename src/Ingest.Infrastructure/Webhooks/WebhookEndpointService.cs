@@ -151,13 +151,19 @@ public sealed class WebhookEndpointService : IWebhookEndpointService
 
     private static void Validate(WebhookEndpointInput input)
     {
-        var errors = new List<string>();
-        if (string.IsNullOrWhiteSpace(input.Name)) errors.Add("Name is required.");
+        var errors = new List<Diagnostic>();
+        if (string.IsNullOrWhiteSpace(input.Name))
+            errors.Add(new Diagnostic(DiagnosticCodes.Webhooks.NameRequired, "Name is required."));
         if (string.IsNullOrWhiteSpace(input.Url))
-            errors.Add("URL is required.");
+            errors.Add(new Diagnostic(DiagnosticCodes.Webhooks.UrlRequired, "URL is required."));
         else if (!Uri.TryCreate(input.Url.Trim(), UriKind.Absolute, out var uri) ||
                  (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-            errors.Add($"'{input.Url}' is not a valid absolute http(s) URL.");
-        if (errors.Count > 0) throw new ValidationException(errors);
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Webhooks.UrlInvalid,
+                $"'{input.Url}' is not a valid absolute http(s) URL.",
+                ("url", input.Url),
+                ("allowedSchemes", new[] { Uri.UriSchemeHttp, Uri.UriSchemeHttps })));
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
     }
 }

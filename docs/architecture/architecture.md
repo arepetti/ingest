@@ -188,6 +188,50 @@ Translations are deterministic functions of the source string, so the client cac
 
 The submission form and its rule machinery are factored into shared pieces — `SchemaSampleFields` (the controlled form renderer) and `utils/sampleRules.ts` (the row model, the variable context the server mirrors, gating, and the `useSampleRules` prefetch hook) — so the same translate runtime also powers the **schema editor's Preview** (`SchemaPreviewDialog`). The preview renders the live form from the in-progress, unsaved schema and additionally evaluates value-level and schema-level validations client-side (via `interpretRuleResult`, mirroring the server's accept/reject contract). It's explicitly best-effort: the dialog carries a disclaimer that the server is authoritative, since the regex dialect and submission-only helpers (`sampleTimestamp()`, `serviceName()`) differ in the browser.
 
+## Localization
+
+Localization belongs to the React admin SPA. The backend remains language-neutral: it does not inspect `Accept-Language` and has no `.resx` resources. Anonymous `GET /api/bootstrap` exposes only the normalized `Ingest:DefaultLocale` (default `en-US`) needed before login. The SPA then resolves its locale in this order: a supported `localStorage["ingest.locale"]` value, the supported bootstrap default, then `en-US`. **Settings → General → Language** changes i18next immediately and saves only that browser-local preference; it does not update an account or server-side setting.
+
+The shipped locales are `en-US`, `en-GB`, `it-IT`, `zh-CN`, `zh-TW`, and `ja-JP`. Product-owned UI text and stable API diagnostics are localized. User- or operator-authored schema labels and messages, account data, report templates/content, comments, and raw third-party details remain verbatim. Microsoft Teams bot localization is deliberately outside this implementation.
+
+API errors retain their existing en-US RFC 7807 `title`, `detail`, and validation `errors`; API success payloads retain `errors`/`warnings` where applicable. Additive `code`, `params`, `errorDetails`, and `warningDetails` let the SPA translate stable codes without breaking older clients. Unknown codes fall back to the parallel legacy string or diagnostic `message`; generic categories preserve actionable operator/user/third-party detail rather than replacing it with a vague translation.
+
+Dates with semantic display text are formatted using the active locale and rendered through `LocalizedTime` as `<time dateTime="the-original-wire-value">…localized text…</time>` wherever the DOM allows. Machine-facing ISO timestamps, identifiers, query values, API payloads, filenames, schema/value names, and similar protocol data remain invariant.
+
+### Adding a language
+
+Add exactly one file at `web/admin/src/locales/<code>.json`; catalogs are discovered automatically. The filename and `metadata.locale` must be the same canonical BCP 47 code. `metadata.description` is a non-empty maintainer-facing description, `metadata.nativeLabel` is the language name in that language, and `metadata.englishLabel` is its invariant English name. The picker shows both labels; locale, description, native label, and English label must each be unique.
+
+Copy the complete `strings` tree from `en-US.json` and translate values only, working from the translator context described below rather than from the English alone. Catalog loading and tests require an exact key match with en-US, non-empty strings, identical i18next `{{placeholder}}` names, identical named component tags, coverage for every backend `DiagnosticCodes` value, and coverage for every statically referenced frontend translation key. From `web/admin`, verify the catalog and production bundle with:
+
+```bash
+npm ci
+npm test
+npm run lint
+npm run build
+```
+
+### Translator context
+
+A string on its own is not translatable. "Saving…" is the financial sense of *save* in half the languages we ship, "Enable" is an infinitive rather than an imperative, and a two-character avatar abbreviation is indistinguishable from a paragraph. So every one of the en-US strings carries a note, and the notes live in a sidecar at `web/admin/src/locales/_context/en-US.json`.
+
+It is a sidecar rather than comments in the catalog for two reasons. JSON has no comments, and anything approximating them does not survive `JSON.parse`/`JSON.stringify`, which is what the review tooling does. Embedding the notes in the catalog instead would break the "copy `en-US.json` and translate the values" contract that all six locales depend on, since every locale would then have to carry English prose. The sidecar sits in a subdirectory, and the loader's `../locales/*.json` glob does not cross a directory separator, so it can never be mistaken for a shippable catalog; `catalogs.test.ts` asserts that exactly six locales are discovered.
+
+Each note records the English it was written against (`en`), the surface it is rendered on (`ui`), prose for the translator (`context`), a description of every interpolated value (`placeholders`), and, for strings concatenated with a rendered date or number, how they are joined (`joins`). `ui` is a closed vocabulary — `button`, `buttonProgress`, `menuItem`, `navItem`, `pageTitle`, `sectionTitle`, `dialogTitle`, `dialogBody`, `fieldLabel`, `fieldHint`, `placeholder`, `ariaLabel`, `tooltip`, `columnHeader`, `statusBadge`, `toast`, `validationError`, `apiDiagnostic`, `emptyState`, `chartLabel`, `fragment`, `prose` — each defined with the register and length constraints it implies in `_context/ui-surfaces.json`. Closing the set turns "what tone does this need?" into a lookup, and `context.test.ts` enforces membership.
+
+**Changing an English string obliges you to revisit its note in the same commit.** `context.test.ts` compares each note's `en` against the live catalog and fails when they diverge, because a note written against wording that has since changed is worse than no note at all. This is the same discipline the placeholder-parity check already applies to the translations themselves.
+
+The tooling in `web/admin/scripts` keeps the sidecar honest and gives translators something self-contained to work from:
+
+| Command (from `web/admin`) | Purpose |
+| --- | --- |
+| `npm run i18n:scaffold` | Sync the sidecar with the catalog: add notes for new keys, drop orphans, refresh placeholder lists, and re-derive the `ui` guess from `t()` call sites. Authored prose is never overwritten. `--check` fails instead of writing, for CI. |
+| `npm run i18n:kit -- --area shell` | Emit a self-contained authoring view for one area: source string, surface, placeholders, and every call site. |
+| `npm run i18n:kit -- --area shell --locale ja-JP` | The same view with the current translation alongside, for reviewing an existing locale. |
+| `npm run i18n:apply -- scripts/context-parts/shell.json` | Fold authored notes in from a flat part file, rejecting empty prose, unknown surfaces, and undocumented placeholders. |
+
+Notes are authored through part files under `scripts/context-parts/` rather than by editing the 2000-key sidecar directly, which keeps concurrent work from colliding; both that directory and the generated kits are gitignored. `web/admin/src/locales/_context/README.md` is the working guide, including what makes a note worth having.
+
 ## Cadence semantics
 
 `CadenceCalculator.BucketFor(cadence, timestamp, anchors)` returns the half-open `[start, end)` window that contains `timestamp` for the given cadence. With the default anchors (plain calendar) the buckets are:

@@ -5,11 +5,13 @@ import {
   makeStyles, MessageBarBody, tokens,
 } from '@fluentui/react-components'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { formatApiError } from '../api/client'
 import { useAccounts, useServiceStatus } from '../api/hooks'
 import { useMemo, useState, type ReactElement } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type { Cadence, SchemaStatus } from '../api/types'
-import { cadenceLabel } from '../utils/cadence'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '24px' },
@@ -36,8 +38,10 @@ const periods = ['day', 'week', 'fortnight', 'month', 'quarter', 'halfyear', 'ye
 // prettification rule. Keep the helper local so the shared cadenceLabel() stays strictly typed.
 type CadenceCellValue = Cadence | '—' | 'Mixed'
 
-function displayCadence(value: CadenceCellValue): string {
-  return value === '—' || value === 'Mixed' ? value : cadenceLabel(value)
+function displayCadence(value: CadenceCellValue, t: TFunction): string {
+  if (value === '—') return value
+  if (value === 'Mixed') return t('analytics.serviceStatus.mixed')
+  return t(`analytics.cadence.${value.toLowerCase()}`)
 }
 
 /**
@@ -47,6 +51,7 @@ function displayCadence(value: CadenceCellValue): string {
  */
 export function ServiceStatusPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const { name } = useParams<{ name: string }>()
   const [period, setPeriod] = useState('week')
   const { data, isLoading, error } = useServiceStatus(name, period)
@@ -61,10 +66,10 @@ export function ServiceStatusPage() {
   return (
     <div className={s.root}>
       <div className={s.toolbar}>
-        <Title2>Status — {displayName}</Title2>
-        <Field label="Period">
-          <Dropdown selectedOptions={[period]} value={period} onOptionSelect={(_, d) => setPeriod(d.optionValue as string)}>
-            {periods.map(p => <Option key={p} value={p}>{p}</Option>)}
+        <Title2>{t('analytics.serviceStatus.title', { service: displayName })}</Title2>
+        <Field label={t('analytics.common.period')}>
+          <Dropdown selectedOptions={[period]} value={t(`analytics.serviceStatus.periods.${period}`)} onOptionSelect={(_, d) => setPeriod(d.optionValue as string)}>
+            {periods.map(p => <Option key={p} value={p}>{t(`analytics.serviceStatus.periods.${p}`)}</Option>)}
           </Dropdown>
         </Field>
       </div>
@@ -75,22 +80,22 @@ export function ServiceStatusPage() {
         </AutoScrollMessageBar>
       )}
 
-      {isLoading && <div>Loading...</div>}
+      {isLoading && <div>{t('analytics.common.loading')}</div>}
 
       <Table size="small">
         <TableHeader>
           <TableRow>
-            <TableHeaderCell>Schema</TableHeaderCell>
-            <TableHeaderCell>Cadence</TableHeaderCell>
-            <TableHeaderCell>Submitted</TableHeaderCell>
-            <TableHeaderCell>Last sample</TableHeaderCell>
-            <TableHeaderCell>Status</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.common.schema')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.common.cadence')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.serviceStatus.columns.submitted')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.serviceStatus.columns.lastSample')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.serviceStatus.columns.status')}</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
           {(data?.schemas ?? []).map(schema => <SchemaRow key={schema.schemaName} schema={schema} className={s.row} />)}
           {!isLoading && (data?.schemas ?? []).length === 0 && (
-            <TableRow><TableCell colSpan={5}>No schemas visible to this service.</TableCell></TableRow>
+            <TableRow><TableCell colSpan={5}>{t('analytics.serviceStatus.empty')}</TableCell></TableRow>
           )}
         </TableBody>
       </Table>
@@ -100,7 +105,8 @@ export function ServiceStatusPage() {
 
 function SchemaRow({ schema, className }: { schema: SchemaStatus; className: string }) {
   const s = useStyles()
-  const summary = summarise(schema)
+  const { t } = useTranslation()
+  const summary = summarise(schema, t)
   const display = schema.label || schema.schemaName
 
   return (
@@ -110,25 +116,33 @@ function SchemaRow({ schema, className }: { schema: SchemaStatus; className: str
           <Tooltip content={display} relationship="label">
             <strong className={s.truncate}>{display}</strong>
           </Tooltip>
-          {!schema.enabled && <Badge appearance="outline" color="subtle">Disabled</Badge>}
+          {!schema.enabled && <Badge appearance="outline" color="subtle">{t('analytics.serviceStatus.disabled')}</Badge>}
         </div>
       </TableCell>
-      <TableCell>{displayCadence(summary.cadence)}</TableCell>
+      <TableCell>{displayCadence(summary.cadence, t)}</TableCell>
       <TableCell>
         <Tooltip
           relationship="description"
-          content={`${summary.submitted} of ${summary.total} active value(s) submitted in the current cadence window — ${summary.requiredSubmitted}/${summary.requiredTotal} required.`}
+          content={t('analytics.serviceStatus.submittedHelp', {
+            submitted: summary.submitted,
+            total: summary.total,
+            requiredSubmitted: summary.requiredSubmitted,
+            requiredTotal: summary.requiredTotal,
+          })}
         >
           <span>
             <strong>{summary.submitted}</strong>
             <span className={s.total}>/{summary.total}</span>
             {summary.requiredTotal > 0 && (
-              <> <span className={s.requiredHint}>· {summary.requiredSubmitted}/{summary.requiredTotal} required</span></>
+              <> <span className={s.requiredHint}>· {t('analytics.serviceStatus.requiredRatio', {
+                submitted: summary.requiredSubmitted,
+                total: summary.requiredTotal,
+              })}</span></>
             )}
           </span>
         </Tooltip>
       </TableCell>
-      <TableCell>{summary.lastTimestamp ? new Date(summary.lastTimestamp).toLocaleString() : '—'}</TableCell>
+      <TableCell><LocalizedTime value={summary.lastTimestamp} /></TableCell>
       <TableCell>
         {summary.statusBadge}
       </TableCell>
@@ -146,7 +160,7 @@ interface SchemaSummary {
   statusBadge: ReactElement
 }
 
-function summarise(schema: SchemaStatus): SchemaSummary {
+function summarise(schema: SchemaStatus, t: TFunction): SchemaSummary {
   // A disabled schema short-circuits everything — its values are inert by definition.
   if (!schema.enabled) {
     return {
@@ -155,7 +169,7 @@ function summarise(schema: SchemaStatus): SchemaSummary {
       requiredTotal: 0,
       requiredSubmitted: 0,
       cadence: '—',
-      statusBadge: <Badge appearance="outline" color="subtle">Inert</Badge>,
+      statusBadge: <Badge appearance="outline" color="subtle">{t('analytics.serviceStatus.statuses.inert')}</Badge>,
     }
   }
 
@@ -181,15 +195,15 @@ function summarise(schema: SchemaStatus): SchemaSummary {
 
   let statusBadge: ReactElement
   if (active.length === 0) {
-    statusBadge = <Badge appearance="outline" color="subtle">No values</Badge>
+    statusBadge = <Badge appearance="outline" color="subtle">{t('analytics.serviceStatus.statuses.noValues')}</Badge>
   } else if (requiredTotal === 0) {
     statusBadge = submitted > 0
-      ? <Badge appearance="filled" color="success">Submitted</Badge>
-      : <Badge appearance="outline" color="subtle">Optional</Badge>
+      ? <Badge appearance="filled" color="success">{t('analytics.serviceStatus.statuses.submitted')}</Badge>
+      : <Badge appearance="outline" color="subtle">{t('analytics.serviceStatus.statuses.optional')}</Badge>
   } else if (requiredSubmitted === requiredTotal) {
-    statusBadge = <Badge appearance="filled" color="success">Submitted</Badge>
+    statusBadge = <Badge appearance="filled" color="success">{t('analytics.serviceStatus.statuses.submitted')}</Badge>
   } else {
-    statusBadge = <Badge appearance="filled" color="danger">Missing</Badge>
+    statusBadge = <Badge appearance="filled" color="danger">{t('analytics.serviceStatus.statuses.missing')}</Badge>
   }
 
   return { total: active.length, submitted, requiredTotal, requiredSubmitted, cadence, lastTimestamp, statusBadge }

@@ -1,9 +1,10 @@
 import {
   Card, CardHeader, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Text,
 } from '@fluentui/react-components'
+import { useTranslation } from 'react-i18next'
 import type { ExploreAggregation, ExploreValueSeries } from '../../../api/types'
 import { formatPeriodLabel } from '../../../utils/periodFormat'
-import { AGG_LABELS, fmt, useExploreStyles, type ServiceRef } from '../shared'
+import { aggregationLabel, fmt, useExploreStyles, type ServiceRef } from '../shared'
 
 /** The Snapshot sub-view: the latest period's value for every service and every numeric value. */
 export function SnapshotView({ values, services, agg }: {
@@ -12,8 +13,9 @@ export function SnapshotView({ values, services, agg }: {
   agg: ExploreAggregation
 }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
   if (values.length === 0 || services.length === 0) {
-    return <Card className={styles.card}><div className={styles.empty}>No samples for this selection.</div></Card>
+    return <Card className={styles.card}><div className={styles.empty}>{t('analytics.explore.content.noSamples')}</div></Card>
   }
   // Latest bucket per value, indexed by service for O(1) cell lookup.
   const latestByValue = values.map(v => {
@@ -27,10 +29,10 @@ export function SnapshotView({ values, services, agg }: {
     <Card className={styles.card}>
       <CardHeader
         className={styles.cardHeader}
-        header={<Text weight="semibold">Latest value per service</Text>}
+        header={<Text weight="semibold">{t('analytics.explore.snapshot.title')}</Text>}
         description={
           <span className={styles.cardSub}>
-            Most recent period per value · cells show the {AGG_LABELS[agg].toLowerCase()} for that period
+            {t('analytics.explore.snapshot.description', { aggregation: aggregationLabel(agg, t) })}
           </span>
         }
       />
@@ -38,7 +40,7 @@ export function SnapshotView({ values, services, agg }: {
         <Table size="small">
           <TableHeader>
             <TableRow>
-              <TableHeaderCell>Service</TableHeaderCell>
+              <TableHeaderCell>{t('analytics.common.service')}</TableHeaderCell>
               {latestByValue.map(c => (
                 <TableHeaderCell key={c.value.valueName}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>

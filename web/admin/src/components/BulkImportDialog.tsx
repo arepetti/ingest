@@ -4,9 +4,10 @@ import {
   Dropdown, Field, MessageBarBody, Option, Spinner, Text, makeStyles, tokens,
 } from '@fluentui/react-components'
 import { AutoScrollMessageBar } from './AutoScrollMessageBar'
-import { formatApiError } from '../api/client'
+import { formatApiError, localizeDiagnostics } from '../api/client'
 import { useBulkImport } from '../api/hooks'
 import type { Account, BulkImportFormat, BulkImportResult } from '../api/types'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   form: { display: 'flex', flexDirection: 'column', gap: '12px' },
@@ -14,10 +15,9 @@ const useStyles = makeStyles({
   report: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' },
   itemList: { margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '6px' },
   errors: { margin: '2px 0 0', paddingLeft: '18px', color: tokens.colorPaletteRedForeground1 },
+  warnings: { margin: '2px 0 0', paddingLeft: '18px', color: tokens.colorPaletteDarkOrangeForeground1 },
   help: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
 })
-
-const formatLabels: Record<BulkImportFormat, string> = { Json: 'JSON', Csv: 'CSV' }
 
 function detectFormat(fileName: string): BulkImportFormat | null {
   const lower = fileName.toLowerCase()
@@ -39,7 +39,12 @@ export function BulkImportDialog({
   services: Account[]
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const importer = useBulkImport()
+  const formatLabels: Record<BulkImportFormat, string> = {
+    Json: t('schemasSubmissions.bulkImport.formats.json'),
+    Csv: t('schemasSubmissions.bulkImport.formats.csv'),
+  }
 
   const [serviceId, setServiceId] = useState<string>('')
   const [format, setFormat] = useState<BulkImportFormat>('Json')
@@ -85,19 +90,16 @@ export function BulkImportDialog({
     <Dialog open={open} onOpenChange={(_, d) => { if (!d.open) handleClose() }}>
       <DialogSurface style={{ minWidth: 620 }}>
         <DialogBody>
-          <DialogTitle>Import submissions</DialogTitle>
+          <DialogTitle>{t('schemasSubmissions.bulkImport.title')}</DialogTitle>
           <DialogContent>
             <div className={s.form}>
               <Body1 className={s.help}>
-                Import historical submissions for a single service from a JSON or CSV file. Parsing
-                must succeed for the whole file; each submission is then validated and saved
-                independently, so a rejected one won&apos;t block the rest. Submissions that already
-                exist are skipped, so re-running the same file is safe.
+                {t('schemasSubmissions.bulkImport.help')}
               </Body1>
 
-              <Field label="Service" required>
+              <Field label={t('schemasSubmissions.common.service')} required>
                 <Dropdown
-                  placeholder="Choose a service"
+                  placeholder={t('schemasSubmissions.bulkImport.chooseService')}
                   selectedOptions={serviceId ? [serviceId] : []}
                   value={serviceId ? serviceName(serviceId) : ''}
                   onOptionSelect={(_, d) => setServiceId(d.optionValue || '')}
@@ -108,7 +110,7 @@ export function BulkImportDialog({
                 </Dropdown>
               </Field>
 
-              <Field label="File" required>
+              <Field label={t('schemasSubmissions.bulkImport.file')} required>
                 <div className={s.fileRow}>
                   <input
                     type="file"
@@ -118,7 +120,7 @@ export function BulkImportDialog({
                 </div>
               </Field>
 
-              <Field label="Format" hint="Auto-detected from the file extension; override if needed.">
+              <Field label={t('schemasSubmissions.bulkImport.format')} hint={t('schemasSubmissions.bulkImport.formatHint')}>
                 <Dropdown
                   selectedOptions={[format]}
                   value={formatLabels[format]}
@@ -137,27 +139,40 @@ export function BulkImportDialog({
               )}
 
               {result && (() => {
-                const failures = result.items.filter(item => !item.success && !item.skipped)
+                const reports = result.items
+                  .map(item => ({
+                    item,
+                    errors: localizeDiagnostics(item.errorDetails, item.errors),
+                    warnings: localizeDiagnostics(item.warningDetails, item.warnings),
+                  }))
+                  .filter(({ item, warnings }) => (!item.success && !item.skipped) || warnings.length > 0)
                 return (
                   <div className={s.report}>
                     <AutoScrollMessageBar intent={result.failed === 0 ? 'success' : 'warning'}>
                       <MessageBarBody>
-                        Imported {result.succeeded} of {result.total} submission{result.total === 1 ? '' : 's'}.
-                        {result.skipped > 0 ? ` ${result.skipped} already existed (skipped).` : ''}
-                        {result.failed > 0 ? ` ${result.failed} failed.` : ''}
+                        {t('schemasSubmissions.bulkImport.summary', { succeeded: result.succeeded, total: result.total })}
+                        {result.skipped > 0 ? ` ${t('schemasSubmissions.bulkImport.skipped', { count: result.skipped })}` : ''}
+                        {result.failed > 0 ? ` ${t('schemasSubmissions.bulkImport.failed', { count: result.failed })}` : ''}
                       </MessageBarBody>
                     </AutoScrollMessageBar>
-                    {failures.length > 0 && (
+                    {reports.length > 0 && (
                       <ul className={s.itemList}>
-                        {failures.map(item => (
+                        {reports.map(({ item, errors, warnings }) => (
                           <li key={item.index}>
                             <Text weight="semibold">
-                              {item.group ? `Group "${item.group}"` : `Submission #${item.index + 1}`}
+                              {item.group
+                                ? t('schemasSubmissions.bulkImport.group', { name: item.group })
+                                : t('schemasSubmissions.bulkImport.submissionNumber', { number: item.index + 1 })}
                             </Text>
-                            {' '}({item.sampleCount} sample{item.sampleCount === 1 ? '' : 's'}) — failed
-                            {item.errors.length > 0 && (
+                            {!item.success && <> {' '}{t('schemasSubmissions.bulkImport.itemFailed', { count: item.sampleCount })}</>}
+                            {errors.length > 0 && (
                               <ul className={s.errors}>
-                                {item.errors.map((e, i) => <li key={i}>{e}</li>)}
+                                {errors.map((e, i) => <li key={i}>{e}</li>)}
+                              </ul>
+                            )}
+                            {warnings.length > 0 && (
+                              <ul className={s.warnings}>
+                                {warnings.map((warning, i) => <li key={i}>{warning}</li>)}
                               </ul>
                             )}
                           </li>
@@ -171,7 +186,7 @@ export function BulkImportDialog({
           </DialogContent>
           <DialogActions>
             <Button appearance="secondary" onClick={handleClose}>
-              {result ? 'Close' : 'Cancel'}
+              {result ? t('schemasSubmissions.common.close') : t('schemasSubmissions.common.cancel')}
             </Button>
             <Button
               appearance="primary"
@@ -179,7 +194,7 @@ export function BulkImportDialog({
               icon={importer.isPending ? <Spinner size="tiny" /> : undefined}
               onClick={onImport}
             >
-              {importer.isPending ? 'Importing…' : 'Import'}
+              {importer.isPending ? t('schemasSubmissions.bulkImport.importing') : t('schemasSubmissions.bulkImport.import')}
             </Button>
           </DialogActions>
         </DialogBody>

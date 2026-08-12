@@ -2,6 +2,7 @@ import { Badge, Tooltip, tokens } from '@fluentui/react-components'
 import { Info16Regular } from '@fluentui/react-icons'
 import type { Schema, SchemaValue } from '../api/types'
 import { isWithinOneCadenceOf } from '../utils/cadence'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Render a schema-value label decorated with two small affordances:
@@ -45,6 +46,7 @@ export function ValueLabel({
    */
   showRequired?: boolean
 }) {
+  const { t } = useTranslation()
   const text = (fallback ?? value.label ?? value.name).toString()
   const description = value.description?.trim() || ''
   const sinceVersion = value.sinceVersion ?? 1
@@ -59,7 +61,7 @@ export function ValueLabel({
         {text}
         {showRequired && value.required && (
           <span
-            aria-label="required"
+            aria-label={t('shell.valueLabel.required')}
             style={{ color: tokens.colorPaletteRedForeground1, marginLeft: '2px' }}
           >
             *
@@ -69,13 +71,15 @@ export function ValueLabel({
       {descriptionMode === 'icon' && description && (
         <Tooltip content={description} relationship="description" withArrow>
           <Info16Regular
-            aria-label="Description"
+            aria-label={t('shell.valueLabel.description')}
             style={{ color: tokens.colorNeutralForeground3, cursor: 'help', flexShrink: 0 }}
           />
         </Tooltip>
       )}
       {showNew && (
-        <Badge appearance="filled" color="brand" size="small" style={{ flexShrink: 0 }}>New</Badge>
+        <Badge appearance="filled" color="brand" size="small" style={{ flexShrink: 0 }}>
+          {t('shell.valueLabel.new')}
+        </Badge>
       )}
     </span>
   )

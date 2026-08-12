@@ -1,3 +1,4 @@
+using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.Infrastructure.Mongo;
 using MongoDB.Bson;
@@ -81,6 +82,8 @@ public class LegacySchemaDeserializationTests
         Assert.All(submission.Warnings, w => Assert.Null(w.ValueName));
         Assert.Equal("Peak too high", submission.Warnings[0].Message);
         Assert.Equal("check data", submission.Warnings[1].Message);
+        Assert.All(submission.Warnings, w => Assert.Null(w.Code));
+        Assert.All(submission.Warnings, w => Assert.Null(w.Params));
     }
 
     [Fact]
@@ -91,7 +94,11 @@ public class LegacySchemaDeserializationTests
             ServiceAccountId = Guid.NewGuid(),
             Warnings = new()
             {
-                new SubmissionWarning("sick", "Sample 'Weekly / Sick leave': too high"),
+                new SubmissionWarning(
+                    "sick",
+                    "Sample 'Weekly / Sick leave': too high",
+                    DiagnosticCodes.Submissions.WarningRuleMessage,
+                    new Dictionary<string, object?> { ["schemaName"] = "weekly", ["limit"] = 10L }),
                 new SubmissionWarning(null, "submission-level note"),
             },
         };
@@ -101,7 +108,12 @@ public class LegacySchemaDeserializationTests
         Assert.Equal(2, back.Warnings.Count);
         Assert.Equal("sick", back.Warnings[0].ValueName);
         Assert.Equal("Sample 'Weekly / Sick leave': too high", back.Warnings[0].Message);
+        Assert.Equal(DiagnosticCodes.Submissions.WarningRuleMessage, back.Warnings[0].Code);
+        Assert.Equal("weekly", back.Warnings[0].Params!["schemaName"]);
+        Assert.Equal(10L, back.Warnings[0].Params!["limit"]);
         Assert.Null(back.Warnings[1].ValueName);
         Assert.Equal("submission-level note", back.Warnings[1].Message);
+        Assert.Null(back.Warnings[1].Code);
+        Assert.Null(back.Warnings[1].Params);
     }
 }

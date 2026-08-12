@@ -11,6 +11,14 @@
 
 > **Backup & restore moved.** It isn't really a setting, so it now lives on the **Tools** page (in the sidebar, directly above Settings) — see [tools.md](tools.md).
 
+## General
+
+The **General** section contains browser preferences for the admin console. Choose a language from **English (US)** (`en-US`), **English (UK)** (`en-GB`), **Italian** (`it-IT`), **Simplified Chinese** (`zh-CN`), **Traditional Chinese** (`zh-TW`), or **Japanese** (`ja-JP`).
+
+The switch applies immediately, including to open navigation, forms, diagnostics, and localized date text. It is saved in this browser's `localStorage` as `ingest.locale`; it is **not** written to the server or to your account, so another browser or device chooses independently. When no supported preference has been saved, the console uses the deployment's `Ingest:DefaultLocale` and finally `en-US`.
+
+Localization covers the console's product-owned interface and structured API diagnostics. Names, labels, descriptions, schema validation messages, account and report content, comments, and other operator- or user-authored text remain exactly as entered. Microsoft Teams bot localization is outside the current scope.
+
 ## Rules
 
 The **Rules** section (shown when the approval workflow is enabled, gated by the same `settings:read` / `settings:manage` capabilities as **Approval**) is a generic home for cross-cutting rules. Today the only kind is an **approval rule**: it requires approval for a chosen set of **services** and **schemas**, on top of — and independently of — each schema's own policy.

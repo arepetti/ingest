@@ -2,6 +2,20 @@
 
 Notable changes per release. Versions are newest-first. No breaking changes have been released so far.
 
+## 0.5.3
+
+### Added
+
+- Admin-console **localization** for en-US, en-GB, Italian, Simplified and Traditional Chinese, and Japanese, with an immediate browser-local language preference and configurable deployment default.
+- Stable, additive API diagnostic `code`/`params` and structured `errorDetails`/`warningDetails`, while retaining the existing en-US problem details, errors, and warnings for compatibility.
+- **Translator context** for every en-US string — rendering surface, disambiguating notes, and a description of each interpolated value — in a sidecar catalogs never load, with a test that fails when English changes without its note being revisited.
+- Each capability in the account **Permissions** panel now shows the one-line description of what it grants, instead of only its name.
+
+### Fixed
+
+- Delete confirmations no longer lower-case a translated noun, which mangled languages where capitalisation is grammatical rather than stylistic. The same case-folding is gone from the Explore and missing-data captions.
+- The webhook delivery-history hint is one translatable sentence rather than four fragments joined in English word order, so the link and the section name can be placed where each language needs them.
+
 ## 0.5.2
 
 ### Added

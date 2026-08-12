@@ -3,6 +3,7 @@ import {
   Button, Dropdown, Option, TableCell, TableRow,
   makeStyles, tokens,
 } from '@fluentui/react-components'
+import { useTranslation } from 'react-i18next'
 
 /** Page-size choices shared by every grid. */
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
@@ -43,6 +44,7 @@ export function GridPager({
   pageSizeOptions?: number[]
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(total, page * pageSize)
@@ -50,7 +52,7 @@ export function GridPager({
   return (
     <div className={s.root}>
       <div className={s.group}>
-        <span className={s.label}>Rows per page</span>
+        <span className={s.label}>{t('shell.gridPager.rowsPerPage')}</span>
         <Dropdown
           className={s.sizeDropdown}
           size="small"
@@ -61,11 +63,19 @@ export function GridPager({
           {pageSizeOptions.map(n => <Option key={n} value={String(n)}>{String(n)}</Option>)}
         </Dropdown>
       </div>
-      <span className={s.info}>{total === 0 ? '0 results' : `${from}–${to} of ${total}`}</span>
+      <span className={s.info}>
+        {total === 0
+          ? t('shell.gridPager.results', { count: 0 })
+          : t('shell.gridPager.range', { from, to, total })}
+      </span>
       <div className={s.group}>
-        <Button size="small" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
-        <span className={s.info}>Page {page} of {totalPages}</span>
-        <Button size="small" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
+        <Button size="small" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+          {t('shell.gridPager.previous')}
+        </Button>
+        <span className={s.info}>{t('shell.gridPager.page', { page, totalPages })}</span>
+        <Button size="small" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
+          {t('shell.gridPager.next')}
+        </Button>
       </div>
     </div>
   )

@@ -1,0 +1,2595 @@
+{
+  "metadata": {
+    "locale": "zh-CN",
+    "description": "Simplified Chinese as used in mainland China",
+    "nativeLabel": "简体中文（中国大陆）",
+    "englishLabel": "Chinese (Simplified, China)"
+  },
+  "strings": {
+    "app": {
+      "title": "Ingest Admin"
+    },
+    "apiErrors": {
+      "unexpected": "出现错误。",
+      "status": {
+        "400": "请求无效。",
+        "401": "API 密钥未被接受。",
+        "403": "你没有执行此操作的权限。",
+        "404": "找不到该项目。",
+        "408": "请求超时，请重试。",
+        "409": "此操作与其他更改冲突。请重新加载后重试。",
+        "410": "该项目已不可用。",
+        "413": "请求过大。",
+        "415": "不支持此内容类型。",
+        "422": "无法处理数据。",
+        "429": "请求过多，请稍后重试。",
+        "500": "服务器出现错误，请重试。",
+        "502": "服务器当前未响应，请稍后重试。",
+        "503": "服务器当前未响应，请稍后重试。",
+        "504": "服务器当前未响应，请稍后重试。",
+        "server": "服务器出现错误，请重试。",
+        "request": "请求失败。",
+        "unexpected": "发生意外情况。"
+      }
+    },
+    "apiMessages": {
+      "common": {
+        "not_found": "找不到 {{resource}}。",
+        "conflict": "请求与当前状态冲突。{{message}}",
+        "forbidden": "你没有执行此操作的权限。{{message}}",
+        "unauthorized": "请登录后继续。",
+        "service_unavailable": "此服务暂时不可用。{{message}}",
+        "validation": "验证失败。{{message}}",
+        "internal": "服务器出现错误，请重试。",
+        "feature_disabled": "此功能尚未启用。{{message}}"
+      },
+      "api": {
+        "invalid_request": "请求无效。{{message}}",
+        "missing_required_parameter": "缺少必需参数“{{parameter}}”。",
+        "unsupported_omit": "不支持 omit 值“{{value}}”。",
+        "single_parameter_required": "{{operation}} 需要一个“{{parameter}}”值。",
+        "service_outside_scope": "服务“{{serviceId}}”不在你的分配范围内。"
+      },
+      "submissions": {
+        "validation": "提交验证失败。{{message}}",
+        "duplicate_period": "“{{displayName}}”已在此 {{cadence}} 周期提交。",
+        "pending_duplicate_period": "“{{displayName}}”在此 {{cadence}} 周期已有等待审批的提交。",
+        "schema_not_assigned": "架构“{{schemaName}}”未分配给此服务。",
+        "schema_disabled": "架构“{{schemaName}}”当前已禁用。",
+        "value_not_defined": "值“{{valueName}}”未在架构“{{schemaName}}”中定义。",
+        "calculated_value_submitted": "无法提交计算值“{{valueName}}”。",
+        "value_disabled": "值“{{displayName}}”当前已禁用。",
+        "value_required": "值“{{displayName}}”为必填项。",
+        "required_value_missing": "缺少必填值“{{displayName}}”（{{schemaName}}.{{valueName}}）。",
+        "value_type": "值“{{displayName}}”必须是有效的 {{expectedType}}。",
+        "value_minimum": "值“{{displayName}}”不得小于 {{minimum}}（收到 {{actual}}）。",
+        "value_maximum": "值“{{displayName}}”不得大于 {{maximum}}（收到 {{actual}}）。",
+        "value_before_minimum_date": "值“{{displayName}}”（{{schemaName}}.{{valueName}}）必须不早于 {{minimum}}（收到 {{actual}}）。",
+        "value_after_maximum_date": "值“{{displayName}}”（{{schemaName}}.{{valueName}}）必须不晚于 {{maximum}}（收到 {{actual}}）。",
+        "value_minimum_length": "值“{{displayName}}”至少需要 {{minimum}} 个字符（收到 {{actual}} 个）。",
+        "value_maximum_length": "值“{{displayName}}”最多允许 {{maximum}} 个字符（收到 {{actual}} 个）。",
+        "value_regex": "值“{{displayName}}”不符合所需格式。",
+        "value_validation_failed": "“{{displayName}}”验证失败：{{detail}}",
+        "value_validation_error": "无法评估“{{displayName}}”的验证规则：{{detail}}",
+        "schema_validation_failed": "架构“{{schemaName}}”的提交验证失败：{{detail}}",
+        "schema_validation_error": "无法评估架构“{{schemaName}}”的验证规则：{{detail}}",
+        "value_not_modifiable": "无法更改值“{{displayName}}”。",
+        "gating_evaluation_error": "无法评估“{{schemaName}} / {{valueName}}”的 {{rule}} 规则：{{detail}}",
+        "sample_discarded": "已丢弃一个提交的样本。{{message}}",
+        "sample_discarded_with_message": "样本“{{schemaName}} / {{valueName}}”被 {{rule}} 规则丢弃：{{detail}}",
+        "sample_discarded_by_rule": "样本“{{schemaName}} / {{valueName}}”被 {{rule}} 规则丢弃。",
+        "warning_rule_triggered": "已触发“{{displayName}}”的警告规则。",
+        "warning_rule_message": "“{{displayName}}”的警告：{{detail}}",
+        "warning_rule_error": "无法评估“{{displayName}}”的警告规则：{{detail}}",
+        "legacy_warning": "{{message}}",
+        "published_cannot_become_draft": "已发布的提交无法恢复为草稿。",
+        "not_awaiting_approval": "此提交不在等待审批。",
+        "wrong_owner": "此提交属于其他帐户。",
+        "window_not_open": "提交窗口尚未开放。{{message}}",
+        "window_closed": "提交窗口已关闭。{{message}}",
+        "create_window_not_open": "“{{schemaName}}.{{valueName}}”的 {{cadence}} 提交窗口将于 {{windowStart}} 开放。",
+        "create_window_closed": "“{{schemaName}}.{{valueName}}”的 {{cadence}} 提交窗口已于 {{windowEnd}} 关闭。",
+        "modify_window_closed": "无法修改提交 {{submissionId}}：“{{schemaName}}.{{valueName}}”的 {{cadence}} 窗口已于 {{windowEnd}} 关闭。",
+        "ingestion_closed": "提交已暂时关闭。{{message}}"
+      },
+      "imports": {
+        "invalid_file": "导入文件无效。{{message}}",
+        "empty_file": "导入文件为空。",
+        "invalid_json": "导入文件不是有效的 JSON：{{detail}}",
+        "unsupported_format": "不支持此导入格式。{{message}}",
+        "submissions_not_array": "“submissions”属性必须是数组，不能是 {{actualKind}}。",
+        "invalid_root": "导入根类型 {{actualKind}} 无效。可接受的形式：{{acceptedShapes}}。",
+        "submission_not_object": "提交 {{submissionNumber}} 必须是对象，不能是 {{actualKind}}。",
+        "samples_missing": "提交 {{submissionNumber}} 必须包含 samples 数组（收到 {{actualKind}}）。",
+        "sample_names_required": "提交 {{submissionNumber}} 的样本 {{sampleNumber}} 需要 schemaName“{{schemaName}}”和 valueName“{{valueName}}”。",
+        "sample_invalid_json": "提交 {{submissionNumber}} 的样本 {{sampleNumber}} 在第 {{lineNumber}} 行、第 {{bytePositionInLine}} 字节包含无效 JSON：{{detail}}",
+        "submission_no_samples": "提交 {{submissionNumber}} 不包含有效样本。",
+        "missing_column": "缺少必需列“{{column}}”。",
+        "row_names_required": "第 {{row}} 行需要 schemaName“{{schemaName}}”和 valueName“{{valueName}}”。",
+        "row_timestamp_invalid": "第 {{row}} 行的时间戳“{{timestamp}}”无效。",
+        "no_data_rows": "导入文件不包含数据行。",
+        "invalid_row": "导入行无效。{{message}}",
+        "no_submissions": "文件中未找到任何提交。",
+        "accounts": {
+          "invalid_marker": "此文件不是 Ingest 帐户导出文件。",
+          "invalid_json": "{{fileType}} 文件不是有效的 JSON：{{detail}}",
+          "unsupported_version": "不支持帐户导出版本 {{actualVersion}}；应为版本 {{expectedVersion}}。",
+          "no_accounts": "帐户文件中没有帐户。",
+          "entry_name_missing": "帐户条目因缺少 accountName“{{accountName}}”而被跳过。",
+          "entry_failed": "已跳过一个帐户条目。{{message}}"
+        }
+      },
+      "accounts": {
+        "validation": "帐户验证失败。{{message}}",
+        "already_exists": "帐户“{{accountName}}”已存在。",
+        "invalid_email": "“{{email}}”不是有效的电子邮件地址。",
+        "unknown_capabilities": "未知功能：{{capabilities}}。",
+        "invalid_assigned_services": "一个或多个分配的服务 ID 无效：{{serviceIds}}。",
+        "invalid_sso_link": "SSO 链接无效。{{message}}",
+        "sso_links_user_only": "只有 User 帐户可以设置 SSO 链接；此帐户为 {{accountKind}}。",
+        "sso_link_fields_required": "每个 SSO 链接都需要 provider“{{provider}}”和 email“{{email}}”。",
+        "duplicate_sso_link": "{{provider}} / {{email}} 的 SSO 链接重复。",
+        "sso_link_in_use": "{{provider}} 身份“{{email}}”已链接到其他帐户。",
+        "delete_in_use": "帐户“{{accountName}}”包含已提交数据，无法删除。请改为禁用。",
+        "api_key_description_too_long": "API 密钥说明为 {{actualLength}} 个字符；最多允许 {{maxLength}} 个。",
+        "api_key_expiry_not_future": "API 密钥到期时间 {{expiry}} 必须晚于 {{now}}。",
+        "api_key_expiry_too_distant": "API 密钥到期时间 {{expiry}} 超出 {{now}} 后 {{maxLifetimeYears}} 年。"
+      },
+      "schemas": {
+        "validation": "架构验证失败。{{message}}",
+        "already_exists": "架构“{{schemaName}}”已存在。",
+        "delete_in_use": "架构“{{schemaName}}”正被提交使用，无法删除。请改为禁用。",
+        "version_negative": "架构版本 {{version}} 必须至少为 {{minimum}}。",
+        "version_decreased": "架构版本不能从 {{previousVersion}} 降至 {{requestedVersion}}。",
+        "value_name_invalid": "值名称“{{valueName}}”必须匹配 {{pattern}}。",
+        "since_version_negative": "值“{{valueName}}”的 sinceVersion 为 {{sinceVersion}}；最小值为 {{minimum}}。",
+        "since_version_after_schema": "值“{{valueName}}”的 sinceVersion {{sinceVersion}} 晚于架构版本 {{schemaVersion}}。",
+        "target_band_out_of_order": "值“{{valueName}}”的 {{lowerBand}} {{lowerValue}} 高于 {{upperBand}} {{upperValue}}。",
+        "green_min_without_amber_min": "值“{{valueName}}”设置了 GreenMin {{greenMin}}，但未设置 AmberMin。",
+        "green_max_without_amber_max": "值“{{valueName}}”设置了 GreenMax {{greenMax}}，但未设置 AmberMax。",
+        "calculated_expression_missing": "计算值“{{valueName}}”需要表达式。",
+        "calculated_value_required": "计算值“{{valueName}}”不能设为必填。",
+        "calculated_expression_syntax": "“{{valueName}}”的表达式在位置 {{position}} 存在语法错误：{{detail}}",
+        "calculated_expression_analysis": "无法分析“{{valueName}}”的表达式：{{detail}}",
+        "calculated_self_reference": "“{{valueName}}”的表达式引用了自身。",
+        "calculated_history_reference": "“{{valueName}}”的表达式不能使用历史函数：{{functions}}。",
+        "calculated_unknown_identifier": "“{{valueName}}”的表达式引用了未知标识符“{{identifier}}”。",
+        "calculated_dependency_cycle": "计算值之间存在循环依赖。",
+        "layout_depth_exceeded": "布局深度 {{actualDepth}} 超过上限 {{maxDepth}}。",
+        "layout_value_name_missing": "布局值节点缺少 valueName。",
+        "layout_unknown_value": "布局引用了未知值“{{valueName}}”。",
+        "layout_duplicate_value": "值“{{valueName}}”在布局中出现多次。",
+        "layout_section_caption_missing": "布局区段缺少标题。",
+        "layout_unknown_kind": "布局类型“{{actualKind}}”无效。预期：{{expectedKinds}}。"
+      },
+      "reports": {
+        "validation": "报表验证失败。{{message}}",
+        "already_exists": "报表“{{reportName}}”已存在。",
+        "missing_upload": "请在“{{field}}”字段中上传非空文件。",
+        "content_empty": "报表内容不能为空。",
+        "name_required": "需要报表名称；文件“{{fileName}}”未提供名称。",
+        "date_range_invalid": "报表开始时间 {{from}} 不能晚于结束时间 {{to}}。",
+        "type_unsupported": "不支持报表类型“{{reportType}}”。",
+        "schema_not_target": "架构“{{schemaName}}”不是报表“{{reportName}}”的目标。目标：{{targetSchemaNames}}。",
+        "schema_required_for_multiple_targets": "报表“{{reportName}}”面向 {{targetSchemaNames}}；请提供“{{parameter}}”。",
+        "submission_id_required": "报表“{{reportName}}”需要“{{parameter}}”。",
+        "submission_schema_missing": "提交 {{submissionId}} 没有架构“{{schemaName}}”的样本。",
+        "aggregate_schema_required": "聚合报表“{{reportName}}”需要“{{parameter}}”。",
+        "front_matter_unclosed": "报表前置元数据以“---”开头，但未闭合。",
+        "front_matter_line_invalid": "无法解析前置元数据第 {{lineNumber}} 行：{{line}}",
+        "front_matter_type_invalid": "前置元数据类型“{{actualType}}”无效。允许：{{allowedTypes}}。",
+        "front_matter_inline_list_invalid": "内联列表“{{value}}”必须使用 {{expectedWrapper}}。",
+        "template_parse_failed": "{{engine}} 模板解析失败：{{detail}}",
+        "template_render_failed": "{{engine}} 模板呈现失败：{{detail}}"
+      },
+      "expressions": {
+        "empty": "表达式不能为空。",
+        "too_long": "表达式超过 {{maxLength}} 个字符的限制。",
+        "parse_failed": "无法解析表达式：{{detail}}",
+        "unsupported_target": "不支持表达式目标“{{target}}”。",
+        "batch_missing": "缺少表达式批次。",
+        "batch_too_large": "批次超过 {{maxCount}} 个表达式的限制。"
+      },
+      "configuration": {
+        "validation": "配置验证失败。{{message}}",
+        "backup_empty": "备份文件为空。",
+        "backup_invalid_json": "备份文件不是有效的 JSON：{{detail}}",
+        "backup_invalid_marker": "此文件不是 Ingest 备份（预期“{{expectedFormat}}”，收到“{{actualFormat}}”）。",
+        "backup_unsupported_version": "不支持备份版本 {{version}}；支持的最高版本为 {{maximumVersion}}。",
+        "backup_missing_collections": "备份文件缺少 collections 部分。",
+        "config_backup_empty": "配置备份文件为空。",
+        "config_backup_invalid_json": "配置备份文件不是有效的 JSON：{{detail}}",
+        "config_backup_invalid_marker": "此文件不是 Ingest 配置备份（预期“{{expectedFormat}}”，收到“{{actualFormat}}”）。",
+        "config_backup_unsupported_version": "不支持配置备份版本 {{version}}；支持的最高版本为 {{maximumVersion}}。",
+        "config_backup_missing_collections": "配置备份文件缺少 collections 部分。"
+      },
+      "comments": {
+        "validation": "评论验证失败。{{message}}",
+        "thread_resolved": "此话题已解决。请先重新打开，再添加评论。",
+        "edit_forbidden": "你只能编辑自己的评论。",
+        "value_not_on_schema": "值“{{valueName}}”不在架构 {{schemaId}} 中。",
+        "target_type_unsupported": "目标 {{targetId}} 不支持评论目标类型“{{targetType}}”。",
+        "text_required": "评论文本为必填项。",
+        "text_too_long": "评论文本为 {{actualLength}} 个字符；最多允许 {{maxLength}} 个。"
+      },
+      "events": {
+        "validation": "事件验证失败。{{message}}",
+        "label_required": "事件标签为必填项。",
+        "timestamp_required": "事件时间戳为必填项。",
+        "interval_duration_required": "{{eventKind}} 事件需要正时长“{{duration}}”。",
+        "invalid_service_ids": "受影响的服务 ID 必须标识现有服务：{{serviceIds}}。"
+      },
+      "approval": {
+        "validation": "审批验证失败。{{message}}",
+        "global_default_not_allowed": "此处的审批模式“{{mode}}”不能使用全局默认值。",
+        "approver_required": "至少需要一名审批者。",
+        "required_approver_required": "至少一名审批者必须标记为必需。",
+        "duplicate_service_owner": "服务所有者被重复列出。",
+        "duplicate_approver": "审批者帐户 {{accountId}} 被重复列出。",
+        "approver_not_found": "审批者帐户 {{accountId}} 不存在。",
+        "not_designated_approver": "帐户 {{approverAccountId}} 不是提交 {{submissionId}} 的指定审批者。"
+      },
+      "integrations": {
+        "validation": "集成验证失败。{{message}}",
+        "connection_failed": "集成连接失败：{{detail}}",
+        "schedule_hour_invalid": "计划的小时值 {{hourUtc}} 必须在 UTC {{minimum}} 到 {{maximum}} 之间。",
+        "schedule_minute_invalid": "计划的分钟值 {{minuteUtc}} 必须在 {{minimum}} 到 {{maximum}} 之间。",
+        "schedule_day_invalid": "{{frequency}} 计划的日期 {{dayOfMonth}} 必须在 {{minimum}} 到 {{maximum}} 之间。",
+        "schedule_anchor_month_invalid": "{{frequency}} 计划的锚定月份 {{anchorMonth}} 必须在 {{minimum}} 到 {{maximum}} 之间。",
+        "teams_target_required": "{{integrationKind}} 需要 Teams {{targetKind}} 目标。"
+      },
+      "webhooks": {
+        "validation": "Webhook 验证失败。{{message}}",
+        "delivery_failed": "Webhook 传递失败。{{message}}",
+        "name_required": "Webhook 名称为必填项。",
+        "url_required": "Webhook URL 为必填项。",
+        "url_invalid": "Webhook URL“{{url}}”必须是绝对 URL，并使用以下方案之一：{{allowedSchemes}}。"
+      },
+      "email": {
+        "validation": "电子邮件验证失败。{{message}}",
+        "delivery_failed": "电子邮件传递失败。{{message}}",
+        "address_invalid": "“{{address}}”不是有效的电子邮件地址。",
+        "subject_required": "主题为必填项。",
+        "email_subject_required": "电子邮件主题为必填项。",
+        "text_body_required": "文本正文为必填项。",
+        "template_parse_failed": "无法解析 {{engine}} 模板字段“{{field}}”：{{detail}}",
+        "smtp_host_required": "SMTP 主机为必填项。",
+        "smtp_port_invalid": "SMTP 端口 {{port}} 必须在 {{minimum}} 到 {{maximum}} 之间。",
+        "from_address_required": "发件人地址为必填项。",
+        "account_contact_missing": "帐户“{{accountName}}”（{{accountId}}）没有联系电子邮件。"
+      }
+    },
+    "settings": {
+      "title": "设置",
+      "general": {
+        "navigationLabel": "常规",
+        "navigationGroup": "常规",
+        "title": "常规",
+        "description": "管理控制台的首选项。",
+        "language": "语言",
+        "theme": "主题",
+        "lightTheme": "浅色"
+      },
+      "permissionDenied": "你无权管理任何设置。",
+      "noneEnabled": "未启用任何可配置的设置。请在服务器配置中启用电子邮件、Webhook、集成或审批工作流，以便在此处管理它们。",
+      "navigation": {
+        "areas": "区域",
+        "configuration": "配置",
+        "submissionPeriods": "提交周期",
+        "ingestion": "数据接收",
+        "approval": "审批",
+        "approvals": "审批",
+        "rules": "规则",
+        "email": "电子邮件",
+        "emailTemplates": "电子邮件模板",
+        "notifications": "通知",
+        "webhooks": "Webhook",
+        "integrations": "集成",
+        "teamsNotifications": "Teams 通知",
+        "teamsConnection": "Teams 连接"
+      },
+      "common": {
+        "loading": "正在加载…",
+        "saving": "正在保存…",
+        "save": "保存",
+        "saveChanges": "保存更改",
+        "add": "添加",
+        "cancel": "取消",
+        "done": "完成",
+        "refresh": "刷新",
+        "moreActions": "更多操作",
+        "actions": "操作",
+        "edit": "编辑",
+        "delete": "删除",
+        "enable": "启用",
+        "disable": "禁用",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "configured": "已配置",
+        "notConfigured": "未配置",
+        "label": "标签",
+        "status": "状态",
+        "services": "服务",
+        "schemas": "架构",
+        "allServices": "所有服务",
+        "allSchemas": "所有架构",
+        "selectServices": "选择服务",
+        "selectSchemas": "选择架构",
+        "removed": "（已删除）",
+        "unset": "（未设置）",
+        "optionalListName": "仅在此列表中显示的可选名称。",
+        "serviceRequired": "至少选择一项服务，或选择“所有服务”。",
+        "schemaRequired": "至少选择一种架构，或选择“所有架构”。",
+        "cadence": "频率",
+        "cadences": {
+          "Daily": "每日",
+          "Weekly": "每周",
+          "Fortnightly": "每两周",
+          "Monthly": "每月",
+          "Quarterly": "每季度",
+          "SemiAnnually": "每半年",
+          "Yearly": "每年"
+        },
+        "months": {
+          "january": "一月",
+          "february": "二月",
+          "march": "三月",
+          "april": "四月",
+          "may": "五月",
+          "june": "六月",
+          "july": "七月",
+          "august": "八月",
+          "september": "九月",
+          "october": "十月",
+          "november": "十一月",
+          "december": "十二月"
+        },
+        "weekDays": {
+          "monday": "星期一",
+          "tuesday": "星期二",
+          "wednesday": "星期三",
+          "thursday": "星期四",
+          "friday": "星期五",
+          "saturday": "星期六",
+          "sunday": "星期日"
+        },
+        "weekDaysShort": {
+          "monday": "周一",
+          "tuesday": "周二",
+          "wednesday": "周三",
+          "thursday": "周四",
+          "friday": "周五",
+          "saturday": "周六",
+          "sunday": "周日"
+        }
+      },
+      "approval": {
+        "title": "默认审批策略",
+        "description": "设置为“使用全局默认值”的架构将采用此策略。更改仅影响新的提交；正在处理中的提交仍保留创建时指定的审批者。",
+        "saved": "审批策略已保存。",
+        "defaultBehavior": "当架构采用默认策略时",
+        "dontRequire": "不要求审批",
+        "require": "要求审批",
+        "appliesTo": "适用于",
+        "approvers": "审批者",
+        "approversHint": "可以进行审核的审批者/管理员帐户，和/或服务所有者（发送该提交的帐户）。请至少将一位标记为“必需”。",
+        "requiredApproverValidation": "请至少添加一位“必需”的审批者。",
+        "selectApprovers": "选择审批者",
+        "serviceOwner": "服务所有者（提交数据的服务）",
+        "required": "必需",
+        "optional": "可选",
+        "sources": {
+          "both": "手动提交和 API 提交",
+          "manualOnly": "仅手动（Web 控制台）提交",
+          "apiOnly": "仅 API 提交"
+        }
+      },
+      "areas": {
+        "title": "区域",
+        "description": "编辑帐户时可选用的分组标签。定义一个或多个区域后，帐户编辑器会显示下拉列表；将列表留空，编辑者即可自行输入区域名称。区域仅供参考——更改区域不会影响现有帐户。",
+        "saved": "区域已保存。",
+        "empty": "未定义任何区域——帐户编辑器将使用自由文本字段。",
+        "moveUp": "向上移动 {{name}}",
+        "moveDown": "向下移动 {{name}}",
+        "remove": "移除 {{name}}",
+        "addLabel": "添加区域",
+        "placeholder": "例如：北部区域"
+      },
+      "submissionPeriods": {
+        "title": "提交周期",
+        "description": "定义每个报告周期的起止时间。更改会立即对新的提交和周期开放检查生效；已记录的周期仍保留写入时的边界。",
+        "saved": "提交周期已保存。",
+        "fiscalYearStart": "财年开始月份",
+        "fiscalYearHint": "同时作为季度和半年周期的基准。",
+        "weekStart": "每周开始日",
+        "monthStart": "每月开始日",
+        "monthStartHint": "1-28。",
+        "fortnightAnchor": "两周周期基准日",
+        "fortnightAnchorHint": "两周周期边界上的任意日期；仅日期部分有效。"
+      },
+      "submissionWindows": {
+        "title": "提交窗口",
+        "description": "服务实际可以为某个周期创建或编辑提交的时间范围，相对于该频率的周期前后。“开放偏移”表示窗口在周期开始后延迟多久才开放；“宽限期”表示窗口在周期结束后继续保持开放的时长。在此处设置之前，两者均默认为 0 小时，即窗口与周期完全一致。“错过提交”的报告和提醒也会等到宽限期结束后才触发。",
+        "saved": "提交窗口已保存。",
+        "openOffset": "开放偏移（小时）",
+        "gracePeriod": "宽限期（小时）"
+      },
+      "currentPeriods": {
+        "title": "当前周期",
+        "description": "以上设置当前解析出的结果——这是一份实时快照，不会自动刷新。",
+        "period": "周期",
+        "window": "窗口"
+      },
+      "ingestion": {
+        "title": "数据接收",
+        "description": "用于灾难恢复的全局紧急开关。关闭提交后，面向服务的数据接收（服务帐户、批量导入和 Teams 集成）将被阻止，而其他功能（读取、OData、管理员为修复数据而进行的创建/编辑、架构、设置）仍然可用。关闭期间，所有人都会看到一条包含下述消息的横幅。",
+        "saved": "数据接收状态已保存。",
+        "closeAll": "关闭所有提交",
+        "bannerLabel": "横幅消息（可选）",
+        "bannerHint": "提交关闭期间向所有人显示。",
+        "bannerPlaceholder": "例如：我们正在排查数据问题，提交已暂停。预计在 UTC 下午 5 点前恢复。"
+      },
+      "email": {
+        "title": "电子邮件服务器 (SMTP)",
+        "description": "外发邮件的发送来源。设置存储在数据库中；密码以静态加密方式保存，且不会再次显示。",
+        "saved": "设置已保存。",
+        "host": "主机",
+        "hostPlaceholder": "smtp.example.org",
+        "port": "端口",
+        "useTls": "使用 TLS (STARTTLS)",
+        "fromAddress": "发件人地址",
+        "fromAddressPlaceholder": "ingest@example.org",
+        "fromName": "发件人名称",
+        "fromNamePlaceholder": "Ingest",
+        "username": "用户名",
+        "usernamePlaceholder": "（留空 = 匿名中继）",
+        "changePassword": "更改已存储的密码",
+        "setPassword": "设置密码",
+        "password": "密码",
+        "passwordHint": "留空可清除已存储的密码。"
+      },
+      "emailTemplates": {
+        "title": "电子邮件模板",
+        "description": "用于生成通知电子邮件的 Liquid 模板。选择一个模板以编辑其主题和正文。",
+        "empty": "尚无模板。",
+        "template": "模板",
+        "subject": "主题",
+        "format": "格式",
+        "editAria": "编辑模板 {{name}}",
+        "htmlAndText": "HTML + 文本",
+        "text": "文本",
+        "editNamed": "编辑模板 — {{name}}",
+        "edit": "编辑模板",
+        "saved": "模板已保存。",
+        "textBody": "文本正文",
+        "textBodyHint": "纯文本备用版本。支持 Liquid。",
+        "htmlBody": "HTML 正文",
+        "htmlBodyHint": "可选。留空则仅发送纯文本。",
+        "save": "保存模板"
+      },
+      "notifications": {
+        "title": "通知",
+        "description": "选择哪些事件会生成电子邮件，以及由谁接收。每个触发条件都可以通知服务自身的联系邮箱、下方的收件人列表，或两者。",
+        "saved": "通知设置已保存。",
+        "runResult": "已将 {{total}} 封电子邮件加入队列：即将到期 {{upcoming}} 封，错过提交 {{missed}} 封，带有警告 {{warnings}} 封。",
+        "upcoming": "即将到期的提交提醒",
+        "leadTime": "提前时间（窗口关闭前的小时数）",
+        "missed": "错过提交警报",
+        "warnings": "提交带有警告的通知",
+        "draftSaved": "草稿保存提醒",
+        "draftSavedHint": "每次保存草稿时都会发送（不去重），用于提醒协作者。邮件中显示的是一个相对路径，需要粘贴到你的控制台地址之后——它不是可点击的链接。",
+        "pendingApproval": "提交待审批通知",
+        "pendingApprovalHint": "提交的指定审批者始终会收到电子邮件；这些开关可额外通知提交者和/或管理员列表。",
+        "approved": "提交已审批通知",
+        "rejected": "提交被拒绝通知",
+        "recipientList": "管理员/操作员收件人列表",
+        "recipientListHint": "当某个触发条件启用了“管理员列表”时，接收副本的帐户（须有电子邮件地址）。",
+        "noEligibleAccounts": "没有符合条件的帐户（操作员/管理员需要电子邮件）",
+        "selectRecipients": "选择收件人…",
+        "running": "正在运行…",
+        "runNow": "立即运行",
+        "notifyService": "通知服务帐户",
+        "notifyAdminList": "通知管理员/操作员列表"
+      },
+      "approvalRules": {
+        "title": "规则",
+        "description": "在每个架构自身策略的基础上，额外要求对特定服务和架构进行审批。将某一侧设置为“全部”，即可涵盖所有服务或所有架构。将规则范围限定为 API 提交，可以强制由人工审核并补全半自动数据源，然后才允许其生效。",
+        "add": "添加规则",
+        "edit": "编辑规则",
+        "create": "创建规则",
+        "created": "规则已创建。",
+        "saved": "规则已保存。",
+        "deleted": "规则已删除。",
+        "disabledMessage": "规则已禁用。",
+        "enabledMessage": "规则已启用。",
+        "deleteType": "审批规则",
+        "approval": "审批",
+        "useGlobalDefault": "使用全局默认值",
+        "noApproval": "无需审批",
+        "requiredSummary": "必需（{{source}}）",
+        "emptyManage": "尚无规则 — 单击“添加规则”创建规则。",
+        "emptyReadOnly": "尚无规则。",
+        "editAria": "编辑规则 {{name}}",
+        "actionsAria": "规则 {{name}} 的操作",
+        "labelPlaceholder": "例如：财务数据源需要审批",
+        "sources": {
+          "both": "手动 + API",
+          "manualOnly": "仅手动",
+          "apiOnly": "仅限 API"
+        }
+      },
+      "teamsConnection": {
+        "title": "Microsoft Teams 连接",
+        "description": "用于向 Teams 发送提示的机器人应用注册。设置存储在数据库中；机器人密码以静态加密方式保存，且不会再次显示。有关如何在 Azure 中注册机器人，请参阅设置指南。",
+        "saved": "连接已保存。",
+        "testSucceeded": "连接成功 — 凭据有效。",
+        "testFailed": "连接失败。",
+        "appId": "应用程序（客户端）ID",
+        "appIdPlaceholder": "00000000-0000-0000-0000-000000000000",
+        "tenantId": "租户 ID",
+        "tenantHint": "多租户机器人请留空。",
+        "tenantPlaceholder": "（留空 = 多租户）",
+        "singleTenant": "单租户应用注册",
+        "changeSecret": "更改已存储的机器人密码",
+        "setSecret": "设置机器人密码",
+        "secret": "机器人密码（客户端密码）",
+        "secretHint": "留空可清除已存储的密码。",
+        "testing": "正在测试…",
+        "test": "测试连接"
+      },
+      "integrations": {
+        "title": "集成",
+        "description": "每个集成都会向 Teams 用户或频道发送提示，询问其覆盖的服务和架构中仍未提交的样本。提示按每日计划运行，也可通过“立即运行”按需触发。已禁用和隐藏的字段会被忽略；警告以内联方式显示。",
+        "connectionWarning": "Microsoft Teams 连接尚未配置——请先在“Teams 连接”子页面中设置机器人凭据，集成才能发送提示。",
+        "add": "添加集成",
+        "edit": "编辑集成",
+        "create": "创建集成",
+        "created": "集成已创建。",
+        "saved": "集成已保存。",
+        "deleted": "集成已删除。",
+        "disabledMessage": "集成已禁用。",
+        "enabledMessage": "集成已启用。",
+        "deleteType": "集成",
+        "runComplete": "运行完成——已提示 {{prompted}} 项，跳过 {{skipped}} 项。",
+        "testEnqueued": "测试提示已加入队列。",
+        "target": "目标",
+        "scheduleLabel": "计划",
+        "emptyManage": "尚无集成——单击“添加集成”创建一个。",
+        "emptyReadOnly": "尚无集成。",
+        "editAria": "编辑集成 {{name}}",
+        "actionsAria": "集成 {{name}} 的操作",
+        "runNow": "立即运行",
+        "sendTest": "发送测试",
+        "targetSummary": "{{kind}}：{{target}}",
+        "channel": "频道",
+        "user": "用户",
+        "targetRequired": "输入目标用户或频道 ID。",
+        "hourValidation": "小时必须介于 0 到 23 之间。",
+        "minuteValidation": "分钟必须介于 0 到 59 之间。",
+        "labelPlaceholder": "例如：每日提醒运营频道",
+        "sendTo": "发送至",
+        "aUser": "用户",
+        "aChannel": "频道",
+        "channelId": "频道 ID",
+        "userId": "用户 ID（Entra 对象 ID、UPN 或电子邮件）",
+        "targetIdHint": "有关如何查找此 ID，请参阅设置指南。",
+        "channelIdPlaceholder": "19:...@thread.tacv2",
+        "userIdPlaceholder": "user@example.org",
+        "displayName": "显示名称",
+        "displayNameHint": "此目标的可选友好名称。",
+        "displayNamePlaceholder": "例如：运营团队频道",
+        "frequency": "频率",
+        "frequencyHint": "检查未提交值的运行频率。也可通过“立即运行”按需触发。",
+        "daysOfWeek": "星期几",
+        "daysOfWeekHint": "留空则每天运行。",
+        "everyDay": "每天",
+        "anchorMonth": "基准月份",
+        "anchorMonthHint": "周期从该月份开始重复（例如从 2 月开始按季度 = 2 月、5 月、8 月、11 月）。",
+        "dayOfMonth": "每月日期",
+        "dayOfMonthHint": "在周期内的该日（或之后）运行；“最后一天”表示在该月最后一天运行。",
+        "lastDay": "最后一天",
+        "theLastDay": "最后一天",
+        "hourUtc": "小时 (UTC)",
+        "minuteUtc": "分钟 (UTC)",
+        "ordinal": {
+          "zero": "{{count}} 日",
+          "one": "{{count}} 日",
+          "two": "{{count}} 日",
+          "few": "{{count}} 日",
+          "many": "{{count}} 日",
+          "other": "{{count}} 日"
+        },
+        "schedule": {
+          "weeklyEveryDay": "每周（每天），{{time}}",
+          "weeklyDays": "{{days}}，{{time}}",
+          "monthly": "每月 {{day}}，{{time}}",
+          "quarterly": "从 {{month}} 起每季度 {{day}}，{{time}}",
+          "semiAnnually": "从 {{month}} 起每半年 {{day}}，{{time}}",
+          "yearly": "每年 {{month}} {{day}}，{{time}}",
+          "daily": "每日，{{time}}"
+        }
+      },
+      "webhooks": {
+        "title": "Webhook 端点",
+        "description": "当订阅的事件发生时，向外部 URL（Teams、Power Automate 或你自己的服务）发送带签名的 HTTP POST——无需轮询。",
+        "add": "添加端点",
+        "addTitle": "添加 Webhook 端点",
+        "editTitle": "编辑端点 — {{name}}",
+        "editAria": "编辑端点 {{name}}",
+        "actionsAria": "{{name}} 的操作",
+        "deleteConfirm": "删除 Webhook 端点“{{name}}”？\n\n其历史传递记录将保留以供审核。",
+        "deleted": "已删除“{{name}}”。",
+        "rotateConfirm": "为“{{name}}”生成新的签名密钥？\n\n旧密钥将立即失效。",
+        "testQueued": "已为“{{name}}”将测试传递加入队列。请查看下方的传递日志。",
+        "name": "名称",
+        "url": "URL",
+        "eventsLabel": "事件",
+        "empty": "尚无端点。添加一个即可开始接收事件。",
+        "unsignedHint": "未设置签名密钥——传递内容不带签名。",
+        "unsigned": "未签名",
+        "noEvents": "无事件",
+        "eventCount_one": "{{count}} 个事件",
+        "eventCount_other": "{{count}} 个事件",
+        "rotateSecret": "轮换密钥",
+        "generateSecret": "生成密钥",
+        "deliveryHistory": "传递历史记录（包括状态、重试和手动重新传递）位于<auditLink>审核页面</auditLink>的<sectionName>Webhook 传递</sectionName>下。",
+        "nameRequired": "名称为必填项。",
+        "urlValidation": "请输入绝对的 http(s) URL。",
+        "eventRequired": "至少选择一个要订阅的事件。",
+        "namePlaceholder": "Teams – 提交频道",
+        "destinationUrl": "目标 URL",
+        "destinationUrlHint": "带签名的 POST 将发送到此地址。必须是绝对的 http(s) URL。",
+        "urlPlaceholder": "https://example.org/hooks/ingest",
+        "onlyForService": "仅限于服务",
+        "onlyForServiceHint": "仅向一个服务帐户传递。留空则对所有服务触发。",
+        "descriptionLabel": "描述",
+        "descriptionHint": "仅在此管理列表中显示的可选注释。",
+        "generateOnCreate": "生成签名密钥（HMAC-SHA256）。保存后仅显示一次。",
+        "create": "创建端点",
+        "secretTitle": "“{{name}}”的签名密钥",
+        "secretInstructions": "请立即复制——它仅显示一次，之后无法再获取。使用它可验证每次传递的 X-Ingest-Signature 标头。",
+        "copied": "已复制",
+        "copySecret": "复制密钥",
+        "events": {
+          "SubmissionAccepted": {
+            "label": "提交已接受",
+            "description": "服务提交了数据并被接受。"
+          },
+          "SubmissionWarnings": {
+            "label": "提交警告",
+            "description": "已接受的提交带有非阻塞性警告。"
+          },
+          "WindowUpcoming": {
+            "label": "窗口即将到来",
+            "description": "提交窗口即将关闭。"
+          },
+          "WindowMissed": {
+            "label": "窗口已错过",
+            "description": "窗口已关闭，但未收到必需的提交。"
+          },
+          "SubmissionPendingApproval": {
+            "label": "提交待审批",
+            "description": "提交已接受，但正在等待审批。"
+          },
+          "SubmissionApproved": {
+            "label": "提交已审批",
+            "description": "待审批的提交已通过审批，现已生效。"
+          },
+          "SubmissionRejected": {
+            "label": "提交被拒绝",
+            "description": "待审批的提交已被拒绝，不会生效。"
+          }
+        }
+      }
+    },
+    "shell": {
+      "common": {
+        "close": "关闭",
+        "cancel": "取消"
+      },
+      "skipToContent": "跳至主要内容",
+      "primaryAriaLabel": "主要",
+      "mainNavigationAriaLabel": "主导航",
+      "serviceConsole": "服务控制台",
+      "adminConsole": "管理控制台",
+      "navigation": {
+        "dashboard": "仪表板",
+        "submissions": "提交记录",
+        "missing": "缺失",
+        "explore": "探索",
+        "reports": "报表",
+        "accounts": "帐户",
+        "schemas": "架构",
+        "events": "事件",
+        "audit": "审核",
+        "tools": "工具",
+        "settings": "设置"
+      },
+      "submissionsClosed": {
+        "title": "提交已关闭",
+        "message": "来自服务帐户的新提交和编辑已暂时暂停。"
+      },
+      "login": {
+        "hint": "粘贴你的 API 密钥。只有“用户”类型的凭据才能在此处登录（任何角色）；“应用程序”类型的密钥仅供 API 使用。",
+        "applicationKeyError": "此 API 密钥仅供应用程序（非交互式）使用。请向管理员申请“用户”类型的凭据，以访问管理界面。",
+        "continueWith": "继续使用 {{provider}}",
+        "orUseApiKey": "或使用 API 密钥",
+        "apiKey": "API 密钥",
+        "couldNotSignIn": "无法登录",
+        "verifying": "正在验证…",
+        "signIn": "登录",
+        "sso": {
+          "title": "单点登录",
+          "errors": {
+            "notLinked": "该帐户未在此处配置单点登录。请让管理员关联你的身份，或使用 API 密钥登录。",
+            "noEmail": "你的身份提供程序未提供登录所需的、已验证的电子邮件地址。",
+            "remote": "单点登录已取消或失败。请重试。",
+            "default": "单点登录未完成。请重试。"
+          }
+        }
+      },
+      "breadcrumbs": {
+        "home": "主页",
+        "new": "新建",
+        "edit": "编辑",
+        "view": "查看",
+        "status": "状态",
+        "historicalData": "历史数据",
+        "submission": "提交",
+        "missingSubmissions": "缺失的提交"
+      },
+      "topBar": {
+        "pageLocation": "页面位置",
+        "searchPlaceholder": "搜索…",
+        "searchAriaLabel": "搜索 (Ctrl+K)",
+        "role": "角色：{{role}}",
+        "accountMenu": "帐户菜单",
+        "accountMenuFor": "{{name}} 的帐户菜单",
+        "signOut": "注销",
+        "scope": {
+          "names": "此会话只能看到：{{names}}",
+          "count_one": "此会话仅限 {{count}} 个服务。",
+          "count_other": "此会话仅限 {{count}} 个服务。",
+          "badge_one": "受限视图 · {{count}} 个服务",
+          "badge_other": "受限视图 · {{count}} 个服务"
+        }
+      },
+      "account": {
+        "label": "帐户",
+        "kinds": {
+          "User": "用户",
+          "Application": "应用程序"
+        },
+        "roles": {
+          "Service": "服务",
+          "Operator": "操作员",
+          "Admin": "管理员",
+          "Approver": "审批者"
+        }
+      },
+      "search": {
+        "title": "搜索",
+        "placeholder": "搜索操作、架构、值、事件、帐户…",
+        "button": "搜索",
+        "hint": "输入你想要执行的操作（例如“添加用户”、“提交”、“记分卡”），或架构、值、事件、帐户或报表的名称。",
+        "searching": "正在搜索…",
+        "viewAll": "查看全部",
+        "valueCount_one": "{{count}} 个值",
+        "valueCount_other": "{{count}} 个值",
+        "viewAllSchemas_one": "查看全部 {{count}} 个架构",
+        "viewAllSchemas_other": "查看全部 {{count}} 个架构",
+        "inSchema": "在 {{schema}} 中",
+        "matchingValues_one": "{{count}} 个匹配的值",
+        "matchingValues_other": "{{count}} 个匹配的值",
+        "accountKindRole": "{{kind}} · {{role}}",
+        "viewAllAccounts_one": "查看全部 {{count}} 个帐户",
+        "viewAllAccounts_other": "查看全部 {{count}} 个帐户",
+        "eventSummaryRich": "{{kind}} · <timestamp />",
+        "viewAllEvents_one": "查看全部 {{count}} 个事件",
+        "viewAllEvents_other": "查看全部 {{count}} 个事件",
+        "viewAllReports_one": "查看全部 {{count}} 个报表",
+        "viewAllReports_other": "查看全部 {{count}} 个报表",
+        "submissionSummaryRich": "{{schemas}} · <submittedAt />",
+        "noSchemas": "无架构",
+        "recentMatches_one": "{{count}} 条最近的匹配项",
+        "recentMatches_other": "{{count}} 条最近的匹配项",
+        "noResults": "没有与“{{query}}”匹配的结果。请尝试其他关键词。",
+        "sections": {
+          "actions": "操作",
+          "schemas": "架构",
+          "schemaValues": "架构值",
+          "accounts": "帐户",
+          "events": "事件",
+          "reports": "报表",
+          "submissions": "提交记录"
+        },
+        "reportType": {
+          "single": "单次提交报表",
+          "aggregate": "聚合报表"
+        },
+        "actions": {
+          "submission-new": {
+            "title": "新提交",
+            "description": "提交服务的 KPI 数据",
+            "keywords": "提交|添加提交|创建提交|发送数据|报告数据"
+          },
+          "schema-new": {
+            "title": "添加架构",
+            "description": "创建新架构",
+            "keywords": "新架构|创建架构|添加 kpi"
+          },
+          "account-new-user": {
+            "title": "添加用户",
+            "description": "创建新帐户",
+            "keywords": "新用户|创建用户|添加帐户|新帐户|添加操作员|添加管理员|邀请"
+          },
+          "account-new-service": {
+            "title": "添加服务",
+            "description": "创建新的服务帐户",
+            "keywords": "新服务|创建服务|开通服务|添加帐户"
+          },
+          "event-new": {
+            "title": "添加事件",
+            "description": "记录时间线事件",
+            "keywords": "新建事件|创建事件|事故|维护|部署"
+          },
+          "report-upload": {
+            "title": "上传报表",
+            "description": "添加报表定义",
+            "keywords": "新建报表|添加报表|导入报表"
+          },
+          "explore": {
+            "title": "探索",
+            "description": "应用内分析：趋势、比较、快照",
+            "keywords": "分析|解析|图表|趋势|图形"
+          },
+          "explore-scorecard": {
+            "title": "记分卡",
+            "description": "跨架构 RAG 状态板",
+            "keywords": "rag|红黄绿|红琥珀绿|交通灯|状态板|目标"
+          },
+          "explore-anomalies": {
+            "title": "异常",
+            "description": "按周期的异常检测面板",
+            "keywords": "异常|离群值|不寻常|尖峰"
+          },
+          "missing": {
+            "title": "缺失的提交",
+            "description": "各服务尚未提交的内容",
+            "keywords": "缺失|逾期|差距|未提交"
+          },
+          "dashboard": {
+            "title": "仪表板",
+            "description": "首页概览",
+            "keywords": "首页|概述|开始"
+          },
+          "submissions": {
+            "title": "提交记录",
+            "description": "浏览提交的数据",
+            "keywords": "数据|kpi|样本"
+          },
+          "schemas": {
+            "title": "架构",
+            "description": "浏览架构目录",
+            "keywords": "kpi 定义|模板|字段"
+          },
+          "accounts": {
+            "title": "帐户",
+            "description": "服务、操作员、用户和管理员",
+            "keywords": "服务|用户|操作员|管理员|人员"
+          },
+          "events": {
+            "title": "事件",
+            "description": "浏览事件时间线",
+            "keywords": "时间线|事故|维护"
+          },
+          "reports": {
+            "title": "报表",
+            "description": "浏览并呈现报表",
+            "keywords": "报表目录|呈现"
+          },
+          "audit": {
+            "title": "审核",
+            "description": "谁在何时更改了什么",
+            "keywords": "审核日志|历史记录|跟踪|更改"
+          },
+          "tools": {
+            "title": "工具",
+            "description": "备份和还原工具",
+            "keywords": "备份|还原|导出|导入"
+          },
+          "settings": {
+            "title": "设置",
+            "description": "电子邮件、通知、Webhook 和策略",
+            "keywords": "配置|设置|电子邮件|通知|webhook|审批策略"
+          }
+        }
+      },
+      "gridPager": {
+        "rowsPerPage": "每页行数",
+        "results_one": "{{count}} 条结果",
+        "results_other": "{{count}} 条结果",
+        "range": "{{from}}–{{to}}，共 {{total}} 条",
+        "previous": "上一页",
+        "page": "第 {{page}} 页（共 {{totalPages}}）",
+        "next": "下一页"
+      },
+      "rowActions": {
+        "ariaLabel": "行操作"
+      },
+      "period": {
+        "label": "时间段",
+        "from": "开始",
+        "to": "结束",
+        "interval": {
+          "all": "所有时间",
+          "lastDay": "最近 24 小时",
+          "lastWeek": "最近 7 天",
+          "lastMonth": "最近 30 天",
+          "custom": "自定义范围"
+        },
+        "shift": {
+          "1m": "1 个月",
+          "6m": "6 个月",
+          "1y": "1 年"
+        }
+      },
+      "wizard": {
+        "back": "上一步",
+        "finish": "完成",
+        "next": "下一步"
+      },
+      "drawer": {
+        "collapse": "折叠抽屉",
+        "expand": "展开抽屉"
+      },
+      "export": {
+        "csv": "导出 CSV",
+        "exporting": "正在导出…"
+      },
+      "valueLabel": {
+        "required": "必需",
+        "description": "描述",
+        "new": "新增"
+      },
+      "cadence": {
+        "Daily": "每日",
+        "Weekly": "每周",
+        "Fortnightly": "每两周",
+        "Monthly": "每月",
+        "Quarterly": "每季度",
+        "SemiAnnually": "每半年",
+        "Yearly": "每年"
+      },
+      "eventKind": {
+        "PointInTime": "时间点",
+        "Interval": "间隔",
+        "FromNowOn": "今后"
+      },
+      "comments": {
+        "general": "常规"
+      },
+      "confirm": {
+        "namedSubject": "{{noun}}“{{target}}”",
+        "cannotUndo": "此操作无法撤消。",
+        "delete": "删除 {{subject}}？\n\n{{note}}"
+      },
+      "avatars": {
+        "account": "{{kind}} · {{role}}{{context}}",
+        "disabledSuffix": "（已禁用）",
+        "schema": "架构",
+        "schemaDisabled": "架构（已禁用）",
+        "submission": "提交",
+        "submissionStatus": "提交 · {{status}}",
+        "auditChange": "{{target}} · {{change}}",
+        "status": "状态",
+        "deliveryStatus": "{{label}} · {{status}}",
+        "schemaValue": "{{type}}{{context}}"
+      },
+      "submissionStatus": {
+        "Draft": "草稿",
+        "Pending": "待审批",
+        "Approved": "已审批",
+        "Rejected": "已拒绝",
+        "NotRequired": "无需审批"
+      },
+      "deliveryStatus": {
+        "Pending": "待处理",
+        "Sending": "正在发送",
+        "Sent": "已发送",
+        "Failed": "失败"
+      },
+      "auditChange": {
+        "Create": "创建",
+        "Edit": "编辑",
+        "Delete": "删除",
+        "Approve": "批准",
+        "Reject": "拒绝"
+      },
+      "auditTarget": {
+        "User": "用户",
+        "Account": "帐户",
+        "Schema": "架构",
+        "ApiKey": "API 密钥",
+        "Submission": "提交",
+        "Report": "报表",
+        "SchemaHistory": "架构历史记录",
+        "ApprovalRule": "审批规则",
+        "Settings": "设置",
+        "Backup": "备份",
+        "Event": "事件",
+        "CommentThread": "评论话题",
+        "Comment": "评论"
+      },
+      "auditTargetInitials": {
+        "User": "用",
+        "Account": "帐",
+        "Schema": "架",
+        "ApiKey": "密",
+        "Submission": "提",
+        "Report": "表",
+        "SchemaHistory": "史",
+        "ApprovalRule": "规",
+        "Settings": "设",
+        "Backup": "备",
+        "Event": "事",
+        "CommentThread": "话",
+        "Comment": "评"
+      },
+      "valueType": {
+        "String": "字符串",
+        "Integer": "整数",
+        "Number": "数字",
+        "Date": "日期",
+        "Boolean": "布尔值"
+      },
+      "valueTypeInitials": {
+        "String": "S",
+        "Integer": "I",
+        "Number": "N",
+        "Date": "D",
+        "Boolean": "B"
+      },
+      "capabilities": {
+        "groups": {
+          "schemas": "架构",
+          "submissions": "提交记录",
+          "analytics": "分析",
+          "reports": "报表",
+          "accountsKeys": "帐户和密钥",
+          "oversight": "监督",
+          "notificationsIntegrations": "通知和集成",
+          "settings": "设置",
+          "events": "事件",
+          "comments": "评论"
+        },
+        "items": {
+          "schemasRead": {
+            "label": "查看架构",
+            "description": "浏览架构目录、详细信息和历史记录。"
+          },
+          "schemasManage": {
+            "label": "管理架构",
+            "description": "创建、编辑、克隆和删除架构。"
+          },
+          "submissionsRead": {
+            "label": "查看提交",
+            "description": "查看所有服务的提交。"
+          },
+          "submissionsSubmit": {
+            "label": "代提交",
+            "description": "为服务创建、编辑和批量导入提交。"
+          },
+          "submissionsDelete": {
+            "label": "删除提交",
+            "description": "永久删除提交。"
+          },
+          "submissionsApprove": {
+            "label": "审批提交",
+            "description": "批准或拒绝待审批的提交。"
+          },
+          "queryRead": {
+            "label": "查询数据",
+            "description": "使用 OData 源和即席查询端点。"
+          },
+          "exploreRead": {
+            "label": "探索",
+            "description": "使用应用内的“探索”分析。"
+          },
+          "statusRead": {
+            "label": "查看状态",
+            "description": "查看跨服务状态和缺失提交的分析。"
+          },
+          "reportsRead": {
+            "label": "查看报表",
+            "description": "浏览并呈现报表目录。"
+          },
+          "reportsManage": {
+            "label": "管理报表",
+            "description": "上传和删除报表定义。"
+          },
+          "accountsRead": {
+            "label": "查看帐户",
+            "description": "浏览帐户。"
+          },
+          "accountsManage": {
+            "label": "管理帐户",
+            "description": "创建、编辑和删除帐户及其权限。"
+          },
+          "apiKeysRead": {
+            "label": "查看 API 密钥",
+            "description": "查看帐户下的 API 密钥。"
+          },
+          "apiKeysManage": {
+            "label": "管理 API 密钥",
+            "description": "签发和撤销 API 密钥。"
+          },
+          "auditRead": {
+            "label": "查看审核日志",
+            "description": "读取并导出审核记录。"
+          },
+          "privacyRead": {
+            "label": "导出个人数据",
+            "description": "执行数据主体访问请求的导出。"
+          },
+          "privacyManage": {
+            "label": "擦除/保留",
+            "description": "删除个人数据并执行保留策略。"
+          },
+          "backupRead": {
+            "label": "导出备份",
+            "description": "下载完整备份。"
+          },
+          "backupManage": {
+            "label": "还原备份",
+            "description": "从备份还原注册表。"
+          },
+          "notificationsRead": {
+            "label": "查看通知",
+            "description": "查看电子邮件/通知配置、模板和发件箱。"
+          },
+          "notificationsManage": {
+            "label": "管理通知",
+            "description": "编辑电子邮件/通知配置和模板；发送邮件。"
+          },
+          "webhooksRead": {
+            "label": "查看 Webhook",
+            "description": "查看 Webhook 端点和传递记录。"
+          },
+          "webhooksManage": {
+            "label": "管理 Webhook",
+            "description": "创建/编辑 Webhook、轮换密钥、重新传递和清空队列。"
+          },
+          "integrationsRead": {
+            "label": "查看集成",
+            "description": "查看集成（例如 Microsoft Teams）及其连接。"
+          },
+          "integrationsManage": {
+            "label": "管理集成",
+            "description": "创建/编辑集成、编辑连接、运行/测试以及清空队列。"
+          },
+          "settingsRead": {
+            "label": "查看设置",
+            "description": "读取全局设置（例如默认审批策略）。"
+          },
+          "settingsManage": {
+            "label": "管理设置",
+            "description": "更改全局设置（例如默认审批策略）。"
+          },
+          "eventsRead": {
+            "label": "查看事件",
+            "description": "浏览事件时间线。"
+          },
+          "eventsManage": {
+            "label": "管理事件",
+            "description": "创建、编辑和删除事件。"
+          },
+          "commentsRead": {
+            "label": "查看评论",
+            "description": "查看架构（及其值）上的评论话题。"
+          },
+          "commentsCreate": {
+            "label": "创建评论",
+            "description": "创建新话题并回复现有话题；编辑自己的评论。"
+          },
+          "commentsManage": {
+            "label": "管理评论",
+            "description": "编辑、删除或解决/重新打开任何评论或话题——不限于自己的。"
+          }
+        }
+      },
+      "expression": {
+        "empty": "表达式为空。",
+        "invalid": "表达式无效。",
+        "editorAriaLabel": "表达式编辑器",
+        "lint": {
+          "unknownFunction": "未知函数“{{name}}”。",
+          "unknownValue": "未知值“{{name}}”。"
+        },
+        "runtime": {
+          "averageArgument": "average() 需要数字或布尔参数，得到 {{type}}。",
+          "higherThanArity": "higher_than() 需要参数 (value, reference, percentage)。",
+          "higherThanNumeric": "higher_than() 需要数字参数。",
+          "types": {
+            "undefined": "未定义",
+            "object": "对象",
+            "boolean": "布尔值",
+            "number": "数字",
+            "bigint": "大整数",
+            "string": "字符串",
+            "symbol": "符号",
+            "function": "函数"
+          }
+        },
+        "keywords": {
+          "true": "布尔字面量",
+          "false": "布尔字面量",
+          "null": "null 字面量",
+          "and": "逻辑和",
+          "or": "逻辑或",
+          "not": "逻辑非",
+          "in": "成员测试",
+          "like": "SQL 风格的模式匹配"
+        },
+        "functions": {
+          "if": {
+            "description": "当条件为真时返回“then”，否则返回“else”。"
+          },
+          "average": {
+            "description": "数字参数的平均值。布尔值算作 1/0；空值将被忽略。"
+          },
+          "higher_than": {
+            "description": "当 value 超过 reference 的幅度大于 percentage%（例如 50 = 50%）时为 true。"
+          },
+          "coalesce": {
+            "description": "第一个不为 null 的参数。"
+          },
+          "isNull": {
+            "description": "当值为 null 时为 true。"
+          },
+          "len": {
+            "description": "字符串的长度。"
+          },
+          "now": {
+            "description": "当前 UTC 日期和时间。"
+          },
+          "today": {
+            "description": "当前 UTC 日期（时间为零点）。"
+          },
+          "year": {
+            "description": "日期的年份部分。"
+          },
+          "month": {
+            "description": "日期的月份部分 (1-12)。"
+          },
+          "dayOfMonth": {
+            "description": "一个月中的第几天 (1-31)。"
+          },
+          "dayOfWeek": {
+            "description": "一周中的第几天（0 = 星期日）。"
+          },
+          "dayOfYear": {
+            "description": "一年中的第几天 (1-366)。"
+          },
+          "weekOfYear": {
+            "description": "ISO-8601 周数。"
+          },
+          "hour": {
+            "description": "小时部分 (0-23)。"
+          },
+          "minute": {
+            "description": "分钟部分 (0-59)。"
+          },
+          "second": {
+            "description": "秒部分 (0-59)。"
+          },
+          "abs": {
+            "description": "绝对值。"
+          },
+          "ceiling": {
+            "description": "大于或等于该数字的最小整数。"
+          },
+          "floor": {
+            "description": "小于或等于该数字的最大整数。"
+          },
+          "round": {
+            "description": "四舍五入到给定的小数位数。"
+          },
+          "truncate": {
+            "description": "数字的整数部分（去掉小数）。"
+          },
+          "sign": {
+            "description": "数字的符号：-1、0 或 1。"
+          },
+          "sqrt": {
+            "description": "平方根。"
+          },
+          "pow": {
+            "description": "底数的指数次幂。"
+          },
+          "exp": {
+            "description": "e 的给定次幂。"
+          },
+          "log": {
+            "description": "以给定底数计算该数的对数。"
+          },
+          "log10": {
+            "description": "以 10 为底的对数。"
+          },
+          "max": {
+            "description": "两个数字中较大的一个。"
+          },
+          "min": {
+            "description": "两个数字中较小的一个。"
+          },
+          "ieeeRemainder": {
+            "description": "x 除以 y 的 IEEE 754 余数。"
+          },
+          "sin": {
+            "description": "正弦（弧度）。"
+          },
+          "cos": {
+            "description": "余弦（弧度）。"
+          },
+          "tan": {
+            "description": "正切（弧度）。"
+          },
+          "asin": {
+            "description": "反正弦（弧度）。"
+          },
+          "acos": {
+            "description": "反余弦（弧度）。"
+          },
+          "atan": {
+            "description": "反正切（弧度）。"
+          }
+        }
+      }
+    },
+    "accounts": {
+      "title": "帐户",
+      "singular": "帐户",
+      "common": {
+        "yes": "是",
+        "no": "否"
+      },
+      "roles": {
+        "Service": "服务",
+        "Operator": "操作员",
+        "Approver": "审批者",
+        "Admin": "管理员"
+      },
+      "kinds": {
+        "User": "用户",
+        "Application": "应用程序"
+      },
+      "kindHints": {
+        "Application": "仅限 API 使用的凭据（无法登录界面）",
+        "User": "交互式帐户（可登录界面并调用 API）"
+      },
+      "status": {
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "deleted": "已删除"
+      },
+      "fields": {
+        "name": "名称",
+        "label": "标签",
+        "kind": "类型",
+        "role": "角色",
+        "status": "状态",
+        "email": "电子邮件",
+        "area": "区域",
+        "created": "创建时间",
+        "createdBy": "创建者",
+        "modified": "修改时间",
+        "description": "描述",
+        "actions": "操作"
+      },
+      "actions": {
+        "new": "新建帐户",
+        "more": "更多操作",
+        "onboardService": "接入新服务",
+        "onboardOperator": "接入新操作员",
+        "refresh": "刷新",
+        "exporting": "正在导出…",
+        "exportCsv": "导出此列表 (CSV)",
+        "exportJson": "导出帐户 (JSON)",
+        "importing": "正在导入…",
+        "importJson": "导入帐户 (JSON)…",
+        "edit": "编辑",
+        "apiKeys": "API 密钥",
+        "sendEmail": "发送电子邮件",
+        "viewStatus": "查看状态",
+        "exportPersonalData": "导出个人数据",
+        "exportData": "导出数据",
+        "erase": "擦除 (GDPR)",
+        "delete": "删除",
+        "cancel": "取消",
+        "save": "保存",
+        "close": "关闭"
+      },
+      "messages": {
+        "loadFailed": "加载失败",
+        "actionFailed": "操作失败",
+        "loading": "正在加载…",
+        "empty": "尚无帐户——单击“新建帐户”添加一个。"
+      },
+      "validation": {
+        "emailRequired": "电子邮件为必填项。",
+        "emailInvalid": "请输入有效的电子邮件地址。"
+      },
+      "aria": {
+        "viewAccount": "查看帐户 {{name}}",
+        "actionsFor": "{{name}} 的操作"
+      },
+      "confirmDelete": "删除帐户“{{target}}”？\n\n此操作无法撤消。",
+      "import": {
+        "readError": "无法读取帐户文件：{{error}}",
+        "confirm": "从此文件导入帐户？\n\n帐户按名称匹配：已存在的帐户会被更新，新名称会被创建。文件中没有的帐户不受影响。\n\n文件中不包含 API 密钥，因此通过此次导入创建的帐户最初没有密钥——请在之后为每个帐户各生成一个。",
+        "skipped": " · 已跳过 {{count}} 个：{{errors}}",
+        "complete": "导入完成：已创建 {{created}} 个，已更新 {{updated}} 个{{tail}}。"
+      },
+      "placeholders": {
+        "email": "user@example.com",
+        "area": "例如：北部区域"
+      },
+      "editor": {
+        "newTitle": "新建帐户",
+        "editTitle": "编辑帐户",
+        "tabs": {
+          "general": "常规",
+          "permissions": "角色和权限"
+        },
+        "emailHint": "用于电子邮件通知和临时消息。",
+        "areaHint": "可选的分组标签。",
+        "none": "无",
+        "roleHint": "用于预设下方权限的模板——之后可自由调整。"
+      },
+      "scope": {
+        "title": "服务范围",
+        "hint": "此帐户可以查看哪些服务。留空表示可不受限制地访问所有服务；选择一个或多个则仅限于这些服务。",
+        "viewHint": "此帐户可以查看哪些服务。",
+        "allServices": "所有服务",
+        "unrestricted": "所有服务（无限制）"
+      },
+      "permissions": {
+        "title": "权限",
+        "hint": "细粒度的功能权限。上方的角色只是起始模板——可按需调整。",
+        "adminNote": "管理员始终拥有全部权限，且无法削减。",
+        "serviceNote": "服务帐户只能提交和查看自己的数据，不具备任何后台管理权限。"
+      },
+      "onboarding": {
+        "serviceTitle": "接入新服务",
+        "operatorTitle": "接入新操作员",
+        "createAccount": "创建帐户",
+        "details": {
+          "title": "帐户详细信息",
+          "description": "创建新的 {{role}} 帐户。",
+          "nameHint": "稳定的机器可读标识符，全局唯一。",
+          "namePlaceholder": "例如：acme_logistics",
+          "labelPlaceholder": "易读的显示名称",
+          "emailPlaceholder": "contact@example.com"
+        },
+        "kindHints": {
+          "Application": "仅限 API 使用的凭据（无法登录界面）。",
+          "User": "交互式帐户（可登录界面并调用 API）。"
+        },
+        "scope": {
+          "description": "选择此 {{role}} 可以查看哪些服务。留空表示可不受限制地访问所有服务。",
+          "visibleServices": "可见的服务",
+          "hint": "留空表示可不受限制地访问所有服务；选择一个或多个则将此帐户限制为仅这些服务。"
+        },
+        "key": {
+          "title": "API 密钥",
+          "description": "可选：签发一个 API 密钥，使该帐户能够立即调用数据接收 API。",
+          "generateNow": "立即生成 API 密钥",
+          "applicationWarning": "应用程序帐户只能使用 API 密钥进行身份验证。若不生成密钥，则在之后签发密钥之前无法提交数据。",
+          "descriptionLabel": "密钥描述（可选）",
+          "descriptionHint": "说明此密钥的用途或使用者——便于管理临时密钥或休假代班密钥。",
+          "expiryLabel": "密钥到期时间（可选）"
+        },
+        "result": {
+          "created": "{{role}}“{{name}}”已创建",
+          "copyKey": "请立即复制此 API 密钥——它不会再次显示。",
+          "copied": "已复制！",
+          "copyToClipboard": "复制到剪贴板",
+          "copyAria": "复制 API 密钥",
+          "noKey": "未生成 API 密钥。你可以稍后在该帐户的“API 密钥”对话框中签发。"
+        }
+      },
+      "erase": {
+        "title": "擦除 {{name}}",
+        "deleted": "帐户已删除。",
+        "anonymised": "帐户已匿名化。",
+        "resultPrefix": "假名",
+        "resultCounts": "提交 {{submissions}} 项、样本 {{samples}} 项、电子邮件 {{emails}} 封、审核条目 {{auditEntries}} 条、密钥 {{keys}} 个。",
+        "warningBefore": "此操作用于响应删除权请求，属于",
+        "irreversible": "不可逆",
+        "warningAfter": "操作，并会绕过通常的“帐户已提交数据”保护。",
+        "mode": "方式",
+        "anonymiseOption": "匿名化——保留数字/日期类 KPI 值以供报告，清除全部身份信息（将帐户假名化、隐去自由文本、删除密钥和电子邮件）。",
+        "deleteOption": "删除——永久删除该帐户及与其相关的所有内容（提交、样本、电子邮件、审核记录）。",
+        "acknowledgement": "我了解此操作无法撤消。",
+        "erasing": "正在擦除…",
+        "deleteEverything": "删除所有内容",
+        "anonymise": "匿名化"
+      },
+      "email": {
+        "title": "发送电子邮件至 {{name}}",
+        "to": "收件人：{{email}}",
+        "subjectRequired": "主题为必填项。",
+        "queued": "电子邮件已加入发送队列。",
+        "subject": "主题",
+        "message": "正文",
+        "sending": "正在发送…",
+        "send": "发送"
+      },
+      "sso": {
+        "title": "SSO 登录",
+        "hint": "关联身份提供程序中的帐户，使该用户可以通过“继续使用 …”登录。按提供程序和用户已验证的电子邮件进行匹配。",
+        "provider": "提供程序",
+        "remove": "删除 SSO 链接",
+        "add": "添加 SSO 链接"
+      },
+      "audit": {
+        "title": "审核",
+        "by": " · 由 {{name}}"
+      },
+      "keys": {
+        "title": "{{name}} 的 API 密钥",
+        "copyNow": "请立即复制此密钥——它不会再次显示。",
+        "keyId": "密钥 ID",
+        "expires": "到期时间",
+        "never": "永不过期",
+        "revoke": "撤销",
+        "delete": "删除密钥",
+        "deleteAria": "删除密钥 {{keyId}}",
+        "saveDescription": "保存描述",
+        "editDescription": "编辑描述",
+        "nextDescription": "下一个密钥的描述（可选）",
+        "descriptionHint": "说明此密钥的用途或使用者——便于管理临时密钥或休假代班密钥，尤其是设置了到期时间的密钥。",
+        "descriptionPlaceholderShort": "例如：Jane 休假期间代班",
+        "descriptionPlaceholder": "例如：Jane 休假期间代班（审核人）",
+        "nextExpiry": "下一个密钥的到期时间（可选）",
+        "expiryHint": "留空表示密钥永不过期。最长为自今天起两年。",
+        "generate": "生成新密钥",
+        "confirmDeleteRevoked": "永久删除 API 密钥 {{keyId}}？\n\n这会将已撤销的密钥从列表中彻底移除。\n\n此操作无法撤消。",
+        "confirmDeleteActive": "永久删除 API 密钥 {{keyId}}？\n\n该密钥仍然有效——删除它会像撤销一样立即使其失效，同时还会将其从列表中移除。\n\n此操作无法撤消。",
+        "status": {
+          "revoked": "已撤销",
+          "expired": "已到期",
+          "active": "有效"
+        }
+      }
+    },
+    "tools": {
+      "title": "工具",
+      "loading": "正在加载…",
+      "noPermission": "你无权使用这些工具。",
+      "navigationGroup": "备份与还原",
+      "preparing": "正在准备…",
+      "restoring": "正在还原…",
+      "importing": "正在导入…",
+      "restoreFromFile": "从文件还原…",
+      "importFromFile": "从文件导入…",
+      "restoreComplete": "还原完成。",
+      "dataBackup": {
+        "title": "数据备份",
+        "description": "将整个注册表（帐户、密钥、架构、提交、报表、审核日志）导出为单个 JSON 文件，或从该文件还原。",
+        "readError": "无法读取备份文件：{{error}}",
+        "confirmRestore": "从此备份还原？\n\n这会用文件中的内容替换当前的所有数据（帐户、密钥、架构、提交、报表、审核日志），且无法撤消。请先确保你有一份最新的备份。",
+        "warningBeforeSmall": "此工具适用于",
+        "small": "小型",
+        "warningBeforeNot": "部署以及在不同环境之间迁移数据，",
+        "notPrimary": "并非主要的备份机制。",
+        "warningBeforeCommand": "如需真正的备份，请创建数据库级快照（",
+        "warningBeforeReplace": "或使用托管服务提供商的备份）。还原操作会",
+        "replacesAll": "替换所有当前数据",
+        "warningAfterReplace": "并且不具备事务性。",
+        "download": "下载备份"
+      },
+      "configBackup": {
+        "title": "配置备份",
+        "description": "将所有配置（审批策略与规则、电子邮件与通知设置及模板、Webhook、集成和 Teams 连接）导出为单个 JSON 文件，或从该文件还原——用于在不同环境之间复制配置，或在灾难后恢复。",
+        "readError": "无法读取配置文件：{{error}}",
+        "confirmRestore": "从此配置备份还原？\n\n这会用文件中的内容替换当前的所有配置（审批策略与规则、电子邮件与通知设置及模板、Webhook、集成和 Teams 连接），且无法撤消。\n\n只有当此服务器使用与生成该文件的服务器相同的 ApiKey:Pepper 时，加密的机密（SMTP 密码、webhook 密钥、Teams 机器人密码）才可用；否则请在还原后重新输入。如果文件中省略了某项机密，则会保留已存储的值。",
+        "warningBeforeReplace": "还原会",
+        "replacesAll": "替换所有当前配置",
+        "warningBeforePepper": "并且不具备事务性。加密的机密以密文形式包含在内，只有当服务器使用相同的",
+        "warningAfterPepper": "时才能解密；在其他部署中，请在还原后重新输入。如果文件中省略了某项机密，则会保留已存储的值。",
+        "download": "下载配置"
+      },
+      "accountsBackup": {
+        "title": "帐户",
+        "description": "将每个帐户（名称、标签、角色、权限、SSO 链接、启用状态）导出为单个 JSON 文件，或导入文件以创建和更新帐户——便于克隆环境或为新环境预置数据。",
+        "readError": "无法读取帐户文件：{{error}}",
+        "confirmImport": "从此文件导入帐户？\n\n帐户按名称匹配：已存在的帐户会被更新，新名称会被创建。文件中没有的帐户不受影响。\n\n文件中不包含 API 密钥，因此通过此次导入创建的帐户最初没有密钥——请在之后为每个帐户各生成一个。",
+        "keysNeverExported": "API 密钥永远不会导出。",
+        "warningBeforeNoKey": "它们不会以可恢复的形式存储，因此导入的帐户",
+        "noKey": "没有密钥",
+        "warningAfterNoKey": "并且必须重新生成密钥后才能进行身份验证。导入不会造成破坏——文件中没有的帐户将保持原样。",
+        "importCompleteBeforeCreated": "导入完成：",
+        "created": "已创建",
+        "updated": "已更新",
+        "download": "下载帐户"
+      }
+    },
+    "reports": {
+      "title": "报表",
+      "singular": "报表",
+      "actions": {
+        "more": "更多操作",
+        "refresh": "刷新",
+        "upload": "上传报表",
+        "view": "查看",
+        "delete": "删除"
+      },
+      "messages": {
+        "loadFailed": "加载失败",
+        "actionFailed": "无法完成操作",
+        "loading": "正在加载…",
+        "empty": "尚无报表。",
+        "emptyAdmin": "尚无报表——单击“上传报表”添加一个。"
+      },
+      "fields": {
+        "name": "名称",
+        "type": "类型",
+        "targets": "目标",
+        "created": "创建时间",
+        "createdBy": "创建者",
+        "actions": "操作"
+      },
+      "types": {
+        "single": "单次",
+        "aggregate": "聚合"
+      },
+      "targets": {
+        "global": "全局"
+      },
+      "validation": {
+        "emptyFile": "文件为空。"
+      },
+      "aria": {
+        "open": "打开报表 {{name}}",
+        "actionsFor": "{{name}} 的操作"
+      },
+      "confirmDelete": "删除报表“{{target}}”？\n\n此操作无法撤消。",
+      "view": {
+        "back": "返回",
+        "loadFailed": "无法加载报表",
+        "loading": "正在加载报表…",
+        "schema": "架构",
+        "pickGlobalSchema": "选择架构（全局报表）…",
+        "pickSchema": "选择架构…",
+        "period": "时间段",
+        "periods": {
+          "thisMonth": "本月",
+          "lastWeek": "过去 7 天",
+          "lastMonth": "过去 30 天",
+          "lastYear": "最近 365 天",
+          "custom": "自定义范围"
+        },
+        "from": "开始",
+        "to": "结束",
+        "submission": "提交",
+        "submissionOption": "{{service}} — {{date}}（{{count}} 个样本）",
+        "submissionOptionRich": "{{service}} — <submittedAt />（{{count}} 个样本）",
+        "noMatchingSubmissions": "没有符合筛选条件的提交",
+        "pickSubmission": "选择提交…",
+        "rendering": "正在呈现…",
+        "render": "呈现",
+        "renderFailed": "呈现失败",
+        "frameTitle": "报表：{{name}}",
+        "collapse": "折叠",
+        "expand": "展开",
+        "openNewTab": "在新选项卡中打开",
+        "download": "下载"
+      }
+    },
+    "schemasSubmissions": {
+      "approval": {
+        "appliesTo": "适用于",
+        "appliesToHint": "你可以只对手动录入、只对 API 提交，或对两者要求审批。",
+        "approvers": "审批者",
+        "approversHint": "选择可以进行审核的对象：下方的审批者/管理员帐户，和/或服务所有者（发送该提交的帐户，从而让服务可以为自己的数据签核）。请至少将一位标记为“必需”；当每位必需的审批者都批准后，提交即生效。",
+        "globalDefaultHelp": "此项遵循在“设置”—“审批”中配置的全局默认审批策略。",
+        "heading": "审批",
+        "mode": {
+          "globalDefault": "使用全局默认值",
+          "none": "无需审批",
+          "required": "需要审批"
+        },
+        "modeHint": "范围内的提交在获得审批前保持“待审批”状态，在此之前不会出现在 OData 源和“探索”中。为保持向后兼容，默认不要求审批。",
+        "modeLabel": "审批模式",
+        "modifiableHelp": "为已有提交的窗口重新提交数据会替换原数据，并将其审批状态重置为“待审批”——即使之前已通过审批。在等待重新审批期间，它会从 OData 源和“探索”中消失。如果不希望重新提交影响已审批的数据，请将该架构标记为不可修改。",
+        "modifiableTitle": "请注意：此架构可修改",
+        "requiredValidation": "请至少添加一位“必需”的审批者。",
+        "requirement": {
+          "optional": "可选",
+          "required": "必需"
+        },
+        "selectApprovers": "选择审批者",
+        "serviceOwner": "服务所有者（提交数据的服务）",
+        "source": {
+          "apiOnly": "仅 API 提交",
+          "both": "手动提交和 API 提交",
+          "manualOnly": "仅手动（Web 控制台）提交"
+        }
+      },
+      "bulkImport": {
+        "chooseService": "选择服务",
+        "failed": "{{count}} 项失败。",
+        "file": "文件",
+        "format": "格式",
+        "formatHint": "根据文件扩展名自动检测；如有需要可手动更改。",
+        "formats": {
+          "csv": "CSV",
+          "json": "JSON"
+        },
+        "group": "组“{{name}}”",
+        "help": "从 JSON 或 CSV 文件为单个服务导入历史提交。整个文件必须解析成功；随后每条提交会独立验证并保存，因此被拒绝的提交不会阻塞其余提交。已存在的提交会被跳过，因此重复运行同一文件是安全的。",
+        "import": "导入",
+        "importing": "正在导入…",
+        "itemFailed": "（{{count}} 个样本）— 失败",
+        "skipped": "{{count}} 项已存在（已跳过）。",
+        "submissionNumber": "提交 #{{number}}",
+        "summary": "已导入 {{total}} 项提交中的 {{succeeded}} 项。",
+        "title": "导入提交"
+      },
+      "comments": {
+        "comment": "评论",
+        "deleteThread": "删除话题",
+        "deleteThreadWarning": "这将删除该话题中的所有评论。此操作无法撤消。",
+        "edited": "（已编辑）",
+        "empty": "尚无评论。",
+        "general": "常规",
+        "loading": "正在加载评论…",
+        "newThread": "新话题",
+        "open": "打开",
+        "post": "发布",
+        "reopen": "重新打开",
+        "reply": "回复",
+        "replyPlaceholder": "回复…",
+        "required": "评论文字为必填项。",
+        "resolve": "解决",
+        "resolved": "已解决",
+        "resolvedCanReopen": "此话题已解决——重新打开后才能添加新评论。",
+        "resolvedReadOnly": "此话题已解决。",
+        "scope": "范围",
+        "thread": "话题",
+        "threadActions": "话题操作",
+        "title": "评论",
+        "unknown": "未知",
+        "writeComment": "写评论…"
+      },
+      "common": {
+        "actionFailed": "无法完成操作",
+        "actions": "操作",
+        "actionsFor": "{{name}} 的操作",
+        "approvalStatus": {
+          "Approved": "已审批",
+          "NotRequired": "无需审批",
+          "Pending": "待审批",
+          "Rejected": "已拒绝"
+        },
+        "approve": "批准",
+        "audit": "审核",
+        "back": "返回",
+        "by": "由 {{name}}",
+        "cadenceLabel": "频率",
+        "cancel": "取消",
+        "clone": "克隆",
+        "close": "关闭",
+        "continue": "继续",
+        "created": "创建时间",
+        "createdBy": "创建者",
+        "delete": "删除",
+        "deleted": "已删除",
+        "description": "描述",
+        "disabled": "已禁用",
+        "dismiss": "关闭",
+        "download": "下载",
+        "draft": "草稿",
+        "edit": "编辑",
+        "enabled": "已启用",
+        "exportList": "导出此列表",
+        "exporting": "正在导出…",
+        "false": "否",
+        "from": "开始",
+        "global": "全局",
+        "history": "历史记录",
+        "id": "ID",
+        "label": "标签",
+        "loadFailed": "加载失败",
+        "loading": "正在加载…",
+        "modifiable": "可修改",
+        "modified": "修改时间",
+        "moreActions": "更多操作",
+        "name": "名称",
+        "no": "否",
+        "note": "备注",
+        "notes": "备注",
+        "preview": "预览",
+        "publish": "发布",
+        "published": "已发布",
+        "refresh": "刷新",
+        "reject": "拒绝",
+        "remove": "移除",
+        "replacedAt": "替换时间",
+        "requiresApproval": "需要审批",
+        "retry": "重试",
+        "sample": "样本",
+        "samples": "样本",
+        "save": "保存",
+        "saveChanges": "保存更改",
+        "schema": "架构",
+        "service": "服务",
+        "status": "状态",
+        "submission": "提交",
+        "submissions": "提交记录",
+        "submittedAt": "提交时间",
+        "timestamp": "时间戳",
+        "to": "结束",
+        "true": "是",
+        "type": "类型",
+        "untitledSchema": "未命名架构",
+        "value": "值",
+        "valueType": {
+          "Boolean": "是/否",
+          "Date": "日期",
+          "Integer": "整数",
+          "Number": "数字",
+          "String": "文本"
+        },
+        "values": "值",
+        "version": "版本",
+        "view": "查看",
+        "viewDetails": "查看详细信息",
+        "warnings": "警告",
+        "yes": "是"
+      },
+      "dependencies": {
+        "calculatedValue": "计算值",
+        "connectorHelp": "连接线从被引用的值指向其规则依赖该值的值。",
+        "edge": {
+          "calculated": "计算来源",
+          "enabledIf": "启用条件",
+          "submissionValidation": "跨值验证（架构级）",
+          "validation": "有效条件",
+          "visibleIf": "可见条件",
+          "warning": "警告条件"
+        },
+        "failed": "无法构建依赖关系图：",
+        "legend": "图例",
+        "loading": "正在遍历此架构的规则以查找依赖关系…",
+        "noValues": "此架构还没有可用的值——添加一个即可查看其依赖关系。",
+        "none": "尚未在这些值之间检测到依赖关系。",
+        "title": "依赖关系：{{name}}",
+        "value": "值"
+      },
+      "layout": {
+        "addSection": "添加区段",
+        "addSubsection": "添加子区段",
+        "addSubsectionInside": "在内部添加子区段",
+        "allPlaced": "所有值都已放入布局。",
+        "duplicateValue": "值“{{name}}”在布局中出现多次。",
+        "emptyHelp": "从上方拖动值以放置，或添加一个区段。未放置在此处的值仍会在提交表单中最先呈现（不带标题）。",
+        "errorPrefix": "错误：",
+        "missingCaption": "有一个区段缺少标题。",
+        "missingTarget": "布局值节点缺少其目标。",
+        "newSection": "新区段",
+        "notePrefix": "备注：",
+        "removeFromLayout": "从布局中移除",
+        "removeSection": "删除区段",
+        "sectionCaption": "区段标题",
+        "sectionDescription": "区段描述",
+        "sectionDescriptionPlaceholder": "可选的副标题（在标题下呈现）",
+        "sectionHeading": "区段标题",
+        "tooDeep": "布局嵌套太深（最多 32 层）。",
+        "unassignedValues": "未分配的值 ({{count}})",
+        "unassignedWarning": "有 {{count}} 个值未放置在布局中——它们将在各区段之前呈现。",
+        "unknownValue": "布局引用未知值“{{name}}”。",
+        "untitledSection": "（未命名区段）"
+      },
+      "preview": {
+        "bestEffortHeading": "近似预览",
+        "bestEffortHelp": "这会在你的浏览器中根据未保存的架构呈现表单并评估规则。服务器始终具有最终裁定权——此处的部分语义有所不同（正则表达式方言不同，且 sampleTimestamp()/serviceName() 等帮助程序在客户端不可用），因此在依赖某条规则之前，请务必通过真实提交或 API 进行确认。",
+        "conditionalHelp": "条件显示（隐藏/置灰）和内联警告会显示在左侧的表单中。",
+        "findings": {
+          "requiredEmpty": "必填值为空",
+          "schemaRejected": "架构级规则拒绝了此提交",
+          "valueRejected": "值验证规则拒绝了该值"
+        },
+        "loadingServices": "正在加载服务…",
+        "noFilledValues": "尚未填写任何值——请先填写下方的表单。",
+        "noProblems": "当前值没有问题。",
+        "noUsableValues": "此架构尚无可预览的可用值。请先添加一个值。",
+        "previewTitle": "预览：{{name}}",
+        "resetValues": "重置值",
+        "sampleTimestamp": "样本时间戳",
+        "scopes": {
+          "required": "缺少必填项",
+          "schema": "架构级验证",
+          "shape": "格式检查",
+          "value": "值验证"
+        },
+        "selectService": "选择服务",
+        "server": {
+          "acceptedImmediately": "将立即被接受（无需审批）。",
+          "discarded": "被 EnabledIf/VisibleIf 丢弃：{{names}}。",
+          "heldForApproval": "将被暂存以待审批（需要 {{count}} 位审批者）。",
+          "invalid": "无效——{{count}} 个错误",
+          "valid": "有效——真实提交会被接受。"
+        },
+        "serverValidation": "服务器验证",
+        "shape": {
+          "aboveMaximum": "超过最大值 {{value}}",
+          "belowMinimum": "低于最小值 {{value}}",
+          "earlier": "早于 {{value}}",
+          "invalidDate": "值不是有效日期",
+          "later": "晚于 {{value}}",
+          "longer": "超过最大长度 {{value}}",
+          "notNumber": "值不是数字",
+          "pattern": "与模式 {{value}} 不匹配",
+          "regexBrowser": "无法在浏览器中评估正则表达式模式（将在服务器上检查）",
+          "shorter": "小于最小长度 {{value}}",
+          "wholeNumber": "值必须是整数"
+        },
+        "skipCadence": "跳过频率（每周期一次）检查",
+        "skippedValues": "已跳过 {{count}} 个名称为空或重复的值：{{names}}。请为每个值指定唯一名称后再预览。",
+        "testHeading": "测试提交",
+        "testHelp": "以所选服务的身份运行真实的服务器验证——包括同周期重复、历史规则以及可能的审批状态——但不保存任何内容。请填写表单、选择服务，然后单击“验证”。",
+        "testTitle": "测试提交：{{name}}",
+        "timestampPreviewHint": "用于样本以及任何读取日期值的日期类规则。",
+        "timestampServerHint": "用于每个样本以及所有日期/频率/历史规则。",
+        "unnamedValue": "（未命名值）",
+        "validate": "验证",
+        "validateAsService": "以服务身份验证",
+        "validationCount": "将验证 {{count}} 个值。架构必须已保存且对所选服务可见。",
+        "validationResults": "验证结果"
+      },
+      "sampleFields": {
+        "addNotes": "添加备注",
+        "calculated": "计算值",
+        "disabled": "已禁用",
+        "from": "自 {{value}}",
+        "max": "最大值 {{value}}",
+        "maxLength": "最大长度 {{value}}",
+        "min": "最小值 {{value}}",
+        "minLength": "最小长度 {{value}}",
+        "notProvided": "（未提供）",
+        "note": "备注",
+        "optional": "可选",
+        "regex": "正则表达式：{{value}}",
+        "required": "必需",
+        "to": "至 {{value}}",
+        "value": "值{{unit}}"
+      },
+      "schemaEdit": {
+        "addRule": "添加规则",
+        "addValue": "添加值",
+        "amberMax": "可接受（琥珀色）最大值",
+        "amberMaxHint": "高于此值为红色。外侧上限。",
+        "amberMin": "可接受（琥珀色）最小值",
+        "amberMinHint": "低于此值为红色。外侧下限。",
+        "calculated": "计算值",
+        "cancelEditing": "取消并继续编辑",
+        "caption": "标题",
+        "captionHint": "可选标题，呈现在提交表单和视图中该值的上方（类似区段标题）。仅用于显示；客户端会忽略它。",
+        "checking": "正在检查…",
+        "conditionalDisplay": "条件显示",
+        "create": "创建架构",
+        "dateConstraints": "日期约束",
+        "deleteType": "值",
+        "dependencies": "依赖关系",
+        "discardChanges": "放弃更改",
+        "draftUnavailable": "不可用——此架构已存在 {{count}} 项提交。",
+        "editTitle": "编辑架构",
+        "editValue": "编辑值 {{name}}",
+        "enabledIf": "启用条件",
+        "enabledIfHint": "当结果为 false（或 null）时，该值在界面中被禁用，提交的样本会被丢弃并给出警告。留空 = 始终启用。",
+        "enabledPublished": "已启用（已发布）",
+        "expression": "表达式",
+        "expressionHint": "NCalc 公式，只能引用同一提交中的同级值（例如 average(a, b)）。允许链式引用其他计算值。",
+        "greenMax": "理想（绿色）最大值",
+        "greenMaxHint": "内侧上限。需要同时设置琥珀色最大值。",
+        "greenMin": "理想（绿色）最小值",
+        "greenMinHint": "内侧下限。需要同时设置琥珀色最小值。",
+        "incrementVersion": "自动增加版本号（至 {{version}}）",
+        "kind": "类型",
+        "kindHint": "计算值是根据同一提交中的同级值计算得出的，并且永远不会提交。",
+        "layoutHint": "将值拖入区段以进行分组。这只影响提交表单的布局——服务器仍将提交视为扁平列表。",
+        "loading": "正在加载架构…",
+        "max": "最大值",
+        "maxDate": "最大日期 (ISO)",
+        "maxLength": "最大长度",
+        "min": "最小值",
+        "minDate": "最小日期 (ISO)",
+        "minLength": "最小长度",
+        "moveToDraft": "将架构移回草稿并应用更改",
+        "nameFixed": "架构名称在创建后即固定——更改它可能破坏验证规则和现有提交。",
+        "needsValue": "架构至少需要一个值才有意义。",
+        "noRules": "尚无规则。",
+        "noRulesAdd": "尚无规则。使用“添加规则”创建一个。",
+        "notFound": "未找到架构",
+        "numericConstraints": "数值约束",
+        "publishAsIs": "按原样发布，不更改版本号",
+        "publishChanges": "发布更改",
+        "publishHelp": "你更改了此已发布的架构，但未更新版本号。要如何处理？",
+        "readOnlySnapshot": "只读快照",
+        "regexPattern": "正则表达式模式",
+        "removeRule": "删除规则",
+        "removeValueWarning": "删除值可能破坏验证规则，并导致现有提交被拒绝或发生变化。建议改为禁用它（取消选中“已启用”）以保持历史数据完整。\n\n仍要删除吗？",
+        "schemaMissing": "不存在名为“{{name}}”的架构。它可能已被删除。",
+        "sinceVersion": "起始版本",
+        "sinceVersionHint": "可选。若设置为架构的当前版本 ({{version}})，界面会在一个周期内在该值旁显示“新增”标记。留空表示“始终存在”。",
+        "snapshotHelp": "版本 {{version}} 保存于 <savedAt />，作者 {{author}}。这是历史视图，无法编辑——不会影响当前架构。",
+        "snapshotMissing": "该版本快照已不存在。它可能已从历史记录中删除。",
+        "stringConstraints": "字符串约束",
+        "syntaxError": "语法错误：",
+        "tabs": {
+          "approvals": "审批",
+          "general": "常规",
+          "layout": "布局",
+          "validations": "验证"
+        },
+        "targetBand": "目标区间（RAG，可选）",
+        "targetBandHelp": "仅用于报表展示的红/琥珀/绿区间，在图表上以阴影带显示——不会强制执行。可接受（琥珀色）范围为外层区间，理想（绿色）范围位于其中。琥珀色范围之外为红色。每个边界都是可选的，但绿色边界需要同侧对应的琥珀色边界，且边界必须由低到高：琥珀色最小值 ≤ 绿色最小值 ≤ 绿色最大值 ≤ 琥珀色最大值。",
+        "unit": "单位",
+        "userDefined": "用户自定义",
+        "validSyntax": "语法有效",
+        "validation": "验证",
+        "validationPlaceholder": "例如：if(expenses > revenue, 'expenses cannot exceed revenue', null)",
+        "validationsHint": "每条规则在每次提交时针对架构中的所有值运行一次。可添加多条规则以强制执行多个跨值约束。",
+        "valueDetails": "值详细信息",
+        "valueNameFixed": "名称在创建后即固定——验证规则和现有提交都会引用它。如需其他名称，请添加新值。",
+        "valueNameHint": "用作验证规则中的标识符。必须以字母或下划线开头，并且仅包含字母、数字和下划线。",
+        "valueNameValidation": "必须是有效的标识符：仅包含字母、数字和下划线；不能以数字开头。",
+        "valueNumber": "（值 #{{number}}）",
+        "valueValidation": "值验证",
+        "valueValidationHint": "针对提交的样本运行。可用变量包括 value、minimum、maximum。空格和换行符会被忽略。",
+        "versionHint": "引入新值时请递增版本号。版本号不能降低。每个值的“起始版本”必须 ≤ 此版本。",
+        "viewVersionTitle": "查看架构版本",
+        "visibleIf": "可见条件",
+        "visibleIfHint": "当结果为 false（或 null）时，该值在界面中隐藏。服务器端的行为与“启用条件”相同。留空 = 始终可见。",
+        "visibleServices": "对以下服务可见",
+        "warning": "警告",
+        "warningHint": "可选规则；当结果为 true 或返回非空字符串时产生非阻塞性警告。"
+      },
+      "schemaHistory": {
+        "bucketDescription": "{{count}} 个分组——须线表示最小值/最大值，圆点表示平均值",
+        "minAvgMax": "最小值/平均值/最大值",
+        "noNumericValues": "此架构没有数值型的值，因此无法绘制图表。添加“数字”或“整数”类型的值即可查看时间线。",
+        "noSamples": "尚未提交任何样本。",
+        "title": "历史数据"
+      },
+      "schemaVersions": {
+        "actionsForVersion": "版本 {{version}} 的操作",
+        "author": "作者",
+        "bumped": "升版",
+        "changeDate": "更改日期",
+        "deleteAll": "删除所有历史记录",
+        "deleteAllWarning": "这将删除该架构的所有已保存快照。当前架构不受影响。此操作无法撤消。",
+        "deleteEntryWarning": "这仅从历史记录中删除快照。当前架构不受影响。此操作无法撤消。",
+        "deleteThisEntry": "删除此条目",
+        "empty": "未记录版本历史。",
+        "entireHistory": "整个版本历史记录",
+        "entry": "版本历史条目",
+        "entryLabel": "v{{version}}（{{date}}）",
+        "exportCsv": "导出 CSV",
+        "newVersion": "新版本",
+        "oldVersion": "旧版本",
+        "title": "版本历史记录 — {{name}}",
+        "viewThisVersion": "查看此版本",
+        "viewVersion": "查看版本 {{version}}"
+      },
+      "schemas": {
+        "audience": "适用范围",
+        "bumpedAt": "升版于 <bumpedAt />",
+        "deleteType": "架构",
+        "empty": "尚无架构——单击“新建架构”创建一个。",
+        "exampleJson": "提交示例 (JSON)",
+        "frozen": "已冻结",
+        "globalAudience": "全局（对所有服务可见）",
+        "importFailed": "无法导入架构",
+        "jsonObjectError": "JSON 根必须是对象。",
+        "modifiableApprovalHelp": "为已有提交的窗口重新提交数据会替换原数据，并将审批状态重置为“待审批”——即使之前已通过审批——因此较早的值会从实时报表中撤下，并最终被覆盖。如果已审批的数字在周期中途绝不应变化，请将该架构（或值）标记为不可修改。",
+        "modifiableApprovalTitle": "可修改且需要审批",
+        "new": "新建架构",
+        "noServices": "（无服务）",
+        "noValuesDefined": "未定义任何值。",
+        "schemaJson": "架构（JSON）",
+        "schemaPdf": "架构（PDF）",
+        "serviceCount": "{{count}} 个服务",
+        "submissionValidations": "提交验证",
+        "testSubmission": "测试提交",
+        "title": "架构",
+        "upload": "上传架构",
+        "validationRule": "提交验证规则 {{number}}",
+        "valuesCount": "值 ({{count}})",
+        "viewHistoricalData": "查看历史数据",
+        "viewSchema": "查看架构 {{name}}",
+        "viewVersionHistory": "查看版本历史记录"
+      },
+      "submissionDetail": {
+        "change": "更改",
+        "changeType": {
+          "Create": "创建",
+          "Delete": "删除",
+          "Replace": "替换",
+          "Update": "更新"
+        },
+        "changedBy": "更改者",
+        "details": "详细信息",
+        "noChanges": "未记录任何更改。"
+      },
+      "submissionEdit": {
+        "acceptedWarnings": "提交已接受，但存在警告",
+        "clonedHelp": "服务、架构和值已预先填入，时间戳已重置为当前时间。请检查内容，按需调整服务或架构，然后提交以创建新的提交。",
+        "clonedTitle": "已从现有提交克隆。",
+        "editDraftTitle": "编辑草稿",
+        "editTitle": "编辑提交",
+        "missingRequired": "缺少必填值",
+        "multiSchemaHelp": "保存时仅保留 {{name}} 的值。如果你需要其他架构的值，请先选择相应的架构。",
+        "multiSchemaTitle": "源提交包含来自多个架构的值。",
+        "newTitle": "新建提交",
+        "noValues": "此架构未定义任何值。",
+        "pickSchema": "选择架构",
+        "pickSchemaError": "请先选择架构。",
+        "pickSchemaHelp": "选择架构以查看可提交的值。",
+        "pickService": "选择服务",
+        "pickServiceError": "请先选择服务。",
+        "pickServiceFirst": "请先选择服务",
+        "pickServiceSchemaHelp": "选择服务和架构以开始输入值。",
+        "saveAsDraft": "另存为草稿",
+        "saveFailed": "无法保存提交",
+        "submit": "提交",
+        "timestamp": "时间戳 (UTC)",
+        "timestampHint": "应用于此提交中的每个样本。",
+        "valueCountHelp": "共 {{count}} 个值——可选值留空即可跳过",
+        "viewTitle": "查看提交"
+      },
+      "submissions": {
+        "actionsFor": "提交 {{id}} 的操作",
+        "allSchemas": "所有架构",
+        "allServices": "所有服务",
+        "approvalsReceived": "已获得 {{count}} 项必需审批中的 {{approved}} 项。",
+        "cloneNew": "克隆为新提交",
+        "createNew": "创建新提交",
+        "deleteType": "提交",
+        "draftHelp": "此提交是尚未完成的草稿。在发布之前，它不会进入报表统计和审批流程。",
+        "empty": "没有符合这些筛选条件的提交。",
+        "exportPdf": "导出为 PDF",
+        "exportXlsx": "导出 XLSX（单个架构）",
+        "exportXlsxHelp": "将筛选后的提交导出为 XLSX",
+        "importBulk": "批量导入数据",
+        "interval": {
+          "all": "所有时间",
+          "custom": "自定义范围",
+          "label": "间隔",
+          "lastMonth": "最近 30 天",
+          "lastWeek": "最近 7 天",
+          "lastYear": "最近 365 天"
+        },
+        "manualEntry": "手动录入",
+        "myTitle": "我的提交",
+        "new": "新建提交",
+        "pickSchemaForXlsx": "选择单个架构以启用 XLSX 导出",
+        "rejectHelp": "此提交将被标记为已拒绝，并从 OData 源和“探索”中排除，但仍在此处可见。你可以为提交者和其他审核者填写可选的原因。",
+        "rejectPlaceholder": "例如：第 22 周的数据似乎填反了——请重新核对夜班合计数。",
+        "rejectReason": "原因（可选）",
+        "rejectTitle": "拒绝提交",
+        "rejecting": "正在拒绝…",
+        "rejectionReason": "拒绝原因",
+        "source": "来源",
+        "status": {
+          "all": "所有状态"
+        },
+        "temporarilyClosed": "提交已暂时关闭。",
+        "viewFrom": "查看来自 {{label}} 的提交",
+        "warningsCount": "警告 ({{count}})"
+      }
+    },
+    "analytics": {
+      "common": {
+        "actions": "操作",
+        "all": "全部",
+        "allServices": "所有服务",
+        "cadence": "频率",
+        "cancel": "取消",
+        "delete": "删除",
+        "edit": "编辑",
+        "exportCsv": "导出 CSV",
+        "exporting": "正在导出…",
+        "exportListCsv": "导出此列表 (CSV)",
+        "exportView": "导出此视图",
+        "failedToLoad": "加载失败",
+        "loading": "正在加载…",
+        "moreActions": "更多操作",
+        "no": "否",
+        "noData": "没有数据。",
+        "period": "周期",
+        "refresh": "刷新",
+        "save": "保存",
+        "saving": "正在保存…",
+        "schema": "架构",
+        "selectedCount_one": "已选择 {{count}} 项",
+        "selectedCount_other": "已选择 {{count}} 项",
+        "sending": "正在发送…",
+        "service": "服务",
+        "services": "服务",
+        "yes": "是"
+      },
+      "cadence": {
+        "daily": "每日",
+        "weekly": "每周",
+        "fortnightly": "每两周",
+        "monthly": "每月",
+        "quarterly": "每季度",
+        "semiannually": "每半年",
+        "yearly": "每年"
+      },
+      "periodFilter": {
+        "intervals": {
+          "all": "所有时间",
+          "lastDay": "最近 24 小时",
+          "lastWeek": "最近 7 天",
+          "lastMonth": "最近 30 天",
+          "custom": "自定义范围"
+        },
+        "from": "开始",
+        "to": "结束"
+      },
+      "dashboard": {
+        "title": "概述",
+        "welcome": "欢迎，{{name}}",
+        "cards": {
+          "pendingApprovals": "待审批",
+          "operators": "操作员",
+          "admins": "管理员",
+          "submissions": "提交记录",
+          "mySubmissions": "我的提交",
+          "submitData": "提交数据"
+        },
+        "actions": {
+          "review": "审核",
+          "manage": "管理",
+          "browse": "浏览",
+          "newSubmission": "新提交 →",
+          "viewByPeriod": "按期间查看 →"
+        },
+        "missing": {
+          "overdueTitle": "已逾期——上一周期",
+          "overdueDescription": "这些提交窗口已关闭。",
+          "currentTitle": "本周期",
+          "currentDescription": "仍在提交窗口内。",
+          "servicesShort_one": "个服务提交不足",
+          "servicesShort_other": "个服务提交不足"
+        },
+        "trend": {
+          "title": "缺失提交的变化趋势",
+          "loading": "正在加载趋势…",
+          "empty": "没有可用的趋势数据。",
+          "seriesName": "缺失 — {{service}}"
+        }
+      },
+      "missing": {
+        "title": "按周期查看缺失的提交",
+        "titleShort": "缺失的提交",
+        "columns": {
+          "missing": "缺失",
+          "totalRequired": "必需总数"
+        },
+        "trend": {
+          "title": "缺失趋势",
+          "description": "每个 {{cadence}} 周期缺失的必需值总数 · 单击柱形可查看详情"
+        },
+        "chart": {
+          "missing": "缺失"
+        },
+        "byService": {
+          "title": "按服务 — {{period}}",
+          "description": "所选周期内各服务缺失的必需值",
+          "empty": "本周期没有任何缺失。🎉"
+        },
+        "summary": "{{period}} 内 {{services}} 个服务共缺失 {{missing}} 个必需值",
+        "selectedPeriod": "所选周期",
+        "detail": {
+          "complete": "本周期所有必需的提交均已完成。"
+        }
+      },
+      "explore": {
+        "title": "探索",
+        "tabs": {
+          "scorecard": "记分卡",
+          "analysis": "分析",
+          "anomalies": "异常"
+        },
+        "actions": {
+          "exportCsv": "导出 CSV（当前视图）",
+          "exportPng": "导出图表 (PNG)"
+        },
+        "errors": {
+          "nothingToExport": "此视图尚无任何可导出的内容。"
+        },
+        "filters": {
+          "schemas": "架构",
+          "selectSchema": "选择一个架构",
+          "allSchemas": "所有架构",
+          "value": "值",
+          "selectValue": "选择一个值",
+          "show": "显示",
+          "latestAvailable": "最新可用",
+          "lastPeriod": "上一周期",
+          "latestClosed": "最近已关闭",
+          "current": "当前",
+          "aggregation": "聚合",
+          "comparePrevious": "与上一周期对比"
+        },
+        "help": {
+          "schemas": "要扫描异常的架构。留空则扫描所有包含数值的架构。",
+          "schemasAria": "“架构”有什么用？",
+          "show": "“最新可用”显示每个服务最近一次提交，无论其时间多久之前。“上一周期”只显示单个周期，并将该周期未提交的服务标记为灰色的“未提交”卡片。",
+          "showAria": "“显示”有什么用？",
+          "aggregation": "如何将落在每个周期内的样本归并为一个数值，以及如何将多个服务合并为总体数值。平均值按样本数加权；“样本数”仅统计提交的数量。",
+          "aggregationAria": "“聚合”有什么用？",
+          "comparePrevious": "将同一选择向前平移一段时间后叠加显示，便于将本周期与较早的周期对照。需要指定时间段（不能是“所有时间”）；两个区间可以重叠。",
+          "compareAria": "“对比”有什么用？"
+        },
+        "shifts": {
+          "1m": "1 个月",
+          "6m": "6 个月",
+          "1y": "1 年"
+        },
+        "views": {
+          "trend": "趋势",
+          "compare": "服务对比",
+          "snapshot": "快照"
+        },
+        "aggregation": {
+          "average": "平均值",
+          "sum": "求和",
+          "min": "最小值",
+          "max": "最大值",
+          "count": "样本数"
+        },
+        "status": {
+          "green": "达标",
+          "amber": "警告",
+          "red": "未达标",
+          "normal": "无异常",
+          "anomaly": "异常",
+          "noSubmission": "没有提交",
+          "hideMissing": "隐藏缺失项"
+        },
+        "presets": {
+          "label": "预设",
+          "empty": "尚无已保存的预设。",
+          "namePrompt": "预设名称",
+          "limit_one": "最多只能保存 {{count}} 个预设。请先删除一个。",
+          "limit_other": "最多只能保存 {{count}} 个预设。请先删除一个。",
+          "deleteAria": "删除预设 {{name}}",
+          "saveCurrent": "将当前视图保存为预设…"
+        },
+        "anomaly": {
+          "historyWindow": "历史窗口（周期）",
+          "sensitivity": "灵敏度（|z| 阈值）",
+          "baselineMode": "基线模式",
+          "robustHelp": "稳健模式可避免少数极端峰值扭曲基线。标准模式使用平均值和标准差。",
+          "robustAria": "“稳健模式”有什么用？",
+          "robust": "稳健（中位数 / MAD）",
+          "standard": "标准（平均值 / 标准差）",
+          "detection": "异常检测",
+          "highlight": "突出显示异常",
+          "summaryAnomaly_one": "{{count}} 项异常",
+          "summaryAnomaly_other": "{{count}} 项异常",
+          "summaryNormal_one": "{{count}} 项正常",
+          "summaryNormal_other": "{{count}} 项正常",
+          "summaryMissing_one": "{{count}} 项未提交",
+          "summaryMissing_other": "{{count}} 项未提交",
+          "empty": "尚无可扫描的数值型 KPI。请选择一个或多个包含数值的架构，以检查最近周期是否存在异常。",
+          "hideNormal": "隐藏正常项",
+          "noneInPeriod": "{{period}} 周期内没有异常。",
+          "openAnalysis": "在“分析”中打开 · {{state}}"
+        },
+        "scorecard": {
+          "summaryOnTarget_one": "{{count}} 项达标",
+          "summaryOnTarget_other": "{{count}} 项达标",
+          "summaryWarning_one": "{{count}} 项警告",
+          "summaryWarning_other": "{{count}} 项警告",
+          "summaryOffTarget_one": "{{count}} 项未达标",
+          "summaryOffTarget_other": "{{count}} 项未达标",
+          "summaryMissing_one": "{{count}} 项未提交",
+          "summaryMissing_other": "{{count}} 项未提交",
+          "empty": "尚无设置了目标区间的 KPI。为数值型架构值添加可接受/理想范围即可在此处查看。",
+          "hideOnTarget": "隐藏达标项",
+          "allOnTarget": "所有 KPI 均已达标。",
+          "asOf": "截至 <periodDate />",
+          "viewSubmission": "查看提交 · {{state}}"
+        },
+        "content": {
+          "pickSchema": "选择架构以开始探索。",
+          "noNumeric": "此架构没有数值型的值，因此无法绘制图表。添加“数字”或“整数”类型的值即可进行探索。",
+          "trendOverTime": "随时间变化的趋势",
+          "aggregationOf": "{{value}} 的{{aggregation}}",
+          "perCadencePeriod": "按 {{cadence}} 周期",
+          "combineServices": "合并服务",
+          "projection": "预测",
+          "viewAsTable": "以表格形式查看",
+          "showEvents": "显示事件",
+          "noSamples": "当前选择没有样本。",
+          "overallAggregation": "总体 {{aggregation}}",
+          "latestPeriod": "最近周期",
+          "samples": "样本",
+          "periodsServices": "周期 / 服务"
+        },
+        "trend": {
+          "noAnomalies": "当前选择没有异常。",
+          "anomaliesHighlighted_one": "当前选择中突出显示了 {{count}} 项异常。",
+          "anomaliesHighlighted_other": "当前选择中突出显示了 {{count}} 项异常。",
+          "ago": "{{period}} 前",
+          "previous": "上一周期",
+          "projectionName": "{{name}}（预测）",
+          "overallTrend": "整体趋势"
+        },
+        "snapshot": {
+          "title": "各服务的最新值",
+          "description": "每个值的最近周期 · 单元格显示该周期的 {{aggregation}}"
+        }
+      },
+      "events": {
+        "title": "事件",
+        "singular": "事件",
+        "ongoing": "进行中",
+        "removed": "（已删除）",
+        "notApplicable": "不适用",
+        "durationHours_one": "{{count}} 小时",
+        "durationHours_other": "{{count}} 小时",
+        "durationMinutes_one": "{{count}} 分钟",
+        "durationMinutes_other": "{{count}} 分钟",
+        "kinds": {
+          "pointintime": "时间点",
+          "interval": "间隔",
+          "fromnowon": "今后"
+        },
+        "fields": {
+          "label": "标签",
+          "timestamp": "时间戳",
+          "kind": "类型",
+          "duration": "持续时间",
+          "description": "描述",
+          "affects": "影响",
+          "created": "创建时间",
+          "createdBy": "创建者",
+          "modified": "修改时间"
+        },
+        "actions": {
+          "add": "添加事件",
+          "edit": "编辑事件"
+        },
+        "validation": {
+          "labelRequired": "标签为必填项。",
+          "timestampRequired": "时间戳为必填项。",
+          "serviceRequired": "选择至少一项受影响的服务，或选择“所有服务”。",
+          "durationFormat": "无法识别持续时间格式。请使用分钟 (45)、小时:分钟 (1:30) 或天 小时:分钟 (2 03:15)。",
+          "durationRequired": "间隔事件需要持续时间。"
+        },
+        "help": {
+          "fromNowOn": "从上面的时间戳开始运行，直至另行通知。",
+          "duration": "分钟 (45)、小时:分钟 (1:30) 或天小时:分钟 (2 03:15)。"
+        },
+        "placeholders": {
+          "duration": "例如：90 或 1:30",
+          "selectServices": "选择服务"
+        },
+        "deleteConfirm": "删除事件“{{label}}”？\n\n此操作无法撤消。",
+        "empty": "尚无事件。",
+        "emptyManage": "尚无事件——单击“添加事件”创建一个。",
+        "viewAria": "查看事件 {{label}}",
+        "actionsAria": "事件 {{label}} 的操作",
+        "byActor": "由 {{actor}}"
+      },
+      "audit": {
+        "title": "审核",
+        "email": "电子邮件",
+        "delivery": "传递",
+        "actionError": "无法完成操作",
+        "deliveryActionsAria": "传递记录 {{id}} 的操作",
+        "tabs": {
+          "changes": "更改",
+          "sentEmails": "已发送电子邮件",
+          "webhookDeliveries": "Webhook 传递"
+        },
+        "actions": {
+          "sendPending": "立即发送待发送项",
+          "redeliver": "重新传递"
+        },
+        "filters": {
+          "changeType": "更改类型",
+          "targetType": "目标类型"
+        },
+        "columns": {
+          "created": "创建时间",
+          "to": "收件人",
+          "subject": "主题",
+          "status": "状态",
+          "attempts": "尝试次数",
+          "sent": "发送时间",
+          "event": "事件",
+          "url": "URL",
+          "delivered": "传递时间",
+          "lastStatusCode": "最近状态代码",
+          "lastError": "最近错误",
+          "timestamp": "时间戳",
+          "change": "更改",
+          "target": "目标",
+          "changedBy": "更改者",
+          "note": "备注"
+        },
+        "empty": {
+          "changes": "未记录任何更改。",
+          "emails": "未记录任何电子邮件。",
+          "deliveries": "未记录任何传递。"
+        },
+        "changeTypes": {
+          "create": "创建",
+          "edit": "编辑",
+          "delete": "删除",
+          "approve": "批准",
+          "reject": "拒绝"
+        },
+        "targetTypes": {
+          "user": "用户",
+          "account": "帐户",
+          "schema": "架构",
+          "apiKey": "API 密钥",
+          "submission": "提交",
+          "report": "报表",
+          "schemaHistory": "架构历史记录",
+          "approvalRule": "审批规则",
+          "settings": "设置",
+          "backup": "备份",
+          "event": "事件",
+          "commentThread": "评论话题",
+          "comment": "评论"
+        },
+        "statuses": {
+          "pending": "待发送",
+          "sending": "正在发送",
+          "sent": "已发送",
+          "failed": "失败"
+        }
+      },
+      "serviceStatus": {
+        "title": "状态 — {{service}}",
+        "mixed": "混合",
+        "disabled": "已禁用",
+        "empty": "此服务没有可见的架构。",
+        "periods": {
+          "day": "天",
+          "week": "周",
+          "fortnight": "两周",
+          "month": "月",
+          "quarter": "季度",
+          "halfyear": "半年",
+          "year": "年"
+        },
+        "columns": {
+          "submitted": "已提交",
+          "lastSample": "最近样本",
+          "status": "状态"
+        },
+        "submittedHelp": "当前周期窗口内已提交 {{total}} 个有效值中的 {{submitted}} 个——其中必需项为 {{requiredSubmitted}}/{{requiredTotal}}。",
+        "requiredRatio": "必需项 {{submitted}}/{{total}}",
+        "statuses": {
+          "inert": "未激活",
+          "noValues": "无值",
+          "submitted": "已提交",
+          "optional": "可选",
+          "missing": "缺失"
+        }
+      }
+    }
+  }
+}

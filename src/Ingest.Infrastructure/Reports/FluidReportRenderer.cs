@@ -22,7 +22,14 @@ public sealed class FluidReportRenderer : IReportRenderer
     public async Task<string> RenderAsync(string template, object model, CancellationToken ct = default)
     {
         if (!_parser.TryParse(template, out var parsed, out var parseError))
-            throw new ValidationException(new[] { $"Liquid template failed to parse: {parseError}" });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Reports.TemplateParseFailed,
+                    $"Liquid template failed to parse: {parseError}",
+                    ("detail", parseError),
+                    ("engine", "Liquid")),
+            });
 
         ct.ThrowIfCancellationRequested();
         var context = new TemplateContext(model, _options);
@@ -39,7 +46,14 @@ public sealed class FluidReportRenderer : IReportRenderer
             // Render-time failures (filter on a missing field, divide-by-zero, …) come back as
             // ordinary exceptions; surface them through ValidationException so the API layer
             // returns a 400 with a useful message rather than a 500.
-            throw new ValidationException(new[] { $"Liquid template render failed: {ex.Message}" });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Reports.TemplateRenderFailed,
+                    $"Liquid template render failed: {ex.Message}",
+                    ("detail", ex.Message),
+                    ("engine", "Liquid")),
+            });
         }
     }
 

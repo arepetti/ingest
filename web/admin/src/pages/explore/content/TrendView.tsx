@@ -5,9 +5,10 @@ import {
 import {
   CartesianGrid, Legend, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type { EventKind, ExploreValueSeries, IngestEvent, SchemaValue } from '../../../api/types'
 import { addCadence } from '../../../utils/cadence'
-import { eventKindLabel } from '../../../utils/eventKind'
 import { formatPeriodLabel } from '../../../utils/periodFormat'
 import { ragBandRects } from '../../../utils/targetBand'
 import {
@@ -40,6 +41,7 @@ export function TrendView({
   showEvents: boolean
 }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
   const anomalyCount = useMemo(
     () => (anomaly ? countAnomalies(series, combined) : 0),
     [anomaly, series, combined],
@@ -54,8 +56,8 @@ export function TrendView({
       {anomaly && (
         <Text size={200} style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: 4 }}>
           {anomalyCount === 0
-            ? 'No anomalies in the current selection.'
-            : `${anomalyCount} ${anomalyCount === 1 ? 'anomaly' : 'anomalies'} highlighted in the current selection.`}
+            ? t('analytics.explore.trend.noAnomalies')
+            : t('analytics.explore.trend.anomaliesHighlighted', { count: anomalyCount })}
         </Text>
       )}
       {showEvents && markers.length > 0 && <EventsLegend markers={markers} />}
@@ -77,6 +79,7 @@ export function TrendView({
 /** Small legend above the chart naming each event kind actually present in the current markers. */
 function EventsLegend({ markers }: { markers: EventMarker[] }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
   const kinds = useMemo(() => {
     const seen = new Set<EventKind>()
     for (const m of markers) seen.add(m.kind)
@@ -87,7 +90,7 @@ function EventsLegend({ markers }: { markers: EventMarker[] }) {
       {kinds.map(k => (
         <span key={k} className={styles.scLegendItem}>
           <span className={styles.scDot} style={{ backgroundColor: EVENT_KIND_CHART_COLORS[k], width: 10, height: 10 }} />
-          {eventKindLabel(k)}
+          {t(`analytics.events.kinds.${k.toLowerCase()}`)}
         </span>
       ))}
     </div>
@@ -155,11 +158,12 @@ function buildTrend(
   projectPeriods: number,
   previous?: ExploreValueSeries,
   anomaly: boolean = false,
+  t?: TFunction,
 ): { rows: TrendRow[]; defs: SeriesDef[]; projected: boolean; overallTrend: boolean; compared: boolean } {
   const buckets = series.buckets
   const n = buckets.length
   const defs: SeriesDef[] = combined
-    ? [{ key: 'overall', name: 'All services', color: SERIES_COLORS[0] }]
+    ? [{ key: 'overall', name: t?.('analytics.common.allServices') ?? '', color: SERIES_COLORS[0] }]
     : services.map((svc, i) => ({
         key: svc.serviceId,
         name: svc.serviceLabel || svc.serviceName,
@@ -249,12 +253,15 @@ function TrendChart({ series, services, combined, projectPeriods, previous, prev
   anomaly: boolean
   markers: EventMarker[]
 }) {
+  const { t } = useTranslation()
   const bandRects = useMemo(() => (band ? ragBandRects(band) : []), [band])
   const { rows, defs, projected, overallTrend, compared } = useMemo(
-    () => buildTrend(series, services, combined, projectPeriods, previous, anomaly),
-    [series, services, combined, projectPeriods, previous, anomaly],
+    () => buildTrend(series, services, combined, projectPeriods, previous, anomaly, t),
+    [series, services, combined, projectPeriods, previous, anomaly, t],
   )
-  const prevSuffix = previousLabel ? ` (${previousLabel} ago)` : ' (previous)'
+  const prevSuffix = previousLabel
+    ? ` (${t('analytics.explore.trend.ago', { period: previousLabel })})`
+    : ` (${t('analytics.explore.trend.previous')})`
   const showLegend = (!combined && defs.length > 1) || (projected && overallTrend) || compared
   return (
     <ResponsiveContainer width="100%" height={340}>
@@ -334,7 +341,7 @@ function TrendChart({ series, services, combined, projectPeriods, previous, prev
             key={`${def.key}__proj`}
             type="linear"
             dataKey={`${def.key}__proj`}
-            name={`${def.name} (projection)`}
+            name={t('analytics.explore.trend.projectionName', { name: def.name })}
             stroke={def.color}
             strokeWidth={2}
             strokeDasharray="5 5"
@@ -347,7 +354,7 @@ function TrendChart({ series, services, combined, projectPeriods, previous, prev
           <Line
             type="linear"
             dataKey="__trend"
-            name="Overall trend"
+            name={t('analytics.explore.trend.overallTrend')}
             stroke={tokens.colorNeutralForeground2}
             strokeWidth={2}
             strokeDasharray="6 4"
@@ -428,8 +435,9 @@ function TrendTable({ series, services, combined, anomaly }: {
   anomaly: boolean
 }) {
   const styles = useExploreStyles()
+  const { t } = useTranslation()
   const rows = trendRows(series, combined)
-  const cols = combined ? [{ key: 'overall', name: 'All services' }] : services.map(s => ({ key: s.serviceId, name: s.serviceLabel || s.serviceName }))
+  const cols = combined ? [{ key: 'overall', name: t('analytics.common.allServices') }] : services.map(s => ({ key: s.serviceId, name: s.serviceLabel || s.serviceName }))
   // Extra z / anomaly columns are only unambiguous for the single overall line (combined mode).
   const showAnomalyCols = anomaly && combined
   const zByPeriod = new Map(series.buckets.map(b => [formatPeriodLabel(b.periodStart, series.cadence), b]))
@@ -438,10 +446,10 @@ function TrendTable({ series, services, combined, anomaly }: {
       <Table size="small">
         <TableHeader>
           <TableRow>
-            <TableHeaderCell>Period</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.common.period')}</TableHeaderCell>
             {cols.map(c => <TableHeaderCell key={c.key}>{c.name}</TableHeaderCell>)}
             {showAnomalyCols && <TableHeaderCell>z</TableHeaderCell>}
-            {showAnomalyCols && <TableHeaderCell>Anomaly</TableHeaderCell>}
+            {showAnomalyCols && <TableHeaderCell>{t('analytics.explore.status.anomaly')}</TableHeaderCell>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -452,7 +460,7 @@ function TrendTable({ series, services, combined, anomaly }: {
                 <TableCell>{r.period}</TableCell>
                 {cols.map(c => <TableCell key={c.key} className={styles.numCell}>{cell(r[c.key] as number | string | undefined)}</TableCell>)}
                 {showAnomalyCols && <TableCell className={styles.numCell}>{b?.z === null || b?.z === undefined ? '—' : fmt(b.z)}</TableCell>}
-                {showAnomalyCols && <TableCell>{b?.isAnomaly ? 'Yes' : ''}</TableCell>}
+                {showAnomalyCols && <TableCell>{b?.isAnomaly ? t('analytics.common.yes') : ''}</TableCell>}
               </TableRow>
             )
           })}

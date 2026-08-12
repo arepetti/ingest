@@ -42,7 +42,10 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     {
         var written = await service.CreateMineAsync(User.CurrentAccountId(), input, Request.ResolveSource(), draft, ct);
         return Created($"/api/submissions/{written.Submission.Id}",
-            new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
+            new SubmissionWriteResponse(written.Submission.Id, written.Warnings)
+            {
+                WarningDetails = written.WarningDetails,
+            });
     }
 
     /// <summary>Replace one of the caller's submissions in-place.</summary>
@@ -69,7 +72,10 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     public async Task<IActionResult> Replace(Guid id, [FromBody] SubmissionInput input, [FromQuery] bool draft, CancellationToken ct)
     {
         var written = await service.ReplaceMineAsync(User.CurrentAccountId(), id, input, Request.ResolveSource(), draft, ct);
-        return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings));
+        return Ok(new SubmissionWriteResponse(written.Submission.Id, written.Warnings)
+        {
+            WarningDetails = written.WarningDetails,
+        });
     }
 
     /// <summary>Validate a would-be submission without saving anything (dry run).</summary>
@@ -137,7 +143,9 @@ public sealed class SubmissionsController(ISubmissionService service) : Controll
     public async Task<IActionResult> GetMyById(Guid id, CancellationToken ct)
     {
         var s = await service.GetMineAsync(User.CurrentAccountId(), id, ct);
-        return s is null ? NotFound() : Ok(SubmissionDto.From(s));
+        return s is null
+            ? NotFound(DiagnosticProblem.NotFound("Submission", id))
+            : Ok(SubmissionDto.From(s));
     }
 
     /// <summary>Page through the caller's own submissions, optionally filtered by date.</summary>

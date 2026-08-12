@@ -1,3 +1,5 @@
+using Ingest.Core.Common;
+
 namespace Ingest.Core.Abstractions;
 
 /// <summary>Supported on-the-wire formats for an admin bulk import file.</summary>
@@ -27,7 +29,16 @@ public sealed record BulkImportItemResult(
     Guid? SubmissionId,
     int SampleCount,
     IReadOnlyList<string> Errors,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings)
+{
+    /// <summary>Structured counterparts to <see cref="Errors"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> ErrorDetails { get; init; } =
+        Errors.Select(x => Diagnostics.Common.LegacyValidation(x, "imports")).ToList();
+
+    /// <summary>Structured counterparts to <see cref="Warnings"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> WarningDetails { get; init; } =
+        Warnings.Select(x => Diagnostics.Common.LegacyValidation(x, "imports")).ToList();
+}
 
 /// <summary>Summary of a whole bulk import run.</summary>
 /// <param name="Total">Total number of submission groups found in the file.</param>

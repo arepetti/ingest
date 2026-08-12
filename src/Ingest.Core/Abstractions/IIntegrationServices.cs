@@ -1,4 +1,5 @@
 using Ingest.Core.Entities;
+using Ingest.Core.Common;
 
 namespace Ingest.Core.Abstractions;
 
@@ -85,7 +86,17 @@ public interface IIntegrationDispatchService
 /// <summary>Result of verifying the stored Teams bot credentials against Microsoft Entra.</summary>
 /// <param name="Ok">True when a bot token was successfully obtained.</param>
 /// <param name="Error">Failure reason when <paramref name="Ok"/> is false.</param>
-public sealed record TeamsConnectionTestResult(bool Ok, string? Error = null);
+public sealed record TeamsConnectionTestResult(bool Ok, string? Error = null)
+{
+    /// <summary>Structured counterpart to <see cref="Error"/>.</summary>
+    public Diagnostic? ErrorDetail { get; init; } =
+        Error is null
+            ? null
+            : Diagnostic.Create(
+                DiagnosticCodes.Integrations.ConnectionFailed,
+                Error,
+                ("detail", Error));
+}
 
 /// <summary>Resolved (decrypted) Teams bot credentials handed to <see cref="ITeamsClient"/>.</summary>
 /// <param name="AppId">Microsoft App (client) id.</param>

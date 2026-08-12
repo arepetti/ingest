@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Button, Menu, MenuButton, MenuDivider, MenuItem, MenuList, MenuPopover, MenuTrigger,
   makeStyles, tokens,
@@ -47,6 +48,7 @@ const useStyles = makeStyles({
  */
 export function ExplorePresets({ current, onLoad }: { current: string; onLoad: (query: string) => void }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const [presets, setPresets] = useState<Preset[]>(loadPresets)
 
   const persist = (next: Preset[]) => {
@@ -59,11 +61,11 @@ export function ExplorePresets({ current, onLoad }: { current: string; onLoad: (
   }
 
   const saveCurrent = () => {
-    const name = window.prompt('Preset name')?.trim()
+    const name = window.prompt(t('analytics.explore.presets.namePrompt'))?.trim()
     if (!name) return
     const without = presets.filter(p => p.name !== name)
     if (without.length >= MAX_PRESETS) {
-      window.alert(`You can keep at most ${MAX_PRESETS} presets. Delete one first.`)
+      window.alert(t('analytics.explore.presets.limit', { count: MAX_PRESETS }))
       return
     }
     persist([...without, { name, query: current }])
@@ -74,12 +76,12 @@ export function ExplorePresets({ current, onLoad }: { current: string; onLoad: (
   return (
     <Menu>
       <MenuTrigger disableButtonEnhancement>
-        <MenuButton appearance="subtle" size="small" icon={<BookmarkMultiple20Regular />}>Presets</MenuButton>
+        <MenuButton appearance="subtle" size="small" icon={<BookmarkMultiple20Regular />}>{t('analytics.explore.presets.label')}</MenuButton>
       </MenuTrigger>
       <MenuPopover>
         <MenuList>
           {presets.length === 0 ? (
-            <div className={s.empty}>No saved presets yet.</div>
+            <div className={s.empty}>{t('analytics.explore.presets.empty')}</div>
           ) : (
             presets.map(p => (
               <MenuItem key={p.name} onClick={() => onLoad(p.query)}>
@@ -89,7 +91,7 @@ export function ExplorePresets({ current, onLoad }: { current: string; onLoad: (
                     appearance="subtle"
                     size="small"
                     icon={<Delete16Regular />}
-                    aria-label={`Delete preset ${p.name}`}
+                    aria-label={t('analytics.explore.presets.deleteAria', { name: p.name })}
                     onClick={e => { e.stopPropagation(); remove(p.name) }}
                   />
                 </div>
@@ -98,7 +100,7 @@ export function ExplorePresets({ current, onLoad }: { current: string; onLoad: (
           )}
           <MenuDivider />
           <MenuItem icon={<Add20Regular />} onClick={saveCurrent} disabled={atLimit}>
-            Save current as preset…
+            {t('analytics.explore.presets.saveCurrent')}
           </MenuItem>
         </MenuList>
       </MenuPopover>

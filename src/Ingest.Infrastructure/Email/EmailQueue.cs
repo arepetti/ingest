@@ -25,9 +25,18 @@ public sealed class EmailQueue : IEmailQueue
     {
         var to = request.ToAddress?.Trim();
         if (string.IsNullOrWhiteSpace(to) || !MailAddress.TryCreate(to, out _))
-            throw new ValidationException(new[] { $"'{request.ToAddress}' is not a valid email address." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Email.AddressInvalid,
+                    $"'{request.ToAddress}' is not a valid email address.",
+                    ("address", request.ToAddress)),
+            });
         if (string.IsNullOrWhiteSpace(request.Subject))
-            throw new ValidationException(new[] { "Email subject is required." });
+            throw new ValidationException(new[]
+            {
+                new Diagnostic(DiagnosticCodes.Email.EmailSubjectRequired, "Email subject is required."),
+            });
 
         var now = _audit.UtcNow;
         var message = new EmailMessage

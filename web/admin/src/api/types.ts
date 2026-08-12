@@ -1,4 +1,5 @@
 import type { Capability } from './capabilities'
+import type { ApiDiagnostic } from './client'
 
 /**
  * 'User' = interactive account: can log in to the admin UI and call APIs.
@@ -479,6 +480,8 @@ export interface Submission {
   samples: Sample[]
   /** Non-blocking warnings recorded at the last write. Empty for legacy submissions predating warning persistence. */
   warnings: string[]
+  /** Structured counterparts to `warnings`, in the same order. */
+  warningDetails?: ApiDiagnostic[]
   submittedAt: string
   replacedAt?: string | null
   createdAt: string
@@ -509,6 +512,8 @@ export interface SubmissionWriteResponse {
   id: string
   /** Non-blocking warnings (fired Warning rules, EnabledIf/VisibleIf discards). Always present; empty when none. */
   warnings: string[]
+  /** Structured counterparts to `warnings`, in the same order. */
+  warningDetails?: ApiDiagnostic[]
 }
 
 /** One (schema, value) pair a dry-run validation would discard before persistence. */
@@ -525,6 +530,9 @@ export interface SubmissionValidationResponse {
   valid: boolean
   errors: string[]
   warnings: string[]
+  /** Structured counterparts to `errors` / `warnings`, in the same order. */
+  errorDetails?: ApiDiagnostic[]
+  warningDetails?: ApiDiagnostic[]
   discardedSamples: SampleRef[]
   approvalStatus: ApprovalStatus
   requiredApprovers: ApproverSpec[]
@@ -539,6 +547,7 @@ export interface SubmissionValidationResponse {
 export interface ExpressionDependencyResult {
   identifiers: string[]
   error?: string | null
+  errorDetail?: ApiDiagnostic | null
 }
 
 /** File format accepted by the admin bulk import endpoint. */
@@ -563,6 +572,8 @@ export interface BulkImportItemResult {
   sampleCount: number
   errors: string[]
   warnings: string[]
+  errorDetails?: ApiDiagnostic[]
+  warningDetails?: ApiDiagnostic[]
 }
 
 /** Per-group report returned by the bulk import endpoint (the file itself parsed successfully). */
@@ -585,6 +596,7 @@ export interface AccountsImportResult {
   created: number
   updated: number
   errors: string[]
+  errorDetails?: ApiDiagnostic[]
 }
 
 export interface SampleInput {
@@ -779,6 +791,7 @@ export interface EmailMessage {
   status: EmailStatus
   attempts: number
   lastError?: string | null
+  lastErrorDetail?: ApiDiagnostic | null
   createdAt: string
   sentAt?: string | null
   category: string
@@ -1172,6 +1185,7 @@ export interface WebhookDelivery {
   status: WebhookDeliveryStatus
   attempts: number
   lastError?: string | null
+  lastErrorDetail?: ApiDiagnostic | null
   lastStatusCode?: number | null
   createdAt: string
   deliveredAt?: string | null
@@ -1288,6 +1302,7 @@ export interface UpdateTeamsConnectionRequest {
 export interface TeamsConnectionTestResult {
   ok: boolean
   error?: string | null
+  errorDetail?: ApiDiagnostic | null
 }
 
 /** Outcome of an integration run pass. */

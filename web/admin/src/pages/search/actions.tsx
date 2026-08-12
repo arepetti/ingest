@@ -6,6 +6,7 @@ import {
   Settings20Regular, Toolbox20Regular, Warning20Regular,
 } from '@fluentui/react-icons'
 import type { Capability } from '../../api/capabilities'
+import type { TFunction } from 'i18next'
 
 /**
  * A task/action shortcut the global search can surface. This is a purely client-side catalogue:
@@ -31,165 +32,43 @@ export interface SearchAction {
   capabilities?: Capability[]
 }
 
-/**
- * The action catalogue, roughly ordered by how "actionable" each entry is (create/do first, then
- * navigate). Ordering here is only a tie-breaker; relevance scoring against the query dominates.
- */
-export const ACTIONS: SearchAction[] = [
-  // --- Create / do -------------------------------------------------------------------------
-  {
-    id: 'submission-new',
-    title: 'New submission',
-    description: 'Submit KPI data for a service',
-    keywords: ['submit', 'add submission', 'create submission', 'send data', 'report data'],
-    to: '/submissions/new',
-  },
-  {
-    id: 'schema-new',
-    title: 'Add schema',
-    description: 'Create a new schema',
-    keywords: ['new schema', 'create schema', 'add kpi'],
-    to: '/schemas/new',
-    capabilities: ['schemas:manage'],
-  },
-  {
-    id: 'account-new-user',
-    title: 'Add user',
-    description: 'Create a new account',
-    keywords: ['new user', 'create user', 'add account', 'new account', 'add operator', 'add admin', 'invite'],
-    to: '/services?new=1',
-    capabilities: ['accounts:manage'],
-  },
-  {
-    id: 'account-new-service',
-    title: 'Add service',
-    description: 'Create a new service account',
-    keywords: ['new service', 'create service', 'onboard service', 'add account'],
-    to: '/services?new=1',
-    capabilities: ['accounts:manage'],
-  },
-  {
-    id: 'event-new',
-    title: 'Add event',
-    description: 'Record a timeline event',
-    keywords: ['new event', 'create event', 'incident', 'maintenance', 'deployment'],
-    to: '/events?new=1',
-    capabilities: ['events:manage'],
-  },
-  {
-    id: 'report-upload',
-    title: 'Upload report',
-    description: 'Add a report definition',
-    keywords: ['new report', 'add report', 'import report'],
-    to: '/reports',
-    capabilities: ['reports:manage'],
-  },
-  // --- Analytics ---------------------------------------------------------------------------
-  {
-    id: 'explore',
-    title: 'Explore',
-    description: 'In-app analytics: trends, compare, snapshot',
-    keywords: ['analytics', 'analyse', 'analyze', 'chart', 'trend', 'graph'],
-    to: '/explore',
-    capabilities: ['explore:read'],
-  },
-  {
-    id: 'explore-scorecard',
-    title: 'Scorecard',
-    description: 'Cross-schema RAG status board',
-    keywords: ['rag', 'red amber green', 'traffic light', 'status board', 'targets'],
-    to: '/explore?tab=scorecard',
-    capabilities: ['explore:read'],
-  },
-  {
-    id: 'explore-anomalies',
-    title: 'Anomalies',
-    description: 'Per-period anomaly detection board',
-    keywords: ['anomaly', 'outlier', 'unusual', 'spike'],
-    to: '/explore?tab=anomalies',
-    capabilities: ['explore:read'],
-  },
-  {
-    id: 'missing',
-    title: 'Missing submissions',
-    description: 'What each service still owes',
-    keywords: ['missing', 'overdue', 'gaps', 'not submitted'],
-    to: '/missing',
-    capabilities: ['status:read'],
-  },
-  // --- Navigate ----------------------------------------------------------------------------
-  {
-    id: 'dashboard',
-    title: 'Dashboard',
-    description: 'Home overview',
-    keywords: ['home', 'overview', 'start'],
-    to: '/',
-    icon: <Board20Regular />,
-  },
-  {
-    id: 'submissions',
-    title: 'Submissions',
-    description: 'Browse submitted data',
-    keywords: ['data', 'kpi', 'samples'],
-    to: '/submissions',
-  },
-  {
-    id: 'schemas',
-    title: 'Schemas',
-    description: 'Browse the schema catalogue',
-    keywords: ['kpi definitions', 'templates', 'fields'],
-    to: '/schemas',
-    capabilities: ['schemas:read'],
-  },
-  {
-    id: 'accounts',
-    title: 'Accounts',
-    description: 'Services, operators, users and admins',
-    keywords: ['services', 'users', 'operators', 'admins', 'people'],
-    to: '/services',
-    capabilities: ['accounts:read'],
-  },
-  {
-    id: 'events',
-    title: 'Events',
-    description: 'Browse the events timeline',
-    keywords: ['timeline', 'incidents', 'maintenance'],
-    to: '/events',
-    capabilities: ['events:read'],
-  },
-  {
-    id: 'reports',
-    title: 'Reports',
-    description: 'Browse and render reports',
-    keywords: ['report catalogue', 'render'],
-    to: '/reports',
-    capabilities: ['reports:read'],
-  },
-  {
-    id: 'audit',
-    title: 'Audit',
-    description: 'Who changed what, when',
-    keywords: ['audit log', 'history', 'trail', 'changes'],
-    to: '/audit',
-    capabilities: ['audit:read'],
-  },
-  {
-    id: 'tools',
-    title: 'Tools',
-    description: 'Backup and restore utilities',
-    keywords: ['backup', 'restore', 'export', 'import'],
-    to: '/tools',
-    capabilities: ['backup:read'],
-  },
+type SearchActionDefinition = Omit<SearchAction, 'title' | 'description' | 'keywords'>
+
+/** Route/capability metadata stays language-neutral; display and matching copy comes from i18n. */
+const ACTION_DEFINITIONS: SearchActionDefinition[] = [
+  { id: 'submission-new', to: '/submissions/new' },
+  { id: 'schema-new', to: '/schemas/new', capabilities: ['schemas:manage'] },
+  { id: 'account-new-user', to: '/services?new=1', capabilities: ['accounts:manage'] },
+  { id: 'account-new-service', to: '/services?new=1', capabilities: ['accounts:manage'] },
+  { id: 'event-new', to: '/events?new=1', capabilities: ['events:manage'] },
+  { id: 'report-upload', to: '/reports', capabilities: ['reports:manage'] },
+  { id: 'explore', to: '/explore', capabilities: ['explore:read'] },
+  { id: 'explore-scorecard', to: '/explore?tab=scorecard', capabilities: ['explore:read'] },
+  { id: 'explore-anomalies', to: '/explore?tab=anomalies', capabilities: ['explore:read'] },
+  { id: 'missing', to: '/missing', capabilities: ['status:read'] },
+  { id: 'dashboard', to: '/', icon: <Board20Regular /> },
+  { id: 'submissions', to: '/submissions' },
+  { id: 'schemas', to: '/schemas', capabilities: ['schemas:read'] },
+  { id: 'accounts', to: '/services', capabilities: ['accounts:read'] },
+  { id: 'events', to: '/events', capabilities: ['events:read'] },
+  { id: 'reports', to: '/reports', capabilities: ['reports:read'] },
+  { id: 'audit', to: '/audit', capabilities: ['audit:read'] },
+  { id: 'tools', to: '/tools', capabilities: ['backup:read'] },
   {
     id: 'settings',
-    title: 'Settings',
-    description: 'Email, notifications, webhooks and policy',
-    keywords: ['configuration', 'config', 'email', 'notifications', 'webhooks', 'approval policy'],
     to: '/settings',
     capabilities: ['settings:read', 'settings:manage', 'notifications:read', 'notifications:manage', 'webhooks:read', 'webhooks:manage'],
   },
 ]
+
+export function getSearchActions(t: TFunction): SearchAction[] {
+  return ACTION_DEFINITIONS.map(action => ({
+    ...action,
+    title: t(`shell.search.actions.${action.id}.title`),
+    description: t(`shell.search.actions.${action.id}.description`),
+    keywords: t(`shell.search.actions.${action.id}.keywords`).split('|').map(x => x.trim()).filter(Boolean),
+  }))
+}
 
 // Default icons for actions that don't set one explicitly, keyed by id so the catalogue above stays
 // terse. Anything without an entry here falls back to a generic "action" glyph.
@@ -254,9 +133,13 @@ export function scoreFields(query: string, fields: (string | null | undefined)[]
  * Match the action catalogue against a query, filtered to what the caller can use. Results are
  * ordered by relevance (then title) and capped so the actions block stays scannable.
  */
-export function matchActions(query: string, canUse: (a: SearchAction) => boolean): SearchAction[] {
+export function matchActions(
+  query: string,
+  canUse: (a: SearchAction) => boolean,
+  t: TFunction,
+): SearchAction[] {
   if (!query.trim()) return []
-  return ACTIONS
+  return getSearchActions(t)
     .filter(canUse)
     .map(a => ({ a, score: scoreFields(query, [a.title, ...a.keywords]) }))
     .filter((x): x is { a: SearchAction; score: number } => x.score !== null)

@@ -26,13 +26,21 @@ public sealed class ProblemDetailsExceptionHandler : IExceptionHandler
     {
         ProblemDetails problem = exception switch
         {
-            NotFoundException nf => new ProblemDetails { Status = StatusCodes.Status404NotFound, Title = "Not found", Detail = nf.Message },
-            ConflictException cx => new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Conflict", Detail = cx.Message },
-            ForbiddenException fx => new ProblemDetails { Status = StatusCodes.Status403Forbidden, Title = "Forbidden", Detail = fx.Message },
-            ServiceUnavailableException su => new ProblemDetails { Status = StatusCodes.Status503ServiceUnavailable, Title = "Submissions closed", Detail = su.Message },
+            NotFoundException nf => BuildDomainProblem(StatusCodes.Status404NotFound, "Not found", nf),
+            ConflictException cx => BuildDomainProblem(StatusCodes.Status409Conflict, "Conflict", cx),
+            ForbiddenException fx => BuildDomainProblem(StatusCodes.Status403Forbidden, "Forbidden", fx),
+            ServiceUnavailableException su => BuildDomainProblem(StatusCodes.Status503ServiceUnavailable, "Submissions closed", su),
             ValidationException vx => BuildValidationProblem(vx),
-            UnauthorizedAccessException => new ProblemDetails { Status = StatusCodes.Status401Unauthorized, Title = "Unauthorized" },
-            _ => new ProblemDetails { Status = StatusCodes.Status500InternalServerError, Title = "Internal error" },
+            UnauthorizedAccessException => BuildProblem(
+                StatusCodes.Status401Unauthorized,
+                "Unauthorized",
+                detail: null,
+                new Diagnostic(DiagnosticCodes.Common.Unauthorized, "Unauthorized")),
+            _ => BuildProblem(
+                StatusCodes.Status500InternalServerError,
+                "Internal error",
+                detail: null,
+                new Diagnostic(DiagnosticCodes.Common.Internal, "Internal error")),
         };
 
         if (problem.Status == StatusCodes.Status500InternalServerError)
@@ -43,6 +51,22 @@ public sealed class ProblemDetailsExceptionHandler : IExceptionHandler
         return true;
     }
 
+    private static ProblemDetails BuildDomainProblem(int status, string title, DomainException exception) =>
+        BuildProblem(status, title, exception.Message, exception.Diagnostic);
+
+    private static ProblemDetails BuildProblem(int status, string title, string? detail, Diagnostic diagnostic)
+    {
+        var problem = new ProblemDetails
+        {
+            Status = status,
+            Title = title,
+            Detail = detail,
+        };
+        problem.Extensions["code"] = diagnostic.Code;
+        problem.Extensions["params"] = diagnostic.Params;
+        return problem;
+    }
+
     /// <summary>
     /// Validation failures are special: callers (especially the React UI) read individual errors
     /// from <c>extensions.errors</c>, so we surface the list alongside the standard problem-details
@@ -50,13 +74,13 @@ public sealed class ProblemDetailsExceptionHandler : IExceptionHandler
     /// </summary>
     private static ProblemDetails BuildValidationProblem(ValidationException vx)
     {
-        var problem = new ProblemDetails
-        {
-            Status = StatusCodes.Status400BadRequest,
-            Title = "Validation failed",
-            Detail = vx.Message,
-        };
+        var problem = BuildProblem(
+            StatusCodes.Status400BadRequest,
+            "Validation failed",
+            vx.Message,
+            vx.Diagnostic);
         problem.Extensions["errors"] = vx.Errors;
+        problem.Extensions["errorDetails"] = vx.ErrorDetails;
         return problem;
     }
 }

@@ -1,0 +1,2595 @@
+{
+  "metadata": {
+    "locale": "zh-TW",
+    "description": "Traditional Chinese as used in Taiwan",
+    "nativeLabel": "繁體中文（台灣）",
+    "englishLabel": "Chinese (Traditional, Taiwan)"
+  },
+  "strings": {
+    "app": {
+      "title": "Ingest Admin"
+    },
+    "apiErrors": {
+      "unexpected": "發生錯誤。",
+      "status": {
+        "400": "要求無效。",
+        "401": "API 金鑰未被接受。",
+        "403": "您沒有執行此操作的權限。",
+        "404": "找不到該項目。",
+        "408": "要求逾時，請再試一次。",
+        "409": "此操作與其他變更衝突。請重新載入後再試一次。",
+        "410": "該項目已無法使用。",
+        "413": "要求過大。",
+        "415": "不支援此內容類型。",
+        "422": "無法處理資料。",
+        "429": "要求過多，請稍後再試。",
+        "500": "伺服器發生錯誤，請再試一次。",
+        "502": "伺服器目前沒有回應，請稍後再試。",
+        "503": "伺服器目前沒有回應，請稍後再試。",
+        "504": "伺服器目前沒有回應，請稍後再試。",
+        "server": "伺服器發生錯誤，請再試一次。",
+        "request": "要求失敗。",
+        "unexpected": "發生非預期的情況。"
+      }
+    },
+    "apiMessages": {
+      "common": {
+        "not_found": "找不到 {{resource}}。",
+        "conflict": "要求與目前狀態衝突。{{message}}",
+        "forbidden": "您沒有執行此操作的權限。{{message}}",
+        "unauthorized": "請登入後繼續。",
+        "service_unavailable": "此服務暫時無法使用。{{message}}",
+        "validation": "驗證失敗。{{message}}",
+        "internal": "伺服器發生錯誤，請再試一次。",
+        "feature_disabled": "此功能尚未啟用。{{message}}"
+      },
+      "api": {
+        "invalid_request": "要求無效。{{message}}",
+        "missing_required_parameter": "缺少必要參數「{{parameter}}」。",
+        "unsupported_omit": "不支援 omit 值「{{value}}」。",
+        "single_parameter_required": "{{operation}} 需要一個「{{parameter}}」值。",
+        "service_outside_scope": "服務「{{serviceId}}」不在您的指派範圍內。"
+      },
+      "submissions": {
+        "validation": "提交項目驗證失敗。{{message}}",
+        "duplicate_period": "「{{displayName}}」已在此 {{cadence}} 期間提交。",
+        "pending_duplicate_period": "「{{displayName}}」在此 {{cadence}} 期間已有等待核准的提交項目。",
+        "schema_not_assigned": "結構描述「{{schemaName}}」未指派給此服務。",
+        "schema_disabled": "結構描述「{{schemaName}}」目前已停用。",
+        "value_not_defined": "值「{{valueName}}」未在結構描述「{{schemaName}}」中定義。",
+        "calculated_value_submitted": "無法提交計算值「{{valueName}}」。",
+        "value_disabled": "值「{{displayName}}」目前已停用。",
+        "value_required": "值「{{displayName}}」為必填。",
+        "required_value_missing": "缺少必填值「{{displayName}}」（{{schemaName}}.{{valueName}}）。",
+        "value_type": "值「{{displayName}}」必須是有效的 {{expectedType}}。",
+        "value_minimum": "值「{{displayName}}」不得小於 {{minimum}}（收到 {{actual}}）。",
+        "value_maximum": "值「{{displayName}}」不得大於 {{maximum}}（收到 {{actual}}）。",
+        "value_before_minimum_date": "值「{{displayName}}」（{{schemaName}}.{{valueName}}）必須不早於 {{minimum}}（收到 {{actual}}）。",
+        "value_after_maximum_date": "值「{{displayName}}」（{{schemaName}}.{{valueName}}）必須不晚於 {{maximum}}（收到 {{actual}}）。",
+        "value_minimum_length": "值「{{displayName}}」至少需要 {{minimum}} 個字元（收到 {{actual}} 個）。",
+        "value_maximum_length": "值「{{displayName}}」最多允許 {{maximum}} 個字元（收到 {{actual}} 個）。",
+        "value_regex": "值「{{displayName}}」不符合所需格式。",
+        "value_validation_failed": "「{{displayName}}」驗證失敗：{{detail}}",
+        "value_validation_error": "無法評估「{{displayName}}」的驗證規則：{{detail}}",
+        "schema_validation_failed": "結構描述「{{schemaName}}」的提交項目驗證失敗：{{detail}}",
+        "schema_validation_error": "無法評估結構描述「{{schemaName}}」的驗證規則：{{detail}}",
+        "value_not_modifiable": "無法變更值「{{displayName}}」。",
+        "gating_evaluation_error": "無法評估「{{schemaName}} / {{valueName}}」的 {{rule}} 規則：{{detail}}",
+        "sample_discarded": "已捨棄一個提交的樣本。{{message}}",
+        "sample_discarded_with_message": "樣本「{{schemaName}} / {{valueName}}」已遭 {{rule}} 規則捨棄：{{detail}}",
+        "sample_discarded_by_rule": "樣本「{{schemaName}} / {{valueName}}」已遭 {{rule}} 規則捨棄。",
+        "warning_rule_triggered": "已觸發「{{displayName}}」的警告規則。",
+        "warning_rule_message": "「{{displayName}}」的警告：{{detail}}",
+        "warning_rule_error": "無法評估「{{displayName}}」的警告規則：{{detail}}",
+        "legacy_warning": "{{message}}",
+        "published_cannot_become_draft": "已發佈的提交項目無法還原為草稿。",
+        "not_awaiting_approval": "此提交項目並未等待核准。",
+        "wrong_owner": "此提交項目屬於其他帳戶。",
+        "window_not_open": "提交時段尚未開放。{{message}}",
+        "window_closed": "提交時段已關閉。{{message}}",
+        "create_window_not_open": "「{{schemaName}}.{{valueName}}」的 {{cadence}} 提交時段將於 {{windowStart}} 開放。",
+        "create_window_closed": "「{{schemaName}}.{{valueName}}」的 {{cadence}} 提交時段已於 {{windowEnd}} 關閉。",
+        "modify_window_closed": "無法修改提交項目 {{submissionId}}：「{{schemaName}}.{{valueName}}」的 {{cadence}} 時段已於 {{windowEnd}} 關閉。",
+        "ingestion_closed": "提交已暫時關閉。{{message}}"
+      },
+      "imports": {
+        "invalid_file": "匯入檔案無效。{{message}}",
+        "empty_file": "匯入檔案是空的。",
+        "invalid_json": "匯入檔案不是有效的 JSON：{{detail}}",
+        "unsupported_format": "不支援此匯入格式。{{message}}",
+        "submissions_not_array": "「submissions」屬性必須是陣列，不能是 {{actualKind}}。",
+        "invalid_root": "匯入根類型 {{actualKind}} 無效。可接受的形式：{{acceptedShapes}}。",
+        "submission_not_object": "提交項目 {{submissionNumber}} 必須是物件，不能是 {{actualKind}}。",
+        "samples_missing": "提交項目 {{submissionNumber}} 必須包含 samples 陣列（收到 {{actualKind}}）。",
+        "sample_names_required": "提交項目 {{submissionNumber}} 的樣本 {{sampleNumber}} 需要 schemaName「{{schemaName}}」和 valueName「{{valueName}}」。",
+        "sample_invalid_json": "提交項目 {{submissionNumber}} 的樣本 {{sampleNumber}} 在第 {{lineNumber}} 行、第 {{bytePositionInLine}} 個位元組包含無效的 JSON：{{detail}}",
+        "submission_no_samples": "提交項目 {{submissionNumber}} 不包含有效的樣本。",
+        "missing_column": "缺少必要欄位「{{column}}」。",
+        "row_names_required": "第 {{row}} 列需要 schemaName「{{schemaName}}」和 valueName「{{valueName}}」。",
+        "row_timestamp_invalid": "第 {{row}} 列的時間戳記「{{timestamp}}」無效。",
+        "no_data_rows": "匯入檔案不包含資料列。",
+        "invalid_row": "匯入資料列無效。{{message}}",
+        "no_submissions": "檔案中找不到任何提交項目。",
+        "accounts": {
+          "invalid_marker": "此檔案不是 Ingest 帳戶匯出檔。",
+          "invalid_json": "{{fileType}} 檔案不是有效的 JSON：{{detail}}",
+          "unsupported_version": "不支援帳戶匯出版本 {{actualVersion}}；應為版本 {{expectedVersion}}。",
+          "no_accounts": "帳戶檔案中沒有帳戶。",
+          "entry_name_missing": "帳戶項目因缺少 accountName「{{accountName}}」而被略過。",
+          "entry_failed": "已略過一個帳戶項目。{{message}}"
+        }
+      },
+      "accounts": {
+        "validation": "帳戶驗證失敗。{{message}}",
+        "already_exists": "帳戶「{{accountName}}」已存在。",
+        "invalid_email": "「{{email}}」不是有效的電子郵件地址。",
+        "unknown_capabilities": "未知的功能權限：{{capabilities}}。",
+        "invalid_assigned_services": "一或多個指派的服務 ID 無效：{{serviceIds}}。",
+        "invalid_sso_link": "SSO 連結無效。{{message}}",
+        "sso_links_user_only": "只有 User 帳戶可以設定 SSO 連結；此帳戶為 {{accountKind}}。",
+        "sso_link_fields_required": "每個 SSO 連結都需要 provider「{{provider}}」和 email「{{email}}」。",
+        "duplicate_sso_link": "{{provider}} / {{email}} 的 SSO 連結重複。",
+        "sso_link_in_use": "{{provider}} 身分「{{email}}」已連結至其他帳戶。",
+        "delete_in_use": "帳戶「{{accountName}}」已有提交的資料，無法刪除。請改為停用。",
+        "api_key_description_too_long": "API 金鑰描述為 {{actualLength}} 個字元；上限為 {{maxLength}} 個。",
+        "api_key_expiry_not_future": "API 金鑰到期時間 {{expiry}} 必須晚於 {{now}}。",
+        "api_key_expiry_too_distant": "API 金鑰到期時間 {{expiry}} 超出 {{now}} 後 {{maxLifetimeYears}} 年。"
+      },
+      "schemas": {
+        "validation": "結構描述驗證失敗。{{message}}",
+        "already_exists": "結構描述「{{schemaName}}」已存在。",
+        "delete_in_use": "結構描述「{{schemaName}}」已由提交項目使用，無法刪除。請改為停用。",
+        "version_negative": "結構描述版本 {{version}} 必須至少為 {{minimum}}。",
+        "version_decreased": "結構描述版本不能從 {{previousVersion}} 降至 {{requestedVersion}}。",
+        "value_name_invalid": "值名稱「{{valueName}}」必須符合 {{pattern}}。",
+        "since_version_negative": "值「{{valueName}}」的 sinceVersion 為 {{sinceVersion}}；最小值為 {{minimum}}。",
+        "since_version_after_schema": "值「{{valueName}}」的 sinceVersion {{sinceVersion}} 晚於結構描述版本 {{schemaVersion}}。",
+        "target_band_out_of_order": "值「{{valueName}}」的 {{lowerBand}} {{lowerValue}} 高於 {{upperBand}} {{upperValue}}。",
+        "green_min_without_amber_min": "值「{{valueName}}」設定了 GreenMin {{greenMin}}，但未設定 AmberMin。",
+        "green_max_without_amber_max": "值「{{valueName}}」設定了 GreenMax {{greenMax}}，但未設定 AmberMax。",
+        "calculated_expression_missing": "計算值「{{valueName}}」需要運算式。",
+        "calculated_value_required": "計算值「{{valueName}}」不能設為必填。",
+        "calculated_expression_syntax": "「{{valueName}}」的運算式在位置 {{position}} 有語法錯誤：{{detail}}",
+        "calculated_expression_analysis": "無法分析「{{valueName}}」的運算式：{{detail}}",
+        "calculated_self_reference": "「{{valueName}}」的運算式參照了自身。",
+        "calculated_history_reference": "「{{valueName}}」的運算式不能使用歷程函式：{{functions}}。",
+        "calculated_unknown_identifier": "「{{valueName}}」的運算式參照了未知識別碼「{{identifier}}」。",
+        "calculated_dependency_cycle": "計算值之間有循環相依性。",
+        "layout_depth_exceeded": "版面配置深度 {{actualDepth}} 超過上限 {{maxDepth}}。",
+        "layout_value_name_missing": "版面配置值節點缺少 valueName。",
+        "layout_unknown_value": "版面配置參照了未知值「{{valueName}}」。",
+        "layout_duplicate_value": "值「{{valueName}}」在版面配置中出現多次。",
+        "layout_section_caption_missing": "版面配置區段缺少標題。",
+        "layout_unknown_kind": "版面配置類型「{{actualKind}}」無效。預期：{{expectedKinds}}。"
+      },
+      "reports": {
+        "validation": "報表驗證失敗。{{message}}",
+        "already_exists": "報表「{{reportName}}」已存在。",
+        "missing_upload": "請在「{{field}}」欄位上傳非空白檔案。",
+        "content_empty": "報表內容不可為空白。",
+        "name_required": "需要報表名稱；檔案「{{fileName}}」未提供名稱。",
+        "date_range_invalid": "報表開始時間 {{from}} 不能晚於結束時間 {{to}}。",
+        "type_unsupported": "不支援報表類型「{{reportType}}」。",
+        "schema_not_target": "結構描述「{{schemaName}}」不是報表「{{reportName}}」的目標。目標：{{targetSchemaNames}}。",
+        "schema_required_for_multiple_targets": "報表「{{reportName}}」的目標為 {{targetSchemaNames}}；請提供「{{parameter}}」。",
+        "submission_id_required": "報表「{{reportName}}」需要「{{parameter}}」。",
+        "submission_schema_missing": "提交項目 {{submissionId}} 沒有結構描述「{{schemaName}}」的樣本。",
+        "aggregate_schema_required": "彙總報表「{{reportName}}」需要「{{parameter}}」。",
+        "front_matter_unclosed": "報表前置資料以「---」開頭，但未結束。",
+        "front_matter_line_invalid": "無法剖析前置資料第 {{lineNumber}} 行：{{line}}",
+        "front_matter_type_invalid": "前置資料類型「{{actualType}}」無效。允許：{{allowedTypes}}。",
+        "front_matter_inline_list_invalid": "內嵌清單「{{value}}」必須使用 {{expectedWrapper}}。",
+        "template_parse_failed": "{{engine}} 範本剖析失敗：{{detail}}",
+        "template_render_failed": "{{engine}} 範本呈現失敗：{{detail}}"
+      },
+      "expressions": {
+        "empty": "運算式不可為空白。",
+        "too_long": "運算式超過 {{maxLength}} 個字元的限制。",
+        "parse_failed": "無法剖析運算式：{{detail}}",
+        "unsupported_target": "不支援運算式目標「{{target}}」。",
+        "batch_missing": "缺少運算式批次。",
+        "batch_too_large": "批次超過 {{maxCount}} 個運算式的限制。"
+      },
+      "configuration": {
+        "validation": "組態驗證失敗。{{message}}",
+        "backup_empty": "備份檔案是空的。",
+        "backup_invalid_json": "備份檔案不是有效的 JSON：{{detail}}",
+        "backup_invalid_marker": "此檔案不是 Ingest 備份（預期「{{expectedFormat}}」，收到「{{actualFormat}}」）。",
+        "backup_unsupported_version": "不支援備份版本 {{version}}；支援的最高版本為 {{maximumVersion}}。",
+        "backup_missing_collections": "備份檔案缺少 collections 區段。",
+        "config_backup_empty": "組態備份檔案是空的。",
+        "config_backup_invalid_json": "組態備份檔案不是有效的 JSON：{{detail}}",
+        "config_backup_invalid_marker": "此檔案不是 Ingest 組態備份（預期「{{expectedFormat}}」，收到「{{actualFormat}}」）。",
+        "config_backup_unsupported_version": "不支援組態備份版本 {{version}}；支援的最高版本為 {{maximumVersion}}。",
+        "config_backup_missing_collections": "組態備份檔案缺少 collections 區段。"
+      },
+      "comments": {
+        "validation": "留言驗證失敗。{{message}}",
+        "thread_resolved": "此討論串已解決。請先重新開啟，再新增留言。",
+        "edit_forbidden": "您只能編輯自己的留言。",
+        "value_not_on_schema": "值「{{valueName}}」不在結構描述 {{schemaId}} 中。",
+        "target_type_unsupported": "目標 {{targetId}} 不支援留言目標類型「{{targetType}}」。",
+        "text_required": "留言文字為必填。",
+        "text_too_long": "留言文字為 {{actualLength}} 個字元；最多允許 {{maxLength}} 個。"
+      },
+      "events": {
+        "validation": "事件驗證失敗。{{message}}",
+        "label_required": "事件標籤為必填。",
+        "timestamp_required": "事件時間戳記為必填。",
+        "interval_duration_required": "{{eventKind}} 事件需要正持續時間「{{duration}}」。",
+        "invalid_service_ids": "受影響的服務 ID 必須識別現有服務：{{serviceIds}}。"
+      },
+      "approval": {
+        "validation": "核准驗證失敗。{{message}}",
+        "global_default_not_allowed": "核准模式「{{mode}}」在此不能沿用全域預設值。",
+        "approver_required": "至少需要一位核准者。",
+        "required_approver_required": "至少要有一位核准者標示為必要。",
+        "duplicate_service_owner": "服務擁有者被重複列出。",
+        "duplicate_approver": "核准者帳戶 {{accountId}} 被重複列出。",
+        "approver_not_found": "核准者帳戶 {{accountId}} 不存在。",
+        "not_designated_approver": "帳戶 {{approverAccountId}} 不是提交項目 {{submissionId}} 的指定核准者。"
+      },
+      "integrations": {
+        "validation": "整合驗證失敗。{{message}}",
+        "connection_failed": "整合連線失敗：{{detail}}",
+        "schedule_hour_invalid": "排程小時 {{hourUtc}} 必須介於 UTC {{minimum}} 到 {{maximum}}。",
+        "schedule_minute_invalid": "排程分鐘 {{minuteUtc}} 必須介於 {{minimum}} 到 {{maximum}}。",
+        "schedule_day_invalid": "{{frequency}} 排程的日期 {{dayOfMonth}} 必須介於 {{minimum}} 到 {{maximum}}。",
+        "schedule_anchor_month_invalid": "{{frequency}} 排程的基準月份 {{anchorMonth}} 必須介於 {{minimum}} 到 {{maximum}}。",
+        "teams_target_required": "{{integrationKind}} 需要 Teams {{targetKind}} 目標。"
+      },
+      "webhooks": {
+        "validation": "Webhook 驗證失敗。{{message}}",
+        "delivery_failed": "Webhook 傳遞失敗。{{message}}",
+        "name_required": "Webhook 名稱為必填。",
+        "url_required": "Webhook URL 為必填。",
+        "url_invalid": "Webhook URL「{{url}}」必須是絕對 URL，並使用下列其中一種通訊協定：{{allowedSchemes}}。"
+      },
+      "email": {
+        "validation": "電子郵件驗證失敗。{{message}}",
+        "delivery_failed": "電子郵件傳遞失敗。{{message}}",
+        "address_invalid": "「{{address}}」不是有效的電子郵件地址。",
+        "subject_required": "主旨為必填。",
+        "email_subject_required": "電子郵件主旨為必填。",
+        "text_body_required": "純文字內文為必填。",
+        "template_parse_failed": "無法剖析 {{engine}} 範本欄位「{{field}}」：{{detail}}",
+        "smtp_host_required": "SMTP 主機為必填。",
+        "smtp_port_invalid": "SMTP 連接埠 {{port}} 必須介於 {{minimum}} 到 {{maximum}}。",
+        "from_address_required": "寄件者地址為必填。",
+        "account_contact_missing": "帳戶「{{accountName}}」（{{accountId}}）沒有聯絡電子郵件。"
+      }
+    },
+    "settings": {
+      "title": "設定",
+      "general": {
+        "navigationLabel": "一般",
+        "navigationGroup": "一般",
+        "title": "一般",
+        "description": "管理主控台的喜好設定。",
+        "language": "語言",
+        "theme": "主題",
+        "lightTheme": "淺色"
+      },
+      "permissionDenied": "您無權管理任何設定。",
+      "noneEnabled": "未啟用任何可設定的項目。請在伺服器組態中開啟電子郵件、Webhook、整合或核准工作流程，才能在此處管理。",
+      "navigation": {
+        "areas": "區域",
+        "configuration": "組態",
+        "submissionPeriods": "提交期間",
+        "ingestion": "資料擷取",
+        "approval": "核准",
+        "approvals": "核准",
+        "rules": "規則",
+        "email": "電子郵件",
+        "emailTemplates": "電子郵件範本",
+        "notifications": "通知",
+        "webhooks": "Webhook",
+        "integrations": "整合",
+        "teamsNotifications": "Teams 通知",
+        "teamsConnection": "Teams 連線"
+      },
+      "common": {
+        "loading": "載入中…",
+        "saving": "儲存中…",
+        "save": "儲存",
+        "saveChanges": "儲存變更",
+        "add": "新增",
+        "cancel": "取消",
+        "done": "完成",
+        "refresh": "重新整理",
+        "moreActions": "更多動作",
+        "actions": "動作",
+        "edit": "編輯",
+        "delete": "刪除",
+        "enable": "啟用",
+        "disable": "停用",
+        "enabled": "已啟用",
+        "disabled": "已停用",
+        "configured": "已設定",
+        "notConfigured": "未設定",
+        "label": "標籤",
+        "status": "狀態",
+        "services": "服務",
+        "schemas": "結構描述",
+        "allServices": "所有服務",
+        "allSchemas": "所有結構描述",
+        "selectServices": "選擇服務",
+        "selectSchemas": "選擇結構描述",
+        "removed": "（已移除）",
+        "unset": "（未設定）",
+        "optionalListName": "只會顯示在此清單中的選用名稱。",
+        "serviceRequired": "請至少選擇一項服務，或選擇「所有服務」。",
+        "schemaRequired": "請至少選擇一個結構描述，或選擇「所有結構描述」。",
+        "cadence": "週期",
+        "cadences": {
+          "Daily": "每日",
+          "Weekly": "每週",
+          "Fortnightly": "每兩週",
+          "Monthly": "每月",
+          "Quarterly": "每季",
+          "SemiAnnually": "每半年",
+          "Yearly": "每年"
+        },
+        "months": {
+          "january": "一月",
+          "february": "二月",
+          "march": "三月",
+          "april": "四月",
+          "may": "五月",
+          "june": "六月",
+          "july": "七月",
+          "august": "八月",
+          "september": "九月",
+          "october": "十月",
+          "november": "十一月",
+          "december": "十二月"
+        },
+        "weekDays": {
+          "monday": "星期一",
+          "tuesday": "星期二",
+          "wednesday": "星期三",
+          "thursday": "星期四",
+          "friday": "星期五",
+          "saturday": "星期六",
+          "sunday": "星期日"
+        },
+        "weekDaysShort": {
+          "monday": "週一",
+          "tuesday": "週二",
+          "wednesday": "週三",
+          "thursday": "週四",
+          "friday": "週五",
+          "saturday": "週六",
+          "sunday": "週日"
+        }
+      },
+      "approval": {
+        "title": "預設核准原則",
+        "description": "設定為「使用全域預設值」的結構描述會採用此原則。變更只會影響新的提交項目；處理中的提交項目仍會沿用建立時指定的核准者。",
+        "saved": "核准原則已儲存。",
+        "defaultBehavior": "當結構描述沿用預設值時",
+        "dontRequire": "不需要核准",
+        "require": "需要核准",
+        "appliesTo": "適用於",
+        "approvers": "核准者",
+        "approversHint": "可進行審核的核准者/管理員帳戶，以及/或服務擁有者（送出提交項目的帳戶）。請至少將一位標示為「必要」。",
+        "requiredApproverValidation": "請至少新增一位「必要」核准者。",
+        "selectApprovers": "選擇核准者",
+        "serviceOwner": "服務擁有者（送出提交的服務）",
+        "required": "必要",
+        "optional": "選用",
+        "sources": {
+          "both": "手動與 API 提交",
+          "manualOnly": "僅限手動（Web 主控台）提交",
+          "apiOnly": "僅限 API 提交"
+        }
+      },
+      "areas": {
+        "title": "區域",
+        "description": "編輯帳戶時可選用的分組標籤。定義一個以上的區域後，帳戶編輯器會顯示下拉式清單；清單留空則讓編輯者自行輸入區域文字。區域僅供參考 — 變更區域不會影響現有的帳戶。",
+        "saved": "區域已儲存。",
+        "empty": "未定義任何區域 — 帳戶編輯器會使用自由文字欄位。",
+        "moveUp": "向上移動 {{name}}",
+        "moveDown": "向下移動 {{name}}",
+        "remove": "移除 {{name}}",
+        "addLabel": "新增區域",
+        "placeholder": "例如：北部地區"
+      },
+      "submissionPeriods": {
+        "title": "提交期間",
+        "description": "每個報告期間的開始與結束時間。變更後會立即套用至新的提交項目與開放期間檢查；已記錄的期間仍會沿用寫入時的界線。",
+        "saved": "提交期間已儲存。",
+        "fiscalYearStart": "會計年度開始月份",
+        "fiscalYearHint": "同時作為季度與半年期間的基準。",
+        "weekStart": "每週開始日",
+        "monthStart": "每月開始日",
+        "monthStartHint": "1-28。",
+        "fortnightAnchor": "兩週基準日",
+        "fortnightAnchorHint": "兩週界線上的任一日期；只有日期有意義。"
+      },
+      "submissionWindows": {
+        "title": "提交時段",
+        "description": "服務可以在每個週期的期間前後多久，實際建立或編輯該期間的提交項目。「開放延遲」會延後時段在期間開始後的開放時間；「寬限期」則延長時段在期間結束後保持開放的時間。在此設定之前，兩者的預設值都是 0 小時 — 時段與期間完全一致。「未提交」的報告與提醒也會等到寬限期結束後才發出。",
+        "saved": "提交時段已儲存。",
+        "openOffset": "開放延遲（小時）",
+        "gracePeriod": "寬限期（小時）"
+      },
+      "currentPeriods": {
+        "title": "目前期間",
+        "description": "上述設定目前解析出的結果 — 這是即時快照，不會自行更新。",
+        "period": "期間",
+        "window": "時段"
+      },
+      "ingestion": {
+        "title": "資料擷取",
+        "description": "供災難復原使用的全域緊急開關。關閉提交會封鎖面向服務的資料擷取（服務帳戶、大量匯入與 Teams 整合），其餘功能（讀取、OData、管理員為修正資料而進行的建立/編輯、結構描述、設定）仍可使用。關閉期間會向所有人顯示帶有下列訊息的橫幅。",
+        "saved": "資料擷取狀態已儲存。",
+        "closeAll": "關閉所有提交",
+        "bannerLabel": "橫幅訊息（選填）",
+        "bannerHint": "提交關閉期間會顯示給所有人。",
+        "bannerPlaceholder": "例如：我們正在調查資料問題，提交暫停中。預計 UTC 下午 5 點前恢復。"
+      },
+      "email": {
+        "title": "電子郵件伺服器 (SMTP)",
+        "description": "外寄郵件的傳送來源。儲存在資料庫中；密碼會加密儲存，且不會再次顯示。",
+        "saved": "設定已儲存。",
+        "host": "主機",
+        "hostPlaceholder": "smtp.example.org",
+        "port": "連接埠",
+        "useTls": "使用 TLS (STARTTLS)",
+        "fromAddress": "寄件者地址",
+        "fromAddressPlaceholder": "ingest@example.org",
+        "fromName": "寄件者名稱",
+        "fromNamePlaceholder": "Ingest",
+        "username": "使用者名稱",
+        "usernamePlaceholder": "（空白 = 匿名轉送）",
+        "changePassword": "變更已儲存的密碼",
+        "setPassword": "設定密碼",
+        "password": "密碼",
+        "passwordHint": "留空以清除已儲存的密碼。"
+      },
+      "emailTemplates": {
+        "title": "電子郵件範本",
+        "description": "用來建立通知電子郵件的 Liquid 範本。選取其中一個即可編輯主旨與內文。",
+        "empty": "尚無範本。",
+        "template": "範本",
+        "subject": "主旨",
+        "format": "格式",
+        "editAria": "編輯範本 {{name}}",
+        "htmlAndText": "HTML + 文字",
+        "text": "文字",
+        "editNamed": "編輯範本 — {{name}}",
+        "edit": "編輯範本",
+        "saved": "範本已儲存。",
+        "textBody": "純文字內文",
+        "textBodyHint": "純文字備援內容。支援 Liquid。",
+        "htmlBody": "HTML 內文",
+        "htmlBodyHint": "選填。留空則只傳送純文字。",
+        "save": "儲存範本"
+      },
+      "notifications": {
+        "title": "通知",
+        "description": "選擇哪些事件會產生電子郵件，以及由誰接收。每個觸發程序可以通知服務本身的聯絡電子郵件、下方的收件者清單，或兩者皆通知。",
+        "saved": "已儲存通知設定。",
+        "runResult": "已排入 {{total}} 封電子郵件：即將到期 {{upcoming}} 封、未提交 {{missed}} 封、警告 {{warnings}} 封。",
+        "upcoming": "即將到期的提交項目提醒",
+        "leadTime": "提前時間（時段關閉前幾小時）",
+        "missed": "未提交警示",
+        "warnings": "提交項目含警告通知",
+        "draftSaved": "草稿已儲存提醒",
+        "draftSavedHint": "每次儲存草稿時都會傳送（不會去除重複），用來提醒協作者。郵件中顯示的是相對路徑，需要接在您主控台的網址後面 — 它不是可點選的連結。",
+        "pendingApproval": "提交項目待核准通知",
+        "pendingApprovalHint": "系統一律會寄送電子郵件給提交項目的指定核准者；這些開關會另外加上提交者和/或管理員清單。",
+        "approved": "提交項目已核准通知",
+        "rejected": "提交項目已拒絕通知",
+        "recipientList": "管理員/操作員收件者清單",
+        "recipientListHint": "當觸發程序啟用「管理員清單」時，會收到副本的帳戶（需有電子郵件）。",
+        "noEligibleAccounts": "沒有符合條件的帳戶（操作員/管理員需要有電子郵件）",
+        "selectRecipients": "選擇收件者…",
+        "running": "執行中…",
+        "runNow": "立即執行",
+        "notifyService": "通知服務帳戶",
+        "notifyAdminList": "通知管理員/操作員清單"
+      },
+      "approvalRules": {
+        "title": "規則",
+        "description": "在每個結構描述本身的原則之外，另外要求特定服務與結構描述必須核准。將任一側設為「全部」即可涵蓋所有服務或所有結構描述。範圍限定為 API 提交的規則，可以強制由人員先審核並補齊半自動化的資料來源，才讓資料生效。",
+        "add": "新增規則",
+        "edit": "編輯規則",
+        "create": "建立規則",
+        "created": "規則已建立。",
+        "saved": "規則已儲存。",
+        "deleted": "規則已刪除。",
+        "disabledMessage": "規則已停用。",
+        "enabledMessage": "規則已啟用。",
+        "deleteType": "核准規則",
+        "approval": "核准",
+        "useGlobalDefault": "使用全域預設值",
+        "noApproval": "不需核准",
+        "requiredSummary": "需要核准（{{source}}）",
+        "emptyManage": "尚無規則 — 按一下「新增規則」即可建立。",
+        "emptyReadOnly": "尚無規則。",
+        "editAria": "編輯規則 {{name}}",
+        "actionsAria": "規則 {{name}} 的動作",
+        "labelPlaceholder": "例如：財務資料來源需要簽核",
+        "sources": {
+          "both": "手動 + API",
+          "manualOnly": "僅手動",
+          "apiOnly": "僅限 API"
+        }
+      },
+      "teamsConnection": {
+        "title": "Microsoft Teams 連線",
+        "description": "用來將提示傳送至 Teams 的 Bot 應用程式註冊。儲存在資料庫中；Bot 密碼會加密儲存，且不會再次顯示。如需在 Azure 中註冊 Bot 的方式，請參閱設定指南。",
+        "saved": "連線已儲存。",
+        "testSucceeded": "連線成功 — 憑證有效。",
+        "testFailed": "連線失敗。",
+        "appId": "應用程式（用戶端）ID",
+        "appIdPlaceholder": "00000000-0000-0000-0000-000000000000",
+        "tenantId": "租用戶 ID",
+        "tenantHint": "多租用戶 Bot 請留空。",
+        "tenantPlaceholder": "（空白 = 多租用戶）",
+        "singleTenant": "單一租用戶應用程式註冊",
+        "changeSecret": "變更已儲存的 Bot 密碼",
+        "setSecret": "設定 Bot 密碼",
+        "secret": "Bot 密碼（用戶端密碼）",
+        "secretHint": "留空以清除已儲存的密碼。",
+        "testing": "測試中…",
+        "test": "測試連線"
+      },
+      "integrations": {
+        "title": "整合",
+        "description": "每個整合都會提示 Teams 使用者或頻道，補齊其涵蓋的服務與結構描述中仍未完成的樣本。提示會依每日排程執行，也可以透過「立即執行」隨時執行。已停用與隱藏的欄位會略過；警告會直接顯示在內容中。",
+        "connectionWarning": "Microsoft Teams 連線尚未設定 — 請先在「Teams 連線」子頁面設定 Bot 認證，整合才能傳送提示。",
+        "add": "新增整合",
+        "edit": "編輯整合",
+        "create": "建立整合",
+        "created": "整合已建立。",
+        "saved": "整合已儲存。",
+        "deleted": "整合已刪除。",
+        "disabledMessage": "整合已停用。",
+        "enabledMessage": "整合已啟用。",
+        "deleteType": "整合",
+        "runComplete": "執行完成 — 已提示 {{prompted}} 項，略過 {{skipped}} 項。",
+        "testEnqueued": "測試提示已排入佇列。",
+        "target": "目標",
+        "scheduleLabel": "排程",
+        "emptyManage": "尚無整合 — 按一下「新增整合」即可建立。",
+        "emptyReadOnly": "尚無整合。",
+        "editAria": "編輯整合 {{name}}",
+        "actionsAria": "整合 {{name}} 的動作",
+        "runNow": "立即執行",
+        "sendTest": "傳送測試",
+        "targetSummary": "{{kind}}：{{target}}",
+        "channel": "頻道",
+        "user": "使用者",
+        "targetRequired": "請輸入目標使用者或頻道 ID。",
+        "hourValidation": "小時必須介於 0 到 23 之間。",
+        "minuteValidation": "分鐘必須介於 0 到 59 之間。",
+        "labelPlaceholder": "例如：營運頻道的每日提醒",
+        "sendTo": "傳送對象",
+        "aUser": "使用者",
+        "aChannel": "頻道",
+        "channelId": "頻道 ID",
+        "userId": "使用者 ID（Entra 物件 ID、UPN 或電子郵件）",
+        "targetIdHint": "如需尋找此 ID 的方式，請參閱設定指南。",
+        "channelIdPlaceholder": "19:...@thread.tacv2",
+        "userIdPlaceholder": "user@example.org",
+        "displayName": "顯示名稱",
+        "displayNameHint": "此目標的選用易記標籤。",
+        "displayNamePlaceholder": "例如：營運團隊頻道",
+        "frequency": "頻率",
+        "frequencyHint": "這項作業檢查未完成值的頻率。也可以透過「立即執行」隨時執行。",
+        "daysOfWeek": "星期幾",
+        "daysOfWeekHint": "留空表示每天執行。",
+        "everyDay": "每天",
+        "anchorMonth": "基準月份",
+        "anchorMonthHint": "期間會從這個月份開始重複（例如：從 2 月起每季 = 2 月、5 月、8 月、11 月）。",
+        "dayOfMonth": "每月日期",
+        "dayOfMonthHint": "在期間內的這一天（或之後）執行；「最後一天」表示該月的最後一天。",
+        "lastDay": "最後一天",
+        "theLastDay": "最後一天",
+        "hourUtc": "小時 (UTC)",
+        "minuteUtc": "分鐘 (UTC)",
+        "ordinal": {
+          "zero": "{{count}} 日",
+          "one": "{{count}} 日",
+          "two": "{{count}} 日",
+          "few": "{{count}} 日",
+          "many": "{{count}} 日",
+          "other": "{{count}} 日"
+        },
+        "schedule": {
+          "weeklyEveryDay": "每週（每天），{{time}}",
+          "weeklyDays": "{{days}}，{{time}}",
+          "monthly": "每月 {{day}}，{{time}}",
+          "quarterly": "每季自 {{month}} 起，於 {{day}} {{time}}",
+          "semiAnnually": "每半年自 {{month}} 起，於 {{day}} {{time}}",
+          "yearly": "每年 {{month}} 的 {{day}} {{time}}",
+          "daily": "每日，{{time}}"
+        }
+      },
+      "webhooks": {
+        "title": "Webhook 端點",
+        "description": "當訂閱的事件發生時，將已簽署的 HTTP POST 傳送至外部 URL（Teams、Power Automate 或您自己的服務）— 不需要輪詢。",
+        "add": "新增端點",
+        "addTitle": "新增 Webhook 端點",
+        "editTitle": "編輯端點 — {{name}}",
+        "editAria": "編輯端點 {{name}}",
+        "actionsAria": "{{name}} 的操作",
+        "deleteConfirm": "要刪除 Webhook 端點「{{name}}」嗎？\n\n過去的傳遞記錄會保留以供稽核。",
+        "deleted": "已刪除「{{name}}」。",
+        "rotateConfirm": "要為「{{name}}」產生新的簽章金鑰嗎？\n\n舊金鑰會立即失效。",
+        "testQueued": "已為「{{name}}」排入測試傳遞。請參閱下方的傳遞記錄。",
+        "name": "名稱",
+        "url": "URL",
+        "eventsLabel": "事件",
+        "empty": "尚無端點。新增一個即可開始接收事件。",
+        "unsignedHint": "未設定簽章金鑰 — 傳遞內容不會簽署。",
+        "unsigned": "未簽署",
+        "noEvents": "無事件",
+        "eventCount_one": "{{count}} 個事件",
+        "eventCount_other": "{{count}} 個事件",
+        "rotateSecret": "輪替金鑰",
+        "generateSecret": "產生金鑰",
+        "deliveryHistory": "傳遞記錄（狀態、重試與手動重新傳遞）位於<auditLink>稽核頁面</auditLink>的<sectionName>Webhook 傳遞記錄</sectionName>中。",
+        "nameRequired": "名稱為必填。",
+        "urlValidation": "請輸入絕對的 http(s) URL。",
+        "eventRequired": "請至少選擇一個要訂閱的事件。",
+        "namePlaceholder": "Teams – 提交頻道",
+        "destinationUrl": "目的地 URL",
+        "destinationUrlHint": "已簽署的 POST 會傳送到這裡。必須是絕對的 http(s) URL。",
+        "urlPlaceholder": "https://example.org/hooks/ingest",
+        "onlyForService": "僅限特定服務",
+        "onlyForServiceHint": "只傳遞給單一服務帳戶。留空則所有服務都會觸發。",
+        "descriptionLabel": "描述",
+        "descriptionHint": "只會顯示在此管理清單中的選用附註。",
+        "generateOnCreate": "產生簽章金鑰 (HMAC-SHA256)。儲存後只會顯示一次。",
+        "create": "建立端點",
+        "secretTitle": "「{{name}}」的簽章金鑰",
+        "secretInstructions": "請立即複製 — 它只會顯示一次，之後無法再取得。請用它來驗證每次傳遞的 X-Ingest-Signature 標頭。",
+        "copied": "已複製",
+        "copySecret": "複製金鑰",
+        "events": {
+          "SubmissionAccepted": {
+            "label": "提交項目已接受",
+            "description": "服務提交了資料，且已被接受。"
+          },
+          "SubmissionWarnings": {
+            "label": "提交項目警告",
+            "description": "已接受的提交項目帶有不會阻擋的警告。"
+          },
+          "WindowUpcoming": {
+            "label": "時段即將結束",
+            "description": "提交時段即將結束。"
+          },
+          "WindowMissed": {
+            "label": "未在時段內提交",
+            "description": "時段已關閉，但未收到必要的提交項目。"
+          },
+          "SubmissionPendingApproval": {
+            "label": "提交項目待核准",
+            "description": "提交項目已接受，但保留待核准。"
+          },
+          "SubmissionApproved": {
+            "label": "提交項目已核准",
+            "description": "待核准的提交項目已核准，現已生效。"
+          },
+          "SubmissionRejected": {
+            "label": "提交項目已拒絕",
+            "description": "待核准的提交項目已拒絕，不會生效。"
+          }
+        }
+      }
+    },
+    "shell": {
+      "common": {
+        "close": "關閉",
+        "cancel": "取消"
+      },
+      "skipToContent": "跳至主要內容",
+      "primaryAriaLabel": "主要",
+      "mainNavigationAriaLabel": "主要導覽",
+      "serviceConsole": "服務主控台",
+      "adminConsole": "管理主控台",
+      "navigation": {
+        "dashboard": "儀表板",
+        "submissions": "提交項目",
+        "missing": "未提交",
+        "explore": "探索",
+        "reports": "報表",
+        "accounts": "帳戶",
+        "schemas": "結構描述",
+        "events": "事件",
+        "audit": "稽核",
+        "tools": "工具",
+        "settings": "設定"
+      },
+      "submissionsClosed": {
+        "title": "提交已關閉",
+        "message": "暫停接受服務帳戶的新提交與編輯。"
+      },
+      "login": {
+        "hint": "請貼上您的 API 金鑰。只有使用者類型的認證可以在此登入（任何角色）；應用程式類型的金鑰僅供 API 使用。",
+        "applicationKeyError": "此 API 金鑰僅供應用程式（非互動式）使用。請向管理員申請使用者類型的認證，才能存取管理 UI。",
+        "continueWith": "繼續使用 {{provider}}",
+        "orUseApiKey": "或使用 API 金鑰",
+        "apiKey": "API 金鑰",
+        "couldNotSignIn": "無法登入",
+        "verifying": "驗證中…",
+        "signIn": "登入",
+        "sso": {
+          "title": "單一登入",
+          "errors": {
+            "notLinked": "該帳戶未在此設定單一登入。請洽管理員連結您的身分，或使用 API 金鑰登入。",
+            "noEmail": "您的身分提供者未提供登入所需的已驗證電子郵件。",
+            "remote": "單一登入已取消或失敗。請再試一次。",
+            "default": "單一登入未完成。請再試一次。"
+          }
+        }
+      },
+      "breadcrumbs": {
+        "home": "首頁",
+        "new": "新增",
+        "edit": "編輯",
+        "view": "檢視",
+        "status": "狀態",
+        "historicalData": "歷史資料",
+        "submission": "提交項目",
+        "missingSubmissions": "未提交項目"
+      },
+      "topBar": {
+        "pageLocation": "頁面位置",
+        "searchPlaceholder": "搜尋…",
+        "searchAriaLabel": "搜尋（Ctrl+K）",
+        "role": "角色：{{role}}",
+        "accountMenu": "帳戶選單",
+        "accountMenuFor": "{{name}} 的帳戶選單",
+        "signOut": "登出",
+        "scope": {
+          "names": "此工作階段只能看到：{{names}}",
+          "count_one": "此工作階段僅限 {{count}} 項服務。",
+          "count_other": "此工作階段僅限 {{count}} 項服務。",
+          "badge_one": "檢視受限 · {{count}} 項服務",
+          "badge_other": "檢視受限 · {{count}} 項服務"
+        }
+      },
+      "account": {
+        "label": "帳戶",
+        "kinds": {
+          "User": "使用者",
+          "Application": "應用程式"
+        },
+        "roles": {
+          "Service": "服務",
+          "Operator": "操作員",
+          "Admin": "管理員",
+          "Approver": "核准者"
+        }
+      },
+      "search": {
+        "title": "搜尋",
+        "placeholder": "搜尋動作、結構描述、值、事件、帳戶…",
+        "button": "搜尋",
+        "hint": "輸入您想執行的動作（例如「新增使用者」、「提交」、「記分卡」），或結構描述、值、事件、帳戶或報表的名稱。",
+        "searching": "搜尋中…",
+        "viewAll": "檢視全部",
+        "valueCount_one": "{{count}} 值",
+        "valueCount_other": "{{count}} 值",
+        "viewAllSchemas_one": "檢視全部 {{count}} 個結構描述",
+        "viewAllSchemas_other": "檢視全部 {{count}} 個結構描述",
+        "inSchema": "在 {{schema}} 中",
+        "matchingValues_one": "{{count}} 個相符的值",
+        "matchingValues_other": "{{count}} 個相符的值",
+        "accountKindRole": "{{kind}} · {{role}}",
+        "viewAllAccounts_one": "檢視全部 {{count}} 個帳戶",
+        "viewAllAccounts_other": "檢視全部 {{count}} 個帳戶",
+        "eventSummaryRich": "{{kind}} · <timestamp />",
+        "viewAllEvents_one": "檢視全部 {{count}} 個事件",
+        "viewAllEvents_other": "檢視全部 {{count}} 個事件",
+        "viewAllReports_one": "檢視全部 {{count}} 份報表",
+        "viewAllReports_other": "檢視全部 {{count}} 份報表",
+        "submissionSummaryRich": "{{schemas}} · <submittedAt />",
+        "noSchemas": "無結構描述",
+        "recentMatches_one": "{{count}} 筆最近的相符項目",
+        "recentMatches_other": "{{count}} 筆最近的相符項目",
+        "noResults": "找不到「{{query}}」的結果。請嘗試其他關鍵字。",
+        "sections": {
+          "actions": "動作",
+          "schemas": "結構描述",
+          "schemaValues": "結構描述值",
+          "accounts": "帳戶",
+          "events": "事件",
+          "reports": "報表",
+          "submissions": "提交項目"
+        },
+        "reportType": {
+          "single": "單一提交項目報表",
+          "aggregate": "彙總報表"
+        },
+        "actions": {
+          "submission-new": {
+            "title": "新增提交項目",
+            "description": "為服務提交 KPI 資料",
+            "keywords": "提交|新增提交|建立提交|傳送資料|回報資料"
+          },
+          "schema-new": {
+            "title": "新增結構描述",
+            "description": "建立新的結構描述",
+            "keywords": "新結構描述|建立結構描述|新增 kpi"
+          },
+          "account-new-user": {
+            "title": "新增使用者",
+            "description": "建立一個新帳戶",
+            "keywords": "新使用者|建立使用者|新增帳戶|新帳戶|新增操作員|新增管理員|邀請"
+          },
+          "account-new-service": {
+            "title": "新增服務",
+            "description": "建立新的服務帳戶",
+            "keywords": "新服務|建立服務|導入服務|新增帳戶"
+          },
+          "event-new": {
+            "title": "新增事件",
+            "description": "記錄時間軸事件",
+            "keywords": "新增事件|建立事件|事故|維護|部署"
+          },
+          "report-upload": {
+            "title": "上傳報表",
+            "description": "新增報表定義",
+            "keywords": "新報表|新增報表|匯入報表"
+          },
+          "explore": {
+            "title": "探索",
+            "description": "應用程式內建分析：趨勢、比較、快照",
+            "keywords": "分析|解析|統計|圖表|趨勢|圖形"
+          },
+          "explore-scorecard": {
+            "title": "記分卡",
+            "description": "跨結構描述的 RAG 狀態看板",
+            "keywords": "rag|紅琥珀綠|紅綠燈|狀態看板|目標"
+          },
+          "explore-anomalies": {
+            "title": "異常",
+            "description": "各期間的異常偵測看板",
+            "keywords": "異常|離群值|不尋常|尖峰"
+          },
+          "missing": {
+            "title": "未提交項目",
+            "description": "各服務尚未提交的項目",
+            "keywords": "未提交|逾期|缺漏|沒有提交"
+          },
+          "dashboard": {
+            "title": "儀表板",
+            "description": "首頁概觀",
+            "keywords": "首頁|概述|開始"
+          },
+          "submissions": {
+            "title": "提交項目",
+            "description": "瀏覽已提交的資料",
+            "keywords": "資料|kpi|樣本"
+          },
+          "schemas": {
+            "title": "結構描述",
+            "description": "瀏覽結構描述目錄",
+            "keywords": "kpi 定義|範本|欄位"
+          },
+          "accounts": {
+            "title": "帳戶",
+            "description": "服務、操作員、使用者和管理員",
+            "keywords": "服務|使用者|操作員|管理員|人員"
+          },
+          "events": {
+            "title": "事件",
+            "description": "瀏覽事件時間軸",
+            "keywords": "時間軸|事故|維護"
+          },
+          "reports": {
+            "title": "報表",
+            "description": "瀏覽並呈現報表",
+            "keywords": "報表目錄|呈現"
+          },
+          "audit": {
+            "title": "稽核",
+            "description": "誰在何時變更了什麼",
+            "keywords": "稽核記錄|歷程|軌跡|變更"
+          },
+          "tools": {
+            "title": "工具",
+            "description": "備份與還原工具",
+            "keywords": "備份|還原|匯出|匯入"
+          },
+          "settings": {
+            "title": "設定",
+            "description": "電子郵件、通知、Webhook 與原則",
+            "keywords": "組態|設定|電子郵件|通知|webhook|核准原則"
+          }
+        }
+      },
+      "gridPager": {
+        "rowsPerPage": "每頁列數",
+        "results_one": "{{count}} 筆結果",
+        "results_other": "{{count}} 筆結果",
+        "range": "{{from}}–{{to}}，共 {{total}} 筆",
+        "previous": "上一頁",
+        "page": "第 {{page}} 頁，共 {{totalPages}} 頁",
+        "next": "下一頁"
+      },
+      "rowActions": {
+        "ariaLabel": "資料列動作"
+      },
+      "period": {
+        "label": "期間",
+        "from": "起始",
+        "to": "結束",
+        "interval": {
+          "all": "所有時間",
+          "lastDay": "最近 24 小時",
+          "lastWeek": "最近 7 天",
+          "lastMonth": "最近 30 天",
+          "custom": "自訂範圍"
+        },
+        "shift": {
+          "1m": "1 個月",
+          "6m": "6 個月",
+          "1y": "1 年"
+        }
+      },
+      "wizard": {
+        "back": "上一步",
+        "finish": "完成",
+        "next": "下一步"
+      },
+      "drawer": {
+        "collapse": "摺疊抽屜",
+        "expand": "展開抽屜"
+      },
+      "export": {
+        "csv": "匯出 CSV",
+        "exporting": "匯出中…"
+      },
+      "valueLabel": {
+        "required": "必填",
+        "description": "描述",
+        "new": "新"
+      },
+      "cadence": {
+        "Daily": "每日",
+        "Weekly": "每週",
+        "Fortnightly": "每兩週",
+        "Monthly": "每月",
+        "Quarterly": "每季",
+        "SemiAnnually": "每半年",
+        "Yearly": "每年"
+      },
+      "eventKind": {
+        "PointInTime": "時間點",
+        "Interval": "間隔",
+        "FromNowOn": "今後"
+      },
+      "comments": {
+        "general": "一般"
+      },
+      "confirm": {
+        "namedSubject": "{{noun}}「{{target}}」",
+        "cannotUndo": "此操作無法復原。",
+        "delete": "刪除 {{subject}}？\n\n{{note}}"
+      },
+      "avatars": {
+        "account": "{{kind}} · {{role}}{{context}}",
+        "disabledSuffix": "（已停用）",
+        "schema": "結構描述",
+        "schemaDisabled": "結構描述（已停用）",
+        "submission": "提交項目",
+        "submissionStatus": "提交項目 · {{status}}",
+        "auditChange": "{{target}} · {{change}}",
+        "status": "狀態",
+        "deliveryStatus": "{{label}} · {{status}}",
+        "schemaValue": "{{type}}{{context}}"
+      },
+      "submissionStatus": {
+        "Draft": "草稿",
+        "Pending": "待處理",
+        "Approved": "已核准",
+        "Rejected": "已拒絕",
+        "NotRequired": "不需要"
+      },
+      "deliveryStatus": {
+        "Pending": "待處理",
+        "Sending": "傳送中",
+        "Sent": "已傳送",
+        "Failed": "失敗"
+      },
+      "auditChange": {
+        "Create": "建立",
+        "Edit": "編輯",
+        "Delete": "刪除",
+        "Approve": "核准",
+        "Reject": "拒絕"
+      },
+      "auditTarget": {
+        "User": "使用者",
+        "Account": "帳戶",
+        "Schema": "結構描述",
+        "ApiKey": "API 金鑰",
+        "Submission": "提交項目",
+        "Report": "報表",
+        "SchemaHistory": "結構描述歷程",
+        "ApprovalRule": "核准規則",
+        "Settings": "設定",
+        "Backup": "備份",
+        "Event": "事件",
+        "CommentThread": "留言討論串",
+        "Comment": "留言"
+      },
+      "auditTargetInitials": {
+        "User": "使",
+        "Account": "帳",
+        "Schema": "結",
+        "ApiKey": "金",
+        "Submission": "提",
+        "Report": "報",
+        "SchemaHistory": "歷",
+        "ApprovalRule": "規",
+        "Settings": "設",
+        "Backup": "備",
+        "Event": "事",
+        "CommentThread": "串",
+        "Comment": "留"
+      },
+      "valueType": {
+        "String": "字串",
+        "Integer": "整數",
+        "Number": "數字",
+        "Date": "日期",
+        "Boolean": "布林值"
+      },
+      "valueTypeInitials": {
+        "String": "S",
+        "Integer": "I",
+        "Number": "N",
+        "Date": "D",
+        "Boolean": "B"
+      },
+      "capabilities": {
+        "groups": {
+          "schemas": "結構描述",
+          "submissions": "提交項目",
+          "analytics": "分析",
+          "reports": "報表",
+          "accountsKeys": "帳戶和金鑰",
+          "oversight": "監督",
+          "notificationsIntegrations": "通知與整合",
+          "settings": "設定",
+          "events": "事件",
+          "comments": "留言"
+        },
+        "items": {
+          "schemasRead": {
+            "label": "檢視結構描述",
+            "description": "瀏覽結構描述目錄、詳細資料與歷程。"
+          },
+          "schemasManage": {
+            "label": "管理結構描述",
+            "description": "建立、編輯、複製與刪除結構描述。"
+          },
+          "submissionsRead": {
+            "label": "檢視提交項目",
+            "description": "檢視所有服務的提交項目。"
+          },
+          "submissionsSubmit": {
+            "label": "代為提交",
+            "description": "為服務建立、編輯與大量匯入提交項目。"
+          },
+          "submissionsDelete": {
+            "label": "刪除提交項目",
+            "description": "永久移除提交項目。"
+          },
+          "submissionsApprove": {
+            "label": "核准提交項目",
+            "description": "核准或拒絕待處理的提交項目。"
+          },
+          "queryRead": {
+            "label": "查詢資料",
+            "description": "使用 OData 摘要與臨時查詢端點。"
+          },
+          "exploreRead": {
+            "label": "探索",
+            "description": "使用應用程式內建的「探索」分析。"
+          },
+          "statusRead": {
+            "label": "檢視狀態",
+            "description": "檢視跨服務狀態與未提交分析。"
+          },
+          "reportsRead": {
+            "label": "檢視報表",
+            "description": "瀏覽並呈現報表目錄。"
+          },
+          "reportsManage": {
+            "label": "管理報表",
+            "description": "上傳與刪除報表定義。"
+          },
+          "accountsRead": {
+            "label": "檢視帳戶",
+            "description": "瀏覽帳戶。"
+          },
+          "accountsManage": {
+            "label": "管理帳戶",
+            "description": "建立、編輯和刪除帳戶及其權限。"
+          },
+          "apiKeysRead": {
+            "label": "檢視 API 金鑰",
+            "description": "檢視附加至帳戶的 API 金鑰。"
+          },
+          "apiKeysManage": {
+            "label": "管理 API 金鑰",
+            "description": "核發與撤銷 API 金鑰。"
+          },
+          "auditRead": {
+            "label": "檢視稽核記錄",
+            "description": "讀取並匯出稽核軌跡。"
+          },
+          "privacyRead": {
+            "label": "匯出個人資料",
+            "description": "執行資料主體存取匯出。"
+          },
+          "privacyManage": {
+            "label": "抹除／保留",
+            "description": "抹除個人資料並執行保留原則。"
+          },
+          "backupRead": {
+            "label": "匯出備份",
+            "description": "下載完整備份。"
+          },
+          "backupManage": {
+            "label": "還原備份",
+            "description": "從備份還原登錄資料庫。"
+          },
+          "notificationsRead": {
+            "label": "檢視通知",
+            "description": "檢視電子郵件/通知設定、範本與寄件匣。"
+          },
+          "notificationsManage": {
+            "label": "管理通知",
+            "description": "編輯電子郵件/通知設定與範本；傳送郵件。"
+          },
+          "webhooksRead": {
+            "label": "檢視 Webhook",
+            "description": "檢視 Webhook 端點與傳遞記錄。"
+          },
+          "webhooksManage": {
+            "label": "管理 Webhook",
+            "description": "建立/編輯 Webhook、輪替金鑰、重新傳遞與清空佇列。"
+          },
+          "integrationsRead": {
+            "label": "檢視整合",
+            "description": "檢視整合（例如 Microsoft Teams）及其連線。"
+          },
+          "integrationsManage": {
+            "label": "管理整合",
+            "description": "建立/編輯整合、編輯連線、執行/測試與清空佇列。"
+          },
+          "settingsRead": {
+            "label": "檢視設定",
+            "description": "讀取全域設定（例如預設核准原則）。"
+          },
+          "settingsManage": {
+            "label": "管理設定",
+            "description": "變更全域設定（例如預設核准原則）。"
+          },
+          "eventsRead": {
+            "label": "檢視事件",
+            "description": "瀏覽事件時間軸。"
+          },
+          "eventsManage": {
+            "label": "管理事件",
+            "description": "建立、編輯與刪除事件。"
+          },
+          "commentsRead": {
+            "label": "檢視留言",
+            "description": "檢視結構描述（及其值）上的留言討論串。"
+          },
+          "commentsCreate": {
+            "label": "建立留言",
+            "description": "開啟新的討論串並回覆現有討論串；可編輯自己的留言。"
+          },
+          "commentsManage": {
+            "label": "管理留言",
+            "description": "編輯、刪除或解決/重新開啟任何留言或討論串 — 不限於自己的。"
+          }
+        }
+      },
+      "expression": {
+        "empty": "運算式是空的。",
+        "invalid": "運算式無效。",
+        "editorAriaLabel": "運算式編輯器",
+        "lint": {
+          "unknownFunction": "未知的函式「{{name}}」。",
+          "unknownValue": "未知的值「{{name}}」。"
+        },
+        "runtime": {
+          "averageArgument": "average() 需要數值或布林引數，但收到 {{type}}。",
+          "higherThanArity": "higher_than() 需要 (value, reference, percentage)。",
+          "higherThanNumeric": "higher_than() 需要數值引數。",
+          "types": {
+            "undefined": "未定義",
+            "object": "物件",
+            "boolean": "布林值",
+            "number": "數字",
+            "bigint": "大整數",
+            "string": "字串",
+            "symbol": "符號",
+            "function": "函式"
+          }
+        },
+        "keywords": {
+          "true": "布林常值",
+          "false": "布林常值",
+          "null": "null 常值",
+          "and": "邏輯 AND",
+          "or": "邏輯 OR",
+          "not": "邏輯 NOT",
+          "in": "成員資格測試",
+          "like": "SQL 風格的模式比對"
+        },
+        "functions": {
+          "if": {
+            "description": "條件為 true 時傳回「then」，否則傳回「else」。"
+          },
+          "average": {
+            "description": "數值引數的平均值。布林值視為 1/0；null 會被忽略。"
+          },
+          "higher_than": {
+            "description": "當 value 超出 reference 的幅度大於 percentage%（例如 50 = 50%）時為 true。"
+          },
+          "coalesce": {
+            "description": "第一個不為 null 的引數。"
+          },
+          "isNull": {
+            "description": "值為 null 時為 true。"
+          },
+          "len": {
+            "description": "字串的長度。"
+          },
+          "now": {
+            "description": "目前 UTC 日期和時間。"
+          },
+          "today": {
+            "description": "目前 UTC 日期（午夜時分）。"
+          },
+          "year": {
+            "description": "日期的年份部分。"
+          },
+          "month": {
+            "description": "日期的月份部分 (1-12)。"
+          },
+          "dayOfMonth": {
+            "description": "該月的某天 (1-31)。"
+          },
+          "dayOfWeek": {
+            "description": "一週中的某一天（0 = 星期日）。"
+          },
+          "dayOfYear": {
+            "description": "一年中的某一天 (1-366)。"
+          },
+          "weekOfYear": {
+            "description": "ISO-8601 週數。"
+          },
+          "hour": {
+            "description": "小時部分 (0-23)。"
+          },
+          "minute": {
+            "description": "分鐘部分 (0-59)。"
+          },
+          "second": {
+            "description": "秒部分 (0-59)。"
+          },
+          "abs": {
+            "description": "絕對值。"
+          },
+          "ceiling": {
+            "description": "大於或等於該數字的最小整數。"
+          },
+          "floor": {
+            "description": "小於或等於該數字的最大整數。"
+          },
+          "round": {
+            "description": "四捨五入到給定的小數位數。"
+          },
+          "truncate": {
+            "description": "數字的整數部分（去掉小數）。"
+          },
+          "sign": {
+            "description": "數字的符號：-1、0 或 1。"
+          },
+          "sqrt": {
+            "description": "平方根。"
+          },
+          "pow": {
+            "description": "底數的指數次方。"
+          },
+          "exp": {
+            "description": "e 的指定次方。"
+          },
+          "log": {
+            "description": "給定底數的數字的對數。"
+          },
+          "log10": {
+            "description": "以 10 為底的對數。"
+          },
+          "max": {
+            "description": "兩個數字中較大的一個。"
+          },
+          "min": {
+            "description": "兩個數字中較小的一個。"
+          },
+          "ieeeRemainder": {
+            "description": "IEEE 754 x 除以 y 的餘數。"
+          },
+          "sin": {
+            "description": "正弦（弧度）。"
+          },
+          "cos": {
+            "description": "餘弦（弧度）。"
+          },
+          "tan": {
+            "description": "正切（弧度）。"
+          },
+          "asin": {
+            "description": "反正弦（弧度）。"
+          },
+          "acos": {
+            "description": "反餘弦（弧度）。"
+          },
+          "atan": {
+            "description": "反正切（弧度）。"
+          }
+        }
+      }
+    },
+    "accounts": {
+      "title": "帳戶",
+      "singular": "帳戶",
+      "common": {
+        "yes": "是",
+        "no": "否"
+      },
+      "roles": {
+        "Service": "服務",
+        "Operator": "操作員",
+        "Approver": "核准者",
+        "Admin": "管理員"
+      },
+      "kinds": {
+        "User": "使用者",
+        "Application": "應用程式"
+      },
+      "kindHints": {
+        "Application": "僅供 API 使用的認證（無法登入 UI）",
+        "User": "互動式帳戶（可登入 UI 並呼叫 API）"
+      },
+      "status": {
+        "enabled": "已啟用",
+        "disabled": "已停用",
+        "deleted": "已刪除"
+      },
+      "fields": {
+        "name": "名稱",
+        "label": "標籤",
+        "kind": "類型",
+        "role": "角色",
+        "status": "狀態",
+        "email": "電子郵件",
+        "area": "區域",
+        "created": "建立時間",
+        "createdBy": "建立者",
+        "modified": "修改時間",
+        "description": "描述",
+        "actions": "動作"
+      },
+      "actions": {
+        "new": "新增帳戶",
+        "more": "更多動作",
+        "onboardService": "導入新服務",
+        "onboardOperator": "導入新操作員",
+        "refresh": "重新整理",
+        "exporting": "匯出中…",
+        "exportCsv": "匯出此清單 (CSV)",
+        "exportJson": "匯出帳戶 (JSON)",
+        "importing": "匯入中…",
+        "importJson": "匯入帳戶 (JSON)…",
+        "edit": "編輯",
+        "apiKeys": "API 金鑰",
+        "sendEmail": "傳送電子郵件",
+        "viewStatus": "檢視狀態",
+        "exportPersonalData": "匯出個人資料",
+        "exportData": "匯出資料",
+        "erase": "抹除 (GDPR)",
+        "delete": "刪除",
+        "cancel": "取消",
+        "save": "儲存",
+        "close": "關閉"
+      },
+      "messages": {
+        "loadFailed": "載入失敗",
+        "actionFailed": "操作失敗",
+        "loading": "載入中…",
+        "empty": "尚無帳戶 — 按一下「新增帳戶」即可新增。"
+      },
+      "validation": {
+        "emailRequired": "電子郵件為必填。",
+        "emailInvalid": "請輸入有效的電子郵件地址。"
+      },
+      "aria": {
+        "viewAccount": "檢視帳戶 {{name}}",
+        "actionsFor": "{{name}} 的動作"
+      },
+      "confirmDelete": "要刪除帳戶「{{target}}」嗎？\n\n此操作無法復原。",
+      "import": {
+        "readError": "無法讀取帳戶檔案：{{error}}",
+        "confirm": "要從這個檔案匯入帳戶嗎？\n\n帳戶會依名稱比對：現有的帳戶會更新，新的名稱會建立。檔案中沒有的帳戶不受影響。\n\n檔案不包含 API 金鑰，因此透過這次匯入建立的帳戶一開始都沒有金鑰 — 請事後為每個帳戶各產生一把。",
+        "skipped": " · 已略過 {{count}} 個：{{errors}}",
+        "complete": "匯入完成：已建立 {{created}} 個、已更新 {{updated}} 個{{tail}}。"
+      },
+      "placeholders": {
+        "email": "user@example.com",
+        "area": "例如：北部地區"
+      },
+      "editor": {
+        "newTitle": "新增帳戶",
+        "editTitle": "編輯帳戶",
+        "tabs": {
+          "general": "一般",
+          "permissions": "角色與權限"
+        },
+        "emailHint": "用於電子郵件通知與臨時訊息。",
+        "areaHint": "選用的分組標籤。",
+        "none": "無",
+        "roleHint": "用來預先設定下方權限的範本 — 之後可自由調整。"
+      },
+      "scope": {
+        "title": "服務範圍",
+        "hint": "此帳戶可以看到哪些服務。留空表示可不受限制地存取所有服務；選擇一項以上的服務則只限於這些服務。",
+        "viewHint": "此帳戶可以看到哪些服務。",
+        "allServices": "所有服務",
+        "unrestricted": "所有服務（無限制）"
+      },
+      "permissions": {
+        "title": "權限",
+        "hint": "細部的功能權限。上方的角色只是起始範本 — 請依需要調整。",
+        "adminNote": "管理員一律擁有所有權限，無法縮減。",
+        "serviceNote": "服務帳戶只能提交及檢視自己的資料，不具備任何後台權限。"
+      },
+      "onboarding": {
+        "serviceTitle": "導入新服務",
+        "operatorTitle": "導入新操作員",
+        "createAccount": "建立帳戶",
+        "details": {
+          "title": "帳戶詳情",
+          "description": "建立新的 {{role}} 帳戶。",
+          "nameHint": "穩定的機器可讀識別碼，全域唯一。",
+          "namePlaceholder": "例如 acme_logistics",
+          "labelPlaceholder": "易記的顯示名稱",
+          "emailPlaceholder": "contact@example.com"
+        },
+        "kindHints": {
+          "Application": "僅供 API 使用的認證（無法登入 UI）。",
+          "User": "互動式帳戶（可登入 UI 並呼叫 API）。"
+        },
+        "scope": {
+          "description": "選擇這個 {{role}} 可以看到哪些服務。留空表示可不受限制地存取所有服務。",
+          "visibleServices": "可見的服務",
+          "hint": "留空表示可不受限制地存取所有服務；選擇一項以上的服務則只將此帳戶限制在這些服務。"
+        },
+        "key": {
+          "title": "API 金鑰",
+          "description": "可選擇立即發行 API 金鑰，讓此帳戶馬上就能呼叫 Ingest API。",
+          "generateNow": "立即產生 API 金鑰",
+          "applicationWarning": "應用程式帳戶只能使用 API 金鑰驗證。若沒有金鑰，在日後發行金鑰之前將無法提交資料。",
+          "descriptionLabel": "金鑰描述（選填）",
+          "descriptionHint": "記錄這把金鑰的用途或使用者 — 適合臨時或代理期間使用的金鑰。",
+          "expiryLabel": "金鑰到期時間（選填）"
+        },
+        "result": {
+          "created": "{{role}}「{{name}}」已建立",
+          "copyKey": "請立即複製這把 API 金鑰 — 之後不會再顯示。",
+          "copied": "已複製！",
+          "copyToClipboard": "複製到剪貼簿",
+          "copyAria": "複製 API 金鑰",
+          "noKey": "未產生 API 金鑰。您可以稍後從帳戶的「API 金鑰」對話方塊發行一把。"
+        }
+      },
+      "erase": {
+        "title": "抹除 {{name}}",
+        "deleted": "帳戶已刪除。",
+        "anonymised": "帳戶已匿名化。",
+        "resultPrefix": "假名",
+        "resultCounts": "{{submissions}} 筆提交項目、{{samples}} 個樣本、{{emails}} 封電子郵件、{{auditEntries}} 筆稽核記錄、{{keys}} 把金鑰。",
+        "warningBefore": "這可滿足抹除權要求。此操作",
+        "irreversible": "無法復原",
+        "warningAfter": "並會略過平常的「帳戶已提交資料」保護機制。",
+        "mode": "模式",
+        "anonymiseOption": "匿名化 — 保留數值/日期 KPI 值供報告使用，移除所有身分資訊（將帳戶假名化、遮蔽自由文字、刪除金鑰與電子郵件）。",
+        "deleteOption": "刪除 — 永久移除帳戶及所有與其相關的資料（提交項目、樣本、電子郵件、稽核軌跡）。",
+        "acknowledgement": "我了解此操作無法復原。",
+        "erasing": "抹除中…",
+        "deleteEverything": "刪除所有內容",
+        "anonymise": "匿名化"
+      },
+      "email": {
+        "title": "傳送電子郵件給 {{name}}",
+        "to": "收件者：{{email}}",
+        "subjectRequired": "主旨為必填。",
+        "queued": "電子郵件已排入傳送佇列。",
+        "subject": "主旨",
+        "message": "訊息",
+        "sending": "傳送中…",
+        "send": "傳送"
+      },
+      "sso": {
+        "title": "SSO 登入",
+        "hint": "連結身分提供者帳戶，讓這位使用者可以透過「繼續使用…」登入。系統會依提供者與使用者已驗證的電子郵件進行比對。",
+        "provider": "提供者",
+        "remove": "移除 SSO 連結",
+        "add": "新增 SSO 連結"
+      },
+      "audit": {
+        "title": "稽核",
+        "by": " · 由 {{name}}"
+      },
+      "keys": {
+        "title": "{{name}} 的 API 金鑰",
+        "copyNow": "請立即複製這把金鑰 — 之後不會再顯示。",
+        "keyId": "金鑰 ID",
+        "expires": "到期時間",
+        "never": "永不",
+        "revoke": "撤銷",
+        "delete": "刪除金鑰",
+        "deleteAria": "刪除金鑰 {{keyId}}",
+        "saveDescription": "儲存描述",
+        "editDescription": "編輯描述",
+        "nextDescription": "下一把金鑰的描述（選填）",
+        "descriptionHint": "記錄這把金鑰的用途或使用者 — 適合臨時或代理期間使用的金鑰，設有到期時間時尤其方便。",
+        "descriptionPlaceholderShort": "例如 Jane 休假代理",
+        "descriptionPlaceholder": "例如 Jane 休假代理（審核者）",
+        "nextExpiry": "下一把金鑰的到期時間（選填）",
+        "expiryHint": "留空表示金鑰永不到期。最長為自今天起兩年。",
+        "generate": "產生新金鑰",
+        "confirmDeleteRevoked": "要永久刪除 API 金鑰 {{keyId}} 嗎？\n\n這會將已撤銷的金鑰從清單中永久移除。\n\n此操作無法復原。",
+        "confirmDeleteActive": "要永久刪除 API 金鑰 {{keyId}} 嗎？\n\n這把金鑰仍然有效 — 刪除後會立即失效，效果與撤銷相同，但同時也會從清單中移除。\n\n此操作無法復原。",
+        "status": {
+          "revoked": "已撤銷",
+          "expired": "已到期",
+          "active": "有效"
+        }
+      }
+    },
+    "tools": {
+      "title": "工具",
+      "loading": "載入中…",
+      "noPermission": "您沒有使用這些工具的權限。",
+      "navigationGroup": "備份與還原",
+      "preparing": "準備中…",
+      "restoring": "還原中…",
+      "importing": "匯入中…",
+      "restoreFromFile": "從檔案還原…",
+      "importFromFile": "從檔案匯入…",
+      "restoreComplete": "還原完成。",
+      "dataBackup": {
+        "title": "資料備份",
+        "description": "將整個登錄資料庫（帳戶、金鑰、結構描述、提交項目、報表、稽核記錄）匯出成單一 JSON 檔案，或從檔案還原。",
+        "readError": "無法讀取備份檔案：{{error}}",
+        "confirmRestore": "要從這個備份還原嗎？\n\n這會將目前所有資料（帳戶、金鑰、結構描述、提交項目、報表、稽核記錄）取代為檔案的內容，且無法復原。請先確認您有最新的備份。",
+        "warningBeforeSmall": "這是適用於",
+        "small": "小型",
+        "warningBeforeNot": "部署以及在環境之間搬移資料的便利工具 —",
+        "notPrimary": "並非主要的備份機制。",
+        "warningBeforeCommand": "如需真正的備份，請建立資料庫層級的快照（",
+        "warningBeforeReplace": "或使用主機服務供應商的備份）。還原作業會",
+        "replacesAll": "取代所有目前的資料",
+        "warningAfterReplace": "且不具交易性。",
+        "download": "下載備份"
+      },
+      "configBackup": {
+        "title": "組態備份",
+        "description": "將所有組態（核准原則與規則、電子郵件與通知設定及範本、Webhook、整合和 Teams 連線）匯出成單一 JSON 檔案，或從檔案還原 — 可用來在環境之間複製組態，或在災難後復原。",
+        "readError": "無法讀取組態檔案：{{error}}",
+        "confirmRestore": "要從這個組態備份還原嗎？\n\n這會將目前所有組態（核准原則與規則、電子郵件與通知設定及範本、Webhook、整合和 Teams 連線）取代為檔案的內容，且無法復原。\n\n加密的機密資料（SMTP 密碼、Webhook 金鑰、Teams Bot 密碼）只有在這台伺服器使用與產生檔案時相同的 ApiKey:Pepper 時才有效；否則請於還原後重新輸入。若檔案中省略某項機密資料，系統會保留已儲存的內容。",
+        "warningBeforeReplace": "還原作業會",
+        "replacesAll": "取代所有目前的組態",
+        "warningBeforePepper": "且不具交易性。加密的機密資料會以密文形式包含在內，只能在使用相同",
+        "warningAfterPepper": "的伺服器上解密；若部署環境不同，請於還原後重新輸入。若檔案中省略某項機密資料，系統會保留已儲存的內容。",
+        "download": "下載組態"
+      },
+      "accountsBackup": {
+        "title": "帳戶",
+        "description": "將每個帳戶（名稱、標籤、角色、權限、SSO 連結、啟用狀態）匯出成單一 JSON 檔案，或匯入檔案來建立及更新帳戶 — 適合複製環境或建立初始資料。",
+        "readError": "無法讀取帳戶檔案：{{error}}",
+        "confirmImport": "要從這個檔案匯入帳戶嗎？\n\n帳戶會依名稱比對：現有的帳戶會更新，新的名稱會建立。檔案中沒有的帳戶不受影響。\n\n檔案不包含 API 金鑰，因此透過這次匯入建立的帳戶一開始都沒有金鑰 — 請事後為每個帳戶各產生一把。",
+        "keysNeverExported": "API 金鑰一律不會匯出。",
+        "warningBeforeNoKey": "金鑰不會以可還原的形式儲存，因此匯入的帳戶一開始會",
+        "noKey": "沒有金鑰",
+        "warningAfterNoKey": "並且必須重新產生金鑰才能通過驗證。匯入不具破壞性 — 檔案中沒有的帳戶會維持原狀。",
+        "importCompleteBeforeCreated": "匯入完成：",
+        "created": "個已建立",
+        "updated": "個已更新",
+        "download": "下載帳戶"
+      }
+    },
+    "reports": {
+      "title": "報表",
+      "singular": "報表",
+      "actions": {
+        "more": "更多動作",
+        "refresh": "重新整理",
+        "upload": "上傳報表",
+        "view": "檢視",
+        "delete": "刪除"
+      },
+      "messages": {
+        "loadFailed": "載入失敗",
+        "actionFailed": "無法完成操作",
+        "loading": "載入中…",
+        "empty": "尚無報表。",
+        "emptyAdmin": "尚無報表 — 按一下「上傳報表」即可新增。"
+      },
+      "fields": {
+        "name": "名稱",
+        "type": "類型",
+        "targets": "目標",
+        "created": "建立時間",
+        "createdBy": "建立者",
+        "actions": "動作"
+      },
+      "types": {
+        "single": "單一",
+        "aggregate": "彙總"
+      },
+      "targets": {
+        "global": "全域"
+      },
+      "validation": {
+        "emptyFile": "檔案是空的。"
+      },
+      "aria": {
+        "open": "開啟報表 {{name}}",
+        "actionsFor": "{{name}} 的動作"
+      },
+      "confirmDelete": "要刪除報表「{{target}}」嗎？\n\n此操作無法復原。",
+      "view": {
+        "back": "返回",
+        "loadFailed": "無法載入報表",
+        "loading": "載入報表中…",
+        "schema": "結構描述",
+        "pickGlobalSchema": "選擇結構描述（全域報表）…",
+        "pickSchema": "選擇結構描述…",
+        "period": "期間",
+        "periods": {
+          "thisMonth": "本月",
+          "lastWeek": "過去 7 天",
+          "lastMonth": "過去 30 天",
+          "lastYear": "最近 365 天",
+          "custom": "自訂範圍"
+        },
+        "from": "起始",
+        "to": "結束",
+        "submission": "提交項目",
+        "submissionOption": "{{service}} — {{date}}（{{count}} 個樣本）",
+        "submissionOptionRich": "{{service}} — <submittedAt />（{{count}} 個樣本）",
+        "noMatchingSubmissions": "沒有符合篩選條件的提交項目",
+        "pickSubmission": "選擇提交項目…",
+        "rendering": "呈現中…",
+        "render": "呈現",
+        "renderFailed": "呈現失敗",
+        "frameTitle": "報表：{{name}}",
+        "collapse": "摺疊",
+        "expand": "展開",
+        "openNewTab": "在新分頁中開啟",
+        "download": "下載"
+      }
+    },
+    "schemasSubmissions": {
+      "approval": {
+        "appliesTo": "適用於",
+        "appliesToHint": "您可以只要求手動輸入、只要求 API 提交，或兩者都需要核准。",
+        "approvers": "核准者",
+        "approversHint": "選擇可以審核的對象：下方的核准者/管理員帳戶，以及/或服務擁有者（送出提交項目的帳戶，讓服務可以簽核自己的資料）。請至少將一位標示為「必要」；當所有必要的核准者都核准後，提交項目就會生效。",
+        "globalDefaultHelp": "這會沿用在「設定 — 核准」中設定的全域預設核准原則。",
+        "heading": "核准",
+        "mode": {
+          "globalDefault": "使用全域預設值",
+          "none": "不需要核准",
+          "required": "需要核准"
+        },
+        "modeHint": "範圍內的提交項目在核准前會維持「待處理」狀態，在此之前不會納入 OData 摘要與「探索」。為了向下相容，預設為不需要核准。",
+        "modeLabel": "核准模式",
+        "modifiableHelp": "為已有提交項目的時段重新提交資料時，會取代原有資料並將核准狀態重設為「待處理」— 即使先前已核准也一樣。在等待重新核准期間，該筆資料會退出 OData 摘要與「探索」。如果您不希望重新提交影響已核准的資料，請將結構描述標示為不可修改。",
+        "modifiableTitle": "請注意：此結構描述可修改",
+        "requiredValidation": "請至少新增一位「必要」核准者。",
+        "requirement": {
+          "optional": "選用",
+          "required": "必要"
+        },
+        "selectApprovers": "選擇核准者",
+        "serviceOwner": "服務擁有者（送出提交的服務）",
+        "source": {
+          "apiOnly": "僅限 API 提交",
+          "both": "手動與 API 提交",
+          "manualOnly": "僅限手動（Web 主控台）提交"
+        }
+      },
+      "bulkImport": {
+        "chooseService": "選擇服務",
+        "failed": "{{count}} 筆失敗。",
+        "file": "檔案",
+        "format": "格式",
+        "formatHint": "依副檔名自動偵測；必要時可手動覆寫。",
+        "formats": {
+          "csv": "CSV",
+          "json": "JSON"
+        },
+        "group": "群組「{{name}}」",
+        "help": "從 JSON 或 CSV 檔案匯入單一服務的歷史提交項目。整個檔案必須都能剖析成功；接著每筆提交項目會各自獨立驗證並儲存，因此被拒絕的一筆不會影響其他筆。已存在的提交項目會略過，所以重複執行同一個檔案是安全的。",
+        "import": "匯入",
+        "importing": "匯入中…",
+        "itemFailed": "（{{count}} 個樣本）— 失敗",
+        "skipped": "{{count}} 筆已存在（已略過）。",
+        "submissionNumber": "提交項目 #{{number}}",
+        "summary": "已匯入 {{total}} 筆提交項目中的 {{succeeded}} 筆。",
+        "title": "匯入提交項目"
+      },
+      "comments": {
+        "comment": "留言",
+        "deleteThread": "刪除討論串",
+        "deleteThreadWarning": "這會刪除討論串中的所有留言。此操作無法復原。",
+        "edited": "（已編輯）",
+        "empty": "尚無留言。",
+        "general": "一般",
+        "loading": "載入留言中…",
+        "newThread": "新增討論串",
+        "open": "開啟中",
+        "post": "張貼",
+        "reopen": "重新開啟",
+        "reply": "回覆",
+        "replyPlaceholder": "回覆…",
+        "required": "留言文字為必填。",
+        "resolve": "解決",
+        "resolved": "已解決",
+        "resolvedCanReopen": "此討論串已解決 — 重新開啟才能新增留言。",
+        "resolvedReadOnly": "此討論串已解決。",
+        "scope": "範圍",
+        "thread": "討論串",
+        "threadActions": "討論串動作",
+        "title": "留言",
+        "unknown": "未知",
+        "writeComment": "撰寫留言…"
+      },
+      "common": {
+        "actionFailed": "無法完成操作",
+        "actions": "動作",
+        "actionsFor": "{{name}} 的動作",
+        "approvalStatus": {
+          "Approved": "已核准",
+          "NotRequired": "不需要",
+          "Pending": "待處理",
+          "Rejected": "已拒絕"
+        },
+        "approve": "核准",
+        "audit": "稽核",
+        "back": "返回",
+        "by": "由 {{name}}",
+        "cadenceLabel": "週期",
+        "cancel": "取消",
+        "clone": "複製",
+        "close": "關閉",
+        "continue": "繼續",
+        "created": "建立時間",
+        "createdBy": "建立者",
+        "delete": "刪除",
+        "deleted": "已刪除",
+        "description": "描述",
+        "disabled": "已停用",
+        "dismiss": "關閉",
+        "download": "下載",
+        "draft": "草稿",
+        "edit": "編輯",
+        "enabled": "已啟用",
+        "exportList": "匯出此清單",
+        "exporting": "匯出中…",
+        "false": "假",
+        "from": "起始",
+        "global": "全域",
+        "history": "歷程",
+        "id": "ID",
+        "label": "標籤",
+        "loadFailed": "載入失敗",
+        "loading": "載入中…",
+        "modifiable": "可修改",
+        "modified": "修改時間",
+        "moreActions": "更多動作",
+        "name": "名稱",
+        "no": "否",
+        "note": "備註",
+        "notes": "備註",
+        "preview": "預覽",
+        "publish": "發佈",
+        "published": "已發佈",
+        "refresh": "重新整理",
+        "reject": "拒絕",
+        "remove": "移除",
+        "replacedAt": "取代時間",
+        "requiresApproval": "需要核准",
+        "retry": "重試",
+        "sample": "樣本",
+        "samples": "樣本",
+        "save": "儲存",
+        "saveChanges": "儲存變更",
+        "schema": "結構描述",
+        "service": "服務",
+        "status": "狀態",
+        "submission": "提交項目",
+        "submissions": "提交項目",
+        "submittedAt": "提交時間",
+        "timestamp": "時間戳記",
+        "to": "結束",
+        "true": "真",
+        "type": "類型",
+        "untitledSchema": "未命名的結構描述",
+        "value": "值",
+        "valueType": {
+          "Boolean": "是/否",
+          "Date": "日期",
+          "Integer": "整數",
+          "Number": "數字",
+          "String": "文字"
+        },
+        "values": "值",
+        "version": "版本",
+        "view": "檢視",
+        "viewDetails": "檢視詳細資料",
+        "warnings": "警告",
+        "yes": "是"
+      },
+      "dependencies": {
+        "calculatedValue": "計算值",
+        "connectorHelp": "連接線由被參照的值，指向規則相依於它的值。",
+        "edge": {
+          "calculated": "計算來源",
+          "enabledIf": "啟用條件",
+          "submissionValidation": "跨值驗證（結構描述層級）",
+          "validation": "有效條件",
+          "visibleIf": "顯示條件",
+          "warning": "警告條件"
+        },
+        "failed": "無法建立相依性圖表：",
+        "legend": "圖例",
+        "loading": "正在檢查此結構描述的規則相依性…",
+        "noValues": "此結構描述尚無可用的值 — 請先新增一個值，才能看到相依性。",
+        "none": "尚未在這些值之間偵測到相依性。",
+        "title": "相依性：{{name}}",
+        "value": "值"
+      },
+      "layout": {
+        "addSection": "新增區段",
+        "addSubsection": "新增小節",
+        "addSubsectionInside": "在裡面新增小節",
+        "allPlaced": "所有值都已放入版面配置。",
+        "duplicateValue": "值「{{name}}」在版面配置中出現多次。",
+        "emptyHelp": "從上方拖曳值來放置，或新增一個區段。未放在這裡的值仍會在提交表單中優先呈現（不會有標題）。",
+        "errorPrefix": "錯誤：",
+        "missingCaption": "有一個區段缺少標題。",
+        "missingTarget": "版面配置的值節點缺少目標。",
+        "newSection": "新區段",
+        "notePrefix": "備註：",
+        "removeFromLayout": "從版面配置中移除",
+        "removeSection": "移除區段",
+        "sectionCaption": "區段標題",
+        "sectionDescription": "區段描述",
+        "sectionDescriptionPlaceholder": "選用的副標題（顯示在標題下方）",
+        "sectionHeading": "區段標題",
+        "tooDeep": "版面配置巢狀層級過深（最多 32 層）。",
+        "unassignedValues": "未指派的值 ({{count}})",
+        "unassignedWarning": "有 {{count}} 個值未放入版面配置 — 它們會顯示在各區段之前。",
+        "unknownValue": "版面配置引用未知值「{{name}}」。",
+        "untitledSection": "（未命名的區段）"
+      },
+      "preview": {
+        "bestEffortHeading": "概略預覽",
+        "bestEffortHelp": "這會在您的瀏覽器中呈現表單，並依尚未儲存的結構描述評估規則。伺服器仍具有最終效力 — 這裡的部分語意並不相同（正規表示式的方言，以及 sampleTimestamp()/serviceName() 這類協助程式在用戶端無法使用），因此在依賴某條規則之前，請務必以實際提交或 API 再次確認。",
+        "conditionalHelp": "條件式顯示（隱藏/變灰）與內嵌警告會出現在左側的表單上。",
+        "findings": {
+          "requiredEmpty": "必填值是空的",
+          "schemaRejected": "結構描述層級的規則拒絕了此提交項目",
+          "valueRejected": "值驗證規則拒絕了這個值"
+        },
+        "loadingServices": "載入服務中…",
+        "noFilledValues": "尚未填寫任何值 — 請先填寫下方的表單。",
+        "noProblems": "目前的值沒有問題。",
+        "noUsableValues": "此結構描述尚無可預覽的值，請先新增一個值。",
+        "previewTitle": "預覽：{{name}}",
+        "resetValues": "重設值",
+        "sampleTimestamp": "樣本時間戳記",
+        "scopes": {
+          "required": "缺少必填項目",
+          "schema": "結構描述層級驗證",
+          "shape": "格式檢查",
+          "value": "值驗證"
+        },
+        "selectService": "選擇服務",
+        "server": {
+          "acceptedImmediately": "會立即被接受（不需要核准）。",
+          "discarded": "已由 EnabledIf/VisibleIf 捨棄：{{names}}。",
+          "heldForApproval": "會保留待核准（需要 {{count}} 位核准者）。",
+          "invalid": "無效 — {{count}} 錯誤",
+          "valid": "有效 — 實際的提交項目會被接受。"
+        },
+        "serverValidation": "伺服器驗證",
+        "shape": {
+          "aboveMaximum": "高於最大值 {{value}}",
+          "belowMinimum": "低於最小值 {{value}}",
+          "earlier": "早於 {{value}}",
+          "invalidDate": "值不是有效日期",
+          "later": "晚於 {{value}}",
+          "longer": "超過最大長度 {{value}}",
+          "notNumber": "值不是數字",
+          "pattern": "不符合模式 {{value}}",
+          "regexBrowser": "無法在瀏覽器中評估正規表示式模式（將在伺服器上檢查）",
+          "shorter": "短於最小長度 {{value}}",
+          "wholeNumber": "值必須是整數"
+        },
+        "skipCadence": "略過週期（每期一次）檢查",
+        "skippedValues": "已略過 {{count}} 個名稱空白或重複的值：{{names}}。請為每個值指定唯一的名稱，才能預覽。",
+        "testHeading": "測試提交",
+        "testHelp": "以所選服務的身分執行實際的伺服器驗證 — 包含週期重複、歷程規則以及可能的核准狀態 — 但不會儲存任何內容。請填寫表單、選擇服務，然後按「驗證」。",
+        "testTitle": "測試提交：{{name}}",
+        "timestampPreviewHint": "用於樣本，以及任何讀取日期值的日期規則。",
+        "timestampServerHint": "用於每個樣本，以及任何日期/週期/歷程規則。",
+        "unnamedValue": "（未命名值）",
+        "validate": "驗證",
+        "validateAsService": "以服務身分驗證",
+        "validationCount": "將驗證 {{count}} 個值。結構描述必須已儲存，且對所選服務可見。",
+        "validationResults": "驗證結果"
+      },
+      "sampleFields": {
+        "addNotes": "新增備註",
+        "calculated": "計算值",
+        "disabled": "已停用",
+        "from": "自 {{value}}",
+        "max": "最大 {{value}}",
+        "maxLength": "最大長度 {{value}}",
+        "min": "最小 {{value}}",
+        "minLength": "最小長度 {{value}}",
+        "notProvided": "（未提供）",
+        "note": "備註",
+        "optional": "選填",
+        "regex": "正規表示式：{{value}}",
+        "required": "必填",
+        "to": "至 {{value}}",
+        "value": "值{{unit}}"
+      },
+      "schemaEdit": {
+        "addRule": "新增規則",
+        "addValue": "新增值",
+        "amberMax": "可接受（琥珀色）最大值",
+        "amberMaxHint": "高於此值為紅色。外側上緣。",
+        "amberMin": "可接受（琥珀色）最小值",
+        "amberMinHint": "低於此值為紅色。外側下緣。",
+        "calculated": "計算值",
+        "cancelEditing": "取消並繼續編輯",
+        "caption": "標題",
+        "captionHint": "選用標題，會顯示在提交表單與檢視畫面中這個值的上方（可視為區段標題）。僅供顯示；用戶端會忽略它。",
+        "checking": "檢查中…",
+        "conditionalDisplay": "條件式顯示",
+        "create": "建立結構描述",
+        "dateConstraints": "日期限制",
+        "deleteType": "值",
+        "dependencies": "相依性",
+        "discardChanges": "捨棄變更",
+        "draftUnavailable": "無法使用 — 此結構描述已有 {{count}} 筆提交項目。",
+        "editTitle": "編輯結構描述",
+        "editValue": "編輯值 {{name}}",
+        "enabledIf": "啟用條件",
+        "enabledIfHint": "為 false（或 null）時，該值在 UI 中會停用，提交的樣本會被捨棄並產生警告。留空 = 一律啟用。",
+        "enabledPublished": "已啟用（已發佈）",
+        "expression": "運算式",
+        "expressionHint": "NCalc 公式，只能參照同一筆提交項目中的同層值（例如 average(a, b)）。允許串連參照其他計算值。",
+        "greenMax": "理想（綠色）最大值",
+        "greenMaxHint": "內側上緣。需要搭配琥珀色最大值。",
+        "greenMin": "理想（綠色）最小值",
+        "greenMinHint": "內側下緣。需要搭配琥珀色最小值。",
+        "incrementVersion": "自動遞增版本號碼（改為 {{version}}）",
+        "kind": "類型",
+        "kindHint": "計算值是由同一筆提交項目中的同層值計算而來，永遠不會被提交。",
+        "layoutHint": "將值拖曳至區段中即可分組。這只會影響提交表單的版面配置 — 伺服器仍將提交項目視為平面清單。",
+        "loading": "載入結構描述中…",
+        "max": "最大值",
+        "maxDate": "最大日期 (ISO)",
+        "maxLength": "最大長度",
+        "min": "最小值",
+        "minDate": "最短日期 (ISO)",
+        "minLength": "最小長度",
+        "moveToDraft": "將結構描述移回草稿並套用變更",
+        "nameFixed": "結構描述名稱在建立後即固定 — 變更名稱可能會破壞驗證規則與現有的提交項目。",
+        "needsValue": "結構描述至少需要一個值才有作用。",
+        "noRules": "還沒有規則。",
+        "noRulesAdd": "尚無規則。請使用「新增規則」來建立。",
+        "notFound": "找不到結構描述",
+        "numericConstraints": "數值限制",
+        "publishAsIs": "直接發佈，不變更版本",
+        "publishChanges": "發佈變更",
+        "publishHelp": "您變更了這個已發佈的結構描述，但沒有更新版本號碼。您想要怎麼做？",
+        "readOnlySnapshot": "唯讀快照",
+        "regexPattern": "正規表示式模式",
+        "removeRule": "刪除規則",
+        "removeValueWarning": "移除某個值可能會破壞驗證規則，並導致現有的提交項目被拒絕或變動。建議改為停用它（取消勾選「啟用」），以保留完整的歷史資料。\n\n仍要移除嗎？",
+        "schemaMissing": "沒有名為「{{name}}」的結構描述，它可能已被刪除。",
+        "sinceVersion": "自版本起",
+        "sinceVersionHint": "選填。設定的值等於結構描述目前的版本 ({{version}}) 時，SPA 會在這個值旁邊顯示「新」標籤，維持一個週期期間。留空表示「一律存在」。",
+        "snapshotHelp": "版本 {{version}} 儲存於 <savedAt /> {{author}}。這是歷程檢視，無法編輯 — 不會影響目前的結構描述。",
+        "snapshotMissing": "此版本快照已不存在，它可能已從歷程中刪除。",
+        "stringConstraints": "字串限制",
+        "syntaxError": "語法錯誤：",
+        "tabs": {
+          "approvals": "核准",
+          "general": "一般",
+          "layout": "版面配置",
+          "validations": "驗證"
+        },
+        "targetBand": "目標範圍（RAG，選填）",
+        "targetBandHelp": "僅供報告用的紅/琥珀/綠範圍，會在圖表上顯示為陰影帶 — 不會強制執行。可接受（琥珀色）範圍是外圈；理想（綠色）範圍位於其中。琥珀色範圍之外為紅色。每個邊界都是選填，但綠色邊界需要同一側有對應的琥珀色邊界，而且各邊界必須由小到大：琥珀色最小值 ≤ 綠色最小值 ≤ 綠色最大值 ≤ 琥珀色最大值。",
+        "unit": "單位",
+        "userDefined": "使用者自訂",
+        "validSyntax": "語法正確",
+        "validation": "驗證",
+        "validationPlaceholder": "例如 if(expenses > revenue, 'expenses cannot exceed revenue', null)",
+        "validationsHint": "每條規則在每次提交時，會針對結構描述中的所有值執行一次。可新增多條規則，以強制執行多項跨值條件。",
+        "valueDetails": "值的詳細資料",
+        "valueNameFixed": "名稱在建立後即固定 — 驗證規則與現有的提交項目都會參照它。若需要不同的名稱，請新增一個值。",
+        "valueNameHint": "作為驗證規則中的識別碼。必須以英文字母或底線開頭，且只能包含英文字母、數字與底線。",
+        "valueNameValidation": "必須是有效的識別碼：只包含字母、數字和底線；不能以數字開頭。",
+        "valueNumber": "（值 #{{number}}）",
+        "valueValidation": "值驗證",
+        "valueValidationHint": "針對提交的樣本執行。可用變數包括 value、minimum、maximum。空白字元與換行會被忽略。",
+        "versionHint": "引入新值時請提高版本。版本不能降低。每個值的「自版本起」必須 ≤ 此版本。",
+        "viewVersionTitle": "檢視結構描述版本",
+        "visibleIf": "顯示條件",
+        "visibleIfHint": "為 false（或 null）時，該值在 UI 中會隱藏。伺服器端的行為與「啟用條件」相同。留空 = 一律顯示。",
+        "visibleServices": "對哪些服務可見",
+        "warning": "警告",
+        "warningHint": "選用規則；當結果為 true 或傳回非空字串時，會產生不會阻擋提交的警告。"
+      },
+      "schemaHistory": {
+        "bucketDescription": "{{count}} 個區間 — 鬚線顯示最小值/最大值，圓點顯示平均值",
+        "minAvgMax": "最小值/平均值/最大值",
+        "noNumericValues": "此結構描述沒有數值，因此無法繪製圖表。請新增「數字」或「整數」值以檢視時間軸。",
+        "noSamples": "尚未提交任何樣本。",
+        "title": "歷史資料"
+      },
+      "schemaVersions": {
+        "actionsForVersion": "版本 {{version}} 的動作",
+        "author": "作者",
+        "bumped": "已提高版本",
+        "changeDate": "更改日期",
+        "deleteAll": "刪除所有歷程",
+        "deleteAllWarning": "這會移除此結構描述所有已儲存的快照。目前的結構描述不受影響。此操作無法復原。",
+        "deleteEntryWarning": "這只會從歷程中移除該快照。目前的結構描述不受影響。此操作無法復原。",
+        "deleteThisEntry": "刪除此條目",
+        "empty": "未記錄任何版本歷程。",
+        "entireHistory": "整份版本歷程",
+        "entry": "版本歷程項目",
+        "entryLabel": "v{{version}}（{{date}}）",
+        "exportCsv": "匯出 CSV",
+        "newVersion": "新版本",
+        "oldVersion": "舊版本",
+        "title": "版本歷程 — {{name}}",
+        "viewThisVersion": "檢視此版本",
+        "viewVersion": "檢視版本 {{version}}"
+      },
+      "schemas": {
+        "audience": "適用對象",
+        "bumpedAt": "於 <bumpedAt /> 提高版本",
+        "deleteType": "結構描述",
+        "empty": "尚無結構描述 — 按一下「新增結構描述」即可建立。",
+        "exampleJson": "提交範例 (JSON)",
+        "frozen": "已凍結",
+        "globalAudience": "全域（所有服務皆可見）",
+        "importFailed": "無法匯入結構描述",
+        "jsonObjectError": "JSON 根節點必須是物件。",
+        "modifiableApprovalHelp": "為已有提交項目的時段重新提交資料時，會取代原有資料並將核准狀態重設為「待處理」— 即使先前已核准也一樣 — 因此較早的值會退出即時報告，最終被覆寫。如果已核准的數字絕不應在週期中途變動，請將結構描述（或值）標示為不可修改。",
+        "modifiableApprovalTitle": "可修改且需核准",
+        "new": "新增結構描述",
+        "noServices": "（無服務）",
+        "noValuesDefined": "沒有定義值。",
+        "schemaJson": "結構描述（JSON 格式）",
+        "schemaPdf": "結構描述（PDF 格式）",
+        "serviceCount": "{{count}} 項服務",
+        "submissionValidations": "提交驗證",
+        "testSubmission": "測試提交",
+        "title": "結構描述",
+        "upload": "上傳結構描述",
+        "validationRule": "提交驗證規則 {{number}}",
+        "valuesCount": "值（{{count}}）",
+        "viewHistoricalData": "檢視歷史資料",
+        "viewSchema": "檢視結構描述 {{name}}",
+        "viewVersionHistory": "檢視版本歷程"
+      },
+      "submissionDetail": {
+        "change": "變更",
+        "changeType": {
+          "Create": "建立",
+          "Delete": "刪除",
+          "Replace": "取代",
+          "Update": "更新"
+        },
+        "changedBy": "變更者",
+        "details": "詳細資料",
+        "noChanges": "未記錄任何變更。"
+      },
+      "submissionEdit": {
+        "acceptedWarnings": "提交項目已接受，但有警告",
+        "clonedHelp": "服務、結構描述與值都已預先填入，時間戳記則重設為現在。請確認內容，必要時調整服務或結構描述，然後按「提交」建立新的提交項目。",
+        "clonedTitle": "複製自現有的提交項目。",
+        "editDraftTitle": "編輯草稿",
+        "editTitle": "編輯提交項目",
+        "missingRequired": "缺少必填值",
+        "multiSchemaHelp": "儲存時只會保留 {{name}} 的值。如果您需要其他值，請先選擇其他結構描述。",
+        "multiSchemaTitle": "來源提交項目包含多個結構描述的值。",
+        "newTitle": "新增提交項目",
+        "noValues": "此結構描述沒有定義任何值。",
+        "pickSchema": "選擇結構描述",
+        "pickSchemaError": "請先選擇結構描述。",
+        "pickSchemaHelp": "選擇結構描述以檢視可以提交的值。",
+        "pickService": "選擇服務",
+        "pickServiceError": "請先選擇服務。",
+        "pickServiceFirst": "請先選擇服務",
+        "pickServiceSchemaHelp": "選擇服務與結構描述以開始輸入值。",
+        "saveAsDraft": "儲存為草稿",
+        "saveFailed": "無法儲存提交項目",
+        "submit": "提交",
+        "timestamp": "時間戳記 (UTC)",
+        "timestampHint": "套用至此提交項目中的每個樣本。",
+        "valueCountHelp": "{{count}} 個值 — 選填的值留空即可略過",
+        "viewTitle": "檢視提交項目"
+      },
+      "submissions": {
+        "actionsFor": "提交項目 {{id}} 的動作",
+        "allSchemas": "所有結構描述",
+        "allServices": "所有服務",
+        "approvalsReceived": "已取得 {{count}} 項必要核准中的 {{approved}} 項。",
+        "cloneNew": "複製為新的提交項目",
+        "createNew": "建立新的提交項目",
+        "deleteType": "提交項目",
+        "draftHelp": "此提交項目是進行中的草稿。在發佈之前不會納入報告與核准流程。",
+        "empty": "沒有符合這些篩選條件的提交項目。",
+        "exportPdf": "匯出為 PDF",
+        "exportXlsx": "匯出 XLSX（單一結構描述）",
+        "exportXlsxHelp": "將篩選後的提交項目匯出為 XLSX",
+        "importBulk": "大量匯入資料",
+        "interval": {
+          "all": "所有時間",
+          "custom": "自訂範圍",
+          "label": "間隔",
+          "lastMonth": "最近 30 天",
+          "lastWeek": "最近 7 天",
+          "lastYear": "最近 365 天"
+        },
+        "manualEntry": "手動輸入",
+        "myTitle": "我的提交項目",
+        "new": "新增提交項目",
+        "pickSchemaForXlsx": "選擇單一結構描述以啟用 XLSX 匯出",
+        "rejectHelp": "此提交項目會標示為已拒絕，並排除於 OData 摘要與「探索」之外，但仍會顯示在這裡。您可以留下選填的原因給提交者與其他審核者。",
+        "rejectPlaceholder": "例如：第 22 週的數字看起來對調了 — 請重新檢查夜班的總計。",
+        "rejectReason": "原因（選填）",
+        "rejectTitle": "拒絕提交項目",
+        "rejecting": "拒絕中…",
+        "rejectionReason": "拒絕原因",
+        "source": "來源",
+        "status": {
+          "all": "所有狀態"
+        },
+        "temporarilyClosed": "提交已暫時關閉。",
+        "viewFrom": "檢視 {{label}} 的提交項目",
+        "warningsCount": "警告 ({{count}})"
+      }
+    },
+    "analytics": {
+      "common": {
+        "actions": "動作",
+        "all": "全部",
+        "allServices": "所有服務",
+        "cadence": "週期",
+        "cancel": "取消",
+        "delete": "刪除",
+        "edit": "編輯",
+        "exportCsv": "匯出 CSV",
+        "exporting": "匯出中…",
+        "exportListCsv": "匯出此清單 (CSV)",
+        "exportView": "匯出此檢視",
+        "failedToLoad": "載入失敗",
+        "loading": "載入中…",
+        "moreActions": "更多動作",
+        "no": "否",
+        "noData": "沒有資料。",
+        "period": "期間",
+        "refresh": "重新整理",
+        "save": "儲存",
+        "saving": "儲存中…",
+        "schema": "結構描述",
+        "selectedCount_one": "已選取 {{count}} 項",
+        "selectedCount_other": "已選取 {{count}} 項",
+        "sending": "傳送中…",
+        "service": "服務",
+        "services": "服務",
+        "yes": "是"
+      },
+      "cadence": {
+        "daily": "每日",
+        "weekly": "每週",
+        "fortnightly": "每兩週",
+        "monthly": "每月",
+        "quarterly": "每季",
+        "semiannually": "每半年",
+        "yearly": "每年"
+      },
+      "periodFilter": {
+        "intervals": {
+          "all": "所有時間",
+          "lastDay": "最近 24 小時",
+          "lastWeek": "最近 7 天",
+          "lastMonth": "最近 30 天",
+          "custom": "自訂範圍"
+        },
+        "from": "起始",
+        "to": "結束"
+      },
+      "dashboard": {
+        "title": "概觀",
+        "welcome": "歡迎，{{name}}",
+        "cards": {
+          "pendingApprovals": "待核准",
+          "operators": "操作員",
+          "admins": "管理員",
+          "submissions": "提交項目",
+          "mySubmissions": "我的提交項目",
+          "submitData": "提交資料"
+        },
+        "actions": {
+          "review": "審核",
+          "manage": "管理",
+          "browse": "瀏覽",
+          "newSubmission": "新增提交項目 →",
+          "viewByPeriod": "依期間檢視 →"
+        },
+        "missing": {
+          "overdueTitle": "逾期 — 上一期",
+          "overdueDescription": "這些提交時段已關閉。",
+          "currentTitle": "本期",
+          "currentDescription": "仍在提交時段內。",
+          "servicesShort_one": "項服務的提交項目不足",
+          "servicesShort_other": "項服務的提交項目不足"
+        },
+        "trend": {
+          "title": "未提交項目趨勢",
+          "loading": "載入趨勢中…",
+          "empty": "沒有可用的趨勢資料。",
+          "seriesName": "未提交 — {{service}}"
+        }
+      },
+      "missing": {
+        "title": "各期間的未提交項目",
+        "titleShort": "未提交項目",
+        "columns": {
+          "missing": "未提交",
+          "totalRequired": "必填總數"
+        },
+        "trend": {
+          "title": "未提交趨勢",
+          "description": "每個 {{cadence}} 期間缺少的必填值總數 · 按一下長條即可檢視細節"
+        },
+        "chart": {
+          "missing": "未提交"
+        },
+        "byService": {
+          "title": "依服務 — {{period}}",
+          "description": "所選期間內每項服務缺少的必填值",
+          "empty": "此期間沒有任何缺漏。🎉"
+        },
+        "summary": "{{period}} 期間有 {{services}} 項服務共缺少 {{missing}} 個必填值",
+        "selectedPeriod": "所選期間",
+        "detail": {
+          "complete": "此期間所有必要的提交項目都已完成。"
+        }
+      },
+      "explore": {
+        "title": "探索",
+        "tabs": {
+          "scorecard": "記分卡",
+          "analysis": "分析",
+          "anomalies": "異常"
+        },
+        "actions": {
+          "exportCsv": "匯出 CSV（此檢視）",
+          "exportPng": "匯出圖表 (PNG)"
+        },
+        "errors": {
+          "nothingToExport": "此檢視目前沒有可匯出的內容。"
+        },
+        "filters": {
+          "schemas": "結構描述",
+          "selectSchema": "選擇結構描述",
+          "allSchemas": "所有結構描述",
+          "value": "值",
+          "selectValue": "選擇一個值",
+          "show": "顯示",
+          "latestAvailable": "最新可用",
+          "lastPeriod": "上一期",
+          "latestClosed": "最近已結束",
+          "current": "目前",
+          "aggregation": "彙總",
+          "comparePrevious": "與前期比較"
+        },
+        "help": {
+          "schemas": "要掃描哪些結構描述以尋找異常。留空則掃描所有含數值的結構描述。",
+          "schemasAria": "「結構描述」有什麼作用？",
+          "show": "「最新可用」會顯示每項服務最近一次的提交項目，不論多舊。「上一期」只顯示單一期間，並將該期未提交的服務標示為灰色的「未提交」卡片。",
+          "showAria": "「顯示」有什麼作用？",
+          "aggregation": "如何將落在每個期間內的樣本歸納為一個數字，以及如何將多項服務合併為整體數字。平均值會依樣本數加權；「樣本數」則只計算提交了多少筆。",
+          "aggregationAria": "「彙總」有什麼作用？",
+          "comparePrevious": "疊加同一組選取範圍並往前推移，讓您可以拿這一期與較早的期間對照。需要設定期間範圍（不能是「所有時間」）；兩個時段可以重疊。",
+          "compareAria": "「比較」有什麼作用？"
+        },
+        "shifts": {
+          "1m": "1 個月",
+          "6m": "6 個月",
+          "1y": "1 年"
+        },
+        "views": {
+          "trend": "趨勢",
+          "compare": "比較服務",
+          "snapshot": "快照"
+        },
+        "aggregation": {
+          "average": "平均值",
+          "sum": "總和",
+          "min": "最小值",
+          "max": "最大值",
+          "count": "樣本數"
+        },
+        "status": {
+          "green": "達到目標",
+          "amber": "警告",
+          "red": "偏離目標",
+          "normal": "無異常",
+          "anomaly": "異常",
+          "noSubmission": "未提交",
+          "hideMissing": "隱藏未提交項目"
+        },
+        "presets": {
+          "label": "預設組合",
+          "empty": "尚未儲存任何預設組合。",
+          "namePrompt": "預設組合名稱",
+          "limit_one": "最多只能保留 {{count}} 組預設組合。請先刪除一組。",
+          "limit_other": "最多只能保留 {{count}} 組預設組合。請先刪除一組。",
+          "deleteAria": "刪除預設組合 {{name}}",
+          "saveCurrent": "將目前設定儲存為預設組合…"
+        },
+        "anomaly": {
+          "historyWindow": "歷史範圍（期數）",
+          "sensitivity": "靈敏度（|z| 閾值）",
+          "baselineMode": "基線模式",
+          "robustHelp": "「穩健」模式比較不受少數極端尖峰影響而偏移基線。「標準」模式使用平均值與標準差。",
+          "robustAria": "「穩健」模式有什麼作用？",
+          "robust": "穩健（中位數/MAD）",
+          "standard": "標準（平均值/標準差）",
+          "detection": "異常偵測",
+          "highlight": "標示異常",
+          "summaryAnomaly_one": "{{count}} 異常",
+          "summaryAnomaly_other": "{{count}} 異常",
+          "summaryNormal_one": "{{count}} 正常",
+          "summaryNormal_other": "{{count}} 正常",
+          "summaryMissing_one": "{{count}} 未提交",
+          "summaryMissing_other": "{{count}} 未提交",
+          "empty": "尚無可掃描的數值型 KPI。請選擇一個以上含有數值的結構描述，即可檢查最近期間是否有異常。",
+          "hideNormal": "隱藏正常項目",
+          "noneInPeriod": "{{period}} 期間沒有異常。",
+          "openAnalysis": "在「分析」中開啟 · {{state}}"
+        },
+        "scorecard": {
+          "summaryOnTarget_one": "{{count}} 達到目標",
+          "summaryOnTarget_other": "{{count}} 達到目標",
+          "summaryWarning_one": "{{count}} 警告",
+          "summaryWarning_other": "{{count}} 警告",
+          "summaryOffTarget_one": "{{count}} 偏離目標",
+          "summaryOffTarget_other": "{{count}} 偏離目標",
+          "summaryMissing_one": "{{count}} 未提交",
+          "summaryMissing_other": "{{count}} 未提交",
+          "empty": "尚無設定目標範圍的 KPI。請為數值型的結構描述值加上可接受/理想範圍，即可在此顯示。",
+          "hideOnTarget": "隱藏達標項目",
+          "allOnTarget": "每個 KPI 都達到目標。",
+          "asOf": "自 <periodDate /> 起",
+          "viewSubmission": "檢視提交項目 · {{state}}"
+        },
+        "content": {
+          "pickSchema": "選擇結構描述以開始探索。",
+          "noNumeric": "此結構描述沒有數值，因此無法繪製圖表。請新增「數字」或「整數」值以進行探索。",
+          "trendOverTime": "隨時間變化的趨勢",
+          "aggregationOf": "{{value}} 的 {{aggregation}}",
+          "perCadencePeriod": "每個 {{cadence}} 期間",
+          "combineServices": "合併服務",
+          "projection": "預測",
+          "viewAsTable": "以表格檢視",
+          "showEvents": "顯示事件",
+          "noSamples": "此選取範圍沒有樣本。",
+          "overallAggregation": "整體 {{aggregation}}",
+          "latestPeriod": "最近期間",
+          "samples": "樣本",
+          "periodsServices": "期間/服務"
+        },
+        "trend": {
+          "noAnomalies": "目前選取範圍中沒有異常。",
+          "anomaliesHighlighted_one": "目前選取範圍中標示了 {{count}} 個異常。",
+          "anomaliesHighlighted_other": "目前選取範圍中標示了 {{count}} 個異常。",
+          "ago": "{{period}}前",
+          "previous": "前期",
+          "projectionName": "{{name}}（預測）",
+          "overallTrend": "整體趨勢"
+        },
+        "snapshot": {
+          "title": "各服務的最新值",
+          "description": "各值的最近期間 · 儲存格顯示該期間的 {{aggregation}}"
+        }
+      },
+      "events": {
+        "title": "事件",
+        "singular": "事件",
+        "ongoing": "進行中",
+        "removed": "（已移除）",
+        "notApplicable": "不適用",
+        "durationHours_one": "{{count}} 小時",
+        "durationHours_other": "{{count}} 小時",
+        "durationMinutes_one": "{{count}} 分鐘",
+        "durationMinutes_other": "{{count}} 分鐘",
+        "kinds": {
+          "pointintime": "時間點",
+          "interval": "間隔",
+          "fromnowon": "今後"
+        },
+        "fields": {
+          "label": "標籤",
+          "timestamp": "時間戳記",
+          "kind": "類型",
+          "duration": "持續時間",
+          "description": "描述",
+          "affects": "影響",
+          "created": "建立時間",
+          "createdBy": "建立者",
+          "modified": "修改時間"
+        },
+        "actions": {
+          "add": "新增事件",
+          "edit": "編輯事件"
+        },
+        "validation": {
+          "labelRequired": "標籤為必填。",
+          "timestampRequired": "時間戳記為必填。",
+          "serviceRequired": "請至少選擇一項受影響的服務，或選擇「所有服務」。",
+          "durationFormat": "無法辨識持續時間格式。請使用分鐘 (45)、時:分 (1:30)，或 天 時:分 (2 03:15)。",
+          "durationRequired": "間隔事件需要持續時間。"
+        },
+        "help": {
+          "fromNowOn": "自上方的時間戳記起持續進行，直到另行通知。",
+          "duration": "分鐘 (45)、時:分 (1:30)，或 天 時:分 (2 03:15)。"
+        },
+        "placeholders": {
+          "duration": "例如 90 或 1:30",
+          "selectServices": "選擇服務"
+        },
+        "deleteConfirm": "要刪除事件「{{label}}」嗎？\n\n此操作無法復原。",
+        "empty": "尚無事件。",
+        "emptyManage": "尚無事件 — 按一下「新增事件」即可建立。",
+        "viewAria": "檢視事件 {{label}}",
+        "actionsAria": "事件 {{label}} 的動作",
+        "byActor": "由 {{actor}}"
+      },
+      "audit": {
+        "title": "稽核",
+        "email": "電子郵件",
+        "delivery": "傳遞",
+        "actionError": "無法完成操作",
+        "deliveryActionsAria": "傳遞 {{id}} 的動作",
+        "tabs": {
+          "changes": "變更",
+          "sentEmails": "已傳送的電子郵件",
+          "webhookDeliveries": "Webhook 傳遞記錄"
+        },
+        "actions": {
+          "sendPending": "立即傳送待處理項目",
+          "redeliver": "重新傳遞"
+        },
+        "filters": {
+          "changeType": "變更類型",
+          "targetType": "目標類型"
+        },
+        "columns": {
+          "created": "建立時間",
+          "to": "收件者",
+          "subject": "主旨",
+          "status": "狀態",
+          "attempts": "嘗試次數",
+          "sent": "傳送時間",
+          "event": "事件",
+          "url": "URL",
+          "delivered": "傳遞時間",
+          "lastStatusCode": "最後狀態碼",
+          "lastError": "最後錯誤",
+          "timestamp": "時間戳記",
+          "change": "變更",
+          "target": "目標",
+          "changedBy": "變更者",
+          "note": "備註"
+        },
+        "empty": {
+          "changes": "未記錄任何變更。",
+          "emails": "未記錄任何電子郵件。",
+          "deliveries": "未記錄任何傳遞。"
+        },
+        "changeTypes": {
+          "create": "建立",
+          "edit": "編輯",
+          "delete": "刪除",
+          "approve": "核准",
+          "reject": "拒絕"
+        },
+        "targetTypes": {
+          "user": "使用者",
+          "account": "帳戶",
+          "schema": "結構描述",
+          "apiKey": "API 金鑰",
+          "submission": "提交項目",
+          "report": "報表",
+          "schemaHistory": "結構描述歷程",
+          "approvalRule": "核准規則",
+          "settings": "設定",
+          "backup": "備份",
+          "event": "事件",
+          "commentThread": "留言討論串",
+          "comment": "留言"
+        },
+        "statuses": {
+          "pending": "待處理",
+          "sending": "傳送中",
+          "sent": "已傳送",
+          "failed": "失敗"
+        }
+      },
+      "serviceStatus": {
+        "title": "狀態 — {{service}}",
+        "mixed": "混合",
+        "disabled": "已停用",
+        "empty": "此服務沒有可見的結構描述。",
+        "periods": {
+          "day": "日",
+          "week": "週",
+          "fortnight": "兩週",
+          "month": "月",
+          "quarter": "季",
+          "halfyear": "半年",
+          "year": "年"
+        },
+        "columns": {
+          "submitted": "已提交",
+          "lastSample": "最後樣本",
+          "status": "狀態"
+        },
+        "submittedHelp": "在目前的週期時段中，已提交 {{total}} 個作用中值裡的 {{submitted}} 個 — 必填 {{requiredSubmitted}}/{{requiredTotal}}。",
+        "requiredRatio": "必填 {{submitted}}/{{total}}",
+        "statuses": {
+          "inert": "無作用",
+          "noValues": "無值",
+          "submitted": "已提交",
+          "optional": "選填",
+          "missing": "未提交"
+        }
+      }
+    }
+  }
+}

@@ -6,6 +6,7 @@ import { formatApiError, setApiKey } from '../api/client'
 import { api } from '../api/client'
 import { useAuthProviders } from '../api/hooks'
 import type { Me } from '../api/types'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: {
@@ -36,14 +37,15 @@ const useStyles = makeStyles({
 
 // Map the server's sso_error codes to a friendly sentence. Anything unrecognised falls through to
 // a generic message so we never leave the user staring at a bare code.
-const SSO_ERRORS: Record<string, string> = {
-  not_linked: 'That account is not set up for single sign-on here. Ask an administrator to link your identity, or sign in with an API key.',
-  no_email: "Your identity provider didn't share a verified email, which is required to sign in.",
-  remote: 'Single sign-on was cancelled or failed. Please try again.',
+const SSO_ERROR_KEYS: Record<string, string> = {
+  not_linked: 'notLinked',
+  no_email: 'noEmail',
+  remote: 'remote',
 }
 
 export function Login() {
   const s = useStyles()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const [params] = useSearchParams()
   const [key, setKey] = useState('')
@@ -52,7 +54,9 @@ export function Login() {
 
   const { data: providers } = useAuthProviders()
   const ssoError = params.get('sso_error')
-  const ssoMessage = ssoError ? (SSO_ERRORS[ssoError] ?? 'Single sign-on did not complete. Please try again.') : null
+  const ssoMessage = ssoError
+    ? t(`shell.login.sso.errors.${SSO_ERROR_KEYS[ssoError] ?? 'default'}`)
+    : null
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -66,7 +70,7 @@ export function Login() {
       // that they can't really use anyway.
       if (me.kind === 'Application') {
         setApiKey(null)
-        setError('This API key is for application (non-interactive) use only. Ask an administrator for a User-kind credential to access the admin UI.')
+        setError(t('shell.login.applicationKeyError'))
         return
       }
       nav('/', { replace: true })
@@ -92,13 +96,13 @@ export function Login() {
       <Card className={s.card}>
         <Title2>Ingest</Title2>
         <div className={s.hint}>
-          Paste your API key. Only User-kind credentials can sign in here (any role); Application-kind keys are API-only.
+          {t('shell.login.hint')}
         </div>
 
         {ssoMessage && (
           <AutoScrollMessageBar intent="error">
             <MessageBarBody>
-              <MessageBarTitle>Single sign-on</MessageBarTitle>
+              <MessageBarTitle>{t('shell.login.sso.title')}</MessageBarTitle>
               {ssoMessage}
             </MessageBarBody>
           </AutoScrollMessageBar>
@@ -109,16 +113,16 @@ export function Login() {
             <div className={s.providers}>
               {providers!.map(p => (
                 <Button key={p.id} appearance="outline" onClick={() => signInWith(p.loginUrl)}>
-                  Continue with {p.displayName}
+                  {t('shell.login.continueWith', { provider: p.displayName })}
                 </Button>
               ))}
             </div>
-            <Divider>or use an API key</Divider>
+            <Divider>{t('shell.login.orUseApiKey')}</Divider>
           </>
         )}
 
         <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Field label="API key" required>
+          <Field label={t('shell.login.apiKey')} required>
             <Input
               type="password"
               value={key}
@@ -130,13 +134,13 @@ export function Login() {
           {error && (
             <AutoScrollMessageBar intent="error">
               <MessageBarBody>
-                <MessageBarTitle>Could not sign in</MessageBarTitle>
+                <MessageBarTitle>{t('shell.login.couldNotSignIn')}</MessageBarTitle>
                 {error}
               </MessageBarBody>
             </AutoScrollMessageBar>
           )}
           <Button type="submit" appearance="primary" disabled={!key || busy}>
-            {busy ? 'Verifying...' : 'Sign in'}
+            {busy ? t('shell.login.verifying') : t('shell.login.signIn')}
           </Button>
         </form>
       </Card>

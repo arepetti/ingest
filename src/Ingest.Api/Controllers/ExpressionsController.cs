@@ -1,5 +1,7 @@
 using Ingest.Api.Models;
+using Ingest.Api.Common;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -78,14 +80,18 @@ public sealed class ExpressionsController : ControllerBase
     public IActionResult Translate([FromBody] TranslateExpressionRequest request)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.Expression))
-            return BadRequest(new ProblemDetails { Title = "Expression must not be empty.", Status = StatusCodes.Status400BadRequest });
+            return BadRequest(DiagnosticProblem.BadRequest(
+                new Diagnostic(DiagnosticCodes.Expressions.Empty, "Expression must not be empty.")));
 
         if (request.Expression.Length > MaxExpressionLength)
-            return BadRequest(new ProblemDetails
-            {
-                Title = $"Expression exceeds the {MaxExpressionLength}-character limit.",
-                Status = StatusCodes.Status400BadRequest,
-            });
+        {
+            var message = $"Expression exceeds the {MaxExpressionLength}-character limit.";
+            return BadRequest(DiagnosticProblem.BadRequest(Diagnostic.Create(
+                DiagnosticCodes.Expressions.TooLong,
+                message,
+                ("maxLength", MaxExpressionLength),
+                ("actualLength", request.Expression.Length))));
+        }
 
         // Content negotiation drives the target language. Today only JS is supported; the
         // shape of this method leaves room for future targets (e.g. text/plain for a
@@ -93,12 +99,15 @@ public sealed class ExpressionsController : ControllerBase
         var target = NegotiateTarget(Request.Headers[HeaderNames.Accept]);
         if (target is null)
         {
-            return new ObjectResult(new ProblemDetails
-            {
-                Title = "Unsupported target language.",
-                Detail = $"This endpoint produces {JavaScriptMediaType} (or {JavaScriptMediaTypeLegacy}) and {PlainTextMediaType}. Set the Accept header accordingly.",
-                Status = StatusCodes.Status406NotAcceptable,
-            })
+            var detail = $"This endpoint produces {JavaScriptMediaType} (or {JavaScriptMediaTypeLegacy}) and {PlainTextMediaType}. Set the Accept header accordingly.";
+            return new ObjectResult(DiagnosticProblem.Create(
+                StatusCodes.Status406NotAcceptable,
+                "Unsupported target language.",
+                Diagnostic.Create(
+                    DiagnosticCodes.Expressions.UnsupportedTarget,
+                    "Unsupported target language.",
+                    ("supported", new[] { JavaScriptMediaType, JavaScriptMediaTypeLegacy, PlainTextMediaType })),
+                detail))
             {
                 StatusCode = StatusCodes.Status406NotAcceptable,
             };
@@ -117,12 +126,13 @@ public sealed class ExpressionsController : ControllerBase
             // Most failures will be NCalcParserException with a useful message — surface them
             // verbatim so the schema editor can show the user what's wrong.
             _logger.LogDebug(ex, "Expression translation failed");
-            return BadRequest(new ProblemDetails
-            {
-                Title = "Expression failed to parse.",
-                Detail = ex.Message,
-                Status = StatusCodes.Status400BadRequest,
-            });
+            return BadRequest(DiagnosticProblem.BadRequest(
+                Diagnostic.Create(
+                    DiagnosticCodes.Expressions.ParseFailed,
+                    "Expression failed to parse.",
+                    ("detail", ex.Message)),
+                "Expression failed to parse.",
+                ex.Message));
         }
     }
 
@@ -149,17 +159,24 @@ public sealed class ExpressionsController : ControllerBase
     public IActionResult Validate([FromBody] TranslateExpressionRequest request)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.Expression))
-            return BadRequest(new ProblemDetails { Title = "Expression must not be empty.", Status = StatusCodes.Status400BadRequest });
+            return BadRequest(DiagnosticProblem.BadRequest(
+                new Diagnostic(DiagnosticCodes.Expressions.Empty, "Expression must not be empty.")));
 
         if (request.Expression.Length > MaxExpressionLength)
-            return BadRequest(new ProblemDetails
-            {
-                Title = $"Expression exceeds the {MaxExpressionLength}-character limit.",
-                Status = StatusCodes.Status400BadRequest,
-            });
+        {
+            var message = $"Expression exceeds the {MaxExpressionLength}-character limit.";
+            return BadRequest(DiagnosticProblem.BadRequest(Diagnostic.Create(
+                DiagnosticCodes.Expressions.TooLong,
+                message,
+                ("maxLength", MaxExpressionLength),
+                ("actualLength", request.Expression.Length))));
+        }
 
         var result = _translator.ValidateSyntax(request.Expression);
-        return Ok(new ValidateExpressionResponse(result.Ok, result.Error, result.Position));
+        return Ok(new ValidateExpressionResponse(result.Ok, result.Error, result.Position)
+        {
+            ErrorDetail = result.ErrorDetail,
+        });
     }
 
     /// <summary>Maximum number of expressions accepted in one dependency-batch request.</summary>
@@ -193,14 +210,18 @@ public sealed class ExpressionsController : ControllerBase
     public IActionResult Dependencies([FromBody] ExpressionDependencyBatchRequest request)
     {
         if (request?.Expressions is null)
-            return BadRequest(new ProblemDetails { Title = "Expressions must not be null.", Status = StatusCodes.Status400BadRequest });
+            return BadRequest(DiagnosticProblem.BadRequest(
+                new Diagnostic(DiagnosticCodes.Expressions.BatchMissing, "Expressions must not be null.")));
 
         if (request.Expressions.Count > MaxDependencyBatchSize)
-            return BadRequest(new ProblemDetails
-            {
-                Title = $"Batch exceeds the {MaxDependencyBatchSize}-expression limit.",
-                Status = StatusCodes.Status400BadRequest,
-            });
+        {
+            var message = $"Batch exceeds the {MaxDependencyBatchSize}-expression limit.";
+            return BadRequest(DiagnosticProblem.BadRequest(Diagnostic.Create(
+                DiagnosticCodes.Expressions.BatchTooLarge,
+                message,
+                ("maxCount", MaxDependencyBatchSize),
+                ("actualCount", request.Expressions.Count))));
+        }
 
         var results = request.Expressions.Select(ParseOne).ToList();
         return Ok(new ExpressionDependencyBatchResponse(results));
@@ -214,7 +235,17 @@ public sealed class ExpressionsController : ControllerBase
         // A single oversized entry shouldn't fail the whole batch — every other rule on the
         // schema is still worth graphing.
         if (expression.Length > MaxExpressionLength)
-            return new ExpressionDependencyResult(Array.Empty<string>(), $"Expression exceeds the {MaxExpressionLength}-character limit.");
+        {
+            var message = $"Expression exceeds the {MaxExpressionLength}-character limit.";
+            return new ExpressionDependencyResult(Array.Empty<string>(), message)
+            {
+                ErrorDetail = Diagnostic.Create(
+                    DiagnosticCodes.Expressions.TooLong,
+                    message,
+                    ("maxLength", MaxExpressionLength),
+                    ("actualLength", expression.Length)),
+            };
+        }
 
         try
         {
@@ -224,7 +255,13 @@ public sealed class ExpressionsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Dependency-batch expression failed to parse");
-            return new ExpressionDependencyResult(Array.Empty<string>(), ex.Message);
+            return new ExpressionDependencyResult(Array.Empty<string>(), ex.Message)
+            {
+                ErrorDetail = Diagnostic.Create(
+                    DiagnosticCodes.Expressions.ParseFailed,
+                    ex.Message,
+                    ("detail", ex.Message)),
+            };
         }
     }
 

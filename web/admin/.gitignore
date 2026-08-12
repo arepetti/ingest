@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Generated i18n review kits and in-flight authoring fragments
+scripts/kit-out
+scripts/context-parts
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

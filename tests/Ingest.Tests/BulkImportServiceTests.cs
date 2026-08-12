@@ -26,6 +26,8 @@ public class BulkImportServiceTests
             sut.ImportAsync(Guid.NewGuid(), BulkImportFormat.Json, ValidJson));
 
         Assert.Equal("Maintenance window", ex.Message);
+        Assert.Equal(DiagnosticCodes.Submissions.IngestionClosed, ex.Code);
+        Assert.True(Assert.IsType<bool>(ex.Params["configuredMessage"]));
         Assert.False(submissions.AdminCreateCalled);
     }
 
@@ -40,6 +42,8 @@ public class BulkImportServiceTests
             sut.ImportAsync(Guid.NewGuid(), BulkImportFormat.Json, ValidJson));
 
         Assert.Equal("Submissions are temporarily closed.", ex.Message);
+        Assert.Equal(DiagnosticCodes.Submissions.IngestionClosed, ex.Code);
+        Assert.False(Assert.IsType<bool>(ex.Params["configuredMessage"]));
     }
 
     [Fact]

@@ -134,25 +134,54 @@ public sealed class IntegrationsService : IIntegrationsService
 
     private static void Validate(Integration integration)
     {
-        var errors = new List<string>();
+        var errors = new List<Diagnostic>();
         if (integration.Schedule is { } s)
         {
-            if (s.HourUtc is < 0 or > 23) errors.Add("Schedule hour must be between 0 and 23.");
-            if (s.MinuteUtc is < 0 or > 59) errors.Add("Schedule minute must be between 0 and 59.");
+            if (s.HourUtc is < 0 or > 23)
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Integrations.ScheduleHourInvalid,
+                    "Schedule hour must be between 0 and 23.",
+                    ("hourUtc", s.HourUtc),
+                    ("minimum", 0),
+                    ("maximum", 23)));
+            if (s.MinuteUtc is < 0 or > 59)
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Integrations.ScheduleMinuteInvalid,
+                    "Schedule minute must be between 0 and 59.",
+                    ("minuteUtc", s.MinuteUtc),
+                    ("minimum", 0),
+                    ("maximum", 59)));
 
             var usesDayOfMonth = s.Frequency is IntegrationFrequency.Monthly or IntegrationFrequency.Quarterly
                 or IntegrationFrequency.SemiAnnually or IntegrationFrequency.Yearly;
             if (usesDayOfMonth && !s.LastDayOfMonth && s.DayOfMonth is < 1 or > 31)
-                errors.Add("Schedule day of month must be between 1 and 31.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Integrations.ScheduleDayInvalid,
+                    "Schedule day of month must be between 1 and 31.",
+                    ("dayOfMonth", s.DayOfMonth),
+                    ("minimum", 1),
+                    ("maximum", 31),
+                    ("frequency", s.Frequency.ToString())));
 
             var usesAnchorMonth = s.Frequency is IntegrationFrequency.Quarterly
                 or IntegrationFrequency.SemiAnnually or IntegrationFrequency.Yearly;
             if (usesAnchorMonth && s.AnchorMonth is < 1 or > 12)
-                errors.Add("Schedule anchor month must be between 1 and 12.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Integrations.ScheduleAnchorMonthInvalid,
+                    "Schedule anchor month must be between 1 and 12.",
+                    ("anchorMonth", s.AnchorMonth),
+                    ("minimum", 1),
+                    ("maximum", 12),
+                    ("frequency", s.Frequency.ToString())));
         }
         if (integration.Kind == IntegrationKind.MicrosoftTeams &&
             string.IsNullOrWhiteSpace(integration.Teams?.TargetId))
-            errors.Add("A Teams target (user or channel) is required.");
-        if (errors.Count > 0) throw new ValidationException(errors);
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Integrations.TeamsTargetRequired,
+                "A Teams target (user or channel) is required.",
+                ("integrationKind", integration.Kind.ToString()),
+                ("targetKind", integration.Teams?.Kind.ToString())));
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
     }
 }

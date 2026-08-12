@@ -1,0 +1,2595 @@
+{
+  "metadata": {
+    "locale": "it-IT",
+    "description": "Italian as used in Italy",
+    "nativeLabel": "Italiano (Italia)",
+    "englishLabel": "Italian (Italy)"
+  },
+  "strings": {
+    "app": {
+      "title": "Ingest Admin"
+    },
+    "apiErrors": {
+      "unexpected": "Si è verificato un errore.",
+      "status": {
+        "400": "La richiesta non è valida.",
+        "401": "La chiave API non è stata accettata.",
+        "403": "Non hai l'autorizzazione per eseguire questa operazione.",
+        "404": "L'elemento non è stato trovato.",
+        "408": "La richiesta ha impiegato troppo tempo. Riprova.",
+        "409": "Questa operazione è in conflitto con un'altra modifica. Ricarica e riprova.",
+        "410": "L'elemento non è più disponibile.",
+        "413": "La richiesta è troppo grande.",
+        "415": "Questo tipo di contenuto non è supportato.",
+        "422": "Non è stato possibile elaborare i dati.",
+        "429": "Troppe richieste. Attendi un momento e riprova.",
+        "500": "Si è verificato un errore nel server. Riprova.",
+        "502": "Il server non risponde. Riprova tra poco.",
+        "503": "Il server non risponde. Riprova tra poco.",
+        "504": "Il server non risponde. Riprova tra poco.",
+        "server": "Si è verificato un errore nel server. Riprova.",
+        "request": "La richiesta non è riuscita.",
+        "unexpected": "Si è verificato un evento imprevisto."
+      }
+    },
+    "apiMessages": {
+      "common": {
+        "not_found": "Impossibile trovare {{resource}}.",
+        "conflict": "La richiesta è in conflitto con lo stato corrente. {{message}}",
+        "forbidden": "Non hai l'autorizzazione per eseguire questa operazione. {{message}}",
+        "unauthorized": "Accedi per continuare.",
+        "service_unavailable": "Il servizio è temporaneamente non disponibile. {{message}}",
+        "validation": "Convalida non riuscita. {{message}}",
+        "internal": "Si è verificato un errore nel server. Riprova.",
+        "feature_disabled": "Questa funzionalità non è abilitata. {{message}}"
+      },
+      "api": {
+        "invalid_request": "La richiesta non è valida. {{message}}",
+        "missing_required_parameter": "Manca il parametro obbligatorio “{{parameter}}”.",
+        "unsupported_omit": "Il valore omit “{{value}}” non è supportato.",
+        "single_parameter_required": "Per {{operation}} è richiesto un solo valore “{{parameter}}”.",
+        "service_outside_scope": "Il servizio “{{serviceId}}” non rientra nell'ambito assegnato."
+      },
+      "submissions": {
+        "validation": "Convalida dell'invio non riuscita. {{message}}",
+        "duplicate_period": "“{{displayName}}” è già stato inviato per questo periodo {{cadence}}.",
+        "pending_duplicate_period": "“{{displayName}}” ha già un invio in attesa di approvazione per questo periodo {{cadence}}.",
+        "schema_not_assigned": "Lo schema “{{schemaName}}” non è assegnato a questo servizio.",
+        "schema_disabled": "Lo schema “{{schemaName}}” è attualmente disabilitato.",
+        "value_not_defined": "Il valore “{{valueName}}” non è definito nello schema “{{schemaName}}”.",
+        "calculated_value_submitted": "Il valore calcolato “{{valueName}}” non può essere inviato.",
+        "value_disabled": "Il valore “{{displayName}}” è attualmente disabilitato.",
+        "value_required": "Il valore “{{displayName}}” è obbligatorio.",
+        "required_value_missing": "Manca il valore obbligatorio “{{displayName}}” ({{schemaName}}.{{valueName}}).",
+        "value_type": "Il valore “{{displayName}}” deve essere un valore {{expectedType}} valido.",
+        "value_minimum": "Il valore “{{displayName}}” deve essere almeno {{minimum}} (ricevuto: {{actual}}).",
+        "value_maximum": "Il valore “{{displayName}}” non deve superare {{maximum}} (ricevuto: {{actual}}).",
+        "value_before_minimum_date": "Il valore “{{displayName}}” ({{schemaName}}.{{valueName}}) deve essere uguale o successivo a {{minimum}} (ricevuto: {{actual}}).",
+        "value_after_maximum_date": "Il valore “{{displayName}}” ({{schemaName}}.{{valueName}}) deve essere uguale o precedente a {{maximum}} (ricevuto: {{actual}}).",
+        "value_minimum_length": "Il valore “{{displayName}}” deve contenere almeno {{minimum}} caratteri (ricevuti: {{actual}}).",
+        "value_maximum_length": "Il valore “{{displayName}}” non deve contenere più di {{maximum}} caratteri (ricevuti: {{actual}}).",
+        "value_regex": "Il valore “{{displayName}}” non corrisponde al formato richiesto.",
+        "value_validation_failed": "Convalida non riuscita per “{{displayName}}”: {{detail}}",
+        "value_validation_error": "Impossibile valutare la regola di convalida per “{{displayName}}”: {{detail}}",
+        "schema_validation_failed": "Convalida dell'invio non riuscita per lo schema “{{schemaName}}”: {{detail}}",
+        "schema_validation_error": "Impossibile valutare una regola dello schema “{{schemaName}}”: {{detail}}",
+        "value_not_modifiable": "Il valore “{{displayName}}” non può essere modificato.",
+        "gating_evaluation_error": "Impossibile valutare la regola {{rule}} per “{{schemaName}} / {{valueName}}”: {{detail}}",
+        "sample_discarded": "Un campione inviato è stato scartato. {{message}}",
+        "sample_discarded_with_message": "Il campione “{{schemaName}} / {{valueName}}” è stato scartato dalla regola {{rule}}: {{detail}}",
+        "sample_discarded_by_rule": "Il campione “{{schemaName}} / {{valueName}}” è stato scartato dalla regola {{rule}}.",
+        "warning_rule_triggered": "È stata attivata la regola di avviso per “{{displayName}}”.",
+        "warning_rule_message": "Avviso per “{{displayName}}”: {{detail}}",
+        "warning_rule_error": "Impossibile valutare la regola di avviso per “{{displayName}}”: {{detail}}",
+        "legacy_warning": "{{message}}",
+        "published_cannot_become_draft": "Un invio pubblicato non può tornare a essere una bozza.",
+        "not_awaiting_approval": "Questo invio non è in attesa di approvazione.",
+        "wrong_owner": "Questo invio appartiene a un altro account.",
+        "window_not_open": "La finestra di invio non è aperta. {{message}}",
+        "window_closed": "La finestra di invio è chiusa. {{message}}",
+        "create_window_not_open": "La finestra di invio {{cadence}} per “{{schemaName}}.{{valueName}}” si apre alle {{windowStart}}.",
+        "create_window_closed": "La finestra di invio {{cadence}} per “{{schemaName}}.{{valueName}}” si è chiusa alle {{windowEnd}}.",
+        "modify_window_closed": "Impossibile modificare l'invio {{submissionId}}: la finestra {{cadence}} per “{{schemaName}}.{{valueName}}” si è chiusa alle {{windowEnd}}.",
+        "ingestion_closed": "Gli invii sono temporaneamente chiusi. {{message}}"
+      },
+      "imports": {
+        "invalid_file": "Il file di importazione non è valido. {{message}}",
+        "empty_file": "Il file di importazione è vuoto.",
+        "invalid_json": "Il file di importazione non contiene JSON valido: {{detail}}",
+        "unsupported_format": "Il formato di importazione non è supportato. {{message}}",
+        "submissions_not_array": "La proprietà “submissions” deve essere un array, non {{actualKind}}.",
+        "invalid_root": "Il tipo radice {{actualKind}} non è valido. Formati accettati: {{acceptedShapes}}.",
+        "submission_not_object": "L'invio {{submissionNumber}} deve essere un oggetto, non {{actualKind}}.",
+        "samples_missing": "L'invio {{submissionNumber}} deve contenere un array samples (ricevuto: {{actualKind}}).",
+        "sample_names_required": "Nell'invio {{submissionNumber}}, il campione {{sampleNumber}} richiede schemaName “{{schemaName}}” e valueName “{{valueName}}”.",
+        "sample_invalid_json": "Nell'invio {{submissionNumber}}, il campione {{sampleNumber}} contiene JSON non valido alla riga {{lineNumber}}, byte {{bytePositionInLine}}: {{detail}}",
+        "submission_no_samples": "L'invio {{submissionNumber}} non contiene campioni validi.",
+        "missing_column": "Manca la colonna obbligatoria “{{column}}”.",
+        "row_names_required": "La riga {{row}} richiede schemaName “{{schemaName}}” e valueName “{{valueName}}”.",
+        "row_timestamp_invalid": "La riga {{row}} contiene un timestamp non valido “{{timestamp}}”.",
+        "no_data_rows": "Il file di importazione non contiene righe di dati.",
+        "invalid_row": "Una riga di importazione non è valida. {{message}}",
+        "no_submissions": "Il file non contiene invii.",
+        "accounts": {
+          "invalid_marker": "Questo file non è un'esportazione di account Ingest.",
+          "invalid_json": "Il file {{fileType}} non contiene JSON valido: {{detail}}",
+          "unsupported_version": "La versione {{actualVersion}} dell'esportazione account non è supportata; è prevista la versione {{expectedVersion}}.",
+          "no_accounts": "Il file degli account non contiene account.",
+          "entry_name_missing": "Una voce account è stata ignorata perché manca accountName “{{accountName}}”.",
+          "entry_failed": "Una voce account è stata ignorata. {{message}}"
+        }
+      },
+      "accounts": {
+        "validation": "Convalida dell'account non riuscita. {{message}}",
+        "already_exists": "L'account “{{accountName}}” esiste già.",
+        "invalid_email": "“{{email}}” non è un indirizzo e-mail valido.",
+        "unknown_capabilities": "Funzionalità sconosciute: {{capabilities}}.",
+        "invalid_assigned_services": "Uno o più ID servizio assegnati non sono validi: {{serviceIds}}.",
+        "invalid_sso_link": "Il collegamento SSO non è valido. {{message}}",
+        "sso_links_user_only": "Solo gli account User possono avere collegamenti SSO; questo account è {{accountKind}}.",
+        "sso_link_fields_required": "Ogni collegamento SSO richiede provider “{{provider}}” ed email “{{email}}”.",
+        "duplicate_sso_link": "Il collegamento SSO per {{provider}} / {{email}} è duplicato.",
+        "sso_link_in_use": "L'identità {{provider}} “{{email}}” è già collegata a un altro account.",
+        "delete_in_use": "L'account “{{accountName}}” contiene dati inviati e non può essere eliminato. Disabilitalo.",
+        "api_key_description_too_long": "La descrizione della chiave API contiene {{actualLength}} caratteri; il massimo è {{maxLength}}.",
+        "api_key_expiry_not_future": "La scadenza della chiave API {{expiry}} deve essere successiva a {{now}}.",
+        "api_key_expiry_too_distant": "La scadenza della chiave API {{expiry}} è oltre {{maxLifetimeYears}} anni dopo {{now}}."
+      },
+      "schemas": {
+        "validation": "Convalida dello schema non riuscita. {{message}}",
+        "already_exists": "Lo schema “{{schemaName}}” esiste già.",
+        "delete_in_use": "Lo schema “{{schemaName}}” è usato dagli invii e non può essere eliminato. Disabilitalo.",
+        "version_negative": "La versione dello schema {{version}} deve essere almeno {{minimum}}.",
+        "version_decreased": "La versione dello schema non può diminuire da {{previousVersion}} a {{requestedVersion}}.",
+        "value_name_invalid": "Il nome valore “{{valueName}}” deve rispettare {{pattern}}.",
+        "since_version_negative": "Il valore “{{valueName}}” ha sinceVersion {{sinceVersion}}; il minimo è {{minimum}}.",
+        "since_version_after_schema": "Il valore “{{valueName}}” ha sinceVersion {{sinceVersion}}, successiva alla versione schema {{schemaVersion}}.",
+        "target_band_out_of_order": "Il valore “{{valueName}}” ha {{lowerBand}} {{lowerValue}} superiore a {{upperBand}} {{upperValue}}.",
+        "green_min_without_amber_min": "Il valore “{{valueName}}” imposta GreenMin {{greenMin}} senza AmberMin.",
+        "green_max_without_amber_max": "Il valore “{{valueName}}” imposta GreenMax {{greenMax}} senza AmberMax.",
+        "calculated_expression_missing": "Il valore calcolato “{{valueName}}” richiede un'espressione.",
+        "calculated_value_required": "Il valore calcolato “{{valueName}}” non può essere obbligatorio.",
+        "calculated_expression_syntax": "L'espressione di “{{valueName}}” contiene un errore di sintassi alla posizione {{position}}: {{detail}}",
+        "calculated_expression_analysis": "Impossibile analizzare l'espressione di “{{valueName}}”: {{detail}}",
+        "calculated_self_reference": "L'espressione di “{{valueName}}” fa riferimento a se stessa.",
+        "calculated_history_reference": "L'espressione di “{{valueName}}” non può usare funzioni cronologiche: {{functions}}.",
+        "calculated_unknown_identifier": "L'espressione di “{{valueName}}” fa riferimento all'identificatore sconosciuto “{{identifier}}”.",
+        "calculated_dependency_cycle": "I valori calcolati contengono un ciclo di dipendenze.",
+        "layout_depth_exceeded": "La profondità layout {{actualDepth}} supera il massimo {{maxDepth}}.",
+        "layout_value_name_missing": "In un nodo valore del layout manca valueName.",
+        "layout_unknown_value": "Il layout fa riferimento al valore sconosciuto “{{valueName}}”.",
+        "layout_duplicate_value": "Il valore “{{valueName}}” compare più volte nel layout.",
+        "layout_section_caption_missing": "In una sezione del layout manca la didascalia.",
+        "layout_unknown_kind": "Il tipo layout “{{actualKind}}” non è valido. Previsti: {{expectedKinds}}."
+      },
+      "reports": {
+        "validation": "Convalida del report non riuscita. {{message}}",
+        "already_exists": "Il report “{{reportName}}” esiste già.",
+        "missing_upload": "Carica un file non vuoto nel campo “{{field}}”.",
+        "content_empty": "Il contenuto del report non può essere vuoto.",
+        "name_required": "È richiesto un nome per il report; il file “{{fileName}}” non ne contiene uno.",
+        "date_range_invalid": "L'inizio report {{from}} non può essere successivo alla fine {{to}}.",
+        "type_unsupported": "Il tipo di report “{{reportType}}” non è supportato.",
+        "schema_not_target": "Lo schema “{{schemaName}}” non è una destinazione del report “{{reportName}}”. Destinazioni: {{targetSchemaNames}}.",
+        "schema_required_for_multiple_targets": "Il report “{{reportName}}” ha come destinazioni {{targetSchemaNames}}; specifica “{{parameter}}”.",
+        "submission_id_required": "Il report “{{reportName}}” richiede “{{parameter}}”.",
+        "submission_schema_missing": "L'invio {{submissionId}} non contiene campioni per lo schema “{{schemaName}}”.",
+        "aggregate_schema_required": "Il report aggregato “{{reportName}}” richiede “{{parameter}}”.",
+        "front_matter_unclosed": "Il front matter del report si apre con “---” ma non si chiude.",
+        "front_matter_line_invalid": "Impossibile analizzare la riga front matter {{lineNumber}}: {{line}}",
+        "front_matter_type_invalid": "Il tipo front matter “{{actualType}}” non è valido. Consentiti: {{allowedTypes}}.",
+        "front_matter_inline_list_invalid": "L'elenco inline “{{value}}” deve usare {{expectedWrapper}}.",
+        "template_parse_failed": "Analisi del modello {{engine}} non riuscita: {{detail}}",
+        "template_render_failed": "Rendering del modello {{engine}} non riuscito: {{detail}}"
+      },
+      "expressions": {
+        "empty": "L'espressione non può essere vuota.",
+        "too_long": "L'espressione supera il limite di {{maxLength}} caratteri.",
+        "parse_failed": "Impossibile analizzare l'espressione: {{detail}}",
+        "unsupported_target": "La destinazione dell'espressione “{{target}}” non è supportata.",
+        "batch_missing": "Manca il batch di espressioni.",
+        "batch_too_large": "Il batch supera il limite di {{maxCount}} espressioni."
+      },
+      "configuration": {
+        "validation": "Convalida della configurazione non riuscita. {{message}}",
+        "backup_empty": "Il file di backup è vuoto.",
+        "backup_invalid_json": "Il file di backup non contiene JSON valido: {{detail}}",
+        "backup_invalid_marker": "Questo non è un backup Ingest (previsto “{{expectedFormat}}”, ricevuto “{{actualFormat}}”).",
+        "backup_unsupported_version": "La versione backup {{version}} non è supportata; la versione massima è {{maximumVersion}}.",
+        "backup_missing_collections": "Nel file di backup manca la sezione collections.",
+        "config_backup_empty": "Il file di backup della configurazione è vuoto.",
+        "config_backup_invalid_json": "Il backup della configurazione non contiene JSON valido: {{detail}}",
+        "config_backup_invalid_marker": "Questo non è un backup di configurazione Ingest (previsto “{{expectedFormat}}”, ricevuto “{{actualFormat}}”).",
+        "config_backup_unsupported_version": "La versione backup configurazione {{version}} non è supportata; la versione massima è {{maximumVersion}}.",
+        "config_backup_missing_collections": "Nel backup della configurazione manca la sezione collections."
+      },
+      "comments": {
+        "validation": "Convalida del commento non riuscita. {{message}}",
+        "thread_resolved": "Questa discussione è risolta. Riaprila prima di aggiungere un commento.",
+        "edit_forbidden": "Puoi modificare solo i tuoi commenti.",
+        "value_not_on_schema": "Il valore “{{valueName}}” non appartiene allo schema {{schemaId}}.",
+        "target_type_unsupported": "Il tipo destinazione commento “{{targetType}}” non è supportato per {{targetId}}.",
+        "text_required": "Il testo del commento è obbligatorio.",
+        "text_too_long": "Il commento contiene {{actualLength}} caratteri; il massimo è {{maxLength}}."
+      },
+      "events": {
+        "validation": "Convalida dell'evento non riuscita. {{message}}",
+        "label_required": "L'etichetta dell'evento è obbligatoria.",
+        "timestamp_required": "Il timestamp dell'evento è obbligatorio.",
+        "interval_duration_required": "Per gli eventi {{eventKind}} è richiesta una durata positiva “{{duration}}”.",
+        "invalid_service_ids": "Gli ID dei servizi interessati devono identificare servizi esistenti: {{serviceIds}}."
+      },
+      "approval": {
+        "validation": "Convalida dell'approvazione non riuscita. {{message}}",
+        "global_default_not_allowed": "La modalità di approvazione “{{mode}}” non può usare qui il criterio globale predefinito.",
+        "approver_required": "È richiesto almeno un approvatore.",
+        "required_approver_required": "Almeno un approvatore deve essere contrassegnato come obbligatorio.",
+        "duplicate_service_owner": "Il proprietario del servizio è elencato più volte.",
+        "duplicate_approver": "L'account approvatore {{accountId}} è elencato più volte.",
+        "approver_not_found": "L'account approvatore {{accountId}} non esiste.",
+        "not_designated_approver": "L'account {{approverAccountId}} non è un approvatore designato per l'invio {{submissionId}}."
+      },
+      "integrations": {
+        "validation": "Convalida dell'integrazione non riuscita. {{message}}",
+        "connection_failed": "Connessione all'integrazione non riuscita: {{detail}}",
+        "schedule_hour_invalid": "L'ora pianificata {{hourUtc}} deve essere compresa tra {{minimum}} e {{maximum}} UTC.",
+        "schedule_minute_invalid": "Il minuto pianificato {{minuteUtc}} deve essere compreso tra {{minimum}} e {{maximum}}.",
+        "schedule_day_invalid": "Il giorno {{dayOfMonth}} per le pianificazioni {{frequency}} deve essere compreso tra {{minimum}} e {{maximum}}.",
+        "schedule_anchor_month_invalid": "Il mese iniziale {{anchorMonth}} per le pianificazioni {{frequency}} deve essere compreso tra {{minimum}} e {{maximum}}.",
+        "teams_target_required": "Per {{integrationKind}} è richiesta una destinazione Teams {{targetKind}}."
+      },
+      "webhooks": {
+        "validation": "Convalida del webhook non riuscita. {{message}}",
+        "delivery_failed": "Consegna del webhook non riuscita. {{message}}",
+        "name_required": "Il nome del webhook è obbligatorio.",
+        "url_required": "L'URL del webhook è obbligatorio.",
+        "url_invalid": "L'URL webhook “{{url}}” deve essere assoluto e usare uno di questi schemi: {{allowedSchemes}}."
+      },
+      "email": {
+        "validation": "Convalida dell'e-mail non riuscita. {{message}}",
+        "delivery_failed": "Consegna dell'e-mail non riuscita. {{message}}",
+        "address_invalid": "“{{address}}” non è un indirizzo e-mail valido.",
+        "subject_required": "L'oggetto è obbligatorio.",
+        "email_subject_required": "L'oggetto dell'e-mail è obbligatorio.",
+        "text_body_required": "Il corpo di testo è obbligatorio.",
+        "template_parse_failed": "Impossibile analizzare il campo “{{field}}” del modello {{engine}}: {{detail}}",
+        "smtp_host_required": "L'host SMTP è obbligatorio.",
+        "smtp_port_invalid": "La porta SMTP {{port}} deve essere compresa tra {{minimum}} e {{maximum}}.",
+        "from_address_required": "L'indirizzo mittente è obbligatorio.",
+        "account_contact_missing": "L'account “{{accountName}}” ({{accountId}}) non ha un'e-mail di contatto."
+      }
+    },
+    "settings": {
+      "title": "Impostazioni",
+      "general": {
+        "navigationLabel": "Generale",
+        "navigationGroup": "Generale",
+        "title": "Generale",
+        "description": "Preferenze per la console di amministrazione.",
+        "language": "Lingua",
+        "theme": "Tema",
+        "lightTheme": "Chiaro"
+      },
+      "permissionDenied": "Non hai l'autorizzazione per gestire alcuna impostazione.",
+      "noneEnabled": "Nessuna impostazione configurabile è abilitata. Attiva e-mail, webhook, integrazioni o il flusso di lavoro di approvazione nella configurazione del server per gestirli qui.",
+      "navigation": {
+        "areas": "Aree",
+        "configuration": "Configurazione",
+        "submissionPeriods": "Periodi di invio",
+        "ingestion": "Acquisizione",
+        "approval": "Approvazione",
+        "approvals": "Approvazioni",
+        "rules": "Regole",
+        "email": "E-mail",
+        "emailTemplates": "Modelli e-mail",
+        "notifications": "Notifiche",
+        "webhooks": "Webhook",
+        "integrations": "Integrazioni",
+        "teamsNotifications": "Notifiche Teams",
+        "teamsConnection": "Connessione Teams"
+      },
+      "common": {
+        "loading": "Caricamento…",
+        "saving": "Salvataggio…",
+        "save": "Salva",
+        "saveChanges": "Salva modifiche",
+        "add": "Aggiungi",
+        "cancel": "Annulla",
+        "done": "Fatto",
+        "refresh": "Aggiorna",
+        "moreActions": "Altre azioni",
+        "actions": "Azioni",
+        "edit": "Modifica",
+        "delete": "Elimina",
+        "enable": "Abilita",
+        "disable": "Disabilita",
+        "enabled": "Abilitato",
+        "disabled": "Disabilitato",
+        "configured": "Configurato",
+        "notConfigured": "Non configurato",
+        "label": "Etichetta",
+        "status": "Stato",
+        "services": "Servizi",
+        "schemas": "Schemi",
+        "allServices": "Tutti i servizi",
+        "allSchemas": "Tutti gli schemi",
+        "selectServices": "Seleziona i servizi",
+        "selectSchemas": "Seleziona gli schemi",
+        "removed": "(rimosso)",
+        "unset": "(non impostato)",
+        "optionalListName": "Nome facoltativo mostrato solo in questo elenco.",
+        "serviceRequired": "Scegli almeno un servizio oppure “Tutti i servizi”.",
+        "schemaRequired": "Scegli almeno uno schema oppure “Tutti gli schemi”.",
+        "cadence": "Cadenza",
+        "cadences": {
+          "Daily": "Giornaliera",
+          "Weekly": "Settimanale",
+          "Fortnightly": "Quindicinale",
+          "Monthly": "Mensile",
+          "Quarterly": "Trimestrale",
+          "SemiAnnually": "Semestrale",
+          "Yearly": "Annuale"
+        },
+        "months": {
+          "january": "gennaio",
+          "february": "febbraio",
+          "march": "marzo",
+          "april": "aprile",
+          "may": "maggio",
+          "june": "giugno",
+          "july": "luglio",
+          "august": "agosto",
+          "september": "settembre",
+          "october": "ottobre",
+          "november": "novembre",
+          "december": "dicembre"
+        },
+        "weekDays": {
+          "monday": "lunedì",
+          "tuesday": "martedì",
+          "wednesday": "mercoledì",
+          "thursday": "giovedì",
+          "friday": "venerdì",
+          "saturday": "sabato",
+          "sunday": "domenica"
+        },
+        "weekDaysShort": {
+          "monday": "lun",
+          "tuesday": "mar",
+          "wednesday": "mer",
+          "thursday": "gio",
+          "friday": "ven",
+          "saturday": "sab",
+          "sunday": "dom"
+        }
+      },
+      "approval": {
+        "title": "Criterio di approvazione predefinito",
+        "description": "Gli schemi impostati su “Usa il valore predefinito globale” ricadono in questo criterio. La modifica vale solo per i nuovi invii; quelli già in corso mantengono gli approvatori con cui sono stati creati.",
+        "saved": "Criterio di approvazione salvato.",
+        "defaultBehavior": "Quando uno schema usa il valore predefinito",
+        "dontRequire": "Non richiedere l'approvazione",
+        "require": "Richiedere l'approvazione",
+        "appliesTo": "Si applica a",
+        "approvers": "Approvatori",
+        "approversHint": "Gli account Approvatore/Amministratore che possono revisionare e/o il proprietario del servizio (l'account che ha effettuato l'invio). Contrassegnane almeno uno come Obbligatorio.",
+        "requiredApproverValidation": "Aggiungi almeno un approvatore obbligatorio.",
+        "selectApprovers": "Seleziona gli approvatori",
+        "serviceOwner": "Proprietario del servizio (il servizio che invia)",
+        "required": "Obbligatorio",
+        "optional": "Facoltativo",
+        "sources": {
+          "both": "Sia invii manuali che API",
+          "manualOnly": "Solo invii manuali (console web)",
+          "apiOnly": "Solo invii API"
+        }
+      },
+      "areas": {
+        "title": "Aree",
+        "description": "Tag di raggruppamento facoltativi proposti quando si modifica un account. Se è definita almeno un'area, l'editor dell'account mostra un elenco a discesa; lascia l'elenco vuoto per poter digitare un'area come testo libero. Le aree sono solo informative: modificarle non ha mai effetto sugli account esistenti.",
+        "saved": "Aree salvate.",
+        "empty": "Nessuna area definita: l'editor dell'account usa un campo di testo libero.",
+        "moveUp": "Sposta {{name}} in alto",
+        "moveDown": "Sposta {{name}} in basso",
+        "remove": "Rimuovi {{name}}",
+        "addLabel": "Aggiungi un'area",
+        "placeholder": "es. Regione Nord"
+      },
+      "submissionPeriods": {
+        "title": "Periodi di invio",
+        "description": "Quando inizia e finisce ogni periodo di rendicontazione. Le modifiche valgono immediatamente per i nuovi invii e per i controlli sui periodi aperti; i periodi già registrati mantengono i limiti con cui sono stati scritti.",
+        "saved": "Periodi di invio salvati.",
+        "fiscalYearStart": "L'anno fiscale inizia a",
+        "fiscalYearHint": "Determina anche l'inizio dei periodi trimestrali e semestrali.",
+        "weekStart": "La settimana inizia il",
+        "monthStart": "Il mese inizia il giorno",
+        "monthStartHint": "1-28.",
+        "fortnightAnchor": "Riferimento quindicinale",
+        "fortnightAnchorHint": "Una data qualsiasi che coincide con l'inizio di un periodo quindicinale; conta solo la data."
+      },
+      "submissionWindows": {
+        "title": "Finestre di invio",
+        "description": "Quanto tempo prima e dopo il periodo di ogni cadenza un servizio può effettivamente creare o modificare un invio. Il ritardo di apertura posticipa l'apertura della finestra rispetto all'inizio del periodo; il periodo di tolleranza ne prolunga l'apertura oltre la fine del periodo. Finché non vengono impostati qui, entrambi valgono 0 ore, quindi la finestra coincide esattamente con il periodo. Anche le segnalazioni di “invio mancato” e i promemoria attendono la scadenza del periodo di tolleranza.",
+        "saved": "Finestre di invio salvate.",
+        "openOffset": "Ritardo di apertura (ore)",
+        "gracePeriod": "Periodo di tolleranza (ore)"
+      },
+      "currentPeriods": {
+        "title": "Periodi attuali",
+        "description": "Il risultato attuale delle impostazioni qui sopra: un'istantanea del momento, che non si aggiorna da sola.",
+        "period": "Periodo",
+        "window": "Finestra"
+      },
+      "ingestion": {
+        "title": "Acquisizione",
+        "description": "Un interruttore di emergenza globale per il ripristino di emergenza. Chiudere gli invii blocca l'acquisizione lato servizi (account di servizio, importazione in blocco e integrazione Teams), mentre tutto il resto resta disponibile: letture, OData, creazione e modifica da parte degli amministratori per le correzioni, schemi e impostazioni. Finché la chiusura è attiva, a tutti viene mostrato un banner con il messaggio qui sotto.",
+        "saved": "Stato dell'acquisizione salvato.",
+        "closeAll": "Chiudi tutti gli invii",
+        "bannerLabel": "Messaggio banner (facoltativo)",
+        "bannerHint": "Mostrato a tutti mentre gli invii sono chiusi.",
+        "bannerPlaceholder": "es. Gli invii sono sospesi mentre analizziamo un problema sui dati. Contiamo di riattivarli entro le 17:00 UTC."
+      },
+      "email": {
+        "title": "Server di posta elettronica (SMTP)",
+        "description": "Da dove viene inviata la posta in uscita. Le impostazioni sono memorizzate nel database; la password è archiviata cifrata e non viene più mostrata.",
+        "saved": "Impostazioni salvate.",
+        "host": "Host",
+        "hostPlaceholder": "smtp.example.org",
+        "port": "Porta",
+        "useTls": "Utilizza TLS (STARTTLS)",
+        "fromAddress": "Indirizzo mittente",
+        "fromAddressPlaceholder": "ingest@example.org",
+        "fromName": "Nome mittente",
+        "fromNamePlaceholder": "Ingest",
+        "username": "Nome utente",
+        "usernamePlaceholder": "(vuoto = relay anonimo)",
+        "changePassword": "Cambia la password memorizzata",
+        "setPassword": "Imposta una password",
+        "password": "Password",
+        "passwordHint": "Lascia vuoto per cancellare la password memorizzata."
+      },
+      "emailTemplates": {
+        "title": "Modelli e-mail",
+        "description": "Modelli Liquid usati per comporre le e-mail di notifica. Selezionane uno per modificarne l'oggetto e il corpo.",
+        "empty": "Ancora nessun modello.",
+        "template": "Modello",
+        "subject": "Oggetto",
+        "format": "Formato",
+        "editAria": "Modifica modello {{name}}",
+        "htmlAndText": "HTML + testo",
+        "text": "Testo",
+        "editNamed": "Modifica modello — {{name}}",
+        "edit": "Modifica modello",
+        "saved": "Modello salvato.",
+        "textBody": "Corpo del messaggio",
+        "textBodyHint": "Versione alternativa in solo testo. Liquid è supportato.",
+        "htmlBody": "Corpo HTML",
+        "htmlBodyHint": "Opzionale. Lascia vuoto per inviare solo testo.",
+        "save": "Salva modello"
+      },
+      "notifications": {
+        "title": "Notifiche",
+        "description": "Scegli quali eventi generano email e chi le riceve. Ogni trigger può inviare notifiche all'e-mail di contatto del servizio, all'elenco dei destinatari riportato di seguito o a entrambi.",
+        "saved": "Impostazioni di notifica salvate.",
+        "runResult": "{{total}} e-mail in coda: {{upcoming}} imminenti, {{missed}} mancate, {{warnings}} con avvisi.",
+        "upcoming": "Promemoria di invio imminente",
+        "leadTime": "Anticipo (ore prima della chiusura della finestra)",
+        "missed": "Avviso di mancato invio",
+        "warnings": "Notifica di invio con avvisi",
+        "draftSaved": "Notifica di bozza salvata",
+        "draftSavedHint": "Inviata a ogni salvataggio della bozza (senza deduplica) per sollecitare i collaboratori. L'e-mail contiene un percorso relativo da incollare dopo l'indirizzo della console: non è un collegamento cliccabile.",
+        "pendingApproval": "Notifica di invio in attesa di approvazione",
+        "pendingApprovalHint": "Gli approvatori designati dell'invio ricevono sempre un'e-mail; queste opzioni aggiungono chi ha effettuato l'invio e/o l'elenco degli amministratori.",
+        "approved": "Notifica di invio approvato",
+        "rejected": "Notifica di invio rifiutato",
+        "recipientList": "Elenco destinatari amministratore/operatore",
+        "recipientListHint": "Gli account (con un'e-mail) che ricevono una copia quando su un evento è attivo “elenco amministratori”.",
+        "noEligibleAccounts": "Nessun account idoneo (gli operatori/amministratori necessitano di un'e-mail)",
+        "selectRecipients": "Seleziona i destinatari…",
+        "running": "Esecuzione in corso…",
+        "runNow": "Esegui ora",
+        "notifyService": "Avvisa l'account di servizio",
+        "notifyAdminList": "Avvisa l'elenco amministratori/operatori"
+      },
+      "approvalRules": {
+        "title": "Regole",
+        "description": "Richiedi l'approvazione per servizi e schemi specifici, in aggiunta al criterio di ciascuno schema. Lascia un lato impostato su “Tutti” per coprire ogni servizio o ogni schema. Una regola limitata agli invii via API può obbligare una persona a revisionare e completare i flussi parzialmente automatizzati prima della pubblicazione.",
+        "add": "Aggiungi regola",
+        "edit": "Modifica regola",
+        "create": "Crea regola",
+        "created": "Regola creata.",
+        "saved": "Regola salvata.",
+        "deleted": "Regola eliminata.",
+        "disabledMessage": "Regola disabilitata.",
+        "enabledMessage": "Regola abilitata.",
+        "deleteType": "regola di approvazione",
+        "approval": "Approvazione",
+        "useGlobalDefault": "Usa il valore predefinito globale",
+        "noApproval": "Nessuna approvazione",
+        "requiredSummary": "Obbligatorio ({{source}})",
+        "emptyManage": "Ancora nessuna regola: fai clic su “Aggiungi regola” per crearne una.",
+        "emptyReadOnly": "Ancora nessuna regola.",
+        "editAria": "Modifica regola {{name}}",
+        "actionsAria": "Azioni per la regola {{name}}",
+        "labelPlaceholder": "es. I flussi finanziari richiedono un'approvazione",
+        "sources": {
+          "both": "manuale + API",
+          "manualOnly": "solo manuale",
+          "apiOnly": "solo API"
+        }
+      },
+      "teamsConnection": {
+        "title": "Connessione Microsoft Teams",
+        "description": "La registrazione dell'app bot usata per inviare i solleciti su Teams. È memorizzata nel database; il segreto del bot è archiviato cifrato e non viene più mostrato. Consulta la guida alla configurazione per sapere come registrare il bot in Azure.",
+        "saved": "Connessione salvata.",
+        "testSucceeded": "Connessione riuscita: le credenziali sono valide.",
+        "testFailed": "Connessione non riuscita.",
+        "appId": "ID app (client)",
+        "appIdPlaceholder": "00000000-0000-0000-0000-000000000000",
+        "tenantId": "ID tenant",
+        "tenantHint": "Lascia vuoto per un bot multi-tenant.",
+        "tenantPlaceholder": "(vuoto = multi-tenant)",
+        "singleTenant": "Registrazione dell'app a tenant singolo",
+        "changeSecret": "Cambia il segreto del bot memorizzato",
+        "setSecret": "Imposta il segreto del bot",
+        "secret": "Segreto del bot (client secret)",
+        "secretHint": "Lascia vuoto per cancellare il segreto memorizzato.",
+        "testing": "Test in corso…",
+        "test": "Prova connessione"
+      },
+      "integrations": {
+        "title": "Integrazioni",
+        "description": "Ogni integrazione sollecita un utente o un canale Teams a inviare i campioni ancora mancanti per i servizi e gli schemi che copre. I solleciti seguono una pianificazione giornaliera, oppure partono su richiesta con “Esegui ora”. I campi disabilitati e nascosti vengono omessi; gli avvisi vengono mostrati inline.",
+        "connectionWarning": "La connessione a Microsoft Teams non è ancora configurata: imposta le credenziali del bot nella pagina “Connessione Teams” prima che le integrazioni possano inviare solleciti.",
+        "add": "Aggiungi integrazione",
+        "edit": "Modifica integrazione",
+        "create": "Crea integrazione",
+        "created": "Integrazione creata.",
+        "saved": "Integrazione salvata.",
+        "deleted": "Integrazione eliminata.",
+        "disabledMessage": "Integrazione disabilitata.",
+        "enabledMessage": "Integrazione abilitata.",
+        "deleteType": "integrazione",
+        "runComplete": "Esecuzione completata: {{prompted}} sollecitati, {{skipped}} saltati.",
+        "testEnqueued": "Sollecito di prova accodato.",
+        "target": "Destinazione",
+        "scheduleLabel": "Pianificazione",
+        "emptyManage": "Ancora nessuna integrazione: fai clic su “Aggiungi integrazione” per crearne una.",
+        "emptyReadOnly": "Ancora nessuna integrazione.",
+        "editAria": "Modifica integrazione {{name}}",
+        "actionsAria": "Azioni per l'integrazione {{name}}",
+        "runNow": "Esegui ora",
+        "sendTest": "Invia un test",
+        "targetSummary": "{{kind}}: {{target}}",
+        "channel": "Canale",
+        "user": "Utente",
+        "targetRequired": "Inserisci l'ID dell'utente o del canale di destinazione.",
+        "hourValidation": "L'ora deve essere compresa tra 0 e 23.",
+        "minuteValidation": "I minuti devono essere compresi tra 0 e 59.",
+        "labelPlaceholder": "es. Sollecito giornaliero per il canale operativo",
+        "sendTo": "Invia a",
+        "aUser": "Un utente",
+        "aChannel": "Un canale",
+        "channelId": "ID canale",
+        "userId": "ID utente (object ID di Entra, UPN o e-mail)",
+        "targetIdHint": "Consulta la guida alla configurazione per sapere come trovare questo ID.",
+        "channelIdPlaceholder": "19:...@thread.tacv2",
+        "userIdPlaceholder": "user@example.org",
+        "displayName": "Nome da visualizzare",
+        "displayNameHint": "Etichetta descrittiva facoltativa per questa destinazione.",
+        "displayNamePlaceholder": "es. Canale del team operativo",
+        "frequency": "Frequenza",
+        "frequencyHint": "Con quale frequenza il controllo cerca i valori ancora mancanti. Viene eseguito anche su richiesta con “Esegui ora”.",
+        "daysOfWeek": "Giorni della settimana",
+        "daysOfWeekHint": "Lascia vuoto per eseguire ogni giorno.",
+        "everyDay": "Ogni giorno",
+        "anchorMonth": "Mese di riferimento",
+        "anchorMonthHint": "Il periodo si ripete a partire da questo mese (ad esempio trimestrale da febbraio = febbraio, maggio, agosto, novembre).",
+        "dayOfMonth": "Giorno del mese",
+        "dayOfMonthHint": "Viene eseguito in questo giorno del periodo (o subito dopo); “Ultimo giorno” esegue l'ultimo giorno del mese.",
+        "lastDay": "Ultimo giorno",
+        "theLastDay": "l'ultimo giorno",
+        "hourUtc": "Ora (UTC)",
+        "minuteUtc": "Minuto (UTC)",
+        "ordinal": {
+          "zero": "{{count}}°",
+          "one": "{{count}}°",
+          "two": "{{count}}°",
+          "few": "{{count}}°",
+          "many": "{{count}}°",
+          "other": "{{count}}°"
+        },
+        "schedule": {
+          "weeklyEveryDay": "Settimanale (tutti i giorni), {{time}}",
+          "weeklyDays": "{{days}}, {{time}}",
+          "monthly": "Ogni mese il {{day}}, {{time}}",
+          "quarterly": "Trimestrale da {{month}} il {{day}}, {{time}}",
+          "semiAnnually": "Semestrale da {{month}} il {{day}}, {{time}}",
+          "yearly": "Ogni anno a {{month}} il {{day}}, {{time}}",
+          "daily": "Ogni giorno, {{time}}"
+        }
+      },
+      "webhooks": {
+        "title": "Endpoint webhook",
+        "description": "Invia un POST HTTP firmato a un URL esterno (Teams, Power Automate, un tuo servizio) quando si verifica un evento a cui sei iscritto: nessun polling richiesto.",
+        "add": "Aggiungi endpoint",
+        "addTitle": "Aggiungi endpoint webhook",
+        "editTitle": "Modifica endpoint — {{name}}",
+        "editAria": "Modifica endpoint {{name}}",
+        "actionsAria": "Azioni per {{name}}",
+        "deleteConfirm": "Eliminare l'endpoint webhook “{{name}}”?\n\nLe consegne già effettuate vengono conservate per l'audit.",
+        "deleted": "“{{name}}” eliminato.",
+        "rotateConfirm": "Generare un nuovo segreto di firma per “{{name}}”?\n\nIl vecchio segreto smette di funzionare immediatamente.",
+        "testQueued": "Consegna di prova accodata per “{{name}}”. Controlla il registro delle consegne qui sotto.",
+        "name": "Nome",
+        "url": "URL",
+        "eventsLabel": "Eventi",
+        "empty": "Ancora nessun endpoint. Aggiungine uno per iniziare a ricevere eventi.",
+        "unsignedHint": "Nessun segreto di firma impostato: le consegne vengono inviate senza firma.",
+        "unsigned": "non firmato",
+        "noEvents": "Nessun evento",
+        "eventCount_one": "{{count}} evento",
+        "eventCount_other": "{{count}} eventi",
+        "rotateSecret": "Ruota segreto",
+        "generateSecret": "Genera segreto",
+        "deliveryHistory": "La cronologia delle consegne (stato, tentativi e riconsegna manuale) si trova nella <auditLink>pagina Audit</auditLink>, alla voce <sectionName>Consegne webhook</sectionName>.",
+        "nameRequired": "È richiesto un nome.",
+        "urlValidation": "Inserisci un URL http(s) assoluto.",
+        "eventRequired": "Seleziona almeno un evento a cui iscriverti.",
+        "namePlaceholder": "Teams – canale invii",
+        "destinationUrl": "URL di destinazione",
+        "destinationUrlHint": "Il POST firmato viene inviato qui. Deve essere un URL http(s) assoluto.",
+        "urlPlaceholder": "https://example.org/hooks/ingest",
+        "onlyForService": "Solo per il servizio",
+        "onlyForServiceHint": "Limita le consegne a un solo account di servizio. Lascia vuoto per inviarle per tutti i servizi.",
+        "descriptionLabel": "Descrizione",
+        "descriptionHint": "Nota facoltativa mostrata solo in questo elenco di amministrazione.",
+        "generateOnCreate": "Genera un segreto di firma (HMAC-SHA256). Viene mostrato una sola volta dopo il salvataggio.",
+        "create": "Crea endpoint",
+        "secretTitle": "Segreto di firma per “{{name}}”",
+        "secretInstructions": "Copialo adesso: viene mostrato una sola volta e non può essere recuperato in seguito. Usalo per verificare l'intestazione X-Ingest-Signature di ogni consegna.",
+        "copied": "Copiato",
+        "copySecret": "Copia segreto",
+        "events": {
+          "SubmissionAccepted": {
+            "label": "Invio accettato",
+            "description": "Un servizio ha inviato dati ed è stato accettato."
+          },
+          "SubmissionWarnings": {
+            "label": "Avvisi di invio",
+            "description": "Un invio accettato conteneva avvisi non bloccanti."
+          },
+          "WindowUpcoming": {
+            "label": "Finestra in arrivo",
+            "description": "Una finestra di invio si sta avvicinando alla chiusura."
+          },
+          "WindowMissed": {
+            "label": "Finestra mancata",
+            "description": "Una finestra si è chiusa senza l'invio richiesto."
+          },
+          "SubmissionPendingApproval": {
+            "label": "Invio in attesa di approvazione",
+            "description": "Un invio è stato accettato ma resta in attesa di approvazione."
+          },
+          "SubmissionApproved": {
+            "label": "Invio approvato",
+            "description": "Un invio in attesa è stato approvato ed è ora pubblicato."
+          },
+          "SubmissionRejected": {
+            "label": "Invio rifiutato",
+            "description": "Un invio in attesa è stato rifiutato e non verrà pubblicato."
+          }
+        }
+      }
+    },
+    "shell": {
+      "common": {
+        "close": "Chiudi",
+        "cancel": "Annulla"
+      },
+      "skipToContent": "Passa al contenuto principale",
+      "primaryAriaLabel": "Barra laterale principale",
+      "mainNavigationAriaLabel": "Navigazione principale",
+      "serviceConsole": "Console di servizio",
+      "adminConsole": "Console di amministrazione",
+      "navigation": {
+        "dashboard": "Dashboard",
+        "submissions": "Invii",
+        "missing": "Mancanti",
+        "explore": "Esplora",
+        "reports": "Report",
+        "accounts": "Account",
+        "schemas": "Schemi",
+        "events": "Eventi",
+        "audit": "Audit",
+        "tools": "Strumenti",
+        "settings": "Impostazioni"
+      },
+      "submissionsClosed": {
+        "title": "Gli invii sono chiusi",
+        "message": "I nuovi invii e le modifiche dagli account di servizio sono temporaneamente sospesi."
+      },
+      "login": {
+        "hint": "Incolla la tua chiave API. Solo le credenziali di tipo Utente possono accedere qui (con qualsiasi ruolo); le chiavi di tipo Applicazione sono riservate all'API.",
+        "applicationKeyError": "Questa chiave API è riservata all'uso applicativo (non interattivo). Chiedi a un amministratore una credenziale di tipo Utente per accedere alla console di amministrazione.",
+        "continueWith": "Continua con {{provider}}",
+        "orUseApiKey": "oppure utilizza una chiave API",
+        "apiKey": "Chiave API",
+        "couldNotSignIn": "Impossibile accedere",
+        "verifying": "Verifica in corso…",
+        "signIn": "Accedi",
+        "sso": {
+          "title": "Accesso singolo",
+          "errors": {
+            "notLinked": "Questo account non è abilitato al Single Sign-On. Chiedi a un amministratore di collegare la tua identità, oppure accedi con una chiave API.",
+            "noEmail": "Il tuo provider di identità non ha fornito un indirizzo e-mail verificato, necessario per accedere.",
+            "remote": "Il Single Sign-On è stato annullato o non è riuscito. Riprova.",
+            "default": "Il Single Sign-On non è stato completato. Riprova."
+          }
+        }
+      },
+      "breadcrumbs": {
+        "home": "Home",
+        "new": "Nuovo",
+        "edit": "Modifica",
+        "view": "Visualizza",
+        "status": "Stato",
+        "historicalData": "Dati storici",
+        "submission": "Invio",
+        "missingSubmissions": "Invii mancanti"
+      },
+      "topBar": {
+        "pageLocation": "Posizione della pagina",
+        "searchPlaceholder": "Cerca…",
+        "searchAriaLabel": "Cerca (Ctrl+K)",
+        "role": "Ruolo: {{role}}",
+        "accountMenu": "Menu account",
+        "accountMenuFor": "Menu account per {{name}}",
+        "signOut": "Esci",
+        "scope": {
+          "names": "Questa sessione può vedere solo: {{names}}",
+          "count_one": "Questa sessione è limitata a {{count}} servizio.",
+          "count_other": "Questa sessione è limitata a {{count}} servizi.",
+          "badge_one": "Vista limitata · {{count}} servizio",
+          "badge_other": "Vista limitata · {{count}} servizi"
+        }
+      },
+      "account": {
+        "label": "Account",
+        "kinds": {
+          "User": "Utente",
+          "Application": "Applicazione"
+        },
+        "roles": {
+          "Service": "Servizio",
+          "Operator": "Operatore",
+          "Admin": "Amministratore",
+          "Approver": "Approvatore"
+        }
+      },
+      "search": {
+        "title": "Cerca",
+        "placeholder": "Cerca azioni, schemi, valori, eventi, account…",
+        "button": "Cerca",
+        "hint": "Digita quello che vuoi fare (ad esempio “aggiungi utente”, “invia”, “scorecard”) oppure il nome di uno schema, valore, evento, account o report.",
+        "searching": "Ricerca in corso…",
+        "viewAll": "Visualizza tutto",
+        "valueCount_one": "{{count}} valore",
+        "valueCount_other": "{{count}} valori",
+        "viewAllSchemas_one": "Visualizza {{count}} schema",
+        "viewAllSchemas_other": "Visualizza tutti i {{count}} schemi",
+        "inSchema": "in {{schema}}",
+        "matchingValues_one": "{{count}} valore corrispondente",
+        "matchingValues_other": "{{count}} valori corrispondenti",
+        "accountKindRole": "{{kind}} · {{role}}",
+        "viewAllAccounts_one": "Visualizza {{count}} account",
+        "viewAllAccounts_other": "Visualizza tutti i {{count}} account",
+        "eventSummaryRich": "{{kind}} · <timestamp />",
+        "viewAllEvents_one": "Visualizza {{count}} evento",
+        "viewAllEvents_other": "Visualizza tutti i {{count}} eventi",
+        "viewAllReports_one": "Visualizza {{count}} report",
+        "viewAllReports_other": "Visualizza tutti i {{count}} report",
+        "submissionSummaryRich": "{{schemas}} · <submittedAt />",
+        "noSchemas": "Nessuno schema",
+        "recentMatches_one": "{{count}} risultato recente",
+        "recentMatches_other": "{{count}} risultati recenti",
+        "noResults": "Nessun risultato per “{{query}}”. Prova con un altro termine.",
+        "sections": {
+          "actions": "Azioni",
+          "schemas": "Schemi",
+          "schemaValues": "Valori dello schema",
+          "accounts": "Account",
+          "events": "Eventi",
+          "reports": "Report",
+          "submissions": "Invii"
+        },
+        "reportType": {
+          "single": "Report di un singolo invio",
+          "aggregate": "Report aggregato"
+        },
+        "actions": {
+          "submission-new": {
+            "title": "Nuovo invio",
+            "description": "Invia dati KPI per un servizio",
+            "keywords": "invia|aggiungi invio|crea invio|invia dati|riporta dati"
+          },
+          "schema-new": {
+            "title": "Aggiungi schema",
+            "description": "Crea un nuovo schema",
+            "keywords": "nuovo schema|crea schema|aggiungi kpi"
+          },
+          "account-new-user": {
+            "title": "Aggiungi utente",
+            "description": "Crea un nuovo account",
+            "keywords": "nuovo utente|crea utente|aggiungi account|nuovo account|aggiungi operatore|aggiungi amministratore|invita"
+          },
+          "account-new-service": {
+            "title": "Aggiungi servizio",
+            "description": "Crea un nuovo account di servizio",
+            "keywords": "nuovo servizio|crea servizio|attiva servizio|aggiungi account"
+          },
+          "event-new": {
+            "title": "Aggiungi evento",
+            "description": "Registra un evento della sequenza temporale",
+            "keywords": "nuovo evento|crea evento|incidente|manutenzione|deploy"
+          },
+          "report-upload": {
+            "title": "Carica report",
+            "description": "Aggiungi una definizione di report",
+            "keywords": "nuovo report|aggiungi report|importa report"
+          },
+          "explore": {
+            "title": "Esplora",
+            "description": "Analisi in-app: tendenze, confronto, istantanea",
+            "keywords": "analisi|analizza|grafico|tendenza|andamento"
+          },
+          "explore-scorecard": {
+            "title": "Scorecard",
+            "description": "Scheda di stato RAG con schemi incrociati",
+            "keywords": "rag|rosso ambra verde|semaforo|pannello di stato|obiettivi"
+          },
+          "explore-anomalies": {
+            "title": "Anomalie",
+            "description": "Scheda di rilevamento anomalie per periodo",
+            "keywords": "anomalia|valore anomalo|insolito|picco"
+          },
+          "missing": {
+            "title": "Invii mancanti",
+            "description": "Che cosa manca ancora per ogni servizio",
+            "keywords": "mancante|in ritardo|lacune|non inviato"
+          },
+          "dashboard": {
+            "title": "Dashboard",
+            "description": "Panoramica iniziale",
+            "keywords": "home|panoramica|inizio"
+          },
+          "submissions": {
+            "title": "Invii",
+            "description": "Sfoglia i dati inviati",
+            "keywords": "dati|kpi|campioni"
+          },
+          "schemas": {
+            "title": "Schemi",
+            "description": "Sfoglia il catalogo degli schemi",
+            "keywords": "definizioni kpi|modelli|campi"
+          },
+          "accounts": {
+            "title": "Account",
+            "description": "Servizi, operatori, utenti e amministratori",
+            "keywords": "servizi|utenti|operatori|amministratori|persone"
+          },
+          "events": {
+            "title": "Eventi",
+            "description": "Sfoglia la cronologia degli eventi",
+            "keywords": "cronologia|incidenti|manutenzione"
+          },
+          "reports": {
+            "title": "Report",
+            "description": "Sfoglia e genera i report",
+            "keywords": "catalogo report|render"
+          },
+          "audit": {
+            "title": "Audit",
+            "description": "Chi ha cambiato cosa, quando",
+            "keywords": "registro di audit|cronologia|traccia|modifiche"
+          },
+          "tools": {
+            "title": "Strumenti",
+            "description": "Utilità di backup e ripristino",
+            "keywords": "backup|ripristina|esporta|importa"
+          },
+          "settings": {
+            "title": "Impostazioni",
+            "description": "E-mail, notifiche, webhook e criteri",
+            "keywords": "configurazione|config|e-mail|notifiche|webhook|criterio di approvazione"
+          }
+        }
+      },
+      "gridPager": {
+        "rowsPerPage": "Righe per pagina",
+        "results_one": "{{count}} risultato",
+        "results_other": "{{count}} risultati",
+        "range": "{{from}}–{{to}} di {{total}}",
+        "previous": "Precedente",
+        "page": "Pagina {{page}} di {{totalPages}}",
+        "next": "Successiva"
+      },
+      "rowActions": {
+        "ariaLabel": "Azioni di riga"
+      },
+      "period": {
+        "label": "Periodo",
+        "from": "Da",
+        "to": "A",
+        "interval": {
+          "all": "Tutto il periodo",
+          "lastDay": "Ultime 24 ore",
+          "lastWeek": "Ultimi 7 giorni",
+          "lastMonth": "Ultimi 30 giorni",
+          "custom": "Intervallo personalizzato"
+        },
+        "shift": {
+          "1m": "1 mese",
+          "6m": "6 mesi",
+          "1y": "1 anno"
+        }
+      },
+      "wizard": {
+        "back": "Indietro",
+        "finish": "Fine",
+        "next": "Avanti"
+      },
+      "drawer": {
+        "collapse": "Comprimi il pannello",
+        "expand": "Espandi il pannello"
+      },
+      "export": {
+        "csv": "Esporta CSV",
+        "exporting": "Esportazione in corso…"
+      },
+      "valueLabel": {
+        "required": "obbligatorio",
+        "description": "Descrizione",
+        "new": "Nuovo"
+      },
+      "cadence": {
+        "Daily": "Giornaliera",
+        "Weekly": "Settimanale",
+        "Fortnightly": "Quindicinale",
+        "Monthly": "Mensile",
+        "Quarterly": "Trimestrale",
+        "SemiAnnually": "Semestrale",
+        "Yearly": "Annuale"
+      },
+      "eventKind": {
+        "PointInTime": "Punto nel tempo",
+        "Interval": "Intervallo",
+        "FromNowOn": "Da ora in poi"
+      },
+      "comments": {
+        "general": "Generale"
+      },
+      "confirm": {
+        "namedSubject": "{{noun}} \"{{target}}\"",
+        "cannotUndo": "Questa operazione non può essere annullata.",
+        "delete": "Eliminare {{subject}}?\n\n{{note}}"
+      },
+      "avatars": {
+        "account": "{{kind}} · {{role}}{{context}}",
+        "disabledSuffix": " (disabilitato)",
+        "schema": "Schema",
+        "schemaDisabled": "Schema (disabilitato)",
+        "submission": "Invio",
+        "submissionStatus": "Invio · {{status}}",
+        "auditChange": "{{target}} · {{change}}",
+        "status": "Stato",
+        "deliveryStatus": "{{label}} · {{status}}",
+        "schemaValue": "{{type}}{{context}}"
+      },
+      "submissionStatus": {
+        "Draft": "Bozza",
+        "Pending": "In attesa",
+        "Approved": "Approvato",
+        "Rejected": "Rifiutato",
+        "NotRequired": "Non richiesto"
+      },
+      "deliveryStatus": {
+        "Pending": "In attesa",
+        "Sending": "In invio",
+        "Sent": "Inviata",
+        "Failed": "Non riuscita"
+      },
+      "auditChange": {
+        "Create": "Creazione",
+        "Edit": "Modifica",
+        "Delete": "Eliminazione",
+        "Approve": "Approvazione",
+        "Reject": "Rifiuto"
+      },
+      "auditTarget": {
+        "User": "Utente",
+        "Account": "Account",
+        "Schema": "Schema",
+        "ApiKey": "Chiave API",
+        "Submission": "Invio",
+        "Report": "Report",
+        "SchemaHistory": "Cronologia schema",
+        "ApprovalRule": "Regola di approvazione",
+        "Settings": "Impostazioni",
+        "Backup": "Backup",
+        "Event": "Evento",
+        "CommentThread": "Discussione",
+        "Comment": "Commento"
+      },
+      "auditTargetInitials": {
+        "User": "Ut",
+        "Account": "Ac",
+        "Schema": "Sc",
+        "ApiKey": "Ca",
+        "Submission": "In",
+        "Report": "Re",
+        "SchemaHistory": "Cs",
+        "ApprovalRule": "Ra",
+        "Settings": "Im",
+        "Backup": "Ba",
+        "Event": "Ev",
+        "CommentThread": "Di",
+        "Comment": "Co"
+      },
+      "valueType": {
+        "String": "Testo",
+        "Integer": "Intero",
+        "Number": "Numero",
+        "Date": "Data",
+        "Boolean": "Booleano"
+      },
+      "valueTypeInitials": {
+        "String": "T",
+        "Integer": "I",
+        "Number": "N",
+        "Date": "D",
+        "Boolean": "B"
+      },
+      "capabilities": {
+        "groups": {
+          "schemas": "Schemi",
+          "submissions": "Invii",
+          "analytics": "Analisi",
+          "reports": "Report",
+          "accountsKeys": "Account e chiavi",
+          "oversight": "Supervisione",
+          "notificationsIntegrations": "Notifiche e integrazioni",
+          "settings": "Impostazioni",
+          "events": "Eventi",
+          "comments": "Commenti"
+        },
+        "items": {
+          "schemasRead": {
+            "label": "Visualizza gli schemi",
+            "description": "Sfoglia il catalogo degli schemi, i dettagli e la cronologia."
+          },
+          "schemasManage": {
+            "label": "Gestisci gli schemi",
+            "description": "Crea, modifica, clona ed elimina gli schemi."
+          },
+          "submissionsRead": {
+            "label": "Visualizza gli invii",
+            "description": "Visualizza gli invii di tutti i servizi."
+          },
+          "submissionsSubmit": {
+            "label": "Invia per conto",
+            "description": "Crea, modifica e importa in blocco gli invii di un servizio."
+          },
+          "submissionsDelete": {
+            "label": "Elimina gli invii",
+            "description": "Rimuovi definitivamente un invio."
+          },
+          "submissionsApprove": {
+            "label": "Approva gli invii",
+            "description": "Approva o rifiuta gli invii in attesa."
+          },
+          "queryRead": {
+            "label": "Interroga i dati",
+            "description": "Usa il feed OData e l'endpoint per le query ad hoc."
+          },
+          "exploreRead": {
+            "label": "Esplora",
+            "description": "Usa le analisi Esplora integrate."
+          },
+          "statusRead": {
+            "label": "Visualizza lo stato",
+            "description": "Visualizza lo stato di tutti i servizi e le analisi sugli invii mancanti."
+          },
+          "reportsRead": {
+            "label": "Visualizza i report",
+            "description": "Sfoglia e genera i report del catalogo."
+          },
+          "reportsManage": {
+            "label": "Gestisci i report",
+            "description": "Carica ed elimina le definizioni dei report."
+          },
+          "accountsRead": {
+            "label": "Visualizza gli account",
+            "description": "Sfoglia gli account."
+          },
+          "accountsManage": {
+            "label": "Gestisci gli account",
+            "description": "Crea, modifica ed elimina account e le relative autorizzazioni."
+          },
+          "apiKeysRead": {
+            "label": "Visualizza le chiavi API",
+            "description": "Visualizza le chiavi API associate agli account."
+          },
+          "apiKeysManage": {
+            "label": "Gestisci le chiavi API",
+            "description": "Emetti e revoca le chiavi API."
+          },
+          "auditRead": {
+            "label": "Visualizza il registro di audit",
+            "description": "Leggi ed esporta il registro di audit."
+          },
+          "privacyRead": {
+            "label": "Esporta i dati personali",
+            "description": "Esegui un'esportazione dei dati per l'accesso dell'interessato."
+          },
+          "privacyManage": {
+            "label": "Cancellazione / conservazione",
+            "description": "Cancella i dati personali ed esegui i criteri di conservazione."
+          },
+          "backupRead": {
+            "label": "Esporta backup",
+            "description": "Scarica un backup completo."
+          },
+          "backupManage": {
+            "label": "Ripristina il backup",
+            "description": "Ripristina i dati da un backup."
+          },
+          "notificationsRead": {
+            "label": "Visualizza le notifiche",
+            "description": "Visualizza la configurazione di e-mail e notifiche, i modelli e la posta in uscita."
+          },
+          "notificationsManage": {
+            "label": "Gestisci le notifiche",
+            "description": "Modifica la configurazione e i modelli di e-mail e notifiche; invia e-mail."
+          },
+          "webhooksRead": {
+            "label": "Visualizza webhook",
+            "description": "Visualizza gli endpoint webhook e le relative consegne."
+          },
+          "webhooksManage": {
+            "label": "Gestisci webhook",
+            "description": "Crea e modifica i webhook, ruota i segreti, riconsegna e svuota la coda."
+          },
+          "integrationsRead": {
+            "label": "Visualizza le integrazioni",
+            "description": "Visualizza le integrazioni (ad esempio Microsoft Teams) e la relativa connessione."
+          },
+          "integrationsManage": {
+            "label": "Gestisci le integrazioni",
+            "description": "Crea e modifica le integrazioni, modifica la connessione, esegui, prova e svuota la coda."
+          },
+          "settingsRead": {
+            "label": "Visualizza le impostazioni",
+            "description": "Visualizza le impostazioni globali (ad esempio il criterio di approvazione predefinito)."
+          },
+          "settingsManage": {
+            "label": "Gestisci le impostazioni",
+            "description": "Modifica le impostazioni globali (ad esempio il criterio di approvazione predefinito)."
+          },
+          "eventsRead": {
+            "label": "Visualizza gli eventi",
+            "description": "Sfoglia la cronologia degli eventi."
+          },
+          "eventsManage": {
+            "label": "Gestisci gli eventi",
+            "description": "Crea, modifica ed elimina gli eventi."
+          },
+          "commentsRead": {
+            "label": "Visualizza i commenti",
+            "description": "Visualizza le discussioni sugli schemi (e sui loro valori)."
+          },
+          "commentsCreate": {
+            "label": "Crea commenti",
+            "description": "Avvia nuove discussioni e rispondi a quelle esistenti; modifica i tuoi commenti."
+          },
+          "commentsManage": {
+            "label": "Gestisci i commenti",
+            "description": "Modifica, elimina o risolvi/riapri qualsiasi commento o discussione, non solo i tuoi."
+          }
+        }
+      },
+      "expression": {
+        "empty": "L'espressione è vuota.",
+        "invalid": "Espressione non valida.",
+        "editorAriaLabel": "Editor di espressioni",
+        "lint": {
+          "unknownFunction": "Funzione sconosciuta '{{name}}'.",
+          "unknownValue": "Valore sconosciuto '{{name}}'."
+        },
+        "runtime": {
+          "averageArgument": "average() richiede argomenti numerici o booleani, ricevuto {{type}}.",
+          "higherThanArity": "higher_than() richiede (valore, riferimento, percentuale).",
+          "higherThanNumeric": "higher_than() richiede argomenti numerici.",
+          "types": {
+            "undefined": "indefinito",
+            "object": "oggetto",
+            "boolean": "booleano",
+            "number": "numero",
+            "bigint": "bigint",
+            "string": "stringa",
+            "symbol": "simbolo",
+            "function": "funzione"
+          }
+        },
+        "keywords": {
+          "true": "letterale booleano",
+          "false": "letterale booleano",
+          "null": "letterale null",
+          "and": "AND logico",
+          "or": "OR logico",
+          "not": "NOT logico",
+          "in": "test di appartenenza",
+          "like": "corrispondenza con pattern in stile SQL"
+        },
+        "functions": {
+          "if": {
+            "description": "Restituisce \"then\" quando la condizione è vera, altrimenti \"else\"."
+          },
+          "average": {
+            "description": "Media degli argomenti numerici. I booleani contano come 1/0; i valori nulli vengono ignorati."
+          },
+          "higher_than": {
+            "description": "Vero quando il valore supera il riferimento di oltre percentuale% (ad esempio 50 = 50%)."
+          },
+          "coalesce": {
+            "description": "Primo argomento non nullo."
+          },
+          "isNull": {
+            "description": "Vero quando il valore è nullo."
+          },
+          "len": {
+            "description": "Lunghezza di una stringa."
+          },
+          "now": {
+            "description": "Data e ora UTC attuali."
+          },
+          "today": {
+            "description": "Data UTC corrente a mezzanotte."
+          },
+          "year": {
+            "description": "Componente anno di una data."
+          },
+          "month": {
+            "description": "Componente mese di una data (1-12)."
+          },
+          "dayOfMonth": {
+            "description": "Giorno del mese (1-31)."
+          },
+          "dayOfWeek": {
+            "description": "Giorno della settimana (0 = domenica)."
+          },
+          "dayOfYear": {
+            "description": "Giorno dell'anno (1-366)."
+          },
+          "weekOfYear": {
+            "description": "Numero della settimana secondo ISO-8601."
+          },
+          "hour": {
+            "description": "Componente ora (0-23)."
+          },
+          "minute": {
+            "description": "Componente minuti (0-59)."
+          },
+          "second": {
+            "description": "Componente secondi (0-59)."
+          },
+          "abs": {
+            "description": "Valore assoluto."
+          },
+          "ceiling": {
+            "description": "Il più piccolo intero maggiore o uguale al numero."
+          },
+          "floor": {
+            "description": "Il più grande intero minore o uguale al numero."
+          },
+          "round": {
+            "description": "Arrotonda al numero di cifre decimali indicato."
+          },
+          "truncate": {
+            "description": "Parte intera del numero (elimina la frazione)."
+          },
+          "sign": {
+            "description": "Segno del numero: -1, 0 o 1."
+          },
+          "sqrt": {
+            "description": "Radice quadrata."
+          },
+          "pow": {
+            "description": "Base elevata all'esponente."
+          },
+          "exp": {
+            "description": "e elevato alla potenza indicata."
+          },
+          "log": {
+            "description": "Logaritmo del numero nella base indicata."
+          },
+          "log10": {
+            "description": "Logaritmo in base 10."
+          },
+          "max": {
+            "description": "Il più grande dei due numeri."
+          },
+          "min": {
+            "description": "Il più piccolo dei due numeri."
+          },
+          "ieeeRemainder": {
+            "description": "Resto IEEE 754 di x diviso y."
+          },
+          "sin": {
+            "description": "Seno (radianti)."
+          },
+          "cos": {
+            "description": "Coseno (radianti)."
+          },
+          "tan": {
+            "description": "Tangente (radianti)."
+          },
+          "asin": {
+            "description": "Arcoseno (radianti)."
+          },
+          "acos": {
+            "description": "Arcocoseno (radianti)."
+          },
+          "atan": {
+            "description": "Arcotangente (radianti)."
+          }
+        }
+      }
+    },
+    "accounts": {
+      "title": "Account",
+      "singular": "Account",
+      "common": {
+        "yes": "Sì",
+        "no": "No"
+      },
+      "roles": {
+        "Service": "Servizio",
+        "Operator": "Operatore",
+        "Approver": "Approvatore",
+        "Admin": "Amministratore"
+      },
+      "kinds": {
+        "User": "Utente",
+        "Application": "Applicazione"
+      },
+      "kindHints": {
+        "Application": "Credenziale solo API (non può accedere all'interfaccia)",
+        "User": "Account interattivo (può accedere all'interfaccia e chiamare le API)"
+      },
+      "status": {
+        "enabled": "Abilitato",
+        "disabled": "Disabilitato",
+        "deleted": "Eliminato"
+      },
+      "fields": {
+        "name": "Nome",
+        "label": "Etichetta",
+        "kind": "Tipo",
+        "role": "Ruolo",
+        "status": "Stato",
+        "email": "E-mail",
+        "area": "Area",
+        "created": "Creato",
+        "createdBy": "Creato da",
+        "modified": "Modificato",
+        "description": "Descrizione",
+        "actions": "Azioni"
+      },
+      "actions": {
+        "new": "Nuovo account",
+        "more": "Altre azioni",
+        "onboardService": "Registra un nuovo servizio",
+        "onboardOperator": "Registra un nuovo operatore",
+        "refresh": "Aggiorna",
+        "exporting": "Esportazione in corso…",
+        "exportCsv": "Esporta questo elenco (CSV)",
+        "exportJson": "Esporta account (JSON)",
+        "importing": "Importazione in corso…",
+        "importJson": "Importa account (JSON)…",
+        "edit": "Modifica",
+        "apiKeys": "Chiavi API",
+        "sendEmail": "Invia e-mail",
+        "viewStatus": "Visualizza lo stato",
+        "exportPersonalData": "Esporta i dati personali",
+        "exportData": "Esporta dati",
+        "erase": "Cancella (GDPR)",
+        "delete": "Elimina",
+        "cancel": "Annulla",
+        "save": "Salva",
+        "close": "Chiudi"
+      },
+      "messages": {
+        "loadFailed": "Caricamento non riuscito",
+        "actionFailed": "Azione non riuscita",
+        "loading": "Caricamento…",
+        "empty": "Ancora nessun account: fai clic su “Nuovo account” per aggiungerne uno."
+      },
+      "validation": {
+        "emailRequired": "L'indirizzo e-mail è obbligatorio.",
+        "emailInvalid": "Inserisci un indirizzo e-mail valido."
+      },
+      "aria": {
+        "viewAccount": "Visualizza l'account {{name}}",
+        "actionsFor": "Azioni per {{name}}"
+      },
+      "confirmDelete": "Eliminare l'account \"{{target}}\"?\n\nQuesta operazione non può essere annullata.",
+      "import": {
+        "readError": "Impossibile leggere il file degli account: {{error}}",
+        "confirm": "Importare gli account da questo file?\n\nGli account vengono abbinati per nome: quelli esistenti vengono aggiornati e i nomi nuovi vengono creati. Gli account non presenti nel file restano invariati.\n\nLe chiavi API NON sono incluse, quindi ogni account creato da questa importazione parte senza chiave: generane una per ciascuno in seguito.",
+        "skipped": " · {{count}} saltati: {{errors}}",
+        "complete": "Importazione completata: {{created}} creati, {{updated}} aggiornati{{tail}}."
+      },
+      "placeholders": {
+        "email": "user@example.com",
+        "area": "es. Regione Nord"
+      },
+      "editor": {
+        "newTitle": "Nuovo account",
+        "editTitle": "Modifica account",
+        "tabs": {
+          "general": "Generale",
+          "permissions": "Ruolo e autorizzazioni"
+        },
+        "emailHint": "Usato per le notifiche via e-mail e per i messaggi occasionali.",
+        "areaHint": "Tag di raggruppamento facoltativo.",
+        "none": "Nessuno",
+        "roleHint": "Un modello che precompila le autorizzazioni qui sotto: puoi modificarle liberamente."
+      },
+      "scope": {
+        "title": "Ambito del servizio",
+        "hint": "Quali servizi può vedere questo account. Lascia vuoto per l'accesso senza restrizioni a tutti i servizi; scegline uno o più per limitarlo solo a quelli.",
+        "viewHint": "Quali servizi può vedere questo account.",
+        "allServices": "Tutti i servizi",
+        "unrestricted": "Tutti i servizi (senza restrizioni)"
+      },
+      "permissions": {
+        "title": "Autorizzazioni",
+        "hint": "Autorizzazioni di dettaglio. Il ruolo qui sopra è solo un modello di partenza: personalizzale come preferisci.",
+        "adminNote": "Gli amministratori hanno sempre tutte le autorizzazioni; non è possibile ridurle.",
+        "serviceNote": "Gli account di servizio inviano e visualizzano solo i propri dati; non possiedono autorizzazioni di back-office."
+      },
+      "onboarding": {
+        "serviceTitle": "Registra un nuovo servizio",
+        "operatorTitle": "Registra un nuovo operatore",
+        "createAccount": "Crea account",
+        "details": {
+          "title": "Dettagli dell'account",
+          "description": "Crea il nuovo account {{role}}.",
+          "nameHint": "Identificatore stabile in stile macchina, univoco a livello globale.",
+          "namePlaceholder": "es. acme_logistics",
+          "labelPlaceholder": "Nome visualizzato descrittivo",
+          "emailPlaceholder": "contact@example.com"
+        },
+        "kindHints": {
+          "Application": "Credenziale solo API (non può accedere all'interfaccia).",
+          "User": "Account interattivo (può accedere all'interfaccia e chiamare le API)."
+        },
+        "scope": {
+          "description": "Scegli quali servizi può vedere questo {{role}}. Lascia vuoto per l'accesso senza restrizioni a tutti i servizi.",
+          "visibleServices": "Servizi visibili",
+          "hint": "Lascia vuoto per l'accesso senza restrizioni a tutti i servizi; scegline uno o più per limitare questo account solo a quelli."
+        },
+        "key": {
+          "title": "Chiave API",
+          "description": "Se vuoi, emetti subito una chiave API in modo che l'account possa usare immediatamente l'API di Ingest.",
+          "generateNow": "Genera subito una chiave API",
+          "applicationWarning": "Un account di tipo Applicazione può autenticarsi solo con una chiave API. Senza chiave non potrà inviare dati finché non gliene verrà rilasciata una.",
+          "descriptionLabel": "Descrizione chiave (facoltativa)",
+          "descriptionHint": "Una nota su chi la usa o a cosa serve: utile per chiavi temporanee o per sostituzioni durante le ferie.",
+          "expiryLabel": "Scadenza della chiave (facoltativa)"
+        },
+        "result": {
+          "created": "{{role}} “{{name}}” creato",
+          "copyKey": "Copia subito questa chiave API: non verrà più mostrata.",
+          "copied": "Copiato!",
+          "copyToClipboard": "Copia negli appunti",
+          "copyAria": "Copia la chiave API",
+          "noKey": "Nessuna chiave API è stata generata. Puoi emetterne una in seguito dalla finestra delle chiavi API dell'account."
+        }
+      },
+      "erase": {
+        "title": "Cancella {{name}}",
+        "deleted": "Account eliminato.",
+        "anonymised": "Account anonimizzato.",
+        "resultPrefix": "Pseudonimo",
+        "resultCounts": "{{submissions}} invii, {{samples}} campioni, {{emails}} e-mail, {{auditEntries}} voci di audit, {{keys}} chiavi.",
+        "warningBefore": "Ciò soddisfa una richiesta di diritto alla cancellazione. È",
+        "irreversible": "irreversibile",
+        "warningAfter": "e aggira la consueta protezione “l'account ha inviato dati”.",
+        "mode": "Modalità",
+        "anonymiseOption": "Anonimizza: mantiene i valori KPI numerici e di data per i report e rimuove ogni dato identificativo (pseudonimizza l'account, oscura il testo libero, elimina chiavi ed e-mail).",
+        "deleteOption": "Elimina: rimuove definitivamente l'account e tutto ciò che vi è collegato (invii, campioni, e-mail, registro di audit).",
+        "acknowledgement": "Ho capito che l'operazione non può essere annullata.",
+        "erasing": "Cancellazione in corso…",
+        "deleteEverything": "Elimina tutto",
+        "anonymise": "Anonimizza"
+      },
+      "email": {
+        "title": "Invia e-mail a {{name}}",
+        "to": "A: {{email}}",
+        "subjectRequired": "L'oggetto è obbligatorio.",
+        "queued": "E-mail accodata per la consegna.",
+        "subject": "Oggetto",
+        "message": "Messaggio",
+        "sending": "Invio in corso…",
+        "send": "Invia"
+      },
+      "sso": {
+        "title": "Accesso SSO",
+        "hint": "Collega un account di un provider di identità in modo che questo utente possa accedere con “Continua con…”. L'abbinamento avviene in base al provider e all'e-mail verificata dell'utente.",
+        "provider": "Provider",
+        "remove": "Rimuovi il collegamento SSO",
+        "add": "Aggiungi collegamento SSO"
+      },
+      "audit": {
+        "title": "Audit",
+        "by": " · di {{name}}"
+      },
+      "keys": {
+        "title": "Chiavi API di {{name}}",
+        "copyNow": "Copia subito questa chiave: non verrà più mostrata.",
+        "keyId": "ID chiave",
+        "expires": "Scade",
+        "never": "Mai",
+        "revoke": "Revoca",
+        "delete": "Elimina chiave",
+        "deleteAria": "Elimina chiave {{keyId}}",
+        "saveDescription": "Salva descrizione",
+        "editDescription": "Modifica descrizione",
+        "nextDescription": "Descrizione per la chiave successiva (facoltativa)",
+        "descriptionHint": "Una nota su chi la usa o a cosa serve: utile per chiavi temporanee o per sostituzioni durante le ferie, soprattutto se hanno una scadenza.",
+        "descriptionPlaceholderShort": "es. sostituzione ferie di Jane",
+        "descriptionPlaceholder": "es. sostituzione ferie di Jane (revisore)",
+        "nextExpiry": "Scadenza per la chiave successiva (facoltativa)",
+        "expiryHint": "Lascia vuoto per una chiave che non scade mai. Massimo due anni da oggi.",
+        "generate": "Genera nuova chiave",
+        "confirmDeleteRevoked": "Eliminare definitivamente la chiave API {{keyId}}?\n\nLa chiave revocata verrà rimossa per sempre dall'elenco.\n\nQuesta operazione non può essere annullata.",
+        "confirmDeleteActive": "Eliminare definitivamente la chiave API {{keyId}}?\n\nLa chiave è ancora attiva: eliminarla la rende subito inutilizzabile, esattamente come la revoca, ma la rimuove anche dall'elenco.\n\nQuesta operazione non può essere annullata.",
+        "status": {
+          "revoked": "Revocata",
+          "expired": "Scaduta",
+          "active": "Attiva"
+        }
+      }
+    },
+    "tools": {
+      "title": "Strumenti",
+      "loading": "Caricamento…",
+      "noPermission": "Non hai l'autorizzazione per utilizzare questi strumenti.",
+      "navigationGroup": "Backup e ripristino",
+      "preparing": "Preparazione in corso…",
+      "restoring": "Ripristino in corso…",
+      "importing": "Importazione in corso…",
+      "restoreFromFile": "Ripristina da file…",
+      "importFromFile": "Importa da file…",
+      "restoreComplete": "Ripristino completato.",
+      "dataBackup": {
+        "title": "Backup dei dati",
+        "description": "Esporta l'intero archivio (account, chiavi, schemi, invii, report, registro di audit) in un unico file JSON, oppure ripristinalo da un file.",
+        "readError": "Impossibile leggere il file di backup: {{error}}",
+        "confirmRestore": "Ripristinare da questo backup?\n\nL'operazione SOSTITUISCE tutti i dati attuali (account, chiavi, schemi, invii, report, registro di audit) con il contenuto del file e non può essere annullata. Assicurati prima di avere un backup aggiornato.",
+        "warningBeforeSmall": "Questo è uno strumento comodo per",
+        "small": "piccole",
+        "warningBeforeNot": "installazioni e per spostare dati tra ambienti —",
+        "notPrimary": "non è il meccanismo di backup principale.",
+        "warningBeforeCommand": "Per i backup veri, esegui uno snapshot a livello di database (",
+        "warningBeforeReplace": "o il backup del tuo provider di hosting). Un ripristino",
+        "replacesAll": "sostituisce tutti i dati attuali",
+        "warningAfterReplace": "e non è transazionale.",
+        "download": "Scarica il backup"
+      },
+      "configBackup": {
+        "title": "Backup della configurazione",
+        "description": "Esporta tutta la configurazione (criteri e regole di approvazione, impostazioni e modelli di e-mail e notifiche, webhook, integrazioni e connessione Teams) in un unico file JSON, oppure ripristinala da un file: utile per copiare la configurazione tra ambienti o per il ripristino di emergenza.",
+        "readError": "Impossibile leggere il file di configurazione: {{error}}",
+        "confirmRestore": "Ripristinare da questo backup della configurazione?\n\nL'operazione SOSTITUISCE tutta la configurazione attuale (criteri e regole di approvazione, impostazioni e modelli di e-mail e notifiche, webhook, integrazioni e connessione Teams) con il contenuto del file e non può essere annullata.\n\nI segreti cifrati (password SMTP, segreti dei webhook, segreto del bot Teams) funzionano solo se questo server usa lo stesso ApiKey:Pepper di quello che ha prodotto il file; altrimenti dovrai reinserirli. Se il file omette un segreto, quello memorizzato viene mantenuto.",
+        "warningBeforeReplace": "Ripristino",
+        "replacesAll": "sostituisce tutta la configurazione corrente",
+        "warningBeforePepper": "e non è transazionale. I segreti cifrati sono inclusi come testo cifrato e si decifrano solo su un server che usa lo stesso",
+        "warningAfterPepper": "; in un'altra installazione dovrai reinserirli dopo il ripristino. Se il file omette un segreto, quello memorizzato viene mantenuto.",
+        "download": "Scarica la configurazione"
+      },
+      "accountsBackup": {
+        "title": "Account",
+        "description": "Esporta tutti gli account (nome, etichetta, ruolo, autorizzazioni, collegamenti SSO, stato di abilitazione) in un unico file JSON, oppure importane uno per creare e aggiornare gli account: utile per clonare o popolare un ambiente.",
+        "readError": "Impossibile leggere il file degli account: {{error}}",
+        "confirmImport": "Importare gli account da questo file?\n\nGli account vengono abbinati per nome: quelli esistenti vengono aggiornati e i nomi nuovi vengono creati. Gli account non presenti nel file restano invariati.\n\nLe chiavi API NON sono incluse nel file, quindi ogni account creato da questa importazione parte senza chiave: generane una per ciascuno in seguito.",
+        "keysNeverExported": "Le chiavi API non vengono mai esportate.",
+        "warningBeforeNoKey": "Non vengono archiviate in un formato recuperabile, quindi un account importato parte con",
+        "noKey": "nessuna chiave",
+        "warningAfterNoKey": "e prima di potersi autenticare dovrà riceverne una nuova. L'importazione non è distruttiva: gli account assenti dal file restano invariati.",
+        "importCompleteBeforeCreated": "Importazione completata:",
+        "created": "creati",
+        "updated": "aggiornati",
+        "download": "Scarica gli account"
+      }
+    },
+    "reports": {
+      "title": "Report",
+      "singular": "Report",
+      "actions": {
+        "more": "Altre azioni",
+        "refresh": "Aggiorna",
+        "upload": "Carica report",
+        "view": "Visualizza",
+        "delete": "Elimina"
+      },
+      "messages": {
+        "loadFailed": "Caricamento non riuscito",
+        "actionFailed": "Impossibile completare l'azione",
+        "loading": "Caricamento…",
+        "empty": "Ancora nessun report.",
+        "emptyAdmin": "Ancora nessun report: fai clic su “Carica report” per aggiungerne uno."
+      },
+      "fields": {
+        "name": "Nome",
+        "type": "Tipo",
+        "targets": "Destinazioni",
+        "created": "Creato",
+        "createdBy": "Creato da",
+        "actions": "Azioni"
+      },
+      "types": {
+        "single": "Singolo",
+        "aggregate": "Aggregato"
+      },
+      "targets": {
+        "global": "Globale"
+      },
+      "validation": {
+        "emptyFile": "Il file è vuoto."
+      },
+      "aria": {
+        "open": "Apri il report {{name}}",
+        "actionsFor": "Azioni per {{name}}"
+      },
+      "confirmDelete": "Eliminare il report \"{{target}}\"?\n\nQuesta operazione non può essere annullata.",
+      "view": {
+        "back": "Indietro",
+        "loadFailed": "Impossibile caricare il report",
+        "loading": "Caricamento del report…",
+        "schema": "Schema",
+        "pickGlobalSchema": "Scegli uno schema (report globale)…",
+        "pickSchema": "Scegli uno schema…",
+        "period": "Periodo",
+        "periods": {
+          "thisMonth": "Questo mese",
+          "lastWeek": "Ultimi 7 giorni",
+          "lastMonth": "Ultimi 30 giorni",
+          "lastYear": "Ultimi 365 giorni",
+          "custom": "Intervallo personalizzato"
+        },
+        "from": "Da",
+        "to": "A",
+        "submission": "Invio",
+        "submissionOption": "{{service}} — {{date}} ({{count}} campioni)",
+        "submissionOptionRich": "{{service}} — <submittedAt /> ({{count}} campioni)",
+        "noMatchingSubmissions": "Nessun invio corrisponde ai filtri",
+        "pickSubmission": "Scegli un invio…",
+        "rendering": "Generazione in corso…",
+        "render": "Genera",
+        "renderFailed": "Generazione non riuscita",
+        "frameTitle": "Report: {{name}}",
+        "collapse": "Comprimi",
+        "expand": "Espandi",
+        "openNewTab": "Apri in una nuova scheda",
+        "download": "Scarica"
+      }
+    },
+    "schemasSubmissions": {
+      "approval": {
+        "appliesTo": "Si applica a",
+        "appliesToHint": "Puoi richiedere l'approvazione solo per gli inserimenti manuali, solo per gli invii via API oppure per entrambi.",
+        "approvers": "Approvatori",
+        "approversHint": "Scegli chi può revisionare: gli account Approvatore/Amministratore qui sotto e/o il proprietario del servizio (l'account che ha effettuato l'invio, così un servizio può approvare i propri dati). Contrassegnane almeno uno come Obbligatorio; l'invio viene pubblicato quando tutti gli approvatori obbligatori hanno dato l'approvazione.",
+        "globalDefaultHelp": "Segue il criterio di approvazione predefinito globale, configurato in Impostazioni — Approvazione.",
+        "heading": "Approvazione",
+        "mode": {
+          "globalDefault": "Usa il valore predefinito globale",
+          "none": "Nessuna approvazione richiesta",
+          "required": "Approvazione obbligatoria"
+        },
+        "modeHint": "Gli invii interessati restano In attesa fino all'approvazione e fino ad allora sono esclusi dal feed OData e da Esplora. Per compatibilità con le versioni precedenti, per impostazione predefinita non è richiesta alcuna approvazione.",
+        "modeLabel": "Modalità di approvazione",
+        "modifiableHelp": "Reinviare i dati per una finestra che ha già un invio lo sostituisce e ne riporta lo stato di approvazione a In attesa, anche se era già stato approvato. Finché attende una nuova approvazione, esce dal feed OData e da Esplora. Se non vuoi che i nuovi invii alterino i dati approvati, contrassegna lo schema come non modificabile.",
+        "modifiableTitle": "Attenzione: questo schema è modificabile",
+        "requiredValidation": "Aggiungi almeno un approvatore obbligatorio.",
+        "requirement": {
+          "optional": "Facoltativo",
+          "required": "Obbligatorio"
+        },
+        "selectApprovers": "Seleziona gli approvatori",
+        "serviceOwner": "Proprietario del servizio (il servizio che invia)",
+        "source": {
+          "apiOnly": "Solo invii API",
+          "both": "Sia invii manuali che API",
+          "manualOnly": "Solo invii manuali (console web)"
+        }
+      },
+      "bulkImport": {
+        "chooseService": "Scegli un servizio",
+        "failed": "{{count}} non riusciti.",
+        "file": "File",
+        "format": "Formato",
+        "formatHint": "Rilevato automaticamente dall'estensione del file; modificalo se necessario.",
+        "formats": {
+          "csv": "CSV",
+          "json": "JSON"
+        },
+        "group": "Gruppo \"{{name}}\"",
+        "help": "Importa invii storici di un singolo servizio da un file JSON o CSV. L'analisi deve riuscire sull'intero file; ogni invio viene poi convalidato e salvato in modo indipendente, quindi un invio rifiutato non blocca gli altri. Gli invii già esistenti vengono saltati, perciò reimportare lo stesso file è sicuro.",
+        "import": "Importa",
+        "importing": "Importazione in corso…",
+        "itemFailed": "({{count}} campione/i) — non riuscito",
+        "skipped": "{{count}} già esistenti (saltati).",
+        "submissionNumber": "Invio n.{{number}}",
+        "summary": "Importati {{succeeded}} invii su {{total}}.",
+        "title": "Importa invii"
+      },
+      "comments": {
+        "comment": "Commento",
+        "deleteThread": "Elimina la discussione",
+        "deleteThreadWarning": "Verranno eliminati tutti i commenti della discussione. Questa operazione non può essere annullata.",
+        "edited": "(modificato)",
+        "empty": "Ancora nessun commento.",
+        "general": "Generale",
+        "loading": "Caricamento dei commenti…",
+        "newThread": "Nuova discussione",
+        "open": "Aperta",
+        "post": "Pubblica",
+        "reopen": "Riapri",
+        "reply": "Rispondi",
+        "replyPlaceholder": "Rispondi…",
+        "required": "Il testo del commento è obbligatorio.",
+        "resolve": "Risolvi",
+        "resolved": "Risolta",
+        "resolvedCanReopen": "Questa discussione è risolta: riaprila per aggiungere un altro commento.",
+        "resolvedReadOnly": "Questa discussione è risolta.",
+        "scope": "Ambito",
+        "thread": "Discussione",
+        "threadActions": "Azioni della discussione",
+        "title": "Commenti",
+        "unknown": "Sconosciuto",
+        "writeComment": "Scrivi un commento…"
+      },
+      "common": {
+        "actionFailed": "Impossibile completare l'azione",
+        "actions": "Azioni",
+        "actionsFor": "Azioni per {{name}}",
+        "approvalStatus": {
+          "Approved": "Approvato",
+          "NotRequired": "Non richiesto",
+          "Pending": "In attesa",
+          "Rejected": "Rifiutato"
+        },
+        "approve": "Approva",
+        "audit": "Audit",
+        "back": "Indietro",
+        "by": "di {{name}}",
+        "cadenceLabel": "Cadenza",
+        "cancel": "Annulla",
+        "clone": "Clona",
+        "close": "Chiudi",
+        "continue": "Continua",
+        "created": "Creato",
+        "createdBy": "Creato da",
+        "delete": "Elimina",
+        "deleted": "Eliminato",
+        "description": "Descrizione",
+        "disabled": "Disabilitato",
+        "dismiss": "Ignora",
+        "download": "Scarica",
+        "draft": "Bozza",
+        "edit": "Modifica",
+        "enabled": "Abilitato",
+        "exportList": "Esporta questo elenco",
+        "exporting": "Esportazione in corso…",
+        "false": "falso",
+        "from": "Da",
+        "global": "Globale",
+        "history": "Cronologia",
+        "id": "ID",
+        "label": "Etichetta",
+        "loadFailed": "Caricamento non riuscito",
+        "loading": "Caricamento…",
+        "modifiable": "Modificabile",
+        "modified": "Modificato",
+        "moreActions": "Altre azioni",
+        "name": "Nome",
+        "no": "No",
+        "note": "Nota",
+        "notes": "Note",
+        "preview": "Anteprima",
+        "publish": "Pubblica",
+        "published": "Pubblicato",
+        "refresh": "Aggiorna",
+        "reject": "Rifiuta",
+        "remove": "Rimuovi",
+        "replacedAt": "Sostituito il",
+        "requiresApproval": "Richiede l'approvazione",
+        "retry": "Riprova",
+        "sample": "Campione",
+        "samples": "Campioni",
+        "save": "Salva",
+        "saveChanges": "Salva modifiche",
+        "schema": "Schema",
+        "service": "Servizio",
+        "status": "Stato",
+        "submission": "Invio",
+        "submissions": "Invii",
+        "submittedAt": "Inviato il",
+        "timestamp": "Timestamp",
+        "to": "A",
+        "true": "vero",
+        "type": "Tipo",
+        "untitledSchema": "Schema senza titolo",
+        "value": "Valore",
+        "valueType": {
+          "Boolean": "Sì/No",
+          "Date": "Data",
+          "Integer": "Numero intero",
+          "Number": "Numero",
+          "String": "Testo"
+        },
+        "values": "Valori",
+        "version": "Versione",
+        "view": "Visualizza",
+        "viewDetails": "Visualizza i dettagli",
+        "warnings": "Avvisi",
+        "yes": "Sì"
+      },
+      "dependencies": {
+        "calculatedValue": "Valore calcolato",
+        "connectorHelp": "Un connettore va dal valore referenziato a quello la cui regola dipende da esso.",
+        "edge": {
+          "calculated": "Calcolato da",
+          "enabledIf": "Abilitato quando",
+          "submissionValidation": "Convalida tra valori (a livello di schema)",
+          "validation": "Valido quando",
+          "visibleIf": "Visibile quando",
+          "warning": "Avverte quando"
+        },
+        "failed": "Impossibile costruire il grafo delle dipendenze:",
+        "legend": "Leggenda",
+        "loading": "Analisi delle regole dello schema per individuare le dipendenze…",
+        "noValues": "Questo schema non ha ancora valori utilizzabili: aggiungine uno per vederne le dipendenze.",
+        "none": "Ancora nessuna dipendenza rilevata tra questi valori.",
+        "title": "Dipendenze: {{name}}",
+        "value": "Valore"
+      },
+      "layout": {
+        "addSection": "Aggiungi sezione",
+        "addSubsection": "Aggiungi sottosezione",
+        "addSubsectionInside": "Aggiungi sottosezione all'interno",
+        "allPlaced": "Tutti i valori sono posizionati nel layout.",
+        "duplicateValue": "Il valore \"{{name}}\" appare più di una volta nel layout.",
+        "emptyHelp": "Trascina i valori dall'alto per posizionarli o aggiungi una sezione. I valori che non vengono inseriti qui verranno comunque visualizzati per primi nei moduli di invio (senza alcuna intestazione).",
+        "errorPrefix": "Errore: ",
+        "missingCaption": "A una sezione manca la didascalia.",
+        "missingTarget": "A un nodo valore del layout manca la destinazione.",
+        "newSection": "Nuova sezione",
+        "notePrefix": "Nota: ",
+        "removeFromLayout": "Rimuovi dal layout",
+        "removeSection": "Rimuovi sezione",
+        "sectionCaption": "Didascalia della sezione",
+        "sectionDescription": "Descrizione della sezione",
+        "sectionDescriptionPlaceholder": "Sottotitolo facoltativo (visualizzato sotto la didascalia)",
+        "sectionHeading": "Intestazione della sezione",
+        "tooDeep": "Il layout è annidato troppo in profondità (max 32 livelli).",
+        "unassignedValues": "Valori non assegnati ({{count}})",
+        "unassignedWarning": "{{count}} valori non sono posizionati nel layout: verranno visualizzati prima delle sezioni.",
+        "unknownValue": "Il layout fa riferimento al valore sconosciuto \"{{name}}\".",
+        "untitledSection": "(sezione senza titolo)"
+      },
+      "preview": {
+        "bestEffortHeading": "Anteprima approssimativa",
+        "bestEffortHelp": "Genera il modulo e valuta le regole nel browser sullo schema non salvato. Fa comunque fede il server: qui alcuni comportamenti sono diversi (il dialetto delle espressioni regolari e gli helper come sampleTimestamp()/serviceName() non sono disponibili lato client), quindi verifica sempre con un invio reale o tramite l'API prima di affidarti a una regola.",
+        "conditionalHelp": "La visualizzazione condizionale (nascondi o mostra in grigio) e gli avvisi inline compaiono nel modulo a sinistra.",
+        "findings": {
+          "requiredEmpty": "il valore richiesto è vuoto",
+          "schemaRejected": "la regola a livello di schema ha rifiutato questo invio",
+          "valueRejected": "la regola di convalida del valore ha rifiutato questo valore"
+        },
+        "loadingServices": "Caricamento servizi…",
+        "noFilledValues": "Nessun valore ancora compilato: compila prima il modulo sottostante.",
+        "noProblems": "Nessun problema con i valori attuali.",
+        "noUsableValues": "Questo schema non ha ancora valori utilizzabili da visualizzare in anteprima. Aggiungi prima un valore.",
+        "previewTitle": "Anteprima: {{name}}",
+        "resetValues": "Reimposta i valori",
+        "sampleTimestamp": "Timestamp di esempio",
+        "scopes": {
+          "required": "Obbligatori mancanti",
+          "schema": "Convalida a livello di schema",
+          "shape": "Controlli di formato",
+          "value": "Convalida del valore"
+        },
+        "selectService": "Seleziona un servizio",
+        "server": {
+          "acceptedImmediately": "Sarebbe accettato immediatamente (non è richiesta l'approvazione).",
+          "discarded": "Scartato da EnabledIf/VisibleIf: {{names}}.",
+          "heldForApproval": "Resterebbe in attesa di approvazione ({{count}} approvatori obbligatori).",
+          "invalid": "Non valido: {{count}} errore/i",
+          "valid": "Valido: un invio reale verrebbe accettato."
+        },
+        "serverValidation": "Convalida del server",
+        "shape": {
+          "aboveMaximum": "sopra il massimo di {{value}}",
+          "belowMinimum": "al di sotto del minimo di {{value}}",
+          "earlier": "prima di {{value}}",
+          "invalidDate": "il valore non è una data valida",
+          "later": "più tardi di {{value}}",
+          "longer": "più lungo della lunghezza massima di {{value}}",
+          "notNumber": "il valore non è un numero",
+          "pattern": "non corrisponde al pattern {{value}}",
+          "regexBrowser": "impossibile valutare l'espressione regolare nel browser (verrà controllata sul server)",
+          "shorter": "più corto della lunghezza minima di {{value}}",
+          "wholeNumber": "il valore deve essere un numero intero"
+        },
+        "skipCadence": "Salta i controlli di cadenza (uno per periodo)",
+        "skippedValues": "Saltati {{count}} valori con nome vuoto o duplicato: {{names}}. Assegna a ogni valore un nome univoco per vederlo in anteprima.",
+        "testHeading": "Invio di prova",
+        "testHelp": "Esegue la convalida reale del server come se fosse il servizio scelto, inclusi i duplicati di cadenza, le regole sulla cronologia e lo stato di approvazione che ne deriverebbe, senza salvare nulla. Compila il modulo, scegli un servizio, quindi premi Convalida.",
+        "testTitle": "Invio di prova: {{name}}",
+        "timestampPreviewHint": "Usato per i campioni e per tutte le regole basate su data che leggono un valore di tipo Data.",
+        "timestampServerHint": "Usato per ogni campione e per tutte le regole di data, cadenza e cronologia.",
+        "unnamedValue": "(valore senza nome)",
+        "validate": "Convalida",
+        "validateAsService": "Convalida come servizio",
+        "validationCount": "Verranno convalidati {{count}} valori. Lo schema deve essere salvato e visibile al servizio scelto.",
+        "validationResults": "Risultati della convalida"
+      },
+      "sampleFields": {
+        "addNotes": "Aggiungi note",
+        "calculated": "Calcolato",
+        "disabled": "Disabilitato",
+        "from": "da {{value}}",
+        "max": "massimo {{value}}",
+        "maxLength": "lunghezza massima {{value}}",
+        "min": "min {{value}}",
+        "minLength": "lunghezza minima {{value}}",
+        "notProvided": "(non fornito)",
+        "note": "Nota",
+        "optional": "Facoltativo",
+        "regex": "espressione regolare: {{value}}",
+        "required": "Obbligatorio",
+        "to": "a {{value}}",
+        "value": "Valore{{unit}}"
+      },
+      "schemaEdit": {
+        "addRule": "Aggiungi regola",
+        "addValue": "Aggiungi valore",
+        "amberMax": "Accettabile (ambra) max",
+        "amberMaxHint": "Oltre questo valore è rosso. Limite superiore esterno.",
+        "amberMin": "Accettabile (ambra) min",
+        "amberMinHint": "Al di sotto è rosso. Limite inferiore esterno.",
+        "calculated": "Calcolato",
+        "cancelEditing": "Annulla e continua a modificare",
+        "caption": "Didascalia",
+        "captionHint": "Intestazione facoltativa mostrata sopra questo valore nel modulo di invio e nella vista (come un titolo di sezione). Serve solo alla visualizzazione; i client la ignorano.",
+        "checking": "Verifica in corso…",
+        "conditionalDisplay": "Visualizzazione condizionale",
+        "create": "Crea schema",
+        "dateConstraints": "Vincoli di data",
+        "deleteType": "valore",
+        "dependencies": "Dipendenze",
+        "discardChanges": "Ignora le modifiche",
+        "draftUnavailable": "Non disponibile: esistono già {{count}} invii per questo schema.",
+        "editTitle": "Modifica schema",
+        "editValue": "Modifica valore {{name}}",
+        "enabledIf": "Abilitato se",
+        "enabledIfHint": "Quando è falso (o null) il valore viene disabilitato nell'interfaccia e un campione inviato viene scartato con un avviso. Vuoto = sempre abilitato.",
+        "enabledPublished": "Abilitato (pubblicato)",
+        "expression": "Espressione",
+        "expressionHint": "Formula NCalc che può fare riferimento solo agli altri valori dello stesso invio (ad esempio average(a, b)). È consentito il concatenamento con altri valori calcolati.",
+        "greenMax": "Ideale (verde) max",
+        "greenMaxHint": "Limite superiore interno. Richiede un massimo ambra.",
+        "greenMin": "Ideale (verde) min",
+        "greenMinHint": "Limite inferiore interno. Richiede un minimo ambra.",
+        "incrementVersion": "Incrementa automaticamente il numero di versione (a {{version}})",
+        "kind": "Tipo",
+        "kindHint": "I valori calcolati sono derivati dagli altri valori dello stesso invio e non vengono mai inviati.",
+        "layoutHint": "Trascina i valori nelle sezioni per raggrupparli. Questo influisce solo sul layout del modulo di invio: il server tratta gli invii come elenchi piatti.",
+        "loading": "Caricamento schema…",
+        "max": "Massimo",
+        "maxDate": "Data massima (ISO)",
+        "maxLength": "Lunghezza massima",
+        "min": "Minimo",
+        "minDate": "Data minima (ISO)",
+        "minLength": "Lunghezza minima",
+        "moveToDraft": "Riporta lo schema in Bozza e applica le modifiche",
+        "nameFixed": "Il nome dello schema non è più modificabile dopo la creazione: cambiarlo potrebbe compromettere le regole di convalida e gli invii esistenti.",
+        "needsValue": "Uno schema necessita di almeno un valore per essere utile.",
+        "noRules": "Ancora nessuna regola.",
+        "noRulesAdd": "Ancora nessuna regola. Usa \"Aggiungi regola\" per crearne una.",
+        "notFound": "Schema non trovato",
+        "numericConstraints": "Vincoli numerici",
+        "publishAsIs": "Pubblica così com'è senza modificare la versione",
+        "publishChanges": "Pubblica modifiche",
+        "publishHelp": "Hai modificato questo schema pubblicato ma non hai aggiornato il numero di versione. Cosa vuoi fare?",
+        "readOnlySnapshot": "Istantanea di sola lettura",
+        "regexPattern": "Pattern regex",
+        "removeRule": "Rimuovi regola",
+        "removeValueWarning": "Rimuovere un valore può compromettere le regole di convalida e far rifiutare o alterare gli invii esistenti. Valuta invece di disabilitarlo (deseleziona \"Abilitato\") per mantenere intatti i dati storici.\n\nRimuoverlo comunque?",
+        "schemaMissing": "Non esiste alcuno schema di nome \"{{name}}\". Potrebbe essere stato eliminato.",
+        "sinceVersion": "Dalla versione",
+        "sinceVersionHint": "Facoltativo. Se impostato e uguale alla versione corrente dello schema ({{version}}), l'interfaccia mostra un tag \"Nuovo\" accanto a questo valore per un periodo di cadenza. Lascia vuoto per \"sempre presente\".",
+        "snapshotHelp": "Versione {{version}} salvata <savedAt /> {{author}}. Questa è una vista storica e non può essere modificata: non ha effetto sullo schema corrente.",
+        "snapshotMissing": "Questa istantanea della versione non esiste più. Potrebbe essere stata eliminata dalla cronologia.",
+        "stringConstraints": "Vincoli di stringa",
+        "syntaxError": "Errore di sintassi:",
+        "tabs": {
+          "approvals": "Approvazioni",
+          "general": "Generale",
+          "layout": "Layout",
+          "validations": "Convalide"
+        },
+        "targetBand": "Fascia obiettivo (RAG, facoltativa)",
+        "targetBandHelp": "Intervalli rosso/ambra/verde usati solo per la rendicontazione e mostrati come bande ombreggiate sui grafici: non vengono mai applicati. L'intervallo accettabile (ambra) è la banda esterna; quello ideale (verde) si trova al suo interno. Fuori dall'intervallo ambra è rosso. Ogni limite è facoltativo, ma un limite verde richiede il corrispondente limite ambra sullo stesso lato e i limiti devono essere in ordine crescente: min ambra ≤ min verde ≤ max verde ≤ max ambra.",
+        "unit": "Unità",
+        "userDefined": "Definito dall'utente",
+        "validSyntax": "Sintassi valida",
+        "validation": "Convalida",
+        "validationPlaceholder": "es. if(spese > entrate, 'le spese non possono superare le entrate', null)",
+        "validationsHint": "Ogni regola viene eseguita una volta per invio su tutti i valori dello schema. Aggiungine più di una per imporre più vincoli tra valori diversi.",
+        "valueDetails": "Dettagli del valore",
+        "valueNameFixed": "Il nome non è più modificabile dopo la creazione: è referenziato dalle regole di convalida e dagli invii esistenti. Aggiungi un nuovo valore se ti serve un nome diverso.",
+        "valueNameHint": "Usato come identificatore nelle regole di convalida. Deve iniziare con una lettera o un trattino basso e contenere solo lettere, cifre e trattini bassi.",
+        "valueNameValidation": "Deve essere un identificatore valido: solo lettere, cifre e trattini bassi; non può iniziare con una cifra.",
+        "valueNumber": "(valore #{{number}})",
+        "valueValidation": "Convalida del valore",
+        "valueValidationHint": "Viene eseguita sul campione inviato. Le variabili disponibili includono value, minimum e maximum. Spazi e interruzioni di riga vengono ignorati.",
+        "versionHint": "Incrementala quando introduci nuovi valori. Non può diminuire. La \"Dalla versione\" di ogni valore deve essere ≤ a questa.",
+        "viewVersionTitle": "Visualizza la versione dello schema",
+        "visibleIf": "Visibile se",
+        "visibleIfHint": "Quando è falso (o null) il valore è nascosto nell'interfaccia. Lato server si comporta come \"Abilitato se\". Vuoto = sempre visibile.",
+        "visibleServices": "Visibile ai servizi",
+        "warning": "Avviso",
+        "warningHint": "Regola facoltativa che produce un avviso non bloccante quando è vera o quando restituisce una stringa non vuota."
+      },
+      "schemaHistory": {
+        "bucketDescription": "{{count}} intervalli: le barre mostrano minimo e massimo, il punto mostra la media",
+        "minAvgMax": "min / media / max",
+        "noNumericValues": "Questo schema non ha valori numerici, quindi non c'è nulla da rappresentare. Aggiungi un valore di tipo Numero o Intero per vederne l'andamento nel tempo.",
+        "noSamples": "Nessun campione ancora inviato.",
+        "title": "Dati storici"
+      },
+      "schemaVersions": {
+        "actionsForVersion": "Azioni per la versione {{version}}",
+        "author": "Autore",
+        "bumped": "incrementata",
+        "changeDate": "Data della modifica",
+        "deleteAll": "Elimina tutta la cronologia",
+        "deleteAllWarning": "Verranno rimosse tutte le istantanee salvate per questo schema. Lo schema corrente non viene modificato. Questa operazione non può essere annullata.",
+        "deleteEntryWarning": "L'istantanea verrà rimossa solo dalla cronologia. Lo schema corrente non viene modificato. Questa operazione non può essere annullata.",
+        "deleteThisEntry": "Elimina questa voce",
+        "empty": "Nessuna cronologia delle versioni registrata.",
+        "entireHistory": "intera cronologia delle versioni",
+        "entry": "voce della cronologia delle versioni",
+        "entryLabel": "v{{version}} del {{date}}",
+        "exportCsv": "Esporta CSV",
+        "newVersion": "Nuova versione",
+        "oldVersion": "Vecchia versione",
+        "title": "Cronologia delle versioni — {{name}}",
+        "viewThisVersion": "Visualizza questa versione",
+        "viewVersion": "Visualizza versione {{version}}"
+      },
+      "schemas": {
+        "audience": "Visibilità",
+        "bumpedAt": "incrementata <bumpedAt />",
+        "deleteType": "schema",
+        "empty": "Ancora nessuno schema: fai clic su \"Nuovo schema\" per crearne uno.",
+        "exampleJson": "Esempio di invio (JSON)",
+        "frozen": "Congelato",
+        "globalAudience": "Globale (visibile a tutti i servizi)",
+        "importFailed": "Impossibile importare lo schema",
+        "jsonObjectError": "La radice del JSON deve essere un oggetto.",
+        "modifiableApprovalHelp": "Reinviare i dati per una finestra che ha già un invio lo sostituisce e riporta l'approvazione a In attesa, anche se era già stata concessa: i valori precedenti escono così dalla rendicontazione attiva e alla fine vengono sovrascritti. Contrassegna lo schema (o il valore) come non modificabile se le cifre approvate non devono mai cambiare a metà ciclo.",
+        "modifiableApprovalTitle": "Modificabile e soggetto ad approvazione",
+        "new": "Nuovo schema",
+        "noServices": "(nessun servizio)",
+        "noValuesDefined": "Nessun valore definito.",
+        "schemaJson": "Schema come JSON",
+        "schemaPdf": "Schema come PDF",
+        "serviceCount": "{{count}} servizio/i",
+        "submissionValidations": "Convalide dell'invio",
+        "testSubmission": "Invio di prova",
+        "title": "Schemi",
+        "upload": "Carica schema",
+        "validationRule": "Regola di convalida dell'invio {{number}}",
+        "valuesCount": "Valori ({{count}})",
+        "viewHistoricalData": "Visualizza i dati storici",
+        "viewSchema": "Visualizza schema {{name}}",
+        "viewVersionHistory": "Visualizza la cronologia delle versioni"
+      },
+      "submissionDetail": {
+        "change": "Modifica",
+        "changeType": {
+          "Create": "Creazione",
+          "Delete": "Eliminazione",
+          "Replace": "Sostituzione",
+          "Update": "Aggiornamento"
+        },
+        "changedBy": "Modificato da",
+        "details": "Dettagli",
+        "noChanges": "Nessuna modifica registrata."
+      },
+      "submissionEdit": {
+        "acceptedWarnings": "Invio accettato con avvisi",
+        "clonedHelp": "Il servizio, lo schema e i valori sono stati precompilati e il timestamp è stato riportato a ora. Controllali, modifica il servizio o lo schema se serve, quindi premi Invia per creare un nuovo invio.",
+        "clonedTitle": "Clonato da un invio esistente.",
+        "editDraftTitle": "Modifica bozza",
+        "editTitle": "Modifica invio",
+        "missingRequired": "Valori obbligatori mancanti",
+        "multiSchemaHelp": "Il salvataggio manterrà solo i valori di {{name}}. Scegli prima un altro schema se invece ti servono quei valori.",
+        "multiSchemaTitle": "L'invio di origine conteneva valori provenienti da più schemi.",
+        "newTitle": "Nuovo invio",
+        "noValues": "Questo schema non ha valori definiti.",
+        "pickSchema": "Scegli uno schema",
+        "pickSchemaError": "Scegli prima uno schema.",
+        "pickSchemaHelp": "Scegli uno schema per visualizzare i valori che puoi inviare.",
+        "pickService": "Scegli un servizio",
+        "pickServiceError": "Scegli prima un servizio.",
+        "pickServiceFirst": "Scegli prima un servizio",
+        "pickServiceSchemaHelp": "Scegli un servizio e uno schema per iniziare a inserire i valori.",
+        "saveAsDraft": "Salva come bozza",
+        "saveFailed": "Impossibile salvare l'invio",
+        "submit": "Invia",
+        "timestamp": "Timestamp (UTC)",
+        "timestampHint": "Applicato a ogni campione di questo invio.",
+        "valueCountHelp": "{{count}} valori: lascia vuoti quelli facoltativi per ometterli",
+        "viewTitle": "Visualizza l'invio"
+      },
+      "submissions": {
+        "actionsFor": "Azioni per l'invio {{id}}",
+        "allSchemas": "Tutti gli schemi",
+        "allServices": "Tutti i servizi",
+        "approvalsReceived": "Ricevute {{approved}} approvazioni obbligatorie su {{count}}.",
+        "cloneNew": "Clona in un nuovo invio",
+        "createNew": "Crea un nuovo invio",
+        "deleteType": "invio",
+        "draftHelp": "Questo invio è una bozza in lavorazione. Resta escluso dalla rendicontazione e dall'approvazione finché non viene pubblicato.",
+        "empty": "Nessun invio corrisponde a questi filtri.",
+        "exportPdf": "Esporta come PDF",
+        "exportXlsx": "Esporta XLSX (uno schema)",
+        "exportXlsxHelp": "Esporta gli invii filtrati in XLSX",
+        "importBulk": "Importa dati in blocco",
+        "interval": {
+          "all": "Tutto il periodo",
+          "custom": "Intervallo personalizzato",
+          "label": "Intervallo",
+          "lastMonth": "Ultimi 30 giorni",
+          "lastWeek": "Ultimi 7 giorni",
+          "lastYear": "Ultimi 365 giorni"
+        },
+        "manualEntry": "Inserimento manuale",
+        "myTitle": "I miei invii",
+        "new": "Nuovo invio",
+        "pickSchemaForXlsx": "Scegli un singolo schema per abilitare l'esportazione XLSX",
+        "rejectHelp": "Questo invio verrà contrassegnato come rifiutato ed escluso dal feed OData e da Esplora, ma resterà visibile qui. Puoi lasciare un motivo facoltativo per chi ha inviato e per gli altri revisori.",
+        "rejectPlaceholder": "es. I dati della settimana 22 sembrano invertiti: ricontrolla i totali del turno di notte.",
+        "rejectReason": "Motivo (facoltativo)",
+        "rejectTitle": "Rifiuta invio",
+        "rejecting": "Rifiuto in corso…",
+        "rejectionReason": "Motivo del rifiuto",
+        "source": "Origine",
+        "status": {
+          "all": "Tutti gli stati"
+        },
+        "temporarilyClosed": "Gli invii sono temporaneamente chiusi.",
+        "viewFrom": "Visualizza l'invio del {{label}}",
+        "warningsCount": "Avvisi ({{count}})"
+      }
+    },
+    "analytics": {
+      "common": {
+        "actions": "Azioni",
+        "all": "Tutto",
+        "allServices": "Tutti i servizi",
+        "cadence": "Cadenza",
+        "cancel": "Annulla",
+        "delete": "Elimina",
+        "edit": "Modifica",
+        "exportCsv": "Esporta CSV",
+        "exporting": "Esportazione in corso…",
+        "exportListCsv": "Esporta questo elenco (CSV)",
+        "exportView": "Esporta questa vista",
+        "failedToLoad": "Caricamento non riuscito",
+        "loading": "Caricamento…",
+        "moreActions": "Altre azioni",
+        "no": "No",
+        "noData": "Nessun dato.",
+        "period": "Periodo",
+        "refresh": "Aggiorna",
+        "save": "Salva",
+        "saving": "Salvataggio…",
+        "schema": "Schema",
+        "selectedCount_one": "{{count}} selezionato",
+        "selectedCount_other": "{{count}} selezionati",
+        "sending": "Invio in corso…",
+        "service": "Servizio",
+        "services": "Servizi",
+        "yes": "Sì"
+      },
+      "cadence": {
+        "daily": "Giornaliera",
+        "weekly": "Settimanale",
+        "fortnightly": "Quindicinale",
+        "monthly": "Mensile",
+        "quarterly": "Trimestrale",
+        "semiannually": "Semestrale",
+        "yearly": "Annuale"
+      },
+      "periodFilter": {
+        "intervals": {
+          "all": "Tutto il periodo",
+          "lastDay": "Ultime 24 ore",
+          "lastWeek": "Ultimi 7 giorni",
+          "lastMonth": "Ultimi 30 giorni",
+          "custom": "Intervallo personalizzato"
+        },
+        "from": "Da",
+        "to": "A"
+      },
+      "dashboard": {
+        "title": "Panoramica",
+        "welcome": "Benvenuto, {{name}}",
+        "cards": {
+          "pendingApprovals": "Approvazioni in attesa",
+          "operators": "Operatori",
+          "admins": "Amministratori",
+          "submissions": "Invii",
+          "mySubmissions": "I miei invii",
+          "submitData": "Invia dati"
+        },
+        "actions": {
+          "review": "Rivedi",
+          "manage": "Gestisci",
+          "browse": "Sfoglia",
+          "newSubmission": "Nuovo invio →",
+          "viewByPeriod": "Visualizza per periodo →"
+        },
+        "missing": {
+          "overdueTitle": "In ritardo: periodo precedente",
+          "overdueDescription": "Queste finestre di invio si sono chiuse.",
+          "currentTitle": "Questo periodo",
+          "currentDescription": "Ancora all'interno della finestra di invio.",
+          "servicesShort_one": "servizio con invii mancanti",
+          "servicesShort_other": "servizi con invii mancanti"
+        },
+        "trend": {
+          "title": "Invii mancanti nel tempo",
+          "loading": "Caricamento dell'andamento…",
+          "empty": "Nessun dato di andamento disponibile.",
+          "seriesName": "Mancante — {{service}}"
+        }
+      },
+      "missing": {
+        "title": "Invii mancanti per periodo",
+        "titleShort": "Invii mancanti",
+        "columns": {
+          "missing": "Mancante",
+          "totalRequired": "Totale obbligatori"
+        },
+        "trend": {
+          "title": "Mancante nel tempo",
+          "description": "Totale dei valori obbligatori mancanti per periodo {{cadence}} · fai clic su una barra per esaminarla"
+        },
+        "chart": {
+          "missing": "mancante"
+        },
+        "byService": {
+          "title": "Per servizio — {{period}}",
+          "description": "Valori obbligatori mancanti per servizio nel periodo selezionato",
+          "empty": "Non manca nulla in questo periodo. 🎉"
+        },
+        "summary": "{{missing}} valori obbligatori mancanti in {{services}} servizi nel periodo {{period}}",
+        "selectedPeriod": "il periodo selezionato",
+        "detail": {
+          "complete": "Tutti gli invii obbligatori per questo periodo sono stati ricevuti."
+        }
+      },
+      "explore": {
+        "title": "Esplora",
+        "tabs": {
+          "scorecard": "Scorecard",
+          "analysis": "Analisi",
+          "anomalies": "Anomalie"
+        },
+        "actions": {
+          "exportCsv": "Esporta CSV (questa vista)",
+          "exportPng": "Esporta grafico (PNG)"
+        },
+        "errors": {
+          "nothingToExport": "Non c'è ancora nulla da esportare per questa vista."
+        },
+        "filters": {
+          "schemas": "Schemi",
+          "selectSchema": "Seleziona uno schema",
+          "allSchemas": "Tutti gli schemi",
+          "value": "Valore",
+          "selectValue": "Seleziona un valore",
+          "show": "Mostra",
+          "latestAvailable": "Ultimo disponibile",
+          "lastPeriod": "Ultimo periodo",
+          "latestClosed": "Ultimo chiuso",
+          "current": "Attuale",
+          "aggregation": "Aggregazione",
+          "comparePrevious": "Confronta con il precedente"
+        },
+        "help": {
+          "schemas": "Quali schemi analizzare alla ricerca di anomalie. Lascia vuoto per analizzare tutti gli schemi con valori numerici.",
+          "schemasAria": "A cosa serve Schemi?",
+          "show": "“Ultimo disponibile” mostra l'invio più recente di ogni servizio, per quanto vecchio sia. “Ultimo periodo” mostra un singolo periodo e segnala con schede grigie “nessun invio” i servizi che non hanno inviato.",
+          "showAria": "A cosa serve Mostra?",
+          "aggregation": "Come i campioni che ricadono in ciascun periodo vengono ridotti a un solo numero e come più servizi vengono combinati nel dato complessivo. La media è ponderata sul numero di campioni; “Numero di campioni” conta semplicemente quanti ne sono stati inviati.",
+          "aggregationAria": "A cosa serve Aggregazione?",
+          "comparePrevious": "Sovrappone la stessa selezione spostata indietro nel tempo, così puoi leggere questo periodo a confronto con uno precedente. Richiede un intervallo di periodo (non “Tutto il periodo”); le due finestre possono sovrapporsi.",
+          "compareAria": "A cosa serve Confronta?"
+        },
+        "shifts": {
+          "1m": "1 mese",
+          "6m": "6 mesi",
+          "1y": "1 anno"
+        },
+        "views": {
+          "trend": "Andamento",
+          "compare": "Confronta i servizi",
+          "snapshot": "Istantanea"
+        },
+        "aggregation": {
+          "average": "Media",
+          "sum": "Somma",
+          "min": "Minimo",
+          "max": "Massimo",
+          "count": "Numero di campioni"
+        },
+        "status": {
+          "green": "In linea",
+          "amber": "Attenzione",
+          "red": "Fuori obiettivo",
+          "normal": "Nessuna anomalia",
+          "anomaly": "Anomalia",
+          "noSubmission": "Nessun invio",
+          "hideMissing": "Nascondi i mancanti"
+        },
+        "presets": {
+          "label": "Preimpostazioni",
+          "empty": "Ancora nessuna preimpostazione salvata.",
+          "namePrompt": "Nome della preimpostazione",
+          "limit_one": "Puoi conservare al massimo {{count}} preimpostazione. Eliminane prima una.",
+          "limit_other": "Puoi conservare al massimo {{count}} preimpostazioni. Eliminane prima una.",
+          "deleteAria": "Elimina la preimpostazione {{name}}",
+          "saveCurrent": "Salva la vista corrente come preimpostazione…"
+        },
+        "anomaly": {
+          "historyWindow": "Finestra della cronologia (periodi)",
+          "sensitivity": "Sensibilità (soglia |z|)",
+          "baselineMode": "Modalità di riferimento",
+          "robustHelp": "La modalità Robusta evita che pochi picchi estremi distorcano il riferimento. La modalità Standard usa la media e la deviazione standard.",
+          "robustAria": "A cosa serve la modalità Robusta?",
+          "robust": "Robusta (mediana / MAD)",
+          "standard": "Standard (media / SD)",
+          "detection": "Rilevamento anomalie",
+          "highlight": "Evidenzia le anomalie",
+          "summaryAnomaly_one": "{{count}} anomalia",
+          "summaryAnomaly_other": "{{count}} anomalie",
+          "summaryNormal_one": "{{count}} normale",
+          "summaryNormal_other": "{{count}} normali",
+          "summaryMissing_one": "{{count}} nessun invio",
+          "summaryMissing_other": "{{count}} nessun invio",
+          "empty": "Ancora nessun KPI numerico da analizzare. Scegli uno o più schemi con valori numerici per cercare anomalie nell'ultimo periodo.",
+          "hideNormal": "Nascondi i normali",
+          "noneInPeriod": "Nessuna anomalia nel periodo {{period}}.",
+          "openAnalysis": "Apri in Analisi · {{state}}"
+        },
+        "scorecard": {
+          "summaryOnTarget_one": "{{count}} in linea",
+          "summaryOnTarget_other": "{{count}} in linea",
+          "summaryWarning_one": "{{count}} avviso",
+          "summaryWarning_other": "{{count}} avvisi",
+          "summaryOffTarget_one": "{{count}} fuori obiettivo",
+          "summaryOffTarget_other": "{{count}} fuori obiettivo",
+          "summaryMissing_one": "{{count}} nessun invio",
+          "summaryMissing_other": "{{count}} nessun invio",
+          "empty": "Ancora nessun KPI con una fascia obiettivo. Aggiungi un intervallo accettabile/ideale a un valore numerico di uno schema per vederlo qui.",
+          "hideOnTarget": "Nascondi quelli in linea",
+          "allOnTarget": "Tutti i KPI sono in linea con l'obiettivo.",
+          "asOf": "al <periodDate />",
+          "viewSubmission": "Visualizza l'invio · {{state}}"
+        },
+        "content": {
+          "pickSchema": "Scegli uno schema per iniziare a esplorare.",
+          "noNumeric": "Questo schema non ha valori numerici, quindi non c'è nulla da rappresentare. Aggiungi un valore di tipo Numero o Intero per esplorarlo.",
+          "trendOverTime": "Andamento nel tempo",
+          "aggregationOf": "{{aggregation}} di {{value}}",
+          "perCadencePeriod": "per periodo {{cadence}}",
+          "combineServices": "Combina servizi",
+          "projection": "Proiezione",
+          "viewAsTable": "Visualizza come tabella",
+          "showEvents": "Mostra eventi",
+          "noSamples": "Nessun campione per questa selezione.",
+          "overallAggregation": "{{aggregation}} complessiva",
+          "latestPeriod": "Ultimo periodo",
+          "samples": "Campioni",
+          "periodsServices": "Periodi / servizi"
+        },
+        "trend": {
+          "noAnomalies": "Nessuna anomalia nella selezione attuale.",
+          "anomaliesHighlighted_one": "{{count}} anomalia evidenziata nella selezione corrente.",
+          "anomaliesHighlighted_other": "{{count}} anomalie evidenziate nella selezione corrente.",
+          "ago": "{{period}} fa",
+          "previous": "Precedente",
+          "projectionName": "{{name}} (proiezione)",
+          "overallTrend": "Andamento complessivo"
+        },
+        "snapshot": {
+          "title": "Ultimo valore per servizio",
+          "description": "Periodo più recente per ogni valore · le celle mostrano il valore {{aggregation}} di quel periodo"
+        }
+      },
+      "events": {
+        "title": "Eventi",
+        "singular": "Evento",
+        "ongoing": "In corso",
+        "removed": "(rimosso)",
+        "notApplicable": "Non applicabile",
+        "durationHours_one": "{{count}} h",
+        "durationHours_other": "{{count}} h",
+        "durationMinutes_one": "{{count}} min",
+        "durationMinutes_other": "{{count}} min",
+        "kinds": {
+          "pointintime": "Punto nel tempo",
+          "interval": "Intervallo",
+          "fromnowon": "Da ora in poi"
+        },
+        "fields": {
+          "label": "Etichetta",
+          "timestamp": "Timestamp",
+          "kind": "Tipo",
+          "duration": "Durata",
+          "description": "Descrizione",
+          "affects": "Servizi interessati",
+          "created": "Creato",
+          "createdBy": "Creato da",
+          "modified": "Modificato"
+        },
+        "actions": {
+          "add": "Aggiungi evento",
+          "edit": "Modifica evento"
+        },
+        "validation": {
+          "labelRequired": "L'etichetta è obbligatoria.",
+          "timestampRequired": "Il timestamp è obbligatorio.",
+          "serviceRequired": "Scegli almeno un servizio interessato oppure “Tutti i servizi”.",
+          "durationFormat": "Formato della durata non riconosciuto. Usa minuti (45), ore:minuti (1:30) oppure giorni ore:minuti (2 03:15).",
+          "durationRequired": "La durata è obbligatoria per gli eventi a intervalli."
+        },
+        "help": {
+          "fromNowOn": "Vale dal timestamp indicato sopra fino a nuovo avviso.",
+          "duration": "Minuti (45), ore:minuti (1:30) o giorni ore:minuti (2 03:15)."
+        },
+        "placeholders": {
+          "duration": "es. 90 o 1:30",
+          "selectServices": "Seleziona i servizi"
+        },
+        "deleteConfirm": "Eliminare l'evento \"{{label}}\"?\n\nQuesta operazione non può essere annullata.",
+        "empty": "Ancora nessun evento.",
+        "emptyManage": "Ancora nessun evento: fai clic su “Aggiungi evento” per crearne uno.",
+        "viewAria": "Visualizza evento {{label}}",
+        "actionsAria": "Azioni per l'evento {{label}}",
+        "byActor": "di {{actor}}"
+      },
+      "audit": {
+        "title": "Audit",
+        "email": "E-mail",
+        "delivery": "Consegna",
+        "actionError": "Impossibile completare l'azione",
+        "deliveryActionsAria": "Azioni per la consegna {{id}}",
+        "tabs": {
+          "changes": "Modifiche",
+          "sentEmails": "E-mail inviate",
+          "webhookDeliveries": "Consegne webhook"
+        },
+        "actions": {
+          "sendPending": "Invia subito quelle in attesa",
+          "redeliver": "Riconsegna"
+        },
+        "filters": {
+          "changeType": "Tipo di modifica",
+          "targetType": "Tipo di destinazione"
+        },
+        "columns": {
+          "created": "Creato",
+          "to": "A",
+          "subject": "Oggetto",
+          "status": "Stato",
+          "attempts": "Tentativi",
+          "sent": "Inviato",
+          "event": "Evento",
+          "url": "URL",
+          "delivered": "Consegnato",
+          "lastStatusCode": "Ultimo codice di stato",
+          "lastError": "Ultimo errore",
+          "timestamp": "Timestamp",
+          "change": "Modifica",
+          "target": "Destinazione",
+          "changedBy": "Modificato da",
+          "note": "Nota"
+        },
+        "empty": {
+          "changes": "Nessuna modifica registrata.",
+          "emails": "Nessuna e-mail registrata.",
+          "deliveries": "Nessuna consegna registrata."
+        },
+        "changeTypes": {
+          "create": "Creazione",
+          "edit": "Modifica",
+          "delete": "Eliminazione",
+          "approve": "Approvazione",
+          "reject": "Rifiuto"
+        },
+        "targetTypes": {
+          "user": "Utente",
+          "account": "Account",
+          "schema": "Schema",
+          "apiKey": "Chiave API",
+          "submission": "Invio",
+          "report": "Report",
+          "schemaHistory": "Cronologia schema",
+          "approvalRule": "Regola di approvazione",
+          "settings": "Impostazioni",
+          "backup": "Backup",
+          "event": "Evento",
+          "commentThread": "Discussione",
+          "comment": "Commento"
+        },
+        "statuses": {
+          "pending": "In attesa",
+          "sending": "In invio",
+          "sent": "Inviato",
+          "failed": "Non riuscito"
+        }
+      },
+      "serviceStatus": {
+        "title": "Stato — {{service}}",
+        "mixed": "Misto",
+        "disabled": "Disabilitato",
+        "empty": "Nessuno schema visibile a questo servizio.",
+        "periods": {
+          "day": "Giorno",
+          "week": "Settimana",
+          "fortnight": "Quindicina",
+          "month": "Mese",
+          "quarter": "Trimestre",
+          "halfyear": "Semestre",
+          "year": "Anno"
+        },
+        "columns": {
+          "submitted": "Inviato",
+          "lastSample": "Ultimo campione",
+          "status": "Stato"
+        },
+        "submittedHelp": "{{submitted}} valori attivi su {{total}} inviati nella finestra di cadenza corrente — {{requiredSubmitted}}/{{requiredTotal}} obbligatori.",
+        "requiredRatio": "{{submitted}}/{{total}} obbligatori",
+        "statuses": {
+          "inert": "Inerte",
+          "noValues": "Nessun valore",
+          "submitted": "Inviato",
+          "optional": "Opzionale",
+          "missing": "Mancante"
+        }
+      }
+    }
+  }
+}

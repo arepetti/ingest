@@ -5,6 +5,7 @@ import {
   ArrowMaximize20Regular, ArrowMinimize20Regular, Dismiss20Regular,
 } from '@fluentui/react-icons'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Standard drawer header with the close ("X") affordance, plus an optional expand/collapse
@@ -27,6 +28,7 @@ export function DrawerHeaderWithClose({
   /** Toggle handler; when supplied the expand button is rendered before the close button. */
   onToggleExpand?: () => void
 }) {
+  const { t } = useTranslation()
   const showExpand = typeof onToggleExpand === 'function'
   return (
     <DrawerHeader>
@@ -37,14 +39,16 @@ export function DrawerHeaderWithClose({
               <Button
                 appearance="transparent"
                 icon={expanded ? <ArrowMinimize20Regular /> : <ArrowMaximize20Regular />}
-                aria-label={expanded ? 'Collapse drawer' : 'Expand drawer'}
+                aria-label={expanded
+                  ? t('shell.drawer.collapse')
+                  : t('shell.drawer.expand')}
                 onClick={onToggleExpand}
               />
             )}
             <Button
               appearance="transparent"
               icon={<Dismiss20Regular />}
-              aria-label="Close"
+              aria-label={t('shell.common.close')}
               onClick={onClose}
             />
           </span>

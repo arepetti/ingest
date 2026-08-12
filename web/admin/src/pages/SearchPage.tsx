@@ -8,11 +8,12 @@ import {
   DocumentBulletList20Regular, DocumentText20Regular, PeopleTeam20Regular,
   Rocket20Regular, Search20Regular, Tag20Regular,
 } from '@fluentui/react-icons'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { useCapabilities, useAccounts, useEvents, useReports, useSchemas, useSubmissions } from '../api/hooks'
 import type { Schema, SchemaValue, Submission } from '../api/types'
-import { formatDateTime } from '../utils/format'
 import { eventKindLabel } from '../utils/eventKind'
 import { actionIcon, matchActions, scoreFields, type SearchAction } from './search/actions'
+import { Trans, useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '860px' },
@@ -61,7 +62,7 @@ interface ResultItem {
   to: string
   icon?: ReactNode
   primary: string
-  secondary?: string
+  secondary?: ReactNode
 }
 
 /**
@@ -71,6 +72,7 @@ interface ResultItem {
  */
 export function SearchPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const [sp, setSp] = useSearchParams()
   const q = sp.get('q') ?? ''
   const query = q.trim()
@@ -105,9 +107,9 @@ export function SearchPage() {
   const submissionsQ = useSubmissions({ page: 1, pageSize: 200 }, enabled && has('submissions:read'))
 
   const actions = useMemo(
-    () => matchActions(query, (a: SearchAction) => !a.capabilities || a.capabilities.some(c => has(c))),
+    () => matchActions(query, (a: SearchAction) => !a.capabilities || a.capabilities.some(c => has(c)), t),
     // `has` closes over the capability set; re-run when the query changes (the set is stable per render).
-    [query, has],
+    [query, has, t],
   )
 
   const schemas = useMemo(() => rank(schemasQ.data?.items, q, sc => [sc.label, sc.name, sc.description]), [schemasQ.data, q])
@@ -128,39 +130,38 @@ export function SearchPage() {
   return (
     <div className={s.root}>
       <div className={s.header}>
-        <Title2>Search</Title2>
+        <Title2>{t('shell.search.title')}</Title2>
         <div className={s.searchRow}>
           <SearchBox
             className={s.searchBox}
             size="large"
-            placeholder="Search actions, schemas, values, events, accounts…"
+            placeholder={t('shell.search.placeholder')}
             value={draft}
             onChange={(_, d) => setDraft(d.value)}
             onKeyDown={e => { if (e.key === 'Enter') commit() }}
           />
           <Button appearance="primary" size="large" icon={<Search20Regular />} onClick={commit}>
-            Search
+            {t('shell.search.button')}
           </Button>
         </div>
       </div>
 
       {!enabled && (
         <Text className={s.hint}>
-          Type what you want to do (for example “add user”, “submit”, “scorecard”) or the name of a
-          schema, value, event, account or report.
+          {t('shell.search.hint')}
         </Text>
       )}
 
       {enabled && (
         <>
           <ResultSection
-            title="Actions"
+            title={t('shell.search.sections.actions')}
             icon={<Rocket20Regular />}
             items={actions.map(a => ({ key: a.id, to: a.to, icon: actionIcon(a), primary: a.title, secondary: a.description }))}
           />
 
           <ResultSection
-            title="Schemas"
+            title={t('shell.search.sections.schemas')}
             icon={<DataTreemap20Regular />}
             loading={schemasQ.isLoading}
             items={schemas.slice(0, PER_CATEGORY).map(sc => ({
@@ -168,14 +169,14 @@ export function SearchPage() {
               to: `/schemas/${encodeURIComponent(sc.name)}/edit`,
               icon: <DataTreemap20Regular />,
               primary: sc.label || sc.name,
-              secondary: sc.label ? sc.name : `${sc.values.length} value${sc.values.length === 1 ? '' : 's'}`,
+              secondary: sc.label ? sc.name : t('shell.search.valueCount', { count: sc.values.length }),
             }))}
             viewAllTo={schemas.length > PER_CATEGORY ? '/schemas' : undefined}
-            viewAllLabel={`View all ${schemas.length} schemas`}
+            viewAllLabel={t('shell.search.viewAllSchemas', { count: schemas.length })}
           />
 
           <ResultSection
-            title="Schema values"
+            title={t('shell.search.sections.schemaValues')}
             icon={<Tag20Regular />}
             loading={schemasQ.isLoading}
             items={values.slice(0, PER_CATEGORY).map(({ schema, value }) => ({
@@ -183,14 +184,14 @@ export function SearchPage() {
               to: `/schemas/${encodeURIComponent(schema.name)}/edit`,
               icon: <Tag20Regular />,
               primary: value.label || value.name,
-              secondary: `in ${schema.label || schema.name}`,
+              secondary: t('shell.search.inSchema', { schema: schema.label || schema.name }),
             }))}
             viewAllTo={values.length > PER_CATEGORY ? `/schemas/${encodeURIComponent(values[0].schema.name)}/edit` : undefined}
-            viewAllLabel={`${values.length} matching values`}
+            viewAllLabel={t('shell.search.matchingValues', { count: values.length })}
           />
 
           <ResultSection
-            title="Accounts"
+            title={t('shell.search.sections.accounts')}
             icon={<PeopleTeam20Regular />}
             loading={accountsQ.isLoading}
             items={accounts.slice(0, PER_CATEGORY).map(a => ({
@@ -198,14 +199,17 @@ export function SearchPage() {
               to: a.role === 'Service' ? `/services/${encodeURIComponent(a.name)}/status` : '/services',
               icon: <PeopleTeam20Regular />,
               primary: a.label || a.name,
-              secondary: `${a.kind} · ${a.role}`,
+              secondary: t('shell.search.accountKindRole', {
+                kind: t(`shell.account.kinds.${a.kind}`),
+                role: t(`shell.account.roles.${a.role}`),
+              }),
             }))}
             viewAllTo={accounts.length > PER_CATEGORY ? '/services' : undefined}
-            viewAllLabel={`View all ${accounts.length} accounts`}
+            viewAllLabel={t('shell.search.viewAllAccounts', { count: accounts.length })}
           />
 
           <ResultSection
-            title="Events"
+            title={t('shell.search.sections.events')}
             icon={<CalendarLtr20Regular />}
             loading={eventsQ.isLoading}
             items={events.slice(0, PER_CATEGORY).map(e => ({
@@ -213,14 +217,20 @@ export function SearchPage() {
               to: '/events',
               icon: <CalendarLtr20Regular />,
               primary: e.label,
-              secondary: `${eventKindLabel(e.kind)} · ${formatDateTime(e.timestamp)}`,
+              secondary: (
+                <Trans
+                  i18nKey="shell.search.eventSummaryRich"
+                  values={{ kind: eventKindLabel(e.kind, t) }}
+                  components={{ timestamp: <LocalizedTime value={e.timestamp} /> }}
+                />
+              ),
             }))}
             viewAllTo={events.length > PER_CATEGORY ? '/events' : undefined}
-            viewAllLabel={`View all ${events.length} events`}
+            viewAllLabel={t('shell.search.viewAllEvents', { count: events.length })}
           />
 
           <ResultSection
-            title="Reports"
+            title={t('shell.search.sections.reports')}
             icon={<DocumentText20Regular />}
             loading={reportsQ.isLoading}
             items={reports.slice(0, PER_CATEGORY).map(r => ({
@@ -228,14 +238,16 @@ export function SearchPage() {
               to: `/reports/${encodeURIComponent(r.name)}`,
               icon: <DocumentText20Regular />,
               primary: r.label || r.name,
-              secondary: r.type === 'Single' ? 'Single submission report' : 'Aggregate report',
+              secondary: r.type === 'Single'
+                ? t('shell.search.reportType.single')
+                : t('shell.search.reportType.aggregate'),
             }))}
             viewAllTo={reports.length > PER_CATEGORY ? '/reports' : undefined}
-            viewAllLabel={`View all ${reports.length} reports`}
+            viewAllLabel={t('shell.search.viewAllReports', { count: reports.length })}
           />
 
           <ResultSection
-            title="Submissions"
+            title={t('shell.search.sections.submissions')}
             icon={<DocumentBulletList20Regular />}
             loading={submissionsQ.isLoading}
             items={submissions.slice(0, PER_CATEGORY).map(sub => ({
@@ -243,14 +255,20 @@ export function SearchPage() {
               to: `/submissions/${encodeURIComponent(sub.id)}`,
               icon: <DocumentBulletList20Regular />,
               primary: sub.serviceName || sub.id,
-              secondary: [schemaNames(sub).join(', ') || 'No schemas', formatDateTime(sub.submittedAt)].join(' · '),
+              secondary: (
+                <Trans
+                  i18nKey="shell.search.submissionSummaryRich"
+                  values={{ schemas: schemaNames(sub).join(', ') || t('shell.search.noSchemas') }}
+                  components={{ submittedAt: <LocalizedTime value={sub.submittedAt} /> }}
+                />
+              ),
             }))}
             viewAllTo={submissions.length > PER_CATEGORY ? '/submissions' : undefined}
-            viewAllLabel={`${submissions.length} recent matches`}
+            viewAllLabel={t('shell.search.recentMatches', { count: submissions.length })}
           />
 
           {!anyLoading && totalMatches === 0 && (
-            <div className={s.empty}>No results for “{query}”. Try a different term.</div>
+            <div className={s.empty}>{t('shell.search.noResults', { query })}</div>
           )}
         </>
       )}
@@ -271,6 +289,7 @@ function ResultSection({
   viewAllLabel?: string
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   if (!loading && items.length === 0) return null
   return (
     <section className={s.section} aria-label={title}>
@@ -278,7 +297,7 @@ function ResultSection({
         {icon}
         <Text weight="semibold">{title}</Text>
         {loading
-          ? <Spinner size="tiny" label="Searching…" labelPosition="after" />
+          ? <Spinner size="tiny" label={t('shell.search.searching')} labelPosition="after" />
           : <Badge appearance="tint" color="informative">{items.length}</Badge>}
       </div>
       {!loading && (
@@ -292,7 +311,11 @@ function ResultSection({
               </span>
             </Link>
           ))}
-          {viewAllTo && <Link to={viewAllTo} className={s.viewAll}>{viewAllLabel ?? 'View all'}</Link>}
+          {viewAllTo && (
+            <Link to={viewAllTo} className={s.viewAll}>
+              {viewAllLabel ?? t('shell.search.viewAll')}
+            </Link>
+          )}
         </div>
       )}
     </section>

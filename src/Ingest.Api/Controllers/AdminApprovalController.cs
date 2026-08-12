@@ -32,7 +32,7 @@ public sealed class AdminApprovalController(IApprovalSettingsService settings, I
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
+        if (!Enabled) return NotFound(DiagnosticProblem.FeatureDisabled("approval"));
         var policy = await settings.GetDefaultAsync(ct);
         return Ok(ApprovalPolicyDto.From(policy));
     }
@@ -50,7 +50,7 @@ public sealed class AdminApprovalController(IApprovalSettingsService settings, I
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update([FromBody] ApprovalPolicyDto body, CancellationToken ct)
     {
-        if (!Enabled) return NotFound();
+        if (!Enabled) return NotFound(DiagnosticProblem.FeatureDisabled("approval"));
         var updated = await settings.UpdateDefaultAsync(body.ToEntity(), ct);
         await audit.RecordAsync(AuditTargetType.Settings, AuditChangeType.Edit, AuditTargets.ApprovalPolicy, "Default approval policy", ct);
         return Ok(ApprovalPolicyDto.From(updated));

@@ -14,6 +14,7 @@ import {
 } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { PeriodFilter } from '../components/PeriodFilter'
 import { RowActions } from '../components/RowActions'
 import { usePeriodFilter } from '../utils/usePeriodFilter'
@@ -27,6 +28,7 @@ import { confirmDelete } from '../utils/confirm'
 import { formatDateTime } from '../utils/format'
 import { clickableRowProps } from '../utils/a11y'
 import type { SchemaVersionHistoryEntry } from '../api/types'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -45,15 +47,6 @@ const useStyles = makeStyles({
   mono:       { fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
 })
 
-const EXPORT_COLUMNS: ExportColumn<SchemaVersionHistoryEntry>[] = [
-  { header: 'Change date', value: h => h.changeDate },
-  { header: 'Author', value: h => h.authorName ?? '' },
-  { header: 'Old version', value: h => h.oldVersion ?? '' },
-  { header: 'New version', value: h => h.newVersion },
-  { header: 'Status', value: h => (h.enabled ? 'Published' : 'Draft') },
-  { header: 'Submissions', value: h => h.submissionCount },
-]
-
 /**
  * Admin page listing the saved version snapshots for a single schema (one per save). Mirrors the
  * audit "Changes" tab: a period filter, a three-dots menu (refresh / export / delete-all), and a
@@ -62,6 +55,7 @@ const EXPORT_COLUMNS: ExportColumn<SchemaVersionHistoryEntry>[] = [
  */
 export function SchemaVersionHistoryPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const { name } = useParams<{ name: string }>()
   const { has } = useCapabilities()
@@ -78,10 +72,18 @@ export function SchemaVersionHistoryPage() {
   const deleteAll = useDeleteSchemaVersionHistory()
 
   const items = data?.items ?? []
+  const exportColumns: ExportColumn<SchemaVersionHistoryEntry>[] = [
+    { header: t('schemasSubmissions.schemaVersions.changeDate'), value: h => h.changeDate },
+    { header: t('schemasSubmissions.schemaVersions.author'), value: h => h.authorName ?? '' },
+    { header: t('schemasSubmissions.schemaVersions.oldVersion'), value: h => h.oldVersion ?? '' },
+    { header: t('schemasSubmissions.schemaVersions.newVersion'), value: h => h.newVersion },
+    { header: t('schemasSubmissions.common.status'), value: h => h.enabled ? t('schemasSubmissions.common.published') : t('schemasSubmissions.common.draft') },
+    { header: t('schemasSubmissions.common.submissions'), value: h => h.submissionCount },
+  ]
 
   const csv = useCsvExport({
     filename: `${name}-version-history.csv`,
-    columns: EXPORT_COLUMNS,
+    columns: exportColumns,
     fetchAll: () => fetchAllSchemaVersionHistory(name!, { from: period.from, to: period.to }),
     onError: setPageError,
   })
@@ -95,8 +97,11 @@ export function SchemaVersionHistoryPage() {
   }
 
   async function onDeleteEntry(entry: SchemaVersionHistoryEntry) {
-    if (!confirmDelete('version-history entry', `v${entry.newVersion} from ${formatDateTime(entry.changeDate)}`,
-      'This removes the snapshot from the history only. The current schema is unaffected. This cannot be undone.')) return
+    if (!confirmDelete(
+      t('schemasSubmissions.schemaVersions.entry'),
+      t('schemasSubmissions.schemaVersions.entryLabel', { version: entry.newVersion, date: formatDateTime(entry.changeDate) }),
+      t('schemasSubmissions.schemaVersions.deleteEntryWarning'),
+    )) return
     setPageError(null)
     try {
       await deleteEntry.mutateAsync({ name: name!, entryId: entry.id })
@@ -106,8 +111,11 @@ export function SchemaVersionHistoryPage() {
   }
 
   async function onDeleteAll() {
-    if (!confirmDelete('entire version history', name,
-      'This removes every saved snapshot for this schema. The current schema is unaffected. This cannot be undone.')) return
+    if (!confirmDelete(
+      t('schemasSubmissions.schemaVersions.entireHistory'),
+      name,
+      t('schemasSubmissions.schemaVersions.deleteAllWarning'),
+    )) return
     setPageError(null)
     try {
       await deleteAll.mutateAsync(name!)
@@ -121,18 +129,18 @@ export function SchemaVersionHistoryPage() {
     <div className={s.root}>
       <div className={s.header}>
         <div className={s.headerLeft}>
-          <Button appearance="subtle" icon={<ArrowLeft20Regular />} onClick={() => nav('/schemas')}>Back</Button>
-          <Title2>Version history — {name}</Title2>
+          <Button appearance="subtle" icon={<ArrowLeft20Regular />} onClick={() => nav('/schemas')}>{t('schemasSubmissions.common.back')}</Button>
+          <Title2>{t('schemasSubmissions.schemaVersions.title', { name })}</Title2>
         </div>
         <Menu>
           <MenuTrigger disableButtonEnhancement>
-            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('schemasSubmissions.common.moreActions')} />
           </MenuTrigger>
           <MenuPopover>
             <MenuList>
-              <MenuItem icon={<ArrowClockwise20Regular />} onClick={onRefresh}>Refresh</MenuItem>
+              <MenuItem icon={<ArrowClockwise20Regular />} onClick={onRefresh}>{t('schemasSubmissions.common.refresh')}</MenuItem>
               <MenuItem icon={<ArrowDownload20Regular />} disabled={csv.exporting} onClick={csv.exportList}>
-                {csv.exporting ? 'Exporting…' : 'Export CSV'}
+                {csv.exporting ? t('schemasSubmissions.common.exporting') : t('schemasSubmissions.schemaVersions.exportCsv')}
               </MenuItem>
               {isAdmin && (
                 <>
@@ -143,7 +151,7 @@ export function SchemaVersionHistoryPage() {
                     onClick={onDeleteAll}
                     style={{ color: 'var(--colorPaletteRedForeground1)' }}
                   >
-                    Delete all history
+                    {t('schemasSubmissions.schemaVersions.deleteAll')}
                   </MenuItem>
                 </>
               )}
@@ -159,7 +167,7 @@ export function SchemaVersionHistoryPage() {
       {pageError && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Could not complete the action</MessageBarTitle>
+            <MessageBarTitle>{t('schemasSubmissions.common.actionFailed')}</MessageBarTitle>
             {pageError}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -168,7 +176,7 @@ export function SchemaVersionHistoryPage() {
       {error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Failed to load</MessageBarTitle>
+            <MessageBarTitle>{t('schemasSubmissions.common.loadFailed')}</MessageBarTitle>
             {formatApiError(error)}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -177,28 +185,28 @@ export function SchemaVersionHistoryPage() {
       <Table size="small" className={s.table}>
         <TableHeader>
           <TableRow>
-            <TableHeaderCell className={s.colTime}>Change date</TableHeaderCell>
-            <TableHeaderCell>Author</TableHeaderCell>
-            <TableHeaderCell className={s.colVersion}>Old version</TableHeaderCell>
-            <TableHeaderCell className={s.colVersion}>New version</TableHeaderCell>
-            <TableHeaderCell className={s.colStatus}>Status</TableHeaderCell>
-            <TableHeaderCell className={s.colCount}>Submissions</TableHeaderCell>
-            <TableHeaderCell className={s.colActions} aria-label="Actions" />
+            <TableHeaderCell className={s.colTime}>{t('schemasSubmissions.schemaVersions.changeDate')}</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.schemaVersions.author')}</TableHeaderCell>
+            <TableHeaderCell className={s.colVersion}>{t('schemasSubmissions.schemaVersions.oldVersion')}</TableHeaderCell>
+            <TableHeaderCell className={s.colVersion}>{t('schemasSubmissions.schemaVersions.newVersion')}</TableHeaderCell>
+            <TableHeaderCell className={s.colStatus}>{t('schemasSubmissions.common.status')}</TableHeaderCell>
+            <TableHeaderCell className={s.colCount}>{t('schemasSubmissions.common.submissions')}</TableHeaderCell>
+            <TableHeaderCell className={s.colActions} aria-label={t('schemasSubmissions.common.actions')} />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={7}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={7}>{t('schemasSubmissions.common.loading')}</GridMessageRow>}
           {!isLoading && items.length === 0 && (
-            <GridMessageRow colSpan={7}>No version history recorded.</GridMessageRow>
+            <GridMessageRow colSpan={7}>{t('schemasSubmissions.schemaVersions.empty')}</GridMessageRow>
           )}
           {items.map(entry => (
             <TableRow
               key={entry.id}
               className={s.row}
-              {...clickableRowProps(() => viewEntry(entry), `View version ${entry.newVersion}`)}
+              {...clickableRowProps(() => viewEntry(entry), t('schemasSubmissions.schemaVersions.viewVersion', { version: entry.newVersion }))}
             >
               <TableCell className={s.colTime}>
-                <span className={s.truncate}>{formatDateTime(entry.changeDate)}</span>
+                <LocalizedTime className={s.truncate} value={entry.changeDate} />
               </TableCell>
               <TableCell className={s.cellId}>
                 <span className={s.truncate}>{entry.authorName || '—'}</span>
@@ -206,23 +214,23 @@ export function SchemaVersionHistoryPage() {
               <TableCell className={s.colVersion}>{entry.oldVersion ?? '—'}</TableCell>
               <TableCell className={s.colVersion}>
                 {entry.newVersion}
-                {entry.versionBumped && <> <Badge appearance="tint" color="brand" size="small">bumped</Badge></>}
+                {entry.versionBumped && <> <Badge appearance="tint" color="brand" size="small">{t('schemasSubmissions.schemaVersions.bumped')}</Badge></>}
               </TableCell>
               <TableCell className={s.colStatus}>
                 <Badge appearance="outline" color={entry.enabled ? 'success' : 'subtle'}>
-                  {entry.enabled ? 'Published' : 'Draft'}
+                  {entry.enabled ? t('schemasSubmissions.common.published') : t('schemasSubmissions.common.draft')}
                 </Badge>
               </TableCell>
               <TableCell className={s.colCount}>{entry.submissionCount}</TableCell>
               <TableCell className={s.colActions} onClick={ev => ev.stopPropagation()}>
                 <RowActions
-                  ariaLabel={`Actions for version ${entry.newVersion}`}
+                  ariaLabel={t('schemasSubmissions.schemaVersions.actionsForVersion', { version: entry.newVersion })}
                   actions={[
-                    { key: 'view', label: 'View this version', icon: <Eye20Regular />, onClick: () => viewEntry(entry) },
+                    { key: 'view', label: t('schemasSubmissions.schemaVersions.viewThisVersion'), icon: <Eye20Regular />, onClick: () => viewEntry(entry) },
                     ...(isAdmin
                       ? [{
                           key: 'delete',
-                          label: 'Delete this entry',
+                          label: t('schemasSubmissions.schemaVersions.deleteThisEntry'),
                           icon: <Delete20Regular />,
                           destructive: true,
                           disabled: deleteEntry.isPending,

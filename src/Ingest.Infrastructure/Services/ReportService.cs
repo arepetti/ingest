@@ -69,17 +69,29 @@ public sealed class ReportService : IReportService
     public async Task<Report> UploadAsync(string fileName, string content, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(content))
-            throw new ValidationException(new[] { "Report content is empty." });
+            throw new ValidationException(new[]
+            {
+                new Diagnostic(DiagnosticCodes.Reports.ContentEmpty, "Report content is empty."),
+            });
 
         var meta = ReportMetadataParser.Parse(content);
         var name = !string.IsNullOrWhiteSpace(meta.Name)
             ? meta.Name!
             : NameFromFile(fileName);
         if (string.IsNullOrWhiteSpace(name))
-            throw new ValidationException(new[] { "Report name is required (set 'name:' in the front matter or supply a non-empty file name)." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Reports.NameRequired,
+                    "Report name is required (set 'name:' in the front matter or supply a non-empty file name).",
+                    ("fileName", fileName)),
+            });
 
         if (await _reports.GetByNameAsync(name, includeDeleted: true, ct) is not null)
-            throw new ConflictException($"Report '{name}' already exists.");
+            throw new ConflictException(Diagnostic.Create(
+                DiagnosticCodes.Reports.AlreadyExists,
+                $"Report '{name}' already exists.",
+                ("reportName", name)));
 
         var report = new Report
         {
@@ -117,7 +129,14 @@ public sealed class ReportService : IReportService
         var to = request.To ?? _audit.UtcNow;
         var from = request.From ?? new DateTime(to.Year, to.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         if (from > to)
-            throw new ValidationException(new[] { "'from' must be earlier than or equal to 'to'." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Reports.DateRangeInvalid,
+                    "'from' must be earlier than or equal to 'to'.",
+                    ("from", from),
+                    ("to", to)),
+            });
 
         // Pick the schema this render is scoped to. When the report has exactly one target the
         // viewer doesn't need to pass anything; otherwise SchemaName is required.
@@ -133,7 +152,13 @@ public sealed class ReportService : IReportService
         {
             ReportType.Single => await BuildSingleModelAsync(report, schema, request, from, to, ct),
             ReportType.Aggregate => await BuildAggregateModelAsync(report, schema, from, to, ct),
-            _ => throw new ValidationException(new[] { $"Unsupported report type '{report.Type}'." }),
+            _ => throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Reports.TypeUnsupported,
+                    $"Unsupported report type '{report.Type}'.",
+                    ("reportType", report.Type.ToString())),
+            }),
         };
 
         var html = await _renderer.RenderAsync(report.Template, model, ct);
@@ -159,7 +184,12 @@ public sealed class ReportService : IReportService
             {
                 throw new ValidationException(new[]
                 {
-                    $"Schema '{request.SchemaName}' is not in this report's target list.",
+                    Diagnostic.Create(
+                        DiagnosticCodes.Reports.SchemaNotTarget,
+                        $"Schema '{request.SchemaName}' is not in this report's target list.",
+                        ("reportName", report.Name),
+                        ("schemaName", request.SchemaName),
+                        ("targetSchemaNames", report.TargetSchemaNames)),
                 });
             }
             return request.SchemaName;
@@ -168,7 +198,12 @@ public sealed class ReportService : IReportService
         if (report.TargetSchemaNames.Count == 0) return null;
         throw new ValidationException(new[]
         {
-            $"Report '{report.Name}' targets multiple schemas — pass 'schemaName' to pick one.",
+            Diagnostic.Create(
+                DiagnosticCodes.Reports.SchemaRequiredForMultipleTargets,
+                $"Report '{report.Name}' targets multiple schemas — pass 'schemaName' to pick one.",
+                ("reportName", report.Name),
+                ("targetSchemaNames", report.TargetSchemaNames),
+                ("parameter", "schemaName")),
         });
     }
 
@@ -176,7 +211,14 @@ public sealed class ReportService : IReportService
         Report report, Schema? schema, ReportRenderRequest request, DateTime from, DateTime to, CancellationToken ct)
     {
         if (!request.SubmissionId.HasValue)
-            throw new ValidationException(new[] { "Single-type reports require a 'submissionId'." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Reports.SubmissionIdRequired,
+                    "Single-type reports require a 'submissionId'.",
+                    ("reportName", report.Name),
+                    ("parameter", "submissionId")),
+            });
 
         var submission = await _submissions.GetByIdAsync(request.SubmissionId.Value, ct: ct)
             ?? throw new NotFoundException($"Submission '{request.SubmissionId.Value}'");
@@ -188,7 +230,11 @@ public sealed class ReportService : IReportService
         {
             throw new ValidationException(new[]
             {
-                $"Submission '{submission.Id}' has no samples for schema '{schema.Name}'.",
+                Diagnostic.Create(
+                    DiagnosticCodes.Reports.SubmissionSchemaMissing,
+                    $"Submission '{submission.Id}' has no samples for schema '{schema.Name}'.",
+                    ("submissionId", submission.Id),
+                    ("schemaName", schema.Name)),
             });
         }
 
@@ -246,7 +292,14 @@ public sealed class ReportService : IReportService
         Report report, Schema? schema, DateTime from, DateTime to, CancellationToken ct)
     {
         if (schema is null)
-            throw new ValidationException(new[] { "Aggregate-type reports require a 'schemaName'." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Reports.AggregateSchemaRequired,
+                    "Aggregate-type reports require a 'schemaName'.",
+                    ("reportName", report.Name),
+                    ("parameter", "schemaName")),
+            });
 
         var allSamples = await _samples.GetAllForSchemaAsync(schema.Name, ct);
         // Trim to the requested window using the sample timestamp (sample → service report) so

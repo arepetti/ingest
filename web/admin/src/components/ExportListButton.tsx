@@ -1,6 +1,7 @@
 import { Button } from '@fluentui/react-components'
 import { ArrowDownload20Regular } from '@fluentui/react-icons'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
+import { useTranslation } from 'react-i18next'
 
 /** Standalone "Export CSV" button, built on {@link useCsvExport}. */
 export function ExportListButton<T>({
@@ -8,7 +9,7 @@ export function ExportListButton<T>({
   columns,
   fetchAll,
   onError,
-  label = 'Export CSV',
+  label,
   appearance,
   disabled,
 }: {
@@ -20,6 +21,7 @@ export function ExportListButton<T>({
   appearance?: 'primary' | 'secondary' | 'outline' | 'subtle' | 'transparent'
   disabled?: boolean
 }) {
+  const { t } = useTranslation()
   const { exportList, exporting } = useCsvExport({ filename, columns, fetchAll, onError })
 
   return (
@@ -29,7 +31,7 @@ export function ExportListButton<T>({
       disabled={disabled || exporting}
       onClick={exportList}
     >
-      {exporting ? 'Exporting…' : label}
+      {exporting ? t('shell.export.exporting') : (label ?? t('shell.export.csv'))}
     </Button>
   )
 }

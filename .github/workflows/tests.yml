@@ -22,13 +22,33 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      # Test only the two test projects (and their dependencies). This deliberately avoids building
-      # Ingest.AppHost and the SPA: the admin SPA is only built on `dotnet publish` of Ingest.Api,
-      # so no Node toolchain is required here.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/admin/package-lock.json
+
       - name: Restore
         run: |
           dotnet restore tests/Ingest.Tests/Ingest.Tests.csproj
           dotnet restore tests/Ingest.IntegrationTests/Ingest.IntegrationTests.csproj
+
+      - name: Install frontend dependencies
+        working-directory: web/admin
+        run: npm ci
+
+      - name: Frontend tests
+        working-directory: web/admin
+        run: npm test
+
+      - name: Frontend lint
+        working-directory: web/admin
+        run: npm run lint
+
+      - name: Frontend build
+        working-directory: web/admin
+        run: npm run build
 
       - name: Unit tests
         run: dotnet test tests/Ingest.Tests/Ingest.Tests.csproj -c Release --no-restore --logger "trx;LogFileName=unit.trx" --results-directory TestResults

@@ -142,7 +142,10 @@ Whether a given submission needs approval is **schema data stored in the databas
 |------------------------------------|-------------------------------|-------|
 | `Ingest:EnableSwagger`             | `true`                        | Set `false` in production. Swagger is mostly useful while integrating; in production the OpenAPI document is normally generated offline and shipped with clients. |
 | `Ingest:DefaultStatusPeriod`       | `week`                        | Used by `GET /api/me/status` and `GET /api/services/{name}/status` when no `period` query parameter is passed. One of `day`, `week`, `month`, `year`. |
+| `Ingest:DefaultLocale`             | `en-US`                       | Default admin-console language when this browser has no valid saved preference. The environment-variable form is `Ingest__DefaultLocale`. Supported values are `en-US`, `en-GB`, `it-IT`, `zh-CN`, `zh-TW`, and `ja-JP`; an unsupported value ultimately falls back to `en-US`. |
 | `Ingest:CorsDevOrigins`            | `["http://localhost:5173"]`   | Honoured only in the `Development` environment so the Vite dev server can call the API. Safe to leave empty (or absent) in production — the SPA is served from the same origin as the API. |
+
+Before authentication, the SPA reads the configured locale from anonymous `GET /api/bootstrap`, whose response is limited to `{ "defaultLocale": "…" }`. The effective locale is resolved in this order: a supported browser-local `localStorage` value under `ingest.locale`, then the supported configured default, then `en-US`. This is a display preference only; it does not select a server-side culture or change API content.
 
 ## Hosting & observability
 

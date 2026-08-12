@@ -1,4 +1,5 @@
 using Ingest.Api.Models;
+using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.IntegrationTests.Fixtures;
 
@@ -113,6 +114,8 @@ public sealed class ConfigurationAndKillSwitchTests : IntegrationTestBase
             Assert.Equal(System.Net.HttpStatusCode.ServiceUnavailable, createResponse.StatusCode);
             var createProblem = await createResponse.ReadJsonBodyAsync();
             Assert.Contains("Frozen for maintenance", createProblem.GetProperty("detail").GetString());
+            Assert.Equal(DiagnosticCodes.Submissions.IngestionClosed, createProblem.GetProperty("code").GetString());
+            Assert.True(createProblem.GetProperty("params").GetProperty("configuredMessage").GetBoolean());
 
             // Service-facing replace of the pre-existing submission is rejected the same way.
             var replaceResponse = await service.PutJsonAsync($"/api/submissions/{submissionId}", createBody);

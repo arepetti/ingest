@@ -6,13 +6,15 @@
  * cadence period of that other point?" so a sliding-window calendar-aware add is enough.
  */
 import type { Cadence } from '../api/types'
+import type { TFunction } from 'i18next'
+import i18n from '../i18n'
 
 /**
  * Friendly display label for a cadence value. The wire-format names match the C# enum members
  * verbatim, so the only one that benefits from prettification is `SemiAnnually` (rendered as
  * "Semi-annually" to read like natural English). Everything else is already the right adjective.
  */
-const CADENCE_LABELS: Record<Cadence, string> = {
+const CADENCE_FALLBACKS: Record<Cadence, string> = {
   Daily: 'Daily',
   Weekly: 'Weekly',
   Fortnightly: 'Fortnightly',
@@ -22,8 +24,9 @@ const CADENCE_LABELS: Record<Cadence, string> = {
   Yearly: 'Yearly',
 }
 
-export function cadenceLabel(c: Cadence): string {
-  return CADENCE_LABELS[c] ?? String(c)
+export function cadenceLabel(c: Cadence, t?: TFunction): string {
+  return (t ?? (i18n.isInitialized ? i18n.t : undefined))?.(`shell.cadence.${c}`)
+    ?? CADENCE_FALLBACKS[c]
 }
 
 /**

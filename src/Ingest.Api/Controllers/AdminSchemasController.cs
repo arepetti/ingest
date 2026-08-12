@@ -50,7 +50,7 @@ public sealed class AdminSchemasController(ISchemaService service, IPdfExportSer
     public async Task<IActionResult> GetById(Guid id, [FromQuery] bool? includeDeleted, CancellationToken ct)
     {
         var s = await service.GetByIdAsync(id, includeDeleted ?? false, ct);
-        return s is null ? NotFound() : Ok(SchemaDto.From(s));
+        return s is null ? NotFound(DiagnosticProblem.NotFound("Schema", id)) : Ok(SchemaDto.From(s));
     }
 
     /// <summary>Create a new schema.</summary>
@@ -95,7 +95,7 @@ public sealed class AdminSchemasController(ISchemaService service, IPdfExportSer
     public async Task<IActionResult> Update(Guid id, [FromBody] UpsertSchemaRequest req, CancellationToken ct)
     {
         var updated = await service.UpdateAsync(id, BuildSchema(new Schema { Name = req.Name }, req), ct);
-        return updated is null ? NotFound() : Ok(SchemaDto.From(updated));
+        return updated is null ? NotFound(DiagnosticProblem.NotFound("Schema", id)) : Ok(SchemaDto.From(updated));
     }
 
     /// <summary>Soft-delete a schema.</summary>
@@ -135,7 +135,9 @@ public sealed class AdminSchemasController(ISchemaService service, IPdfExportSer
     public async Task<IActionResult> Clone(Guid id, CancellationToken ct)
     {
         var clone = await service.CloneAsync(id, ct);
-        return clone is null ? NotFound() : Created($"/api/admin/schemas/{clone.Id}", SchemaDto.From(clone));
+        return clone is null
+            ? NotFound(DiagnosticProblem.NotFound("Schema", id))
+            : Created($"/api/admin/schemas/{clone.Id}", SchemaDto.From(clone));
     }
 
     /// <summary>Returns an aggregated history of every submission for a schema, grouped by cadence.</summary>
@@ -154,7 +156,9 @@ public sealed class AdminSchemasController(ISchemaService service, IPdfExportSer
     public async Task<IActionResult> GetHistory(string name, CancellationToken ct)
     {
         var history = await service.GetHistoryAsync(name, ct);
-        return history is null ? NotFound() : Ok(SchemaHistoryMapper.ToDto(history));
+        return history is null
+            ? NotFound(DiagnosticProblem.NotFound("Schema", name))
+            : Ok(SchemaHistoryMapper.ToDto(history));
     }
 
     /// <summary>Export a schema's full field specification as a PDF.</summary>
@@ -174,7 +178,9 @@ public sealed class AdminSchemasController(ISchemaService service, IPdfExportSer
     public async Task<IActionResult> ExportPdf(string name, CancellationToken ct)
     {
         var doc = await pdfExport.ExportSchemaAsync(name, ct);
-        return doc is null ? NotFound() : File(doc.Content, "application/pdf", doc.FileName);
+        return doc is null
+            ? NotFound(DiagnosticProblem.NotFound("Schema", name))
+            : File(doc.Content, "application/pdf", doc.FileName);
     }
 
     /// <summary>Page through a schema's saved version snapshots, newest change first.</summary>
@@ -219,7 +225,7 @@ public sealed class AdminSchemasController(ISchemaService service, IPdfExportSer
     {
         var entry = await service.GetVersionSnapshotAsync(entryId, ct);
         if (entry is null || !string.Equals(entry.SchemaName, name, StringComparison.Ordinal))
-            return NotFound();
+            return NotFound(DiagnosticProblem.NotFound("Schema version", entryId));
         return Ok(SchemaVersionSnapshotDto.From(entry));
     }
 
@@ -240,7 +246,7 @@ public sealed class AdminSchemasController(ISchemaService service, IPdfExportSer
     public async Task<IActionResult> DeleteVersionEntry(string name, Guid entryId, CancellationToken ct)
     {
         var ok = await service.DeleteVersionEntryAsync(name, entryId, ct);
-        return ok ? NoContent() : NotFound();
+        return ok ? NoContent() : NotFound(DiagnosticProblem.NotFound("Schema version", entryId));
     }
 
     /// <summary>Permanently delete the entire version history for a schema.</summary>

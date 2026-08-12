@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Link } from 'react-router-dom'
 import {
   Badge, Card, CardHeader, Dropdown, Field, MessageBar, MessageBarBody, Option,
@@ -14,15 +16,7 @@ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { formatApiError } from '../api/client'
 import { useMissingHistory, useMissingPeriod } from '../api/hooks'
 import type { Cadence, MissingHistoryPoint, MissingSubmissionEntry } from '../api/types'
-import { cadenceLabel } from '../utils/cadence'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
-
-const MISSING_EXPORT_COLUMNS: ExportColumn<MissingSubmissionEntry>[] = [
-  { header: 'Service', value: e => e.serviceLabel || e.serviceName },
-  { header: 'Schema', value: e => e.schemaLabel || e.schemaName },
-  { header: 'Missing', value: e => e.missingRequiredCount },
-  { header: 'Total required', value: e => e.totalRequiredCount },
-]
 
 // All cadences in their natural (enum) order so the picker reads daily → yearly.
 const CADENCES: Cadence[] = ['Daily', 'Weekly', 'Fortnightly', 'Monthly', 'Quarterly', 'SemiAnnually', 'Yearly']
@@ -46,6 +40,7 @@ const useStyles = makeStyles({
 
 export function MissingSubmissionsPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const [cadence, setCadence] = useState<Cadence>('Monthly')
   // Default to the previous (closed, overdue) window — that's the actionable one.
   const [offset, setOffset] = useState(-1)
@@ -75,14 +70,20 @@ export function MissingSubmissionsPage() {
 
   const periodOptions = history.data?.points ?? []
   const selectedPoint = periodOptions.find((p) => p.offset === offset)
-  const periodText = selectedPoint ? periodOptionLabel(selectedPoint, cadence) : ''
+  const periodText = selectedPoint ? periodOptionLabel(selectedPoint, cadence, t) : ''
   const totalMissing = period.data?.entries.reduce((acc, e) => acc + e.missingRequiredCount, 0) ?? 0
 
   const [exportError, setExportError] = useState<string | null>(null)
   const entries = period.data?.entries ?? []
+  const exportColumns = useMemo<ExportColumn<MissingSubmissionEntry>[]>(() => [
+    { header: t('analytics.common.service'), value: e => e.serviceLabel || e.serviceName },
+    { header: t('analytics.common.schema'), value: e => e.schemaLabel || e.schemaName },
+    { header: t('analytics.missing.columns.missing'), value: e => e.missingRequiredCount },
+    { header: t('analytics.missing.columns.totalRequired'), value: e => e.totalRequiredCount },
+  ], [t])
   const missingExport = useCsvExport({
     filename: `missing-submissions-${cadence}.csv`,
-    columns: MISSING_EXPORT_COLUMNS,
+    columns: exportColumns,
     fetchAll: () => Promise.resolve(entries),
     onError: setExportError,
   })
@@ -90,21 +91,21 @@ export function MissingSubmissionsPage() {
   return (
     <div className={s.root}>
       <div className={s.header}>
-        <Title2>Missing submissions by period</Title2>
+        <Title2>{t('analytics.missing.title')}</Title2>
         <Menu>
           <MenuTrigger disableButtonEnhancement>
-            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+            <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('analytics.common.moreActions')} />
           </MenuTrigger>
           <MenuPopover>
             <MenuList>
-              <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => { history.refetch(); period.refetch() }}>Refresh</MenuItem>
+              <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => { history.refetch(); period.refetch() }}>{t('analytics.common.refresh')}</MenuItem>
               <MenuDivider />
               <MenuItem
                 icon={<ArrowDownload20Regular />}
                 disabled={missingExport.exporting || entries.length === 0}
                 onClick={missingExport.exportList}
               >
-                {missingExport.exporting ? 'Exporting…' : 'Export this view'}
+                {missingExport.exporting ? t('analytics.common.exporting') : t('analytics.common.exportView')}
               </MenuItem>
             </MenuList>
           </MenuPopover>
@@ -124,18 +125,18 @@ export function MissingSubmissionsPage() {
       )}
 
       <div className={s.filters}>
-        <Field label="Cadence">
+        <Field label={t('analytics.common.cadence')}>
           <Dropdown
             selectedOptions={[cadence]}
-            value={cadenceLabel(cadence)}
+            value={t(`analytics.cadence.${cadence.toLowerCase()}`)}
             onOptionSelect={(_, d) => setCadence((d.optionValue as Cadence) ?? 'Monthly')}
           >
             {CADENCES.map((c) => (
-              <Option key={c} value={c}>{cadenceLabel(c)}</Option>
+              <Option key={c} value={c}>{t(`analytics.cadence.${c.toLowerCase()}`)}</Option>
             ))}
           </Dropdown>
         </Field>
-        <Field label="Period">
+        <Field label={t('analytics.common.period')}>
           <Dropdown
             selectedOptions={[String(offset)]}
             value={periodText}
@@ -143,8 +144,8 @@ export function MissingSubmissionsPage() {
           >
             {/* Newest first so "current" / "previous" sit at the top of the list. */}
             {[...periodOptions].reverse().map((p) => (
-              <Option key={p.offset} value={String(p.offset)} text={periodOptionLabel(p, cadence)}>
-                {periodOptionLabel(p, cadence)}
+              <Option key={p.offset} value={String(p.offset)} text={periodOptionLabel(p, cadence, t)}>
+                {periodOptionLabel(p, cadence, t)}
               </Option>
             ))}
           </Dropdown>
@@ -155,13 +156,15 @@ export function MissingSubmissionsPage() {
         <Card className={s.card}>
           <CardHeader
             className={s.cardHeader}
-            header={<Text weight="semibold">Missing over time</Text>}
-            description={<span className={s.cardSub}>Total missing required values per {cadenceLabel(cadence).toLowerCase()} period · click a bar to inspect it</span>}
+            header={<Text weight="semibold">{t('analytics.missing.trend.title')}</Text>}
+            description={<span className={s.cardSub}>{t('analytics.missing.trend.description', {
+              cadence: t(`analytics.cadence.${cadence.toLowerCase()}`).toLowerCase(),
+            })}</span>}
           />
           {history.isLoading ? (
-            <div className={s.empty}>Loading…</div>
+            <div className={s.empty}>{t('analytics.common.loading')}</div>
           ) : trend.length === 0 ? (
-            <div className={s.empty}>No data.</div>
+            <div className={s.empty}>{t('analytics.common.noData')}</div>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={trend} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
@@ -170,7 +173,7 @@ export function MissingSubmissionsPage() {
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip
                   cursor={{ fill: tokens.colorNeutralBackground1Hover }}
-                  formatter={(v) => [v, 'missing']}
+                  formatter={(v) => [v, t('analytics.missing.chart.missing')]}
                 />
                 <Bar
                   dataKey="missing"
@@ -199,20 +202,22 @@ export function MissingSubmissionsPage() {
         <Card className={s.card}>
           <CardHeader
             className={s.cardHeader}
-            header={<Text weight="semibold">By service — {periodText || cadenceLabel(cadence)}</Text>}
-            description={<span className={s.cardSub}>Missing required values per service in the selected period</span>}
+            header={<Text weight="semibold">{t('analytics.missing.byService.title', {
+              period: periodText || t(`analytics.cadence.${cadence.toLowerCase()}`),
+            })}</Text>}
+            description={<span className={s.cardSub}>{t('analytics.missing.byService.description')}</span>}
           />
           {period.isLoading ? (
-            <div className={s.empty}>Loading…</div>
+            <div className={s.empty}>{t('analytics.common.loading')}</div>
           ) : byService.length === 0 ? (
-            <div className={s.empty}>Nothing missing in this period. 🎉</div>
+            <div className={s.empty}>{t('analytics.missing.byService.empty')}</div>
           ) : (
             <ResponsiveContainer width="100%" height={Math.max(180, byService.length * 34 + 40)}>
               <BarChart data={byService} layout="vertical" margin={{ top: 8, right: 24, bottom: 8, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={tokens.colorNeutralStroke2} horizontal={false} />
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
-                <Tooltip cursor={{ fill: tokens.colorNeutralBackground1Hover }} formatter={(v) => [v, 'missing']} />
+                <Tooltip cursor={{ fill: tokens.colorNeutralBackground1Hover }} formatter={(v) => [v, t('analytics.missing.chart.missing')]} />
                 <Bar dataKey="missing" fill={tokens.colorStatusDangerForeground1} radius={[0, 3, 3, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -226,7 +231,11 @@ export function MissingSubmissionsPage() {
           header={
             <div className={s.totals}>
               <span className={s.bigNumber}>{totalMissing}</span>
-              <Text className={s.cardSub}>missing required value(s) across {byService.length} service(s) in {periodText || 'the selected period'}</Text>
+              <Text className={s.cardSub}>{t('analytics.missing.summary', {
+                missing: totalMissing,
+                services: byService.length,
+                period: periodText || t('analytics.missing.selectedPeriod'),
+              })}</Text>
             </div>
           }
         />
@@ -245,16 +254,17 @@ function PeriodDetailTable({
   entries: MissingSubmissionEntry[]
   styles: ReturnType<typeof useStyles>
 }) {
-  if (loading) return <div className={styles.empty}>Loading…</div>
-  if (entries.length === 0) return <MessageBar intent="success"><MessageBarBody>All required submissions are in for this period.</MessageBarBody></MessageBar>
+  const { t } = useTranslation()
+  if (loading) return <div className={styles.empty}>{t('analytics.common.loading')}</div>
+  if (entries.length === 0) return <MessageBar intent="success"><MessageBarBody>{t('analytics.missing.detail.complete')}</MessageBarBody></MessageBar>
 
   return (
     <Table size="small">
       <TableHeader>
         <TableRow>
-          <TableHeaderCell>Service</TableHeaderCell>
-          <TableHeaderCell>Schema</TableHeaderCell>
-          <TableHeaderCell>Missing</TableHeaderCell>
+          <TableHeaderCell>{t('analytics.common.service')}</TableHeaderCell>
+          <TableHeaderCell>{t('analytics.common.schema')}</TableHeaderCell>
+          <TableHeaderCell>{t('analytics.missing.columns.missing')}</TableHeaderCell>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -307,10 +317,10 @@ function periodLabel(periodStart: string, cadence: Cadence): string {
 }
 
 /** Longer dropdown label that adds a "current"/"previous" hint on the two most recent windows. */
-function periodOptionLabel(point: MissingHistoryPoint, cadence: Cadence): string {
+function periodOptionLabel(point: MissingHistoryPoint, cadence: Cadence, t: TFunction): string {
   const base = periodLabel(point.periodStart, cadence)
-  if (point.offset === 0) return `${base} (current)`
-  if (point.offset === -1) return `${base} (previous)`
+  if (point.offset === 0) return `${base} (${t('analytics.explore.filters.current')})`
+  if (point.offset === -1) return `${base} (${t('analytics.explore.trend.previous')})`
   return base
 }
 

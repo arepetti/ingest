@@ -1,6 +1,7 @@
 import { Dropdown, Input, Option, makeStyles, tokens } from '@fluentui/react-components'
-import { INTERVAL_LABELS, type Interval } from '../utils/period'
+import { intervalLabel, type Interval } from '../utils/period'
 import type { PeriodFilterState } from '../utils/usePeriodFilter'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   field: { display: 'flex', flexDirection: 'column', gap: '4px' },
@@ -15,29 +16,31 @@ const useStyles = makeStyles({
  */
 export function PeriodFilter({ state, onChange }: { state: PeriodFilterState; onChange?: () => void }) {
   const s = useStyles()
+  const { t } = useTranslation()
+  const intervals: Interval[] = ['all', 'lastDay', 'lastWeek', 'lastMonth', 'custom']
 
   return (
     <>
       <div className={s.field}>
-        <span className={s.label}>Period</span>
+        <span className={s.label}>{t('shell.period.label')}</span>
         <Dropdown
           className={s.dropdown}
           selectedOptions={[state.interval]}
-          value={INTERVAL_LABELS[state.interval]}
+          value={intervalLabel(state.interval, t)}
           onOptionSelect={(_, d) => {
             state.setInterval((d.optionValue as Interval) ?? 'all')
             onChange?.()
           }}
         >
-          {(Object.keys(INTERVAL_LABELS) as Interval[]).map(k => (
-            <Option key={k} value={k}>{INTERVAL_LABELS[k]}</Option>
+          {intervals.map(k => (
+            <Option key={k} value={k}>{intervalLabel(k, t)}</Option>
           ))}
         </Dropdown>
       </div>
       {state.interval === 'custom' && (
         <>
           <div className={s.field}>
-            <span className={s.label}>From</span>
+            <span className={s.label}>{t('shell.period.from')}</span>
             <Input
               type="datetime-local"
               value={state.customFrom}
@@ -45,7 +48,7 @@ export function PeriodFilter({ state, onChange }: { state: PeriodFilterState; on
             />
           </div>
           <div className={s.field}>
-            <span className={s.label}>To</span>
+            <span className={s.label}>{t('shell.period.to')}</span>
             <Input
               type="datetime-local"
               value={state.customTo}

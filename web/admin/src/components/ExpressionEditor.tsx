@@ -22,9 +22,11 @@ import {
 } from '@codemirror/autocomplete'
 import { linter, type Diagnostic } from '@codemirror/lint'
 import { tags as t } from '@lezer/highlight'
-import { EXPRESSION_FUNCTIONS, EXPRESSION_FUNCTION_NAMES } from '../utils/expressionFunctions'
+import { EXPRESSION_FUNCTION_NAMES, getExpressionFunctions } from '../utils/expressionFunctions'
 import { validateExpression } from '../utils/expression'
 import { findUnknownIdentifiers } from '../utils/expressionLint'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 export interface ExpressionEditorProps {
   value: string
@@ -102,33 +104,30 @@ const highlightStyle = HighlightStyle.define([
 // Language keywords/literals offered alongside functions and variables. The `type` drives the
 // little icon CodeMirror renders to the left of each suggestion (keyword / function / variable),
 // so the three kinds are visually distinguishable in the popup.
-const KEYWORD_COMPLETIONS: Completion[] = [
-  { label: 'true', type: 'keyword', detail: 'boolean literal' },
-  { label: 'false', type: 'keyword', detail: 'boolean literal' },
-  { label: 'null', type: 'keyword', detail: 'null literal' },
-  { label: 'and', type: 'keyword', detail: 'logical and' },
-  { label: 'or', type: 'keyword', detail: 'logical or' },
-  { label: 'not', type: 'keyword', detail: 'logical not' },
-  { label: 'in', type: 'keyword', detail: 'membership test' },
-  { label: 'like', type: 'keyword', detail: 'SQL-style pattern match' },
-]
-
-function buildCompletionSource(getIdentifiers: () => string[]) {
-  const fnOptions: Completion[] = EXPRESSION_FUNCTIONS.map(f => ({
-    label: f.name,
-    type: 'function',
-    detail: f.signature,
-    info: f.description,
-    // Insert the opening paren so the caret lands inside the call.
-    apply: f.name + '(',
+function getKeywordCompletions(t: TFunction): Completion[] {
+  return ['true', 'false', 'null', 'and', 'or', 'not', 'in', 'like'].map(label => ({
+    label,
+    type: 'keyword',
+    detail: t(`shell.expression.keywords.${label}`),
   }))
+}
+
+function buildCompletionSource(getIdentifiers: () => string[], t: TFunction) {
   return (ctx: CompletionContext): CompletionResult | null => {
     const word = ctx.matchBefore(/[A-Za-z_]\w*/)
     if (!word || (word.from === word.to && !ctx.explicit)) return null
     const identifierOptions: Completion[] = getIdentifiers().map(name => ({ label: name, type: 'variable' }))
+    const fnOptions: Completion[] = getExpressionFunctions(t).map(f => ({
+      label: f.name,
+      type: 'function',
+      detail: f.signature,
+      info: f.description,
+      // Insert the opening paren so the caret lands inside the call.
+      apply: f.name + '(',
+    }))
     return {
       from: word.from,
-      options: [...identifierOptions, ...fnOptions, ...KEYWORD_COMPLETIONS],
+      options: [...identifierOptions, ...fnOptions, ...getKeywordCompletions(t)],
       validFor: /^[A-Za-z_]\w*$/,
     }
   }
@@ -138,11 +137,11 @@ function buildCompletionSource(getIdentifiers: () => string[]) {
 // hover message. First the server syntax check; if that passes, a client-side pass flags unknown
 // variables/functions against the field's identifiers. Shares `validateExpression`'s cache with the
 // inline status indicator, so the two never cost more than one network round-trip per change.
-function buildLinter(getIdentifiers: () => string[]) {
+function buildLinter(getIdentifiers: () => string[], t: TFunction) {
   return linter(async (view): Promise<Diagnostic[]> => {
     const text = view.state.doc.toString()
     if (!text.trim()) return []
-    const res = await validateExpression(text)
+    const res = await validateExpression(text, t)
     if (!res.ok) {
       const len = text.length
       let from = typeof res.position === 'number' ? res.position : 0
@@ -153,7 +152,7 @@ function buildLinter(getIdentifiers: () => string[]) {
       return [{ from, to, severity: 'error', message: res.error }]
     }
     const knownVars = new Set(getIdentifiers().map(name => name.toLowerCase()))
-    return findUnknownIdentifiers(text, knownVars)
+    return findUnknownIdentifiers(text, knownVars, t)
       .map(p => ({ from: p.from, to: p.to, severity: 'error' as const, message: p.message }))
   }, { delay: 350 })
 }
@@ -214,6 +213,7 @@ function editorTheme(rows: number) {
 
 export default function ExpressionEditor({ value, onChange, identifiers, rows = 3, disabled, lint, ariaLabel, placeholder }: ExpressionEditorProps) {
   const s = useStyles()
+  const { t, i18n } = useTranslation()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   // Keep the latest callbacks/data in refs so the view is built once and never torn down on
@@ -234,7 +234,7 @@ export default function ExpressionEditor({ value, onChange, identifiers, rows = 
       EditorView.lineWrapping,
       editorTheme(rows),
       EditorView.contentAttributes.of({
-        'aria-label': ariaLabel ?? 'Expression editor',
+        'aria-label': ariaLabel ?? t('shell.expression.editorAriaLabel'),
         role: 'textbox',
         'aria-multiline': 'true',
         'aria-readonly': disabled ? 'true' : 'false',
@@ -248,8 +248,8 @@ export default function ExpressionEditor({ value, onChange, identifiers, rows = 
         history(),
         closeBrackets(),
         keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap]),
-        autocompletion({ override: [buildCompletionSource(() => identifiersRef.current)] }),
-        ...(lint ? [buildLinter(() => identifiersRef.current)] : []),
+        autocompletion({ override: [buildCompletionSource(() => identifiersRef.current, t)] }),
+        ...(lint ? [buildLinter(() => identifiersRef.current, t)] : []),
         EditorView.updateListener.of(u => {
           if (u.docChanged) onChangeRef.current(u.state.doc.toString())
         }),
@@ -262,9 +262,9 @@ export default function ExpressionEditor({ value, onChange, identifiers, rows = 
     })
     viewRef.current = view
     return () => { view.destroy(); viewRef.current = null }
-    // Built once on mount; live data flows through refs and the value-sync effect below.
+    // Rebuild only when the language changes; live data otherwise flows through refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [i18n.language])
 
   // Push external value changes (e.g. switching the edited value in the drawer) into the doc,
   // but only when they actually differ — otherwise we'd fight the user's own typing.

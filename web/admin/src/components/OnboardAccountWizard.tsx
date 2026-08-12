@@ -8,6 +8,7 @@ import { Wizard, WizardResultHeader, type WizardStep } from './Wizard'
 import { useAccounts, useCreateAccount, useRotateApiKey } from '../api/hooks'
 import { formatApiError } from '../api/client'
 import type { Account, AccountKind, AccountRole, CreateAccountRequest, GeneratedApiKey } from '../api/types'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   form: { display: 'flex', flexDirection: 'column', gap: '12px' },
@@ -21,11 +22,6 @@ const useStyles = makeStyles({
   keyRow: { display: 'flex', alignItems: 'flex-start', gap: '8px' },
   summary: { display: 'flex', flexDirection: 'column', gap: '4px' },
 })
-
-const KIND_HINTS: Record<AccountKind, string> = {
-  Application: 'API-only credential (cannot log in to the UI).',
-  User: 'Interactive account (can log in to the UI and call APIs).',
-}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -72,6 +68,7 @@ export function OnboardAccountWizard({
   defaultGenerateKey?: boolean
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const create = useCreateAccount()
   const rotate = useRotateApiKey()
   // Per-service scope only applies to back-office roles (Admins are always unrestricted; Service
@@ -147,40 +144,40 @@ export function OnboardAccountWizard({
   const steps = useMemo<WizardStep[]>(() => [
     {
       id: 'details',
-      title: 'Account details',
-      description: `Create the new ${role.toLowerCase()} account.`,
+      title: t('accounts.onboarding.details.title'),
+      description: t('accounts.onboarding.details.description', { role: t(`accounts.roles.${role}`) }),
       canProceed: detailsValid,
       content: (
         <div className={s.form}>
           <div className={s.roleRow}>
-            <span className={s.hint}>Role</span>
-            <Badge appearance="tint" color="brand">{role}</Badge>
+            <span className={s.hint}>{t('accounts.fields.role')}</span>
+            <Badge appearance="tint" color="brand">{t(`accounts.roles.${role}`)}</Badge>
           </div>
           <div className={s.twoCol}>
-            <Field label="Name" required hint="Stable machine-style identifier, globally unique.">
-              <Input value={name} onChange={(_, d) => setName(d.value)} placeholder="e.g. acme_logistics" />
+            <Field label={t('accounts.fields.name')} required hint={t('accounts.onboarding.details.nameHint')}>
+              <Input value={name} onChange={(_, d) => setName(d.value)} placeholder={t('accounts.onboarding.details.namePlaceholder')} />
             </Field>
-            <Field label="Label">
-              <Input value={label} onChange={(_, d) => setLabel(d.value)} placeholder="Friendly display name" />
+            <Field label={t('accounts.fields.label')}>
+              <Input value={label} onChange={(_, d) => setLabel(d.value)} placeholder={t('accounts.onboarding.details.labelPlaceholder')} />
             </Field>
           </div>
           <Field
-            label="Email"
+            label={t('accounts.fields.email')}
             required
             validationState={trimmedEmail === '' || EMAIL_RE.test(trimmedEmail) ? 'none' : 'error'}
-            validationMessage={trimmedEmail === '' || EMAIL_RE.test(trimmedEmail) ? undefined : 'Enter a valid email address.'}
+            validationMessage={trimmedEmail === '' || EMAIL_RE.test(trimmedEmail) ? undefined : t('accounts.validation.emailInvalid')}
           >
-            <Input type="email" value={email} onChange={(_, d) => setEmail(d.value)} placeholder="contact@example.com" />
+            <Input type="email" value={email} onChange={(_, d) => setEmail(d.value)} placeholder={t('accounts.onboarding.details.emailPlaceholder')} />
           </Field>
-          <Field label="Kind" hint={KIND_HINTS[kind]}>
+          <Field label={t('accounts.fields.kind')} hint={t(`accounts.onboarding.kindHints.${kind}`)}>
             <Dropdown
               disabled={lockKind}
-              value={kind}
+              value={t(`accounts.kinds.${kind}`)}
               selectedOptions={[kind]}
               onOptionSelect={(_, d) => setKind((d.optionValue as AccountKind) ?? kind)}
             >
-              <Option value="Application">Application</Option>
-              <Option value="User">User</Option>
+              <Option value="Application">{t('accounts.kinds.Application')}</Option>
+              <Option value="User">{t('accounts.kinds.User')}</Option>
             </Dropdown>
           </Field>
         </div>
@@ -188,21 +185,21 @@ export function OnboardAccountWizard({
     },
     ...(scopeApplies ? [{
       id: 'scope',
-      title: 'Service scope',
-      description: `Choose which services this ${role.toLowerCase()} can see. Leave empty for unrestricted access to every service.`,
+      title: t('accounts.scope.title'),
+      description: t('accounts.onboarding.scope.description', { role: t(`accounts.roles.${role}`) }),
       content: (
         <div className={s.form}>
           <Field
-            label="Visible services"
-            hint="Leave empty for unrestricted access to every service; pick one or more to confine this account to just those."
+            label={t('accounts.onboarding.scope.visibleServices')}
+            hint={t('accounts.onboarding.scope.hint')}
           >
             <Dropdown
               multiselect
-              placeholder="All services"
+              placeholder={t('accounts.scope.allServices')}
               selectedOptions={assignedServiceIds}
               value={
                 assignedServiceIds.length === 0
-                  ? 'All services'
+                  ? t('accounts.scope.allServices')
                   : (serviceAccounts?.items ?? [])
                       .filter(a => assignedServiceIds.includes(a.id))
                       .map(a => a.label || a.name)
@@ -220,29 +217,28 @@ export function OnboardAccountWizard({
     } as WizardStep] : []),
     {
       id: 'key',
-      title: 'API key',
-      description: 'Optionally issue an API key so the account can call the ingest API right away.',
+      title: t('accounts.onboarding.key.title'),
+      description: t('accounts.onboarding.key.description'),
       content: (
         <div className={s.form}>
           <Checkbox
-            label="Generate an API key now"
+            label={t('accounts.onboarding.key.generateNow')}
             checked={generateKey}
             onChange={(_, d) => setGenerateKey(!!d.checked)}
           />
           {kind === 'Application' && !generateKey && (
             <MessageBar intent="warning">
               <MessageBarBody>
-                An Application account can only authenticate with an API key. Without one it won't be
-                able to submit data until a key is issued later.
+                {t('accounts.onboarding.key.applicationWarning')}
               </MessageBarBody>
             </MessageBar>
           )}
           {generateKey && (
             <>
-              <Field label="Key description (optional)" hint="A note on who or why this key is for — handy for temporary or holiday-cover keys.">
-                <Input value={keyDescription} maxLength={200} placeholder="e.g. holiday cover for Jane (reviewer)" onChange={(_, d) => setKeyDescription(d.value)} />
+              <Field label={t('accounts.onboarding.key.descriptionLabel')} hint={t('accounts.onboarding.key.descriptionHint')}>
+                <Input value={keyDescription} maxLength={200} placeholder={t('accounts.keys.descriptionPlaceholder')} onChange={(_, d) => setKeyDescription(d.value)} />
               </Field>
-              <Field label="Key expiry (optional)" hint="Leave blank for a key that never expires. Maximum two years from today.">
+              <Field label={t('accounts.onboarding.key.expiryLabel')} hint={t('accounts.keys.expiryHint')}>
                 <Input type="date" value={expiry} min={minExpiry} max={maxExpiry} onChange={(_, d) => setExpiry(d.value)} />
               </Field>
             </>
@@ -250,24 +246,30 @@ export function OnboardAccountWizard({
         </div>
       ),
     },
-  ], [s, role, name, label, email, kind, generateKey, expiry, keyDescription, detailsValid, trimmedEmail, lockKind, minExpiry, maxExpiry, scopeApplies, assignedServiceIds, serviceAccounts])
+  ], [s, t, role, name, label, email, kind, generateKey, expiry, keyDescription, detailsValid, trimmedEmail, lockKind, minExpiry, maxExpiry, scopeApplies, assignedServiceIds, serviceAccounts])
 
   const busy = create.isPending || rotate.isPending
 
   const resultView = result ? (
     <>
       <WizardResultHeader>
-        {role} “{result.account.label || result.account.name}” created
+        {t('accounts.onboarding.result.created', {
+          role: t(`accounts.roles.${role}`),
+          name: result.account.label || result.account.name,
+        })}
       </WizardResultHeader>
       <div className={s.summary}>
-        <Body1><strong>Name:</strong> {result.account.name}</Body1>
-        <Body1><strong>Kind:</strong> {result.account.kind} · <strong>Role:</strong> {result.account.role}</Body1>
-        {result.account.email && <Body1><strong>Email:</strong> {result.account.email}</Body1>}
+        <Body1><strong>{t('accounts.fields.name')}:</strong> {result.account.name}</Body1>
+        <Body1>
+          <strong>{t('accounts.fields.kind')}:</strong> {t(`accounts.kinds.${result.account.kind}`)} ·{' '}
+          <strong>{t('accounts.fields.role')}:</strong> {t(`accounts.roles.${result.account.role}`)}
+        </Body1>
+        {result.account.email && <Body1><strong>{t('accounts.fields.email')}:</strong> {result.account.email}</Body1>}
         {scopeApplies && (
           <Body1>
-            <strong>Service scope:</strong>{' '}
+            <strong>{t('accounts.scope.title')}:</strong>{' '}
             {assignedServiceIds.length === 0
-              ? 'All services (unrestricted)'
+              ? t('accounts.scope.unrestricted')
               : (serviceAccounts?.items ?? [])
                   .filter(a => assignedServiceIds.includes(a.id))
                   .map(a => a.label || a.name)
@@ -278,17 +280,17 @@ export function OnboardAccountWizard({
       {result.plaintext ? (
         <MessageBar intent="warning">
           <MessageBarBody>
-            <MessageBarTitle>Copy this API key now — it will not be shown again.</MessageBarTitle>
+            <MessageBarTitle>{t('accounts.onboarding.result.copyKey')}</MessageBarTitle>
             <div className={s.keyRow}>
               <div className={s.key}>{result.plaintext}</div>
-              <Tooltip content={copied ? 'Copied!' : 'Copy to clipboard'} relationship="label">
-                <Button appearance="subtle" icon={<Copy20Regular />} onClick={copyKey} aria-label="Copy API key" />
+              <Tooltip content={t(copied ? 'accounts.onboarding.result.copied' : 'accounts.onboarding.result.copyToClipboard')} relationship="label">
+                <Button appearance="subtle" icon={<Copy20Regular />} onClick={copyKey} aria-label={t('accounts.onboarding.result.copyAria')} />
               </Tooltip>
             </div>
           </MessageBarBody>
         </MessageBar>
       ) : (
-        <Body1 className={s.hint}>No API key was generated. You can issue one later from the account's API keys dialog.</Body1>
+        <Body1 className={s.hint}>{t('accounts.onboarding.result.noKey')}</Body1>
       )}
     </>
   ) : undefined
@@ -300,7 +302,7 @@ export function OnboardAccountWizard({
       steps={steps}
       onClose={handleClose}
       onFinish={onFinish}
-      finishLabel="Create account"
+      finishLabel={t('accounts.onboarding.createAccount')}
       busy={busy}
       error={error}
       result={resultView}

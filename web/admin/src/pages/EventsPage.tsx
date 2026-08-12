@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
   Badge, Body1, Button, Checkbox, Drawer, DrawerBody,
@@ -14,14 +16,12 @@ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { EventKindAvatar } from '../components/Avatars'
 import { DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { RowActions } from '../components/RowActions'
 import { clickableRowProps } from '../utils/a11y'
-import { confirmDelete } from '../utils/confirm'
 import { formatApiError } from '../api/client'
-import { formatDateTime } from '../utils/format'
 import { toLocalInput, fromLocalInput } from '../utils/datetimeLocal'
 import { formatDurationInput, parseDurationMinutes } from '../utils/duration'
-import { eventKindLabel } from '../utils/eventKind'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import { fetchAllEvents, useAccounts, useCapabilities, useCreateEvent, useDeleteEvent, useEvents, useUpdateEvent } from '../api/hooks'
 import type { Account, EventKind, IngestEvent, UpsertEventRequest } from '../api/types'
@@ -29,13 +29,19 @@ import type { Account, EventKind, IngestEvent, UpsertEventRequest } from '../api
 const EVENT_KINDS: EventKind[] = ['PointInTime', 'Interval', 'FromNowOn']
 
 /** Human-readable summary of an event's duration for the table/view — "—" when not applicable. */
-function durationSummary(ev: Pick<IngestEvent, 'kind' | 'durationMinutes'>): string {
-  if (ev.kind === 'FromNowOn') return 'Ongoing'
+function durationSummary(ev: Pick<IngestEvent, 'kind' | 'durationMinutes'>, t: TFunction): string {
+  if (ev.kind === 'FromNowOn') return t('analytics.events.ongoing')
   if (ev.kind !== 'Interval' || !ev.durationMinutes) return '—'
   const h = Math.floor(ev.durationMinutes / 60)
   const m = ev.durationMinutes % 60
-  return [h ? `${h}h` : null, m ? `${m}m` : null].filter(Boolean).join(' ') || '0m'
+  return [
+    h ? t('analytics.events.durationHours', { count: h }) : null,
+    m ? t('analytics.events.durationMinutes', { count: m }) : null,
+  ].filter(Boolean).join(' ') || t('analytics.events.durationMinutes', { count: 0 })
 }
+
+const eventKindText = (kind: EventKind, t: TFunction): string =>
+  t(`analytics.events.kinds.${kind.toLowerCase()}`)
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -122,6 +128,7 @@ function emptyDraft(): EventDraft {
  */
 export function EventsPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const [sp, setSp] = useSearchParams()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
@@ -143,22 +150,22 @@ export function EventsPage() {
   const servicesById = useMemo(() => new Map(services.map(a => [a.id, a])), [services])
 
   const serviceSummary = useCallback((ev: IngestEvent): string => {
-    if (ev.serviceIds.length === 0) return 'All services'
-    return ev.serviceIds.map(id => servicesById.get(id)?.label || servicesById.get(id)?.name || '(removed)').join(', ')
-  }, [servicesById])
+    if (ev.serviceIds.length === 0) return t('analytics.common.allServices')
+    return ev.serviceIds.map(id => servicesById.get(id)?.label || servicesById.get(id)?.name || t('analytics.events.removed')).join(', ')
+  }, [servicesById, t])
 
   // Columns for the "Export CSV" button; labels reuse the same resolvers the grid/view drawer use
   // so the file matches what's on screen.
   const exportColumns = useMemo<ExportColumn<IngestEvent>[]>(() => [
-    { header: 'Label', value: ev => ev.label },
-    { header: 'Timestamp', value: ev => ev.timestamp },
-    { header: 'Kind', value: ev => eventKindLabel(ev.kind) },
-    { header: 'Duration', value: ev => durationSummary(ev) },
-    { header: 'Description', value: ev => ev.description ?? '' },
-    { header: 'Affects', value: ev => serviceSummary(ev) },
-    { header: 'Created', value: ev => ev.createdAt },
-    { header: 'Created by', value: ev => ev.createdBy ?? '' },
-  ], [serviceSummary])
+    { header: t('analytics.events.fields.label'), value: ev => ev.label },
+    { header: t('analytics.events.fields.timestamp'), value: ev => ev.timestamp },
+    { header: t('analytics.events.fields.kind'), value: ev => eventKindText(ev.kind, t) },
+    { header: t('analytics.events.fields.duration'), value: ev => durationSummary(ev, t) },
+    { header: t('analytics.events.fields.description'), value: ev => ev.description ?? '' },
+    { header: t('analytics.events.fields.affects'), value: ev => serviceSummary(ev) },
+    { header: t('analytics.events.fields.created'), value: ev => ev.createdAt },
+    { header: t('analytics.events.fields.createdBy'), value: ev => ev.createdBy ?? '' },
+  ], [serviceSummary, t])
 
   const eventsExport = useCsvExport({
     filename: 'events.csv',
@@ -192,12 +199,12 @@ export function EventsPage() {
   }
   function editFromView(ev: IngestEvent) { setViewing(null); openEdit(ev) }
   function deleteFromView(ev: IngestEvent) {
-    if (!confirmDelete('event', ev.label)) return
+    if (!window.confirm(t('analytics.events.deleteConfirm', { label: ev.label }))) return
     setViewing(null)
     del.mutate(ev.id)
   }
   function deleteFromRow(ev: IngestEvent) {
-    if (!confirmDelete('event', ev.label)) return
+    if (!window.confirm(t('analytics.events.deleteConfirm', { label: ev.label }))) return
     del.mutate(ev.id)
   }
 
@@ -205,19 +212,19 @@ export function EventsPage() {
     if (!editing) return
     setSubmitError(null)
     const label = editing.label.trim()
-    if (!label) { setSubmitError('Label is required.'); return }
-    if (!editing.timestampLocal) { setSubmitError('Timestamp is required.'); return }
+    if (!label) { setSubmitError(t('analytics.events.validation.labelRequired')); return }
+    if (!editing.timestampLocal) { setSubmitError(t('analytics.events.validation.timestampRequired')); return }
     if (!editing.allServices && editing.serviceIds.length === 0) {
-      setSubmitError('Pick at least one affected service, or choose “All services”.'); return
+      setSubmitError(t('analytics.events.validation.serviceRequired')); return
     }
     const durationText = editing.durationMinutes.trim()
     if (durationText && parseDurationMinutes(durationText) === null) {
-      setSubmitError('Duration format not recognised. Use minutes (45), hours:minutes (1:30), or days hours:minutes (2 03:15).')
+      setSubmitError(t('analytics.events.validation.durationFormat'))
       return
     }
     const durationMinutes = durationText ? parseDurationMinutes(durationText) : null
     if (editing.kind === 'Interval' && (!durationMinutes || durationMinutes <= 0)) {
-      setSubmitError('Duration is required for interval events.'); return
+      setSubmitError(t('analytics.events.validation.durationRequired')); return
     }
 
     const req: UpsertEventRequest = {
@@ -242,23 +249,23 @@ export function EventsPage() {
   return (
     <div className={s.root}>
       <div className={s.toolbar}>
-        <Title2>Events</Title2>
+        <Title2>{t('analytics.events.title')}</Title2>
         <Toolbar className={s.toolbarActions}>
-          {canManage && <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>Add event</ToolbarButton>}
+          {canManage && <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>{t('analytics.events.actions.add')}</ToolbarButton>}
           <Menu>
             <MenuTrigger disableButtonEnhancement>
-              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('analytics.common.moreActions')} />
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
-                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>{t('analytics.common.refresh')}</MenuItem>
                 <MenuDivider />
                 <MenuItem
                   icon={<ArrowDownload20Regular />}
                   disabled={eventsExport.exporting}
                   onClick={eventsExport.exportList}
                 >
-                  {eventsExport.exporting ? 'Exporting…' : 'Export this list (CSV)'}
+                  {eventsExport.exporting ? t('analytics.common.exporting') : t('analytics.common.exportListCsv')}
                 </MenuItem>
               </MenuList>
             </MenuPopover>
@@ -269,7 +276,7 @@ export function EventsPage() {
       {error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Failed to load</MessageBarTitle>
+            <MessageBarTitle>{t('analytics.common.failedToLoad')}</MessageBarTitle>
             {formatApiError(error)}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -284,39 +291,39 @@ export function EventsPage() {
       <Table size="small">
         <TableHeader>
           <TableRow>
-            <TableHeaderCell>Label</TableHeaderCell>
-            <TableHeaderCell className={s.timestampCell}>Timestamp</TableHeaderCell>
-            <TableHeaderCell>Description</TableHeaderCell>
-            <TableHeaderCell className={s.durationCell}>Duration</TableHeaderCell>
-            <TableHeaderCell>Affects</TableHeaderCell>
-            <TableHeaderCell className={s.actionsHeader}>Actions</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.events.fields.label')}</TableHeaderCell>
+            <TableHeaderCell className={s.timestampCell}>{t('analytics.events.fields.timestamp')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.events.fields.description')}</TableHeaderCell>
+            <TableHeaderCell className={s.durationCell}>{t('analytics.events.fields.duration')}</TableHeaderCell>
+            <TableHeaderCell>{t('analytics.events.fields.affects')}</TableHeaderCell>
+            <TableHeaderCell className={s.actionsHeader}>{t('analytics.common.actions')}</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={6}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={6}>{t('analytics.common.loading')}</GridMessageRow>}
           {!isLoading && (data?.items ?? []).length === 0 && (
-            <GridMessageRow colSpan={6}>No events yet{canManage ? ' — click “Add event” to create one.' : '.'}</GridMessageRow>
+            <GridMessageRow colSpan={6}>{t(canManage ? 'analytics.events.emptyManage' : 'analytics.events.empty')}</GridMessageRow>
           )}
           {(data?.items ?? []).map(ev => (
             <TableRow
               key={ev.id}
               className={`${s.row} ${s.rowClickable}`}
-              {...clickableRowProps(() => setViewing(ev), `View event ${ev.label}`)}
+              {...clickableRowProps(() => setViewing(ev), t('analytics.events.viewAria', { label: ev.label }))}
             >
               <TableCell className={s.labelCell}>
-                <Tooltip content={eventKindLabel(ev.kind)} relationship="label">
+                <Tooltip content={eventKindText(ev.kind, t)} relationship="label">
                   <TableCellLayout media={<EventKindAvatar kind={ev.kind} />}>
                     <strong className={s.truncate}>{ev.label}</strong>
                   </TableCellLayout>
                 </Tooltip>
               </TableCell>
-              <TableCell className={s.timestampCell}>{formatDateTime(ev.timestamp)}</TableCell>
+              <TableCell className={s.timestampCell}><LocalizedTime value={ev.timestamp} /></TableCell>
               <TableCell className={s.descCell}>
                 {ev.description
                   ? <Tooltip content={ev.description} relationship="label"><span className={s.truncate}>{ev.description}</span></Tooltip>
                   : <span className={`${s.truncate} ${s.muted}`}>—</span>}
               </TableCell>
-              <TableCell className={s.durationCell}>{durationSummary(ev)}</TableCell>
+              <TableCell className={s.durationCell}>{durationSummary(ev, t)}</TableCell>
               <TableCell className={s.descCell}>
                 <Tooltip content={serviceSummary(ev)} relationship="label">
                   <span className={s.truncate}>{serviceSummary(ev)}</span>
@@ -324,10 +331,10 @@ export function EventsPage() {
               </TableCell>
               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
                 <RowActions
-                  ariaLabel={`Actions for event ${ev.label}`}
+                  ariaLabel={t('analytics.events.actionsAria', { label: ev.label })}
                   actions={[
-                    ...(canManage ? [{ key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => openEdit(ev) }] : []),
-                    ...(canManage ? [{ key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(ev) }] : []),
+                    ...(canManage ? [{ key: 'edit', label: t('analytics.common.edit'), icon: <Edit20Regular />, onClick: () => openEdit(ev) }] : []),
+                    ...(canManage ? [{ key: 'delete', label: t('analytics.common.delete'), icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(ev) }] : []),
                   ]}
                 />
               </TableCell>
@@ -353,65 +360,65 @@ export function EventsPage() {
         className={s.drawer}
       >
         <DrawerHeaderWithClose
-          title={editing?.id ? 'Edit event' : 'Add event'}
+          title={editing?.id ? t('analytics.events.actions.edit') : t('analytics.events.actions.add')}
           onClose={() => setEditing(null)}
         />
         <DrawerBody>
           {editing && (
             <div className={s.drawerForm}>
-              <Field label="Timestamp" required>
+              <Field label={t('analytics.events.fields.timestamp')} required>
                 <Input
                   type="datetime-local"
                   value={editing.timestampLocal}
                   onChange={(_, v) => setEditing({ ...editing, timestampLocal: v.value })}
                 />
               </Field>
-              <Field label="Label" required>
+              <Field label={t('analytics.events.fields.label')} required>
                 <Input value={editing.label} onChange={(_, v) => setEditing({ ...editing, label: v.value })} />
               </Field>
-              <Field label="Description">
+              <Field label={t('analytics.events.fields.description')}>
                 <Textarea value={editing.description} onChange={(_, v) => setEditing({ ...editing, description: v.value })} />
               </Field>
               <div className={s.twoCol}>
                 <Field
-                  label="Kind"
+                  label={t('analytics.events.fields.kind')}
                   required
-                  hint={editing.kind === 'FromNowOn' ? 'Runs from the timestamp above until further notice.' : undefined}
+                  hint={editing.kind === 'FromNowOn' ? t('analytics.events.help.fromNowOn') : undefined}
                 >
                   <Dropdown
                     selectedOptions={[editing.kind]}
-                    value={eventKindLabel(editing.kind)}
+                    value={eventKindText(editing.kind, t)}
                     onOptionSelect={(_, d) => {
                       const kind = d.optionValue as EventKind
                       setEditing({ ...editing, kind, durationMinutes: kind === 'Interval' ? editing.durationMinutes : '' })
                     }}
                   >
-                    {EVENT_KINDS.map(k => <Option key={k} value={k} text={eventKindLabel(k)}>{eventKindLabel(k)}</Option>)}
+                    {EVENT_KINDS.map(k => <Option key={k} value={k} text={eventKindText(k, t)}>{eventKindText(k, t)}</Option>)}
                   </Dropdown>
                 </Field>
                 <Field
-                  label="Duration"
+                  label={t('analytics.events.fields.duration')}
                   required={editing.kind === 'Interval'}
-                  hint={editing.kind === 'Interval' ? 'Minutes (45), hours:minutes (1:30), or days hours:minutes (2 03:15).' : undefined}
+                  hint={editing.kind === 'Interval' ? t('analytics.events.help.duration') : undefined}
                 >
                   <Input
                     disabled={editing.kind !== 'Interval'}
                     value={editing.durationMinutes}
                     onChange={(_, v) => setEditing({ ...editing, durationMinutes: v.value })}
-                    placeholder={editing.kind === 'Interval' ? 'e.g. 90 or 1:30' : 'Not applicable'}
+                    placeholder={editing.kind === 'Interval' ? t('analytics.events.placeholders.duration') : t('analytics.events.notApplicable')}
                   />
                 </Field>
               </div>
-              <Field label="Affects">
+              <Field label={t('analytics.events.fields.affects')}>
                 <Checkbox
-                  label="All services"
+                  label={t('analytics.common.allServices')}
                   checked={editing.allServices}
                   onChange={(_, d) => setEditing({ ...editing, allServices: !!d.checked })}
                 />
                 {!editing.allServices && (
                   <Dropdown
                     multiselect
-                    placeholder="Select services"
+                    placeholder={t('analytics.events.placeholders.selectServices')}
                     selectedOptions={editing.serviceIds}
                     value={editing.serviceIds.map(id => servicesById.get(id)?.label || servicesById.get(id)?.name || id).join(', ')}
                     onOptionSelect={(_, d) => setEditing({ ...editing, serviceIds: d.selectedOptions })}
@@ -430,8 +437,8 @@ export function EventsPage() {
               )}
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-                <Button onClick={() => setEditing(null)} disabled={pending}>Cancel</Button>
-                <Button appearance="primary" onClick={onSave} disabled={pending}>{pending ? 'Saving…' : 'Save'}</Button>
+                <Button onClick={() => setEditing(null)} disabled={pending}>{t('analytics.common.cancel')}</Button>
+                <Button appearance="primary" onClick={onSave} disabled={pending}>{pending ? t('analytics.common.saving') : t('analytics.common.save')}</Button>
               </div>
             </div>
           )}
@@ -447,13 +454,13 @@ export function EventsPage() {
         className={s.drawer}
       >
         <DrawerHeaderWithClose
-          title={viewing ? viewing.label : 'Event'}
+          title={viewing ? viewing.label : t('analytics.events.singular')}
           onClose={() => setViewing(null)}
         />
         {viewing && (
           <Toolbar className={s.drawerToolbar}>
-            {canManage && <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>Edit</ToolbarButton>}
-            {canManage && <ToolbarButton icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>Delete</ToolbarButton>}
+            {canManage && <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>{t('analytics.common.edit')}</ToolbarButton>}
+            {canManage && <ToolbarButton icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>{t('analytics.common.delete')}</ToolbarButton>}
           </Toolbar>
         )}
         <DrawerBody>
@@ -466,6 +473,7 @@ export function EventsPage() {
 
 function EventViewBody({ event, services }: { event: IngestEvent; services: Account[] }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const serviceIds = event.serviceIds ?? []
   const serviceNames = serviceIds.map(id => {
     const svc = services.find(a => a.id === id)
@@ -473,23 +481,23 @@ function EventViewBody({ event, services }: { event: IngestEvent; services: Acco
   })
   return (
     <div className={s.drawerForm}>
-      <Field label="Timestamp"><Body1>{formatDateTime(event.timestamp)}</Body1></Field>
-      <Field label="Label"><Body1>{event.label}</Body1></Field>
-      <Field label="Description"><Body1>{event.description || '—'}</Body1></Field>
+      <Field label={t('analytics.events.fields.timestamp')}><Body1><LocalizedTime value={event.timestamp} /></Body1></Field>
+      <Field label={t('analytics.events.fields.label')}><Body1>{event.label}</Body1></Field>
+      <Field label={t('analytics.events.fields.description')}><Body1>{event.description || '—'}</Body1></Field>
 
       <div className={s.twoCol}>
-        <Field label="Kind">
+        <Field label={t('analytics.events.fields.kind')}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <EventKindAvatar kind={event.kind} size={24} />
-            <Body1>{eventKindLabel(event.kind)}</Body1>
+            <Body1>{eventKindText(event.kind, t)}</Body1>
           </div>
         </Field>
-        <Field label="Duration"><Body1>{durationSummary(event)}</Body1></Field>
+        <Field label={t('analytics.events.fields.duration')}><Body1>{durationSummary(event, t)}</Body1></Field>
       </div>
 
-      <Field label="Affects">
+      <Field label={t('analytics.events.fields.affects')}>
         {serviceIds.length === 0 ? (
-          <Body1>All services</Body1>
+          <Body1>{t('analytics.common.allServices')}</Body1>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {serviceNames.map((n, i) => (
@@ -499,18 +507,18 @@ function EventViewBody({ event, services }: { event: IngestEvent; services: Acco
         )}
       </Field>
 
-      <div className={s.sectionLabel}>Audit</div>
+      <div className={s.sectionLabel}>{t('analytics.audit.title')}</div>
       <div className={s.twoCol}>
-        <Field label="Created">
+        <Field label={t('analytics.events.fields.created')}>
           <Body1>
-            {new Date(event.createdAt).toLocaleString()}
-            {event.createdBy ? ` · by ${event.createdBy}` : ''}
+            <LocalizedTime value={event.createdAt} />
+            {event.createdBy ? ` · ${t('analytics.events.byActor', { actor: event.createdBy })}` : ''}
           </Body1>
         </Field>
-        <Field label="Modified">
+        <Field label={t('analytics.events.fields.modified')}>
           <Body1>
-            {new Date(event.modifiedAt).toLocaleString()}
-            {event.modifiedBy ? ` · by ${event.modifiedBy}` : ''}
+            <LocalizedTime value={event.modifiedAt} />
+            {event.modifiedBy ? ` · ${t('analytics.events.byActor', { actor: event.modifiedBy })}` : ''}
           </Body1>
         </Field>
       </div>

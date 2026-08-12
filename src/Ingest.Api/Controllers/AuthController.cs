@@ -1,4 +1,5 @@
 using Ingest.Api.Auth;
+using Ingest.Api.Common;
 using Ingest.Api.Options;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -52,7 +53,7 @@ public sealed class AuthController : ControllerBase
     {
         var match = _sso.ActiveProviders.FirstOrDefault(p =>
             string.Equals(p.Id, provider, StringComparison.OrdinalIgnoreCase));
-        if (match is null) return NotFound();
+        if (match is null) return NotFound(DiagnosticProblem.NotFound("SSO provider", provider));
 
         var props = new AuthenticationProperties { RedirectUri = SafeLocalPath(returnUrl) };
         return Challenge(props, AuthConstants.OidcScheme(match.Id));

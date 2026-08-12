@@ -1,4 +1,6 @@
 import type { AccountRole } from './types'
+import type { TFunction } from 'i18next'
+import i18n from '../i18n'
 
 /**
  * The capability catalogue, mirroring `Ingest.Core.Security.Capabilities` on the server. Capabilities
@@ -66,94 +68,86 @@ export interface CapabilityGroup {
  * The catalogue grouped for display in the account permissions panel. The order here is the order
  * shown in the UI; it matches the server-side `Capabilities.All` grouping.
  */
-export const CAPABILITY_GROUPS: CapabilityGroup[] = [
-  {
-    group: 'Schemas',
-    items: [
-      { id: CAPABILITIES.schemasRead, label: 'View schemas', description: 'Browse the schema catalogue, detail and history.' },
-      { id: CAPABILITIES.schemasManage, label: 'Manage schemas', description: 'Create, edit, clone and delete schemas.' },
-    ],
-  },
-  {
-    group: 'Submissions',
-    items: [
-      { id: CAPABILITIES.submissionsRead, label: 'View submissions', description: 'See submissions across every service.' },
-      { id: CAPABILITIES.submissionsSubmit, label: 'Submit on behalf', description: 'Create, edit and bulk-import submissions for a service.' },
-      { id: CAPABILITIES.submissionsDelete, label: 'Delete submissions', description: 'Permanently remove a submission.' },
-      { id: CAPABILITIES.submissionsApprove, label: 'Approve submissions', description: 'Approve or reject pending submissions.' },
-    ],
-  },
-  {
-    group: 'Analytics',
-    items: [
-      { id: CAPABILITIES.queryRead, label: 'Query data', description: 'Use the OData feed and ad-hoc query endpoint.' },
-      { id: CAPABILITIES.exploreRead, label: 'Explore', description: 'Use the in-app Explore analytics.' },
-      { id: CAPABILITIES.statusRead, label: 'View status', description: 'See cross-service status and missing-submission analytics.' },
-    ],
-  },
-  {
-    group: 'Reports',
-    items: [
-      { id: CAPABILITIES.reportsRead, label: 'View reports', description: 'Browse and render the report catalogue.' },
-      { id: CAPABILITIES.reportsManage, label: 'Manage reports', description: 'Upload and delete report definitions.' },
-    ],
-  },
-  {
-    group: 'Accounts & keys',
-    items: [
-      { id: CAPABILITIES.accountsRead, label: 'View accounts', description: 'Browse accounts.' },
-      { id: CAPABILITIES.accountsManage, label: 'Manage accounts', description: 'Create, edit and delete accounts and their permissions.' },
-      { id: CAPABILITIES.apiKeysRead, label: 'View API keys', description: 'See the API keys attached to accounts.' },
-      { id: CAPABILITIES.apiKeysManage, label: 'Manage API keys', description: 'Issue and revoke API keys.' },
-    ],
-  },
-  {
-    group: 'Oversight',
-    items: [
-      { id: CAPABILITIES.auditRead, label: 'View audit log', description: 'Read and export the audit trail.' },
-      { id: CAPABILITIES.privacyRead, label: 'Export personal data', description: 'Run a data-subject access export.' },
-      { id: CAPABILITIES.privacyManage, label: 'Erase / retention', description: 'Erase personal data and run retention.' },
-      { id: CAPABILITIES.backupRead, label: 'Export backup', description: 'Download a full backup.' },
-      { id: CAPABILITIES.backupManage, label: 'Restore backup', description: 'Restore the registry from a backup.' },
-    ],
-  },
-  {
-    group: 'Notifications & integrations',
-    items: [
-      { id: CAPABILITIES.notificationsRead, label: 'View notifications', description: 'See email/notification config, templates and the outbox.' },
-      { id: CAPABILITIES.notificationsManage, label: 'Manage notifications', description: 'Edit email/notification config and templates; send mail.' },
-      { id: CAPABILITIES.webhooksRead, label: 'View webhooks', description: 'See webhook endpoints and deliveries.' },
-      { id: CAPABILITIES.webhooksManage, label: 'Manage webhooks', description: 'Create/edit webhooks, rotate secrets, redeliver and drain.' },
-      { id: CAPABILITIES.integrationsRead, label: 'View integrations', description: 'See integrations (e.g. Microsoft Teams) and their connection.' },
-      { id: CAPABILITIES.integrationsManage, label: 'Manage integrations', description: 'Create/edit integrations, edit the connection, run/test and drain.' },
-    ],
-  },
-  {
-    group: 'Settings',
-    items: [
-      { id: CAPABILITIES.settingsRead, label: 'View settings', description: 'Read global settings (e.g. the default approval policy).' },
-      { id: CAPABILITIES.settingsManage, label: 'Manage settings', description: 'Change global settings (e.g. the default approval policy).' },
-    ],
-  },
-  {
-    group: 'Events',
-    items: [
-      { id: CAPABILITIES.eventsRead, label: 'View events', description: 'Browse the events timeline.' },
-      { id: CAPABILITIES.eventsManage, label: 'Manage events', description: 'Create, edit and delete events.' },
-    ],
-  },
-  {
-    group: 'Comments',
-    items: [
-      { id: CAPABILITIES.commentsRead, label: 'View comments', description: 'See comment threads on schemas (and their values).' },
-      { id: CAPABILITIES.commentsCreate, label: 'Create comments', description: 'Start new threads and reply to existing ones; edit your own comments.' },
-      { id: CAPABILITIES.commentsManage, label: 'Manage comments', description: 'Edit, delete or resolve/reopen any comment or thread — not just your own.' },
-    ],
-  },
+interface CapabilityGroupDefinition {
+  key: string
+  items: Array<{ id: Capability; key: string }>
+}
+
+const CAPABILITY_GROUP_DEFINITIONS: CapabilityGroupDefinition[] = [
+  { key: 'schemas', items: [
+    { id: CAPABILITIES.schemasRead, key: 'schemasRead' },
+    { id: CAPABILITIES.schemasManage, key: 'schemasManage' },
+  ] },
+  { key: 'submissions', items: [
+    { id: CAPABILITIES.submissionsRead, key: 'submissionsRead' },
+    { id: CAPABILITIES.submissionsSubmit, key: 'submissionsSubmit' },
+    { id: CAPABILITIES.submissionsDelete, key: 'submissionsDelete' },
+    { id: CAPABILITIES.submissionsApprove, key: 'submissionsApprove' },
+  ] },
+  { key: 'analytics', items: [
+    { id: CAPABILITIES.queryRead, key: 'queryRead' },
+    { id: CAPABILITIES.exploreRead, key: 'exploreRead' },
+    { id: CAPABILITIES.statusRead, key: 'statusRead' },
+  ] },
+  { key: 'reports', items: [
+    { id: CAPABILITIES.reportsRead, key: 'reportsRead' },
+    { id: CAPABILITIES.reportsManage, key: 'reportsManage' },
+  ] },
+  { key: 'accountsKeys', items: [
+    { id: CAPABILITIES.accountsRead, key: 'accountsRead' },
+    { id: CAPABILITIES.accountsManage, key: 'accountsManage' },
+    { id: CAPABILITIES.apiKeysRead, key: 'apiKeysRead' },
+    { id: CAPABILITIES.apiKeysManage, key: 'apiKeysManage' },
+  ] },
+  { key: 'oversight', items: [
+    { id: CAPABILITIES.auditRead, key: 'auditRead' },
+    { id: CAPABILITIES.privacyRead, key: 'privacyRead' },
+    { id: CAPABILITIES.privacyManage, key: 'privacyManage' },
+    { id: CAPABILITIES.backupRead, key: 'backupRead' },
+    { id: CAPABILITIES.backupManage, key: 'backupManage' },
+  ] },
+  { key: 'notificationsIntegrations', items: [
+    { id: CAPABILITIES.notificationsRead, key: 'notificationsRead' },
+    { id: CAPABILITIES.notificationsManage, key: 'notificationsManage' },
+    { id: CAPABILITIES.webhooksRead, key: 'webhooksRead' },
+    { id: CAPABILITIES.webhooksManage, key: 'webhooksManage' },
+    { id: CAPABILITIES.integrationsRead, key: 'integrationsRead' },
+    { id: CAPABILITIES.integrationsManage, key: 'integrationsManage' },
+  ] },
+  { key: 'settings', items: [
+    { id: CAPABILITIES.settingsRead, key: 'settingsRead' },
+    { id: CAPABILITIES.settingsManage, key: 'settingsManage' },
+  ] },
+  { key: 'events', items: [
+    { id: CAPABILITIES.eventsRead, key: 'eventsRead' },
+    { id: CAPABILITIES.eventsManage, key: 'eventsManage' },
+  ] },
+  { key: 'comments', items: [
+    { id: CAPABILITIES.commentsRead, key: 'commentsRead' },
+    { id: CAPABILITIES.commentsCreate, key: 'commentsCreate' },
+    { id: CAPABILITIES.commentsManage, key: 'commentsManage' },
+  ] },
 ]
 
+export function getCapabilityGroups(t: TFunction = i18n.t): CapabilityGroup[] {
+  return CAPABILITY_GROUP_DEFINITIONS.map(group => ({
+    group: t(`shell.capabilities.groups.${group.key}`),
+    items: group.items.map(item => ({
+      id: item.id,
+      label: t(`shell.capabilities.items.${item.key}.label`),
+      description: t(`shell.capabilities.items.${item.key}.description`),
+    })),
+  }))
+}
+
+/** @deprecated Prefer {@link getCapabilityGroups}; retained for cross-slice compatibility. */
+export const CAPABILITY_GROUPS = new Proxy([] as CapabilityGroup[], {
+  get: (_, property) => Reflect.get(getCapabilityGroups(), property),
+})
+
 /** Every capability id, in catalogue order. */
-export const ALL_CAPABILITIES: Capability[] = CAPABILITY_GROUPS.flatMap(g => g.items.map(i => i.id))
+export const ALL_CAPABILITIES: Capability[] =
+  CAPABILITY_GROUP_DEFINITIONS.flatMap(group => group.items.map(item => item.id))
 
 const OPERATOR_DEFAULTS: Capability[] = [
   CAPABILITIES.schemasRead,

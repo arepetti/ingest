@@ -12,9 +12,10 @@ import {
   accountsBackupExportUrl, backupExportUrl, configBackupExportUrl, useCapabilities,
   useImportAccountsBackup, useImportBackup, useImportConfigBackup,
 } from '../api/hooks'
-import { formatApiError } from '../api/client'
+import { formatApiError, localizeDiagnostics } from '../api/client'
 import { downloadFromUrl, pickTextFile } from '../utils/download'
 import type { AccountsImportResult, BackupImportResult } from '../api/types'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   card: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' },
@@ -38,30 +39,32 @@ const useStyles = makeStyles({
  * sections. Uses the same master-detail layout as Settings.
  */
 export function ToolsPage() {
+  const { t } = useTranslation()
   const { has, isLoading } = useCapabilities()
 
-  if (isLoading) return <Spinner label="Loading…" />
+  if (isLoading) return <Spinner label={t('tools.loading')} />
   if (!has('backup:read')) {
     return (
       <AutoScrollMessageBar intent="error">
-        <MessageBarBody>You don't have permission to use these tools.</MessageBarBody>
+        <MessageBarBody>{t('tools.noPermission')}</MessageBarBody>
       </AutoScrollMessageBar>
     )
   }
 
   const sections: LayoutSection[] = [
-    { id: 'backup', label: 'Data backup', group: 'Backup & restore', icon: <DatabaseArrowDownRegular fontSize={24} />, render: () => <BackupRestoreSection canRestore={has('backup:manage')} /> },
-    { id: 'config-backup', label: 'Configuration backup', group: 'Backup & restore', icon: <SettingsRegular fontSize={24} />, render: () => <ConfigBackupRestoreSection canRestore={has('backup:manage')} /> },
+    { id: 'backup', label: t('tools.dataBackup.title'), group: t('tools.navigationGroup'), icon: <DatabaseArrowDownRegular fontSize={24} />, render: () => <BackupRestoreSection canRestore={has('backup:manage')} /> },
+    { id: 'config-backup', label: t('tools.configBackup.title'), group: t('tools.navigationGroup'), icon: <SettingsRegular fontSize={24} />, render: () => <ConfigBackupRestoreSection canRestore={has('backup:manage')} /> },
     ...(has('accounts:read')
-      ? [{ id: 'accounts-backup', label: 'Accounts', group: 'Backup & restore', icon: <PeopleRegular fontSize={24} />, render: () => <AccountsBackupSection canImport={has('accounts:manage')} /> }]
+      ? [{ id: 'accounts-backup', label: t('tools.accountsBackup.title'), group: t('tools.navigationGroup'), icon: <PeopleRegular fontSize={24} />, render: () => <AccountsBackupSection canImport={has('accounts:manage')} /> }]
       : []),
   ]
 
-  return <SectionedLayout title="Tools" sections={sections} />
+  return <SectionedLayout title={t('tools.title')} sections={sections} />
 }
 
 function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const importer = useImportBackup()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -90,15 +93,11 @@ function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
     } catch (e) {
       // A cancelled picker rejects too; only surface real read/parse failures.
       const msg = e instanceof Error ? e.message : String(e)
-      if (!/no file selected/i.test(msg)) setError(`Could not read the backup file: ${msg}`)
+      if (!/no file selected/i.test(msg)) setError(t('tools.dataBackup.readError', { error: msg }))
       return
     }
 
-    const ok = window.confirm(
-      'Restore from this backup?\n\n' +
-      'This REPLACES all current data (accounts, keys, schemas, submissions, reports, audit log) ' +
-      'with the contents of the file. It cannot be undone. Make sure you have a current backup first.',
-    )
+    const ok = window.confirm(t('tools.dataBackup.confirmRestore'))
     if (!ok) return
 
     try {
@@ -112,18 +111,18 @@ function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Data backup</Title3>
+        <Title3 className={s.sectionTitle}>{t('tools.dataBackup.title')}</Title3>
         <Body1 className={s.help}>
-          Export the entire registry (accounts, keys, schemas, submissions, reports, audit log) to a
-          single JSON file, or restore it from one.
+          {t('tools.dataBackup.description')}
         </Body1>
       </div>
 
       <div className={s.warn}>
-        This is a convenience tool for <strong>small</strong> deployments and moving data between
-        environments — <strong>not</strong> the primary backup mechanism. For real backups, take a
-        database-level snapshot (<code>mongodump</code> or your hosting provider&apos;s backup). A
-        restore <strong>replaces all current data</strong> and is not transactional.
+        {t('tools.dataBackup.warningBeforeSmall')} <strong>{t('tools.dataBackup.small')}</strong>{' '}
+        {t('tools.dataBackup.warningBeforeNot')} <strong>{t('tools.dataBackup.notPrimary')}</strong>{' '}
+        {t('tools.dataBackup.warningBeforeCommand')}<code>mongodump</code>{' '}
+        {t('tools.dataBackup.warningBeforeReplace')} <strong>{t('tools.dataBackup.replacesAll')}</strong>{' '}
+        {t('tools.dataBackup.warningAfterReplace')}
       </div>
 
       {error && (
@@ -135,7 +134,7 @@ function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
       {result && (
         <AutoScrollMessageBar intent="success">
           <MessageBarBody>
-            Restore complete.
+            {t('tools.restoreComplete')}
             <ul className={s.counts}>
               {Object.entries(result.restored).map(([name, n]) => (
                 <li key={name}><Text weight="semibold">{name}</Text>: {n}</li>
@@ -152,7 +151,7 @@ function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
           disabled={busy || importer.isPending}
           onClick={onExport}
         >
-          {busy ? 'Preparing…' : 'Download backup'}
+          {t(busy ? 'tools.preparing' : 'tools.dataBackup.download')}
         </Button>
         {canRestore && (
           <Button
@@ -160,7 +159,7 @@ function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
             disabled={busy || importer.isPending}
             onClick={onImport}
           >
-            {importer.isPending ? 'Restoring…' : 'Restore from file…'}
+            {t(importer.isPending ? 'tools.restoring' : 'tools.restoreFromFile')}
           </Button>
         )}
       </div>
@@ -170,6 +169,7 @@ function BackupRestoreSection({ canRestore }: { canRestore: boolean }) {
 
 function ConfigBackupRestoreSection({ canRestore }: { canRestore: boolean }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const importer = useImportConfigBackup()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -197,19 +197,11 @@ function ConfigBackupRestoreSection({ canRestore }: { canRestore: boolean }) {
       parsed = JSON.parse(content)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (!/no file selected/i.test(msg)) setError(`Could not read the configuration file: ${msg}`)
+      if (!/no file selected/i.test(msg)) setError(t('tools.configBackup.readError', { error: msg }))
       return
     }
 
-    const ok = window.confirm(
-      'Restore from this configuration backup?\n\n' +
-      'This REPLACES all current configuration (approval policy & rules, email & notification ' +
-      'settings and templates, webhooks, integrations and the Teams connection) with the contents ' +
-      'of the file. It cannot be undone.\n\n' +
-      'Encrypted secrets (SMTP password, webhook secrets, Teams bot secret) only work if this ' +
-      'server uses the same ApiKey:Pepper as the one that produced the file; otherwise re-enter them ' +
-      'afterwards. A stored secret is kept when the file omits it.',
-    )
+    const ok = window.confirm(t('tools.configBackup.confirmRestore'))
     if (!ok) return
 
     try {
@@ -223,19 +215,16 @@ function ConfigBackupRestoreSection({ canRestore }: { canRestore: boolean }) {
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Configuration backup</Title3>
+        <Title3 className={s.sectionTitle}>{t('tools.configBackup.title')}</Title3>
         <Body1 className={s.help}>
-          Export all configuration (approval policy &amp; rules, email &amp; notification settings and
-          templates, webhooks, integrations and the Teams connection) to a single JSON file, or
-          restore it from one — to copy configuration between environments or recover after a disaster.
+          {t('tools.configBackup.description')}
         </Body1>
       </div>
 
       <div className={s.warn}>
-        Restoring <strong>replaces all current configuration</strong> and is not transactional.
-        Encrypted secrets are included as ciphertext and only decrypt on a server using the same{' '}
-        <code>ApiKey:Pepper</code>; on a different deployment, re-enter them after the restore. A
-        stored secret is preserved when the file omits it.
+        {t('tools.configBackup.warningBeforeReplace')} <strong>{t('tools.configBackup.replacesAll')}</strong>{' '}
+        {t('tools.configBackup.warningBeforePepper')}{' '}<code>ApiKey:Pepper</code>
+        {t('tools.configBackup.warningAfterPepper')}
       </div>
 
       {error && (
@@ -247,7 +236,7 @@ function ConfigBackupRestoreSection({ canRestore }: { canRestore: boolean }) {
       {result && (
         <AutoScrollMessageBar intent="success">
           <MessageBarBody>
-            Restore complete.
+            {t('tools.restoreComplete')}
             <ul className={s.counts}>
               {Object.entries(result.restored).map(([name, n]) => (
                 <li key={name}><Text weight="semibold">{name}</Text>: {n}</li>
@@ -264,7 +253,7 @@ function ConfigBackupRestoreSection({ canRestore }: { canRestore: boolean }) {
           disabled={busy || importer.isPending}
           onClick={onExport}
         >
-          {busy ? 'Preparing…' : 'Download configuration'}
+          {t(busy ? 'tools.preparing' : 'tools.configBackup.download')}
         </Button>
         {canRestore && (
           <Button
@@ -272,7 +261,7 @@ function ConfigBackupRestoreSection({ canRestore }: { canRestore: boolean }) {
             disabled={busy || importer.isPending}
             onClick={onImport}
           >
-            {importer.isPending ? 'Restoring…' : 'Restore from file…'}
+            {t(importer.isPending ? 'tools.restoring' : 'tools.restoreFromFile')}
           </Button>
         )}
       </div>
@@ -282,10 +271,12 @@ function ConfigBackupRestoreSection({ canRestore }: { canRestore: boolean }) {
 
 function AccountsBackupSection({ canImport }: { canImport: boolean }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const importer = useImportAccountsBackup()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<AccountsImportResult | null>(null)
+  const localizedErrors = result ? localizeDiagnostics(result.errorDetails, result.errors) : []
 
   async function onExport() {
     setError(null)
@@ -309,17 +300,11 @@ function AccountsBackupSection({ canImport }: { canImport: boolean }) {
       parsed = JSON.parse(content)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (!/no file selected/i.test(msg)) setError(`Could not read the accounts file: ${msg}`)
+      if (!/no file selected/i.test(msg)) setError(t('tools.accountsBackup.readError', { error: msg }))
       return
     }
 
-    const ok = window.confirm(
-      'Import accounts from this file?\n\n' +
-      'Accounts are matched by name: existing ones are updated and new names are created. ' +
-      'Accounts not in the file are left untouched.\n\n' +
-      'API keys are NOT included in the file, so any account created by this import starts with no ' +
-      'key — generate one for each afterwards.',
-    )
+    const ok = window.confirm(t('tools.accountsBackup.confirmImport'))
     if (!ok) return
 
     try {
@@ -333,19 +318,16 @@ function AccountsBackupSection({ canImport }: { canImport: boolean }) {
   return (
     <Card className={s.card}>
       <div>
-        <Title3 className={s.sectionTitle}>Accounts</Title3>
+        <Title3 className={s.sectionTitle}>{t('tools.accountsBackup.title')}</Title3>
         <Body1 className={s.help}>
-          Export every account (name, label, role, permissions, SSO links, enabled state) to a single
-          JSON file, or import one to create and update accounts — handy for cloning or seeding an
-          environment.
+          {t('tools.accountsBackup.description')}
         </Body1>
       </div>
 
       <div className={s.warn}>
-        <strong>API keys are never exported.</strong> They aren&apos;t stored in a recoverable form,
-        so an imported account starts with <strong>no key</strong> and must have one re-generated
-        before it can authenticate. Import is non-destructive — accounts missing from the file are
-        left as they are.
+        <strong>{t('tools.accountsBackup.keysNeverExported')}</strong>{' '}
+        {t('tools.accountsBackup.warningBeforeNoKey')} <strong>{t('tools.accountsBackup.noKey')}</strong>{' '}
+        {t('tools.accountsBackup.warningAfterNoKey')}
       </div>
 
       {error && (
@@ -355,13 +337,16 @@ function AccountsBackupSection({ canImport }: { canImport: boolean }) {
       )}
 
       {result && (
-        <AutoScrollMessageBar intent={result.errors.length > 0 ? 'warning' : 'success'}>
+        <AutoScrollMessageBar intent={localizedErrors.length > 0 ? 'warning' : 'success'}>
           <MessageBarBody>
-            Import complete: <Text weight="semibold">{result.created}</Text> created,{' '}
-            <Text weight="semibold">{result.updated}</Text> updated.
-            {result.errors.length > 0 && (
+            {t('tools.accountsBackup.importCompleteBeforeCreated')}{' '}
+            <Text weight="semibold">{result.created}</Text>{' '}
+            {t('tools.accountsBackup.created')},{' '}
+            <Text weight="semibold">{result.updated}</Text>{' '}
+            {t('tools.accountsBackup.updated')}.
+            {localizedErrors.length > 0 && (
               <ul className={s.counts}>
-                {result.errors.map((msg, i) => <li key={i}>{msg}</li>)}
+                {localizedErrors.map((msg, i) => <li key={i}>{msg}</li>)}
               </ul>
             )}
           </MessageBarBody>
@@ -375,7 +360,7 @@ function AccountsBackupSection({ canImport }: { canImport: boolean }) {
           disabled={busy || importer.isPending}
           onClick={onExport}
         >
-          {busy ? 'Preparing…' : 'Download accounts'}
+          {t(busy ? 'tools.preparing' : 'tools.accountsBackup.download')}
         </Button>
         {canImport && (
           <Button
@@ -383,7 +368,7 @@ function AccountsBackupSection({ canImport }: { canImport: boolean }) {
             disabled={busy || importer.isPending}
             onClick={onImport}
           >
-            {importer.isPending ? 'Importing…' : 'Import from file…'}
+            {t(importer.isPending ? 'tools.importing' : 'tools.importFromFile')}
           </Button>
         )}
       </div>

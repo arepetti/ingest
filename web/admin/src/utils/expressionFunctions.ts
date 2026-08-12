@@ -7,6 +7,9 @@
  * out: they're only valid in some rule positions and are rejected in calculated expressions, so
  * suggesting them everywhere would mislead.
  */
+import type { TFunction } from 'i18next'
+import i18n from '../i18n'
+
 export interface ExprFunctionMeta {
   /** Function name as written in the expression (case-insensitive at runtime). */
   name: string
@@ -16,52 +19,64 @@ export interface ExprFunctionMeta {
   description: string
 }
 
-export const EXPRESSION_FUNCTIONS: readonly ExprFunctionMeta[] = [
+const EXPRESSION_FUNCTION_DEFINITIONS: ReadonlyArray<Omit<ExprFunctionMeta, 'description'>> = [
   // App built-ins (mirror NCalcExpressionEvaluator.BuiltIns + the `if` operator).
-  { name: 'if', signature: 'if(condition, then, else)', description: 'Returns "then" when the condition is true, otherwise "else".' },
-  { name: 'average', signature: 'average(a, b, …)', description: 'Mean of the numeric arguments. Booleans count as 1/0; nulls are ignored.' },
-  { name: 'higher_than', signature: 'higher_than(value, reference, percentage)', description: 'True when value exceeds reference by more than percentage% (e.g. 50 = 50%).' },
-  { name: 'coalesce', signature: 'coalesce(a, b, …)', description: 'First argument that is not null.' },
-  { name: 'isNull', signature: 'isNull(value)', description: 'True when the value is null.' },
-  { name: 'len', signature: 'len(text)', description: 'Length of a string.' },
-  { name: 'now', signature: 'now()', description: 'Current UTC date and time.' },
-  { name: 'today', signature: 'today()', description: 'Current UTC date at midnight.' },
-  { name: 'year', signature: 'year(date)', description: 'Year component of a date.' },
-  { name: 'month', signature: 'month(date)', description: 'Month component of a date (1-12).' },
-  { name: 'dayOfMonth', signature: 'dayOfMonth(date)', description: 'Day of the month (1-31).' },
-  { name: 'dayOfWeek', signature: 'dayOfWeek(date)', description: 'Day of the week (0 = Sunday).' },
-  { name: 'dayOfYear', signature: 'dayOfYear(date)', description: 'Day of the year (1-366).' },
-  { name: 'weekOfYear', signature: 'weekOfYear(date)', description: 'ISO-8601 week number.' },
-  { name: 'hour', signature: 'hour(date)', description: 'Hour component (0-23).' },
-  { name: 'minute', signature: 'minute(date)', description: 'Minute component (0-59).' },
-  { name: 'second', signature: 'second(date)', description: 'Second component (0-59).' },
+  { name: 'if', signature: 'if(condition, then, else)' },
+  { name: 'average', signature: 'average(a, b, …)' },
+  { name: 'higher_than', signature: 'higher_than(value, reference, percentage)' },
+  { name: 'coalesce', signature: 'coalesce(a, b, …)' },
+  { name: 'isNull', signature: 'isNull(value)' },
+  { name: 'len', signature: 'len(text)' },
+  { name: 'now', signature: 'now()' },
+  { name: 'today', signature: 'today()' },
+  { name: 'year', signature: 'year(date)' },
+  { name: 'month', signature: 'month(date)' },
+  { name: 'dayOfMonth', signature: 'dayOfMonth(date)' },
+  { name: 'dayOfWeek', signature: 'dayOfWeek(date)' },
+  { name: 'dayOfYear', signature: 'dayOfYear(date)' },
+  { name: 'weekOfYear', signature: 'weekOfYear(date)' },
+  { name: 'hour', signature: 'hour(date)' },
+  { name: 'minute', signature: 'minute(date)' },
+  { name: 'second', signature: 'second(date)' },
   // NCalc native functions (resolved by the engine when not overridden). NCalc matches function
   // names case-insensitively, so they're offered lower-cased to match the rest of the dialect.
-  { name: 'abs', signature: 'abs(number)', description: 'Absolute value.' },
-  { name: 'ceiling', signature: 'ceiling(number)', description: 'Smallest integer greater than or equal to the number.' },
-  { name: 'floor', signature: 'floor(number)', description: 'Largest integer less than or equal to the number.' },
-  { name: 'round', signature: 'round(number, decimals)', description: 'Round to the given number of decimal places.' },
-  { name: 'truncate', signature: 'truncate(number)', description: 'Integer part of the number (drops the fraction).' },
-  { name: 'sign', signature: 'sign(number)', description: 'Sign of the number: -1, 0 or 1.' },
-  { name: 'sqrt', signature: 'sqrt(number)', description: 'Square root.' },
-  { name: 'pow', signature: 'pow(base, exponent)', description: 'Base raised to the exponent.' },
-  { name: 'exp', signature: 'exp(number)', description: 'e raised to the given power.' },
-  { name: 'log', signature: 'log(number, base)', description: 'Logarithm of the number in the given base.' },
-  { name: 'log10', signature: 'log10(number)', description: 'Base-10 logarithm.' },
-  { name: 'max', signature: 'max(a, b)', description: 'Larger of the two numbers.' },
-  { name: 'min', signature: 'min(a, b)', description: 'Smaller of the two numbers.' },
-  { name: 'ieeeRemainder', signature: 'ieeeRemainder(x, y)', description: 'IEEE 754 remainder of x divided by y.' },
-  { name: 'sin', signature: 'sin(number)', description: 'Sine (radians).' },
-  { name: 'cos', signature: 'cos(number)', description: 'Cosine (radians).' },
-  { name: 'tan', signature: 'tan(number)', description: 'Tangent (radians).' },
-  { name: 'asin', signature: 'asin(number)', description: 'Arc sine (radians).' },
-  { name: 'acos', signature: 'acos(number)', description: 'Arc cosine (radians).' },
-  { name: 'atan', signature: 'atan(number)', description: 'Arc tangent (radians).' },
+  { name: 'abs', signature: 'abs(number)' },
+  { name: 'ceiling', signature: 'ceiling(number)' },
+  { name: 'floor', signature: 'floor(number)' },
+  { name: 'round', signature: 'round(number, decimals)' },
+  { name: 'truncate', signature: 'truncate(number)' },
+  { name: 'sign', signature: 'sign(number)' },
+  { name: 'sqrt', signature: 'sqrt(number)' },
+  { name: 'pow', signature: 'pow(base, exponent)' },
+  { name: 'exp', signature: 'exp(number)' },
+  { name: 'log', signature: 'log(number, base)' },
+  { name: 'log10', signature: 'log10(number)' },
+  { name: 'max', signature: 'max(a, b)' },
+  { name: 'min', signature: 'min(a, b)' },
+  { name: 'ieeeRemainder', signature: 'ieeeRemainder(x, y)' },
+  { name: 'sin', signature: 'sin(number)' },
+  { name: 'cos', signature: 'cos(number)' },
+  { name: 'tan', signature: 'tan(number)' },
+  { name: 'asin', signature: 'asin(number)' },
+  { name: 'acos', signature: 'acos(number)' },
+  { name: 'atan', signature: 'atan(number)' },
 ]
+
+export function getExpressionFunctions(t: TFunction = i18n.t): readonly ExprFunctionMeta[] {
+  return EXPRESSION_FUNCTION_DEFINITIONS.map(fn => ({
+    ...fn,
+    description: t(`shell.expression.functions.${fn.name}.description`),
+  }))
+}
+
+/** @deprecated Prefer {@link getExpressionFunctions}; retained for cross-slice compatibility. */
+export const EXPRESSION_FUNCTIONS = new Proxy([] as ExprFunctionMeta[], {
+  get: (_, property) => Reflect.get(getExpressionFunctions(), property),
+})
 
 /** Lower-cased function names offered by autocomplete, for quick "is this a known function" checks. */
 export const EXPRESSION_FUNCTION_NAMES: ReadonlySet<string> =
-  new Set(EXPRESSION_FUNCTIONS.map(f => f.name.toLowerCase()))
+  new Set(EXPRESSION_FUNCTION_DEFINITIONS.map(f => f.name.toLowerCase()))
 
 /**
  * Every function name the server's evaluator accepts (lower-cased) — used by the editor's linter

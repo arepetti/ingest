@@ -1,4 +1,5 @@
 using Ingest.Api.Auth;
+using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
 using Ingest.Core.Security;
@@ -74,7 +75,7 @@ public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
     public async Task<IActionResult> Update(Guid accountId, Guid keyId, [FromBody] UpdateApiKeyRequest request, CancellationToken ct)
     {
         var updated = await service.UpdateDescriptionAsync(accountId, keyId, request.Description, ct);
-        return updated is null ? NotFound() : Ok(ApiKeyDto.From(updated));
+        return updated is null ? NotFound(DiagnosticProblem.NotFound("API key", keyId)) : Ok(ApiKeyDto.From(updated));
     }
 
     /// <summary>Revoke an existing API key.</summary>
@@ -91,7 +92,7 @@ public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
     public async Task<IActionResult> Revoke(Guid accountId, Guid keyId, CancellationToken ct)
     {
         var revoked = await service.RevokeAsync(accountId, keyId, ct);
-        return revoked is null ? NotFound() : Ok(ApiKeyDto.From(revoked));
+        return revoked is null ? NotFound(DiagnosticProblem.NotFound("API key", keyId)) : Ok(ApiKeyDto.From(revoked));
     }
 
     /// <summary>Permanently delete an API key.</summary>
@@ -112,6 +113,6 @@ public sealed class ApiKeysController(IApiKeyService service) : ControllerBase
     public async Task<IActionResult> Delete(Guid accountId, Guid keyId, CancellationToken ct)
     {
         var deleted = await service.DeleteAsync(accountId, keyId, ct);
-        return deleted ? NoContent() : NotFound();
+        return deleted ? NoContent() : NotFound(DiagnosticProblem.NotFound("API key", keyId));
     }
 }

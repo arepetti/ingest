@@ -37,7 +37,8 @@ public class ApprovalPolicyValidatorTests
     public async Task Required_with_no_approvers_is_rejected()
     {
         var policy = new ApprovalPolicy { Mode = ApprovalMode.Required };
-        await Assert.ThrowsAsync<ValidationException>(() => Validate(policy));
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => Validate(policy));
+        Assert.Equal(DiagnosticCodes.Approval.ApproverRequired, Assert.Single(ex.ErrorDetails).Code);
     }
 
     [Fact]
@@ -54,12 +55,16 @@ public class ApprovalPolicyValidatorTests
     [Fact]
     public async Task Required_referencing_an_unknown_account_is_rejected()
     {
+        var unknown = Guid.NewGuid();
         var policy = new ApprovalPolicy
         {
             Mode = ApprovalMode.Required,
-            Approvers = new() { new ApproverSpec { AccountId = Guid.NewGuid(), Requirement = ApproverRequirement.Required } },
+            Approvers = new() { new ApproverSpec { AccountId = unknown, Requirement = ApproverRequirement.Required } },
         };
-        await Assert.ThrowsAsync<ValidationException>(() => Validate(policy));
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => Validate(policy));
+        var detail = Assert.Single(ex.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Approval.ApproverNotFound, detail.Code);
+        Assert.Equal(unknown, detail.Params["accountId"]);
     }
 
     [Fact]
@@ -124,7 +129,10 @@ public class ApprovalPolicyValidatorTests
     public async Task UseGlobalDefault_is_rejected_when_not_allowed()
     {
         var policy = new ApprovalPolicy { Mode = ApprovalMode.UseGlobalDefault };
-        await Assert.ThrowsAsync<ValidationException>(() => Validate(policy, allowUseGlobalDefault: false));
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => Validate(policy, allowUseGlobalDefault: false));
+        var detail = Assert.Single(ex.ErrorDetails);
+        Assert.Equal(DiagnosticCodes.Approval.GlobalDefaultNotAllowed, detail.Code);
+        Assert.Equal(ApprovalMode.UseGlobalDefault.ToString(), detail.Params["mode"]);
     }
 
     [Fact]

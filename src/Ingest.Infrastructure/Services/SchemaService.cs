@@ -97,7 +97,7 @@ public sealed class SchemaService : ISchemaService
         if (collision is not null)
         {
             if (!collision.IsDeleted)
-                throw new ConflictException($"Schema '{input.Name}' already exists.");
+                throw SchemaAlreadyExists(input.Name);
 
             await _schemas.HardDeleteAsync(collision.Id, ct);
         }
@@ -129,7 +129,11 @@ public sealed class SchemaService : ISchemaService
         if (input.Version < existing.Version)
             throw new ValidationException(new[]
             {
-                $"Schema version cannot be decreased (was {existing.Version}, got {input.Version}).",
+                Diagnostic.Create(
+                    DiagnosticCodes.Schemas.VersionDecreased,
+                    $"Schema version cannot be decreased (was {existing.Version}, got {input.Version}).",
+                    ("previousVersion", existing.Version),
+                    ("requestedVersion", input.Version)),
             });
 
         // Capture the version before we overwrite it so the history snapshot can record old → new.
@@ -144,7 +148,7 @@ public sealed class SchemaService : ISchemaService
             if (collision is not null && collision.Id != id)
             {
                 if (!collision.IsDeleted)
-                    throw new ConflictException($"Schema '{input.Name}' already exists.");
+                    throw SchemaAlreadyExists(input.Name);
                 await _schemas.HardDeleteAsync(collision.Id, ct);
             }
         }
@@ -246,9 +250,16 @@ public sealed class SchemaService : ISchemaService
         if (existing is null) return; // idempotent: nothing to delete
 
         if (await _samples.IsSchemaInUseAsync(existing.Name, ct))
-            throw new ConflictException(
-                $"Schema '{existing.Label ?? existing.Name}' is referenced by one or more submissions and cannot be deleted. " +
-                "Disable it instead to stop accepting new data while keeping the history intact.");
+        {
+            var displayName = existing.Label ?? existing.Name;
+            throw new ConflictException(Diagnostic.Create(
+                DiagnosticCodes.Schemas.DeleteInUse,
+                $"Schema '{displayName}' is referenced by one or more submissions and cannot be deleted. " +
+                "Disable it instead to stop accepting new data while keeping the history intact.",
+                ("schemaId", id),
+                ("schemaName", existing.Name),
+                ("displayName", displayName)));
+        }
 
         await _schemas.SoftDeleteAsync(id, ct);
         await _audit.RecordAsync(AuditTargetType.Schema, AuditChangeType.Delete, existing.Id, existing.Name, ct);
@@ -349,10 +360,14 @@ public sealed class SchemaService : ISchemaService
     /// </summary>
     private void ValidateStructure(Schema schema)
     {
-        var errors = new List<string>();
+        var errors = new List<Diagnostic>();
 
         if (schema.Version < 0)
-            errors.Add("Schema version must be greater than or equal to 0.");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Schemas.VersionNegative,
+                "Schema version must be greater than or equal to 0.",
+                ("version", schema.Version),
+                ("minimum", 0)));
 
         // Value-name format: every name must be a valid C-style identifier so it can be used
         // unbracketed in NCalc rules AND so it doesn't collide with the bracketed
@@ -363,10 +378,13 @@ public sealed class SchemaService : ISchemaService
         foreach (var v in schema.Values)
         {
             if (!IsValidValueName(v.Name))
-                errors.Add(
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.ValueNameInvalid,
                     $"Value name '{v.Name}' is not a valid identifier. " +
                     "Names must start with a letter or underscore and contain only letters, " +
-                    "digits, and underscores (no dots, hyphens, spaces, or other punctuation).");
+                    "digits, and underscores (no dots, hyphens, spaces, or other punctuation).",
+                    ("valueName", v.Name),
+                    ("pattern", "^[A-Za-z_][A-Za-z0-9_]*$")));
         }
 
         // Per-value SinceVersion bounds. The wire contract treats null as 1, so we apply the
@@ -375,9 +393,19 @@ public sealed class SchemaService : ISchemaService
         {
             var since = v.SinceVersion ?? 1;
             if (since < 0)
-                errors.Add($"Value '{v.Name}' has SinceVersion < 0.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.SinceVersionNegative,
+                    $"Value '{v.Name}' has SinceVersion < 0.",
+                    ("valueName", v.Name),
+                    ("sinceVersion", since),
+                    ("minimum", 0)));
             if (since > schema.Version)
-                errors.Add($"Value '{v.Name}' has SinceVersion {since} greater than the schema's version {schema.Version}.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.SinceVersionAfterSchema,
+                    $"Value '{v.Name}' has SinceVersion {since} greater than the schema's version {schema.Version}.",
+                    ("valueName", v.Name),
+                    ("sinceVersion", since),
+                    ("schemaVersion", schema.Version)));
         }
 
         // RAG target band: a presentational hint, never enforced against samples, but the band
@@ -390,33 +418,61 @@ public sealed class SchemaService : ISchemaService
         foreach (var v in schema.Values.Where(v => v.IsCalculated))
         {
             if (string.IsNullOrWhiteSpace(v.Expression))
-                errors.Add($"Value '{v.Name}' is calculated but has no expression.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.CalculatedExpressionMissing,
+                    $"Value '{v.Name}' is calculated but has no expression.",
+                    ("valueName", v.Name)));
             if (v.Required)
-                errors.Add($"Value '{v.Name}' is calculated and cannot be required.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.CalculatedValueRequired,
+                    $"Value '{v.Name}' is calculated and cannot be required.",
+                    ("valueName", v.Name)));
             if (string.IsNullOrWhiteSpace(v.Expression)) continue;
 
             var syntax = _translator.ValidateSyntax(v.Expression);
             if (!syntax.Ok)
-                errors.Add($"Value '{v.Name}' expression syntax error: {syntax.Error}");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.CalculatedExpressionSyntax,
+                    $"Value '{v.Name}' expression syntax error: {syntax.Error}",
+                    ("valueName", v.Name),
+                    ("detail", syntax.Error),
+                    ("position", syntax.Position)));
 
             if (!ExpressionReferences.TryGetIdentifiers(v.Expression, out _, out var translateError, _translator))
             {
-                errors.Add($"Value '{v.Name}' expression cannot be analysed: {translateError}");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.CalculatedExpressionAnalysis,
+                    $"Value '{v.Name}' expression cannot be analysed: {translateError}",
+                    ("valueName", v.Name),
+                    ("detail", translateError)));
                 continue;
             }
 
             if (ExpressionReferences.ReferencesSelf(v.Expression, v.Name, _translator))
-                errors.Add($"Value '{v.Name}' expression references itself.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.CalculatedSelfReference,
+                    $"Value '{v.Name}' expression references itself.",
+                    ("valueName", v.Name)));
 
             if (ExpressionReferences.ReferencesHistoryFunctions(v.Expression))
-                errors.Add($"Value '{v.Name}' expression must not use latest() or previous(); calculated values are sibling-only.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.CalculatedHistoryReference,
+                    $"Value '{v.Name}' expression must not use latest() or previous(); calculated values are sibling-only.",
+                    ("valueName", v.Name),
+                    ("functions", new[] { "latest", "previous" })));
 
             foreach (var unknown in ExpressionReferences.UnknownIdentifiers(v.Expression, schema, _translator))
-                errors.Add($"Value '{v.Name}' expression references unknown identifier '{unknown}'.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.CalculatedUnknownIdentifier,
+                    $"Value '{v.Name}' expression references unknown identifier '{unknown}'.",
+                    ("valueName", v.Name),
+                    ("identifier", unknown)));
         }
 
         if (ExpressionReferences.HasCycleAmongCalculated(schema, _translator))
-            errors.Add("Calculated values contain a dependency cycle.");
+            errors.Add(new Diagnostic(
+                DiagnosticCodes.Schemas.CalculatedDependencyCycle,
+                "Calculated values contain a dependency cycle."));
 
         // Layout: every value-ref resolves; no value is referenced more than once; section nodes
         // have a non-empty caption; nesting is bounded.
@@ -424,8 +480,15 @@ public sealed class SchemaService : ISchemaService
         var seenRefs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         ValidateLayoutNodes(schema.Layout, depth: 0, errors, valueNames, seenRefs);
 
-        if (errors.Count > 0) throw new ValidationException(errors);
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
     }
+
+    private static ConflictException SchemaAlreadyExists(string name) =>
+        new(Diagnostic.Create(
+            DiagnosticCodes.Schemas.AlreadyExists,
+            $"Schema '{name}' already exists.",
+            ("schemaName", name)));
 
     /// <summary>
     /// C-style identifier rule: first character is a letter or underscore, subsequent
@@ -447,7 +510,7 @@ public sealed class SchemaService : ISchemaService
     /// <c>AmberMin → GreenMin → GreenMax → AmberMax</c>, must be non-decreasing; (2) a green
     /// (inner) edge requires the matching amber (outer) edge on the same side.
     /// </summary>
-    private static void ValidateTargetBand(SchemaValue v, List<string> errors)
+    private static void ValidateTargetBand(SchemaValue v, List<Diagnostic> errors)
     {
         // Canonical low-to-high order of the four edges; nulls are skipped.
         var edges = new (string Label, double? Value)[]
@@ -463,28 +526,47 @@ public sealed class SchemaService : ISchemaService
         {
             if (value is not { } current) continue;
             if (prev is { } p && p.Value > current)
-                errors.Add($"Value '{v.Name}' has an out-of-order target band: {p.Label} ({p.Value}) must be less than or equal to {label} ({current}).");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.TargetBandOutOfOrder,
+                    $"Value '{v.Name}' has an out-of-order target band: {p.Label} ({p.Value}) must be less than or equal to {label} ({current}).",
+                    ("valueName", v.Name),
+                    ("lowerBand", p.Label),
+                    ("lowerValue", p.Value),
+                    ("upperBand", label),
+                    ("upperValue", current)));
             prev = (label, current);
         }
 
         // Inner (green) needs outer (amber) on its own side, so the ideal range always sits within
         // an acceptable range rather than dropping straight to red.
         if (v.GreenMin is not null && v.AmberMin is null)
-            errors.Add($"Value '{v.Name}' sets GreenMin without AmberMin; the ideal range needs an acceptable lower bound around it.");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Schemas.GreenMinWithoutAmberMin,
+                $"Value '{v.Name}' sets GreenMin without AmberMin; the ideal range needs an acceptable lower bound around it.",
+                ("valueName", v.Name),
+                ("greenMin", v.GreenMin)));
         if (v.GreenMax is not null && v.AmberMax is null)
-            errors.Add($"Value '{v.Name}' sets GreenMax without AmberMax; the ideal range needs an acceptable upper bound around it.");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Schemas.GreenMaxWithoutAmberMax,
+                $"Value '{v.Name}' sets GreenMax without AmberMax; the ideal range needs an acceptable upper bound around it.",
+                ("valueName", v.Name),
+                ("greenMax", v.GreenMax)));
     }
 
     private static void ValidateLayoutNodes(
         IReadOnlyList<SchemaLayoutNode> nodes,
         int depth,
-        List<string> errors,
+        List<Diagnostic> errors,
         HashSet<string> valueNames,
         HashSet<string> seenRefs)
     {
         if (depth > MaxLayoutDepth)
         {
-            errors.Add($"Layout exceeds the maximum nesting depth of {MaxLayoutDepth}.");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Schemas.LayoutDepthExceeded,
+                $"Layout exceeds the maximum nesting depth of {MaxLayoutDepth}.",
+                ("maxDepth", MaxLayoutDepth),
+                ("actualDepth", depth)));
             return;
         }
 
@@ -494,24 +576,34 @@ public sealed class SchemaService : ISchemaService
             {
                 if (string.IsNullOrWhiteSpace(node.ValueName))
                 {
-                    errors.Add("Layout has a value node without a valueName.");
+                    errors.Add(new Diagnostic(
+                        DiagnosticCodes.Schemas.LayoutValueNameMissing,
+                        "Layout has a value node without a valueName."));
                     continue;
                 }
                 if (!valueNames.Contains(node.ValueName))
                 {
-                    errors.Add($"Layout references unknown value '{node.ValueName}'.");
+                    errors.Add(Diagnostic.Create(
+                        DiagnosticCodes.Schemas.LayoutUnknownValue,
+                        $"Layout references unknown value '{node.ValueName}'.",
+                        ("valueName", node.ValueName)));
                     continue;
                 }
                 if (!seenRefs.Add(node.ValueName))
                 {
-                    errors.Add($"Value '{node.ValueName}' is referenced more than once in the layout.");
+                    errors.Add(Diagnostic.Create(
+                        DiagnosticCodes.Schemas.LayoutDuplicateValue,
+                        $"Value '{node.ValueName}' is referenced more than once in the layout.",
+                        ("valueName", node.ValueName)));
                 }
             }
             else if (node.Kind == SchemaLayoutNodeKind.Section)
             {
                 if (string.IsNullOrWhiteSpace(node.Caption))
                 {
-                    errors.Add("Layout has a section node without a caption.");
+                    errors.Add(new Diagnostic(
+                        DiagnosticCodes.Schemas.LayoutSectionCaptionMissing,
+                        "Layout has a section node without a caption."));
                 }
                 if (node.Items is { Count: > 0 })
                 {
@@ -520,7 +612,11 @@ public sealed class SchemaService : ISchemaService
             }
             else
             {
-                errors.Add($"Layout has a node with unknown kind '{node.Kind}'. Expected '{SchemaLayoutNodeKind.Value}' or '{SchemaLayoutNodeKind.Section}'.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Schemas.LayoutUnknownKind,
+                    $"Layout has a node with unknown kind '{node.Kind}'. Expected '{SchemaLayoutNodeKind.Value}' or '{SchemaLayoutNodeKind.Section}'.",
+                    ("actualKind", node.Kind.ToString()),
+                    ("expectedKinds", new[] { SchemaLayoutNodeKind.Value.ToString(), SchemaLayoutNodeKind.Section.ToString() })));
             }
         }
     }

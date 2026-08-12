@@ -5,7 +5,7 @@
     GET /api/me (shown in the dashboard footer).
   -->
   <PropertyGroup>
-    <Version>0.5.2</Version>
+    <Version>0.5.3</Version>
     <Product>Ingest</Product>
   </PropertyGroup>
 </Project>

@@ -15,18 +15,19 @@ import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { accountsBackupExportUrl, fetchAllAccounts, useAccounts, useApiKeys, useAuthProviders, useCapabilities, useCreateAccount, useDeleteAccount, useDeleteApiKey, useEraseAccount, useImportAccountsBackup, useRevokeApiKey, useRotateApiKey, useUpdateApiKey, useSendAdhocEmail, useUpdateAccount, personalDataExportUrl } from '../api/hooks'
 import type { Account, AccountKind, AccountRole, ApiKey, AuthProvider, CreateAccountRequest, ErasureMode, ErasureResult, ExternalLogin, UpdateAccountRequest } from '../api/types'
-import { CAPABILITY_GROUPS, defaultCapabilitiesForRole, type Capability } from '../api/capabilities'
+import { getCapabilityGroups, defaultCapabilitiesForRole, type Capability } from '../api/capabilities'
 import { downloadFromUrl, pickTextFile } from '../utils/download'
-import { formatApiError } from '../api/client'
+import { formatApiError, localizeDiagnostics } from '../api/client'
 import { RowActions } from '../components/RowActions'
 import { OnboardAccountWizard } from '../components/OnboardAccountWizard'
 import { AccountAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
-import { confirmDelete } from '../utils/confirm'
-import { formatDate, formatDateTime } from '../utils/format'
 import { clickableRowProps } from '../utils/a11y'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -78,7 +79,15 @@ const useStyles = makeStyles({
   },
   capPicker: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' },
   capGroupLabel: { fontWeight: 600, fontSize: '12px', color: tokens.colorNeutralForeground2, textTransform: 'uppercase', letterSpacing: '0.02em' },
-  capGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 16px' },
+  capGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px' },
+  capItem: { display: 'flex', flexDirection: 'column' },
+  // Indented past the checkbox indicator so the description hangs under its own label.
+  capDescription: {
+    marginLeft: `calc(16px + ${tokens.spacingHorizontalS})`,
+    color: tokens.colorNeutralForeground3,
+    fontSize: '12px',
+    lineHeight: tokens.lineHeightBase200,
+  },
   capNote: { color: tokens.colorNeutralForeground3, fontSize: '12px' },
 })
 
@@ -109,6 +118,7 @@ function CapabilityPicker({
   onChange: (next: Capability[]) => void
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const isAdmin = role === 'Admin'
   const isService = role === 'Service'
   const readOnly = isAdmin || isService
@@ -122,27 +132,32 @@ function CapabilityPicker({
   }
 
   return (
-    <Field label="Permissions" hint="Fine-grained capabilities. The role above is just a starting template — tailor these as needed.">
+    <Field label={t('accounts.permissions.title')} hint={t('accounts.permissions.hint')}>
       <div className={s.capPicker}>
         {isAdmin && (
-          <Body1 className={s.capNote}>Administrators always hold every permission; this cannot be reduced.</Body1>
+          <Body1 className={s.capNote}>{t('accounts.permissions.adminNote')}</Body1>
         )}
         {isService && (
-          <Body1 className={s.capNote}>Service accounts only submit and view their own data; they hold no back-office permissions.</Body1>
+          <Body1 className={s.capNote}>{t('accounts.permissions.serviceNote')}</Body1>
         )}
-        {CAPABILITY_GROUPS.map(group => (
+        {getCapabilityGroups(t).map(group => (
           <div key={group.group}>
             <div className={s.capGroupLabel}>{group.group}</div>
             <div className={s.capGrid}>
               {group.items.map(item => (
-                <Checkbox
-                  key={item.id}
-                  id={`cap-${item.id}`}
-                  label={item.label}
-                  checked={isAdmin ? true : isService ? false : set.has(item.id)}
-                  disabled={readOnly}
-                  onChange={(_, d) => toggle(item.id, !!d.checked)}
-                />
+                <div key={item.id} className={s.capItem}>
+                  <Checkbox
+                    id={`cap-${item.id}`}
+                    label={item.label}
+                    input={{ 'aria-describedby': `cap-${item.id}-description` }}
+                    checked={isAdmin ? true : isService ? false : set.has(item.id)}
+                    disabled={readOnly}
+                    onChange={(_, d) => toggle(item.id, !!d.checked)}
+                  />
+                  <span id={`cap-${item.id}-description`} className={s.capDescription}>
+                    {item.description}
+                  </span>
+                </div>
               ))}
             </div>
           </div>
@@ -168,22 +183,23 @@ function AssignedServicesPicker({
   selected: string[]
   onChange: (next: string[]) => void
 }) {
+  const { t } = useTranslation()
   const set = new Set(selected)
   // Only offer enabled services; keep any already-assigned id even if it's since been disabled so
   // the existing scope isn't silently dropped on save.
   const options = services.filter(a => a.enabled || set.has(a.id))
   const summary = selected.length === 0
-    ? 'All services'
+    ? t('accounts.scope.allServices')
     : options.filter(a => set.has(a.id)).map(a => a.label || a.name).join(', ')
 
   return (
     <Field
-      label="Service scope"
-      hint="Which services this account can see. Leave empty for unrestricted access to every service; pick one or more to confine it to just those."
+      label={t('accounts.scope.title')}
+      hint={t('accounts.scope.hint')}
     >
       <Dropdown
         multiselect
-        placeholder="All services"
+        placeholder={t('accounts.scope.allServices')}
         selectedOptions={selected}
         value={summary}
         onOptionSelect={(_, d) => onChange(d.selectedOptions)}
@@ -215,27 +231,31 @@ function cleanLogins(links?: ExternalLogin[]): ExternalLogin[] {
     .filter(l => l.provider && l.email)
 }
 
-// Friendly one-liners for the Kind dropdown — Application is the default for service credentials,
-// User is for humans who'll also log in to this admin console.
-const kindHints: Record<AccountKind, string> = {
-  Application: 'API-only credential (cannot log in to the UI)',
-  User: 'Interactive account (can log in to the UI and call APIs)',
+function roleLabel(t: TFunction, role: AccountRole): string {
+  return t(`accounts.roles.${role}`)
 }
 
-const ACCOUNT_EXPORT_COLUMNS: ExportColumn<Account>[] = [
-  { header: 'Name', value: a => a.name },
-  { header: 'Label', value: a => a.label ?? '' },
-  { header: 'Kind', value: a => a.kind },
-  { header: 'Role', value: a => a.role },
-  { header: 'Status', value: a => (a.enabled ? 'Enabled' : 'Disabled') },
-  { header: 'Email', value: a => a.email ?? '' },
-  { header: 'Area', value: a => a.area ?? '' },
-  { header: 'Created', value: a => a.createdAt },
-  { header: 'Created by', value: a => a.createdBy ?? '' },
-]
+function kindLabel(t: TFunction, kind: AccountKind): string {
+  return t(`accounts.kinds.${kind}`)
+}
+
+function accountExportColumns(t: TFunction): ExportColumn<Account>[] {
+  return [
+    { header: t('accounts.fields.name'), value: a => a.name },
+    { header: t('accounts.fields.label'), value: a => a.label ?? '' },
+    { header: t('accounts.fields.kind'), value: a => kindLabel(t, a.kind) },
+    { header: t('accounts.fields.role'), value: a => roleLabel(t, a.role) },
+    { header: t('accounts.fields.status'), value: a => t(a.enabled ? 'accounts.status.enabled' : 'accounts.status.disabled') },
+    { header: t('accounts.fields.email'), value: a => a.email ?? '' },
+    { header: t('accounts.fields.area'), value: a => a.area ?? '' },
+    { header: t('accounts.fields.created'), value: a => a.createdAt },
+    { header: t('accounts.fields.createdBy'), value: a => a.createdBy ?? '' },
+  ]
+}
 
 export function ServicesPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const [sp, setSp] = useSearchParams()
   const [page, setPage] = useState(1)
@@ -268,7 +288,7 @@ export function ServicesPage() {
   const [onboarding, setOnboarding] = useState<AccountRole | null>(null)
   const accountsExport = useCsvExport({
     filename: 'accounts.csv',
-    columns: ACCOUNT_EXPORT_COLUMNS,
+    columns: accountExportColumns(t),
     fetchAll: () => fetchAllAccounts(),
     onError: setActionError,
   })
@@ -293,21 +313,18 @@ export function ServicesPage() {
       parsed = JSON.parse(content)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (!/no file selected/i.test(msg)) setActionError(`Could not read the accounts file: ${msg}`)
+      if (!/no file selected/i.test(msg)) setActionError(t('accounts.import.readError', { error: msg }))
       return
     }
-    const ok = window.confirm(
-      'Import accounts from this file?\n\n' +
-      'Accounts are matched by name: existing ones are updated and new names are created. ' +
-      'Accounts not in the file are left untouched.\n\n' +
-      'API keys are NOT included, so any account created by this import starts with no key — ' +
-      'generate one for each afterwards.',
-    )
+    const ok = window.confirm(t('accounts.import.confirm'))
     if (!ok) return
     try {
       const res = await importAccounts.mutateAsync(parsed)
-      const tail = res.errors.length > 0 ? ` · ${res.errors.length} skipped: ${res.errors.join('; ')}` : ''
-      setActionInfo(`Import complete: ${res.created} created, ${res.updated} updated${tail}.`)
+      const errors = localizeDiagnostics(res.errorDetails, res.errors)
+      const tail = errors.length > 0
+        ? t('accounts.import.skipped', { count: errors.length, errors: errors.join('; ') })
+        : ''
+      setActionInfo(t('accounts.import.complete', { created: res.created, updated: res.updated, tail }))
     } catch (e) {
       setActionError(formatApiError(e))
     }
@@ -350,12 +367,12 @@ export function ServicesPage() {
   function emailFromView(a: Account) { setViewing(null); setEmailDialogFor(a) }
   function statusFromView(a: Account) { setViewing(null); nav(`/services/${encodeURIComponent(a.name)}/status`) }
   function deleteFromView(a: Account) {
-    if (!confirmDelete('account', a.label || a.name)) return
+    if (!window.confirm(t('accounts.confirmDelete', { target: a.label || a.name }))) return
     setViewing(null)
     del.mutate(a.id)
   }
   function deleteFromRow(a: Account) {
-    if (!confirmDelete('account', a.label || a.name)) return
+    if (!window.confirm(t('accounts.confirmDelete', { target: a.label || a.name }))) return
     del.mutate(a.id)
   }
   function eraseFromView(a: Account) { setViewing(null); setEraseDialogFor(a) }
@@ -378,8 +395,8 @@ export function ServicesPage() {
     const area = (a.area ?? '').trim() || null
     // Email is required for new accounts; existing accounts may keep an empty email (legacy data),
     // so editing doesn't force one. A non-empty value must still look like an address.
-    if (editing.kind === 'create' && !email) { setEditorTab('general'); setSubmitError('Email is required.'); return }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEditorTab('general'); setSubmitError('Enter a valid email address.'); return }
+    if (editing.kind === 'create' && !email) { setEditorTab('general'); setSubmitError(t('accounts.validation.emailRequired')); return }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEditorTab('general'); setSubmitError(t('accounts.validation.emailInvalid')); return }
     // Only User-kind accounts can hold SSO links; never send them for Application accounts.
     const logins = a.kind === 'User' ? cleanLogins(a.externalLogins) : []
     const role = a.role ?? 'Service'
@@ -434,30 +451,30 @@ export function ServicesPage() {
   return (
     <div className={s.root}>
       <div className={s.toolbar}>
-        <Title2>Accounts</Title2>
+        <Title2>{t('accounts.title')}</Title2>
         <Toolbar className={s.toolbarActions}>
-          {canManageAccounts && <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>New account</ToolbarButton>}
+          {canManageAccounts && <ToolbarButton appearance="primary" icon={<Add20Regular />} onClick={openCreate}>{t('accounts.actions.new')}</ToolbarButton>}
           <Menu>
             <MenuTrigger disableButtonEnhancement>
-              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('accounts.actions.more')} />
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
-                {canManageAccounts && <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Service')}>Onboard new service</MenuItem>}
-                {canManageAccounts && <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Operator')}>Onboard new operator</MenuItem>}
+                {canManageAccounts && <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Service')}>{t('accounts.actions.onboardService')}</MenuItem>}
+                {canManageAccounts && <MenuItem icon={<PersonAdd20Regular />} onClick={() => setOnboarding('Operator')}>{t('accounts.actions.onboardOperator')}</MenuItem>}
                 {canManageAccounts && <MenuDivider />}
-                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>Refresh</MenuItem>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => refetch()}>{t('accounts.actions.refresh')}</MenuItem>
                 <MenuDivider />
                 <MenuItem
                   icon={<ArrowDownload20Regular />}
                   disabled={accountsExport.exporting}
                   onClick={accountsExport.exportList}
                 >
-                  {accountsExport.exporting ? 'Exporting…' : 'Export this list (CSV)'}
+                  {t(accountsExport.exporting ? 'accounts.actions.exporting' : 'accounts.actions.exportCsv')}
                 </MenuItem>
                 <MenuDivider />
                 <MenuItem icon={<ArrowDownload20Regular />} onClick={exportAccountsJson}>
-                  Export accounts (JSON)
+                  {t('accounts.actions.exportJson')}
                 </MenuItem>
                 {canManageAccounts && (
                   <MenuItem
@@ -465,7 +482,7 @@ export function ServicesPage() {
                     disabled={importAccounts.isPending}
                     onClick={importAccountsJson}
                   >
-                    {importAccounts.isPending ? 'Importing…' : 'Import accounts (JSON)…'}
+                    {t(importAccounts.isPending ? 'accounts.actions.importing' : 'accounts.actions.importJson')}
                   </MenuItem>
                 )}
               </MenuList>
@@ -477,7 +494,7 @@ export function ServicesPage() {
       {error && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Failed to load</MessageBarTitle>
+            <MessageBarTitle>{t('accounts.messages.loadFailed')}</MessageBarTitle>
             {formatApiError(error)}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -486,7 +503,7 @@ export function ServicesPage() {
       {actionError && (
         <AutoScrollMessageBar intent="error">
           <MessageBarBody>
-            <MessageBarTitle>Action failed</MessageBarTitle>
+            <MessageBarTitle>{t('accounts.messages.actionFailed')}</MessageBarTitle>
             {actionError}
           </MessageBarBody>
         </AutoScrollMessageBar>
@@ -501,25 +518,25 @@ export function ServicesPage() {
       <Table size="small">
         <TableHeader>
           <TableRow>
-            <TableHeaderCell>Name</TableHeaderCell>
-            <TableHeaderCell>Kind</TableHeaderCell>
-            <TableHeaderCell>Role</TableHeaderCell>
-            <TableHeaderCell>Status</TableHeaderCell>
-            <TableHeaderCell>Created</TableHeaderCell>
-            <TableHeaderCell>Created by</TableHeaderCell>
-            <TableHeaderCell className={s.actionsHeader}>Actions</TableHeaderCell>
+            <TableHeaderCell>{t('accounts.fields.name')}</TableHeaderCell>
+            <TableHeaderCell>{t('accounts.fields.kind')}</TableHeaderCell>
+            <TableHeaderCell>{t('accounts.fields.role')}</TableHeaderCell>
+            <TableHeaderCell>{t('accounts.fields.status')}</TableHeaderCell>
+            <TableHeaderCell>{t('accounts.fields.created')}</TableHeaderCell>
+            <TableHeaderCell>{t('accounts.fields.createdBy')}</TableHeaderCell>
+            <TableHeaderCell className={s.actionsHeader}>{t('accounts.fields.actions')}</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={7}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={7}>{t('accounts.messages.loading')}</GridMessageRow>}
           {!isLoading && (data?.items ?? []).length === 0 && (
-            <GridMessageRow colSpan={7}>No accounts yet — click “New account” to add one.</GridMessageRow>
+            <GridMessageRow colSpan={7}>{t('accounts.messages.empty')}</GridMessageRow>
           )}
           {(data?.items ?? []).map(a => (
             <TableRow
               key={a.id}
               className={`${s.row} ${s.rowClickable}`}
-              {...clickableRowProps(() => setViewing(a), `View account ${a.label || a.name}`)}
+              {...clickableRowProps(() => setViewing(a), t('accounts.aria.viewAccount', { name: a.label || a.name }))}
             >
               <TableCell className={s.nameCell}>
                 <TableCellLayout media={<AccountAvatar account={a} />} description={a.description ?? ''}>
@@ -528,39 +545,39 @@ export function ServicesPage() {
                   </Tooltip>
                 </TableCellLayout>
               </TableCell>
-              <TableCell>{a.kind}</TableCell>
-              <TableCell>{a.role}</TableCell>
+              <TableCell>{kindLabel(t, a.kind)}</TableCell>
+              <TableCell>{roleLabel(t, a.role)}</TableCell>
               <TableCell>
                 <Badge appearance="outline" color={a.enabled ? 'success' : 'danger'}>
-                  {a.enabled ? 'Enabled' : 'Disabled'}
+                  {t(a.enabled ? 'accounts.status.enabled' : 'accounts.status.disabled')}
                 </Badge>
               </TableCell>
               <TableCell>
-                <Tooltip content={formatDateTime(a.createdAt)} relationship="label">
-                  <span>{formatDate(a.createdAt)}</span>
+                <Tooltip content={<LocalizedTime value={a.createdAt} />} relationship="label">
+                  <LocalizedTime value={a.createdAt} dateOnly />
                 </Tooltip>
               </TableCell>
               <TableCell>{a.createdBy || '—'}</TableCell>
               <TableCell className={s.actionsCell} onClick={e => e.stopPropagation()}>
                 <RowActions
-                  ariaLabel={`Actions for ${a.name}`}
+                  ariaLabel={t('accounts.aria.actionsFor', { name: a.name })}
                   actions={[
-                    ...(canManageAccounts ? [{ key: 'edit', label: 'Edit', icon: <Edit20Regular />, onClick: () => openEdit(a) }] : []),
-                    ...(canManageKeys ? [{ key: 'keys', label: 'API keys', icon: <Key20Regular />, onClick: () => setKeyDialogFor(a) }] : []),
+                    ...(canManageAccounts ? [{ key: 'edit', label: t('accounts.actions.edit'), icon: <Edit20Regular />, onClick: () => openEdit(a) }] : []),
+                    ...(canManageKeys ? [{ key: 'keys', label: t('accounts.actions.apiKeys'), icon: <Key20Regular />, onClick: () => setKeyDialogFor(a) }] : []),
                     ...(emailEnabled && a.email
-                      ? [{ key: 'email', label: 'Send email', icon: <Mail20Regular />, onClick: () => setEmailDialogFor(a) }]
+                      ? [{ key: 'email', label: t('accounts.actions.sendEmail'), icon: <Mail20Regular />, onClick: () => setEmailDialogFor(a) }]
                       : []),
                     ...(a.role === 'Service'
                       ? [{
                           key: 'status',
-                          label: 'View status',
+                          label: t('accounts.actions.viewStatus'),
                           icon: <Status20Regular />,
                           onClick: () => nav(`/services/${encodeURIComponent(a.name)}/status`),
                         }]
                       : []),
-                    ...(canExportPersonal ? [{ key: 'export', label: 'Export personal data', icon: <ArrowDownload20Regular />, onClick: () => exportPersonalData(a) }] : []),
-                    ...(canErase ? [{ key: 'erase', label: 'Erase (GDPR)', icon: <ShieldPerson20Regular />, destructive: true, onClick: () => setEraseDialogFor(a) }] : []),
-                    ...(canManageAccounts ? [{ key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(a) }] : []),
+                    ...(canExportPersonal ? [{ key: 'export', label: t('accounts.actions.exportPersonalData'), icon: <ArrowDownload20Regular />, onClick: () => exportPersonalData(a) }] : []),
+                    ...(canErase ? [{ key: 'erase', label: t('accounts.actions.erase'), icon: <ShieldPerson20Regular />, destructive: true, onClick: () => setEraseDialogFor(a) }] : []),
+                    ...(canManageAccounts ? [{ key: 'delete', label: t('accounts.actions.delete'), icon: <Delete20Regular />, destructive: true, onClick: () => deleteFromRow(a) }] : []),
                   ]}
                 />
               </TableCell>
@@ -587,7 +604,7 @@ export function ServicesPage() {
         style={editorExpanded ? { width: DRAWER_EXPANDED_WIDTH } : undefined}
       >
         <DrawerHeaderWithClose
-          title={editing?.kind === 'create' ? 'New account' : 'Edit account'}
+          title={t(editing?.kind === 'create' ? 'accounts.editor.newTitle' : 'accounts.editor.editTitle')}
           onClose={() => { setEditing(null); setEditorExpanded(false) }}
           expanded={editorExpanded}
           onToggleExpand={() => setEditorExpanded(e => !e)}
@@ -609,63 +626,63 @@ export function ServicesPage() {
             return (
             <div className={s.drawerForm}>
               <TabList selectedValue={activeTab} onTabSelect={(_, d) => setEditorTab(d.value as EditorTab)}>
-                <Tab value="general">General</Tab>
-                <Tab value="permissions">Role &amp; permissions</Tab>
-                {scopeApplies && <Tab value="scope">Service scope</Tab>}
+                <Tab value="general">{t('accounts.editor.tabs.general')}</Tab>
+                <Tab value="permissions">{t('accounts.editor.tabs.permissions')}</Tab>
+                {scopeApplies && <Tab value="scope">{t('accounts.scope.title')}</Tab>}
               </TabList>
 
               {activeTab === 'general' && (
                 <div className={s.editorTabPanel}>
-                  <Field label="Name" required>
+                  <Field label={t('accounts.fields.name')} required>
                     <Input
                       value={editing.account.name ?? ''}
                       disabled={editing.kind === 'edit'}
                       onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, name: v.value } })}
                     />
                   </Field>
-                  <Field label="Label">
+                  <Field label={t('accounts.fields.label')}>
                     <Input value={editing.account.label ?? ''} onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, label: v.value } })} />
                   </Field>
-                  <Field label="Description">
+                  <Field label={t('accounts.fields.description')}>
                     <Textarea value={editing.account.description ?? ''} onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, description: v.value } })} />
                   </Field>
-                  <Field label="Email" required={editing.kind === 'create'} hint="Used for email notifications and ad-hoc messages.">
+                  <Field label={t('accounts.fields.email')} required={editing.kind === 'create'} hint={t('accounts.editor.emailHint')}>
                     <Input
                       type="email"
                       value={editing.account.email ?? ''}
-                      placeholder="user@example.com"
+                      placeholder={t('accounts.placeholders.email')}
                       onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, email: v.value } })}
                     />
                   </Field>
-                  <Field label="Area" hint="Optional grouping tag.">
+                  <Field label={t('accounts.fields.area')} hint={t('accounts.editor.areaHint')}>
                     {areaOptions.length > 0 ? (
                       <Dropdown
                         selectedOptions={[currentArea]}
-                        value={currentArea || 'None'}
+                        value={currentArea || t('accounts.editor.none')}
                         onOptionSelect={(_, d) => setEditing({ ...editing, account: { ...editing.account, area: d.optionValue ?? '' } })}
                       >
-                        <Option value="">None</Option>
+                        <Option value="">{t('accounts.editor.none')}</Option>
                         {areaOptions.map(ar => <Option key={ar} value={ar}>{ar}</Option>)}
                       </Dropdown>
                     ) : (
                       <Input
                         value={editing.account.area ?? ''}
-                        placeholder="e.g. North region"
+                        placeholder={t('accounts.placeholders.area')}
                         onChange={(_, v) => setEditing({ ...editing, account: { ...editing.account, area: v.value } })}
                       />
                     )}
                   </Field>
-                  <Field label="Kind" hint={kindHints[(editing.account.kind ?? 'Application') as AccountKind]}>
+                  <Field label={t('accounts.fields.kind')} hint={t(`accounts.kindHints.${(editing.account.kind ?? 'Application') as AccountKind}`)}>
                     <Dropdown
                       selectedOptions={[editing.account.kind ?? 'Application']}
-                      value={editing.account.kind ?? 'Application'}
+                      value={kindLabel(t, editing.account.kind ?? 'Application')}
                       disabled={editing.kind === 'edit'}
                       onOptionSelect={(_, d) => setEditing({ ...editing, account: { ...editing.account, kind: d.optionValue as AccountKind } })}
                     >
-                      {kinds.map(k => <Option key={k} value={k}>{k}</Option>)}
+                      {kinds.map(k => <Option key={k} value={k}>{kindLabel(t, k)}</Option>)}
                     </Dropdown>
                   </Field>
-                  <Checkbox label="Enabled" checked={editing.account.enabled ?? true} onChange={(_, d) => setEditing({ ...editing, account: { ...editing.account, enabled: !!d.checked } })} />
+                  <Checkbox label={t('accounts.status.enabled')} checked={editing.account.enabled ?? true} onChange={(_, d) => setEditing({ ...editing, account: { ...editing.account, enabled: !!d.checked } })} />
 
                   {hasSso && (editing.account.kind ?? 'Application') === 'User' && (
                     <ExternalLoginsEditor
@@ -679,17 +696,17 @@ export function ServicesPage() {
 
               {activeTab === 'permissions' && (
                 <div className={s.editorTabPanel}>
-                  <Field label="Role" hint="A template that seeds the permissions below — adjust them freely afterwards.">
+                  <Field label={t('accounts.fields.role')} hint={t('accounts.editor.roleHint')}>
                     <Dropdown
                       selectedOptions={[role]}
-                      value={role}
+                      value={roleLabel(t, role)}
                       onOptionSelect={(_, d) => {
                         const nextRole = d.optionValue as AccountRole
                         // Re-seed the permissions picker from the new role's default bundle.
                         setEditing({ ...editing, account: { ...editing.account, role: nextRole, capabilities: defaultCapabilitiesForRole(nextRole) } })
                       }}
                     >
-                      {roles.map(r => <Option key={r} value={r}>{r}</Option>)}
+                      {roles.map(r => <Option key={r} value={r}>{roleLabel(t, r)}</Option>)}
                     </Dropdown>
                   </Field>
 
@@ -718,8 +735,8 @@ export function ServicesPage() {
               )}
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-                <Button onClick={() => setEditing(null)}>Cancel</Button>
-                <Button appearance="primary" onClick={onSave}>Save</Button>
+                <Button onClick={() => setEditing(null)}>{t('accounts.actions.cancel')}</Button>
+                <Button appearance="primary" onClick={onSave}>{t('accounts.actions.save')}</Button>
               </div>
             </div>
             )
@@ -737,22 +754,22 @@ export function ServicesPage() {
         style={viewerExpanded ? { width: DRAWER_EXPANDED_WIDTH } : undefined}
       >
         <DrawerHeaderWithClose
-          title={viewing ? (viewing.label || viewing.name) : 'Account'}
+          title={viewing ? (viewing.label || viewing.name) : t('accounts.singular')}
           onClose={() => { setViewing(null); setViewerExpanded(false) }}
           expanded={viewerExpanded}
           onToggleExpand={() => setViewerExpanded(e => !e)}
         />
         {viewing && (
           <Toolbar className={s.drawerToolbar}>
-            {canManageAccounts && <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>Edit</ToolbarButton>}
-            {canManageKeys && <ToolbarButton icon={<Key20Regular />} onClick={() => keysFromView(viewing)}>API keys</ToolbarButton>}
+            {canManageAccounts && <ToolbarButton icon={<Edit20Regular />} onClick={() => editFromView(viewing)}>{t('accounts.actions.edit')}</ToolbarButton>}
+            {canManageKeys && <ToolbarButton icon={<Key20Regular />} onClick={() => keysFromView(viewing)}>{t('accounts.actions.apiKeys')}</ToolbarButton>}
             {emailEnabled && viewing.email && (
-              <ToolbarButton icon={<Mail20Regular />} onClick={() => emailFromView(viewing)}>Send email</ToolbarButton>
+              <ToolbarButton icon={<Mail20Regular />} onClick={() => emailFromView(viewing)}>{t('accounts.actions.sendEmail')}</ToolbarButton>
             )}
             {viewing.role === 'Service' && (
-              <ToolbarButton icon={<Status20Regular />} onClick={() => statusFromView(viewing)}>View status</ToolbarButton>
+              <ToolbarButton icon={<Status20Regular />} onClick={() => statusFromView(viewing)}>{t('accounts.actions.viewStatus')}</ToolbarButton>
             )}
-            {canExportPersonal && <ToolbarButton icon={<ArrowDownload20Regular />} onClick={() => exportPersonalData(viewing)}>Export data</ToolbarButton>}
+            {canExportPersonal && <ToolbarButton icon={<ArrowDownload20Regular />} onClick={() => exportPersonalData(viewing)}>{t('accounts.actions.exportData')}</ToolbarButton>}
             {canManageAccounts ? (
               // Default action is Delete; the chevron exposes the heavier GDPR erase as a subitem.
               <Menu positioning="below-end">
@@ -764,14 +781,14 @@ export function ServicesPage() {
                       appearance="subtle"
                       icon={<Delete20Regular />}
                     >
-                      Delete
+                      {t('accounts.actions.delete')}
                     </SplitButton>
                   )}
                 </MenuTrigger>
                 <MenuPopover>
                   <MenuList>
                     <MenuItem icon={<Delete20Regular />} onClick={() => deleteFromView(viewing)}>
-                      Delete
+                      {t('accounts.actions.delete')}
                     </MenuItem>
                     {canErase && (
                       <MenuItem
@@ -779,14 +796,14 @@ export function ServicesPage() {
                         onClick={() => eraseFromView(viewing)}
                         style={{ color: 'var(--colorPaletteRedForeground1)' }}
                       >
-                        Erase (GDPR)
+                        {t('accounts.actions.erase')}
                       </MenuItem>
                     )}
                   </MenuList>
                 </MenuPopover>
               </Menu>
             ) : canErase ? (
-              <ToolbarButton icon={<ShieldPerson20Regular />} onClick={() => eraseFromView(viewing)}>Erase (GDPR)</ToolbarButton>
+              <ToolbarButton icon={<ShieldPerson20Regular />} onClick={() => eraseFromView(viewing)}>{t('accounts.actions.erase')}</ToolbarButton>
             ) : null}
           </Toolbar>
         )}
@@ -806,7 +823,7 @@ export function ServicesPage() {
           open
           onClose={() => setOnboarding(null)}
           role={onboarding}
-          title={onboarding === 'Operator' ? 'Onboard a new operator' : 'Onboard a new service'}
+          title={t(onboarding === 'Operator' ? 'accounts.onboarding.operatorTitle' : 'accounts.onboarding.serviceTitle')}
           // Operators are always interactive User accounts, so lock the Kind for that flow.
           defaultKind={onboarding === 'Operator' ? 'User' : 'Application'}
           lockKind={onboarding === 'Operator'}
@@ -820,6 +837,7 @@ export function ServicesPage() {
 // full delete (remove everything). The destructive action is gated behind an explicit acknowledgement
 // because both modes are irreversible and bypass the ordinary "account has data" delete guard.
 function EraseDialog({ account, onClose }: { account: Account | null; onClose: () => void }) {
+  const { t } = useTranslation()
   const erase = useEraseAccount()
   const [mode, setMode] = useState<ErasureMode>('Anonymise')
   const [ack, setAck] = useState(false)
@@ -846,7 +864,7 @@ function EraseDialog({ account, onClose }: { account: Account | null; onClose: (
     <Dialog open={!!account} onOpenChange={(_, d) => !d.open && handleClose()}>
       <DialogSurface style={{ minWidth: 560 }}>
         <DialogBody>
-          <DialogTitle>Erase {account?.label || account?.name}</DialogTitle>
+          <DialogTitle>{t('accounts.erase.title', { name: account?.label || account?.name })}</DialogTitle>
           <DialogContent>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
@@ -854,27 +872,32 @@ function EraseDialog({ account, onClose }: { account: Account | null; onClose: (
                 <AutoScrollMessageBar intent="success">
                   <MessageBarBody>
                     <MessageBarTitle>
-                      {result.mode === 'Delete' ? 'Account deleted.' : 'Account anonymised.'}
+                      {t(result.mode === 'Delete' ? 'accounts.erase.deleted' : 'accounts.erase.anonymised')}
                     </MessageBarTitle>
-                    Pseudonym <code>{result.pseudonym}</code> · {result.submissionsAffected} submission(s),
-                    {' '}{result.samplesAffected} sample(s), {result.emailsRemoved} email(s),
-                    {' '}{result.auditEntriesAffected} audit entr(ies), {result.apiKeysRemoved} key(s).
+                    {t('accounts.erase.resultPrefix')} <code>{result.pseudonym}</code> ·{' '}
+                    {t('accounts.erase.resultCounts', {
+                      submissions: result.submissionsAffected,
+                      samples: result.samplesAffected,
+                      emails: result.emailsRemoved,
+                      auditEntries: result.auditEntriesAffected,
+                      keys: result.apiKeysRemoved,
+                    })}
                   </MessageBarBody>
                 </AutoScrollMessageBar>
               ) : (
                 <>
                   <Body1>
-                    This satisfies a right-to-erasure request. It is <strong>irreversible</strong> and
-                    bypasses the usual “account has submitted data” protection.
+                    {t('accounts.erase.warningBefore')} <strong>{t('accounts.erase.irreversible')}</strong>{' '}
+                    {t('accounts.erase.warningAfter')}
                   </Body1>
-                  <Field label="Mode">
+                  <Field label={t('accounts.erase.mode')}>
                     <RadioGroup value={mode} onChange={(_, d) => setMode(d.value as ErasureMode)}>
-                      <Radio value="Anonymise" label="Anonymise — keep numeric/date KPI values for reporting, strip all identity (pseudonymise the account, redact free-text, drop keys & emails)." />
-                      <Radio value="Delete" label="Delete — permanently remove the account and everything tied to it (submissions, samples, emails, audit trail)." />
+                      <Radio value="Anonymise" label={t('accounts.erase.anonymiseOption')} />
+                      <Radio value="Delete" label={t('accounts.erase.deleteOption')} />
                     </RadioGroup>
                   </Field>
                   <Checkbox
-                    label="I understand this cannot be undone."
+                    label={t('accounts.erase.acknowledgement')}
                     checked={ack}
                     onChange={(_, d) => setAck(!!d.checked)}
                   />
@@ -890,10 +913,14 @@ function EraseDialog({ account, onClose }: { account: Account | null; onClose: (
                 disabled={!ack || erase.isPending}
                 onClick={onErase}
               >
-                {erase.isPending ? 'Erasing…' : (mode === 'Delete' ? 'Delete everything' : 'Anonymise')}
+                {t(erase.isPending
+                  ? 'accounts.erase.erasing'
+                  : mode === 'Delete'
+                    ? 'accounts.erase.deleteEverything'
+                    : 'accounts.erase.anonymise')}
               </Button>
             )}
-            <Button appearance="secondary" onClick={handleClose}>{result ? 'Close' : 'Cancel'}</Button>
+            <Button appearance="secondary" onClick={handleClose}>{t(result ? 'accounts.actions.close' : 'accounts.actions.cancel')}</Button>
           </DialogActions>
         </DialogBody>
       </DialogSurface>
@@ -904,6 +931,7 @@ function EraseDialog({ account, onClose }: { account: Account | null; onClose: (
 // Ad-hoc plain-text email to a single account. The message is queued into the outbox and delivered
 // by the email sender like any other; success here just means "accepted into the queue".
 function SendEmailDialog({ account, onClose }: { account: Account | null; onClose: () => void }) {
+  const { t } = useTranslation()
   const send = useSendAdhocEmail()
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
@@ -913,7 +941,7 @@ function SendEmailDialog({ account, onClose }: { account: Account | null; onClos
   async function onSend() {
     if (!account) return
     setError(null)
-    if (!subject.trim()) { setError('Subject is required.'); return }
+    if (!subject.trim()) { setError(t('accounts.email.subjectRequired')); return }
     try {
       await send.mutateAsync({ accountId: account.id, subject: subject.trim(), body })
       setSent(true)
@@ -931,16 +959,16 @@ function SendEmailDialog({ account, onClose }: { account: Account | null; onClos
     <Dialog open={!!account} onOpenChange={(_, d) => !d.open && handleClose()}>
       <DialogSurface style={{ minWidth: 560 }}>
         <DialogBody>
-          <DialogTitle>Send email to {account?.label || account?.name}</DialogTitle>
+          <DialogTitle>{t('accounts.email.title', { name: account?.label || account?.name })}</DialogTitle>
           <DialogContent>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <Body1>To: {account?.email}</Body1>
+              <Body1>{t('accounts.email.to', { email: account?.email })}</Body1>
               {error && <AutoScrollMessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></AutoScrollMessageBar>}
-              {sent && <AutoScrollMessageBar intent="success"><MessageBarBody>Email queued for delivery.</MessageBarBody></AutoScrollMessageBar>}
-              <Field label="Subject" required>
+              {sent && <AutoScrollMessageBar intent="success"><MessageBarBody>{t('accounts.email.queued')}</MessageBarBody></AutoScrollMessageBar>}
+              <Field label={t('accounts.email.subject')} required>
                 <Input value={subject} onChange={(_, d) => setSubject(d.value)} disabled={sent} />
               </Field>
-              <Field label="Message">
+              <Field label={t('accounts.email.message')}>
                 <Textarea value={body} onChange={(_, d) => setBody(d.value)} rows={8} resize="vertical" disabled={sent} />
               </Field>
             </div>
@@ -948,10 +976,10 @@ function SendEmailDialog({ account, onClose }: { account: Account | null; onClos
           <DialogActions>
             {!sent && (
               <Button appearance="primary" icon={<Mail20Regular />} disabled={send.isPending} onClick={onSend}>
-                {send.isPending ? 'Sending…' : 'Send'}
+                {t(send.isPending ? 'accounts.email.sending' : 'accounts.email.send')}
               </Button>
             )}
-            <Button appearance="secondary" onClick={handleClose}>{sent ? 'Close' : 'Cancel'}</Button>
+            <Button appearance="secondary" onClick={handleClose}>{t(sent ? 'accounts.actions.close' : 'accounts.actions.cancel')}</Button>
           </DialogActions>
         </DialogBody>
       </DialogSurface>
@@ -969,6 +997,7 @@ function ExternalLoginsEditor({
   onChange: (next: ExternalLogin[]) => void
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const defaultProvider = providers[0]?.id ?? ''
 
   function update(i: number, patch: Partial<ExternalLogin>) {
@@ -983,14 +1012,13 @@ function ExternalLoginsEditor({
 
   return (
     <div>
-      <div className={s.sectionLabel}>SSO sign-in</div>
+      <div className={s.sectionLabel}>{t('accounts.sso.title')}</div>
       <div className={s.hint}>
-        Link an identity-provider account so this user can sign in with “Continue with …”. Matched on
-        the provider and the user’s verified email.
+        {t('accounts.sso.hint')}
       </div>
       {links.map((link, i) => (
         <div key={i} className={s.linkRow}>
-          <Field label={i === 0 ? 'Provider' : undefined}>
+          <Field label={i === 0 ? t('accounts.sso.provider') : undefined}>
             <Dropdown
               selectedOptions={[link.provider]}
               value={providers.find(p => p.id === link.provider)?.displayName ?? link.provider}
@@ -999,24 +1027,25 @@ function ExternalLoginsEditor({
               {providers.map(p => <Option key={p.id} value={p.id}>{p.displayName}</Option>)}
             </Dropdown>
           </Field>
-          <Field label={i === 0 ? 'Email' : undefined}>
+          <Field label={i === 0 ? t('accounts.fields.email') : undefined}>
             <Input
               type="email"
               value={link.email}
-              placeholder="user@example.com"
+              placeholder={t('accounts.placeholders.email')}
               onChange={(_, v) => update(i, { email: v.value })}
             />
           </Field>
-          <Button appearance="subtle" icon={<Delete20Regular />} aria-label="Remove SSO link" onClick={() => remove(i)} />
+          <Button appearance="subtle" icon={<Delete20Regular />} aria-label={t('accounts.sso.remove')} onClick={() => remove(i)} />
         </div>
       ))}
-      <Button appearance="secondary" icon={<Add20Regular />} onClick={add}>Add SSO link</Button>
+      <Button appearance="secondary" icon={<Add20Regular />} onClick={add}>{t('accounts.sso.add')}</Button>
     </div>
   )
 }
 
 function AccountViewBody({ account, services }: { account: Account; services: Account[] }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const links = account.externalLogins ?? []
   // Per-service scope is only meaningful for back-office roles; Admins/Services are always unrestricted.
   const scopeApplies = account.role !== 'Admin' && account.role !== 'Service'
@@ -1028,26 +1057,26 @@ function AccountViewBody({ account, services }: { account: Account; services: Ac
   return (
     <div className={s.drawerForm}>
       <div className={s.twoCol}>
-        <Field label="Name"><Body1>{account.name}</Body1></Field>
-        <Field label="Label"><Body1>{account.label || '—'}</Body1></Field>
+        <Field label={t('accounts.fields.name')}><Body1>{account.name}</Body1></Field>
+        <Field label={t('accounts.fields.label')}><Body1>{account.label || '—'}</Body1></Field>
       </div>
-      {account.description && <Field label="Description"><Body1>{account.description}</Body1></Field>}
+      {account.description && <Field label={t('accounts.fields.description')}><Body1>{account.description}</Body1></Field>}
 
       <div className={s.twoCol}>
-        <Field label="Email"><Body1>{account.email || '—'}</Body1></Field>
-        <Field label="Area"><Body1>{account.area || '—'}</Body1></Field>
+        <Field label={t('accounts.fields.email')}><Body1>{account.email || '—'}</Body1></Field>
+        <Field label={t('accounts.fields.area')}><Body1>{account.area || '—'}</Body1></Field>
       </div>
 
       <div className={s.twoCol}>
-        <Field label="Kind"><Body1>{account.kind}</Body1></Field>
-        <Field label="Role"><Body1>{account.role}</Body1></Field>
+        <Field label={t('accounts.fields.kind')}><Body1>{kindLabel(t, account.kind)}</Body1></Field>
+        <Field label={t('accounts.fields.role')}><Body1>{roleLabel(t, account.role)}</Body1></Field>
       </div>
-      <Field label="Enabled"><Body1>{account.enabled ? 'Yes' : 'No'}</Body1></Field>
+      <Field label={t('accounts.status.enabled')}><Body1>{t(account.enabled ? 'accounts.common.yes' : 'accounts.common.no')}</Body1></Field>
 
       {scopeApplies && (
-        <Field label="Service scope" hint="Which services this account can see.">
+        <Field label={t('accounts.scope.title')} hint={t('accounts.scope.viewHint')}>
           {scopeIds.length === 0 ? (
-            <Body1>All services (unrestricted)</Body1>
+            <Body1>{t('accounts.scope.unrestricted')}</Body1>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {scopeNames.map((n, i) => (
@@ -1059,7 +1088,7 @@ function AccountViewBody({ account, services }: { account: Account; services: Ac
       )}
 
       {links.length > 0 && (
-        <Field label="SSO sign-in">
+        <Field label={t('accounts.sso.title')}>
           <div>
             {links.map((l, i) => (
               <Body1 key={i} block>{l.provider}: {l.email}</Body1>
@@ -1072,22 +1101,22 @@ function AccountViewBody({ account, services }: { account: Account; services: Ac
           when (and only when) it applies. */}
       {account.isDeleted && (
         <div>
-          <Badge appearance="outline" color="danger">Deleted</Badge>
+          <Badge appearance="outline" color="danger">{t('accounts.status.deleted')}</Badge>
         </div>
       )}
 
-      <div className={s.sectionLabel}>Audit</div>
+      <div className={s.sectionLabel}>{t('accounts.audit.title')}</div>
       <div className={s.twoCol}>
-        <Field label="Created">
+        <Field label={t('accounts.fields.created')}>
           <Body1>
-            {new Date(account.createdAt).toLocaleString()}
-            {account.createdBy ? ` · by ${account.createdBy}` : ''}
+            <LocalizedTime value={account.createdAt} />
+            {account.createdBy ? t('accounts.audit.by', { name: account.createdBy }) : ''}
           </Body1>
         </Field>
-        <Field label="Modified">
+        <Field label={t('accounts.fields.modified')}>
           <Body1>
-            {new Date(account.modifiedAt).toLocaleString()}
-            {account.modifiedBy ? ` · by ${account.modifiedBy}` : ''}
+            <LocalizedTime value={account.modifiedAt} />
+            {account.modifiedBy ? t('accounts.audit.by', { name: account.modifiedBy }) : ''}
           </Body1>
         </Field>
       </div>
@@ -1105,6 +1134,7 @@ function dateInputOffset(years: number, days = 0): string {
 
 function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account | null; onClose: () => void; rotated: string | null; onRotated: (v: string) => void }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const keys = useApiKeys(account?.id)
   const rotate = useRotateApiKey()
   const revoke = useRevokeApiKey()
@@ -1142,34 +1172,31 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
   }
 
   function deleteKey(k: ApiKey) {
-    const ok = window.confirm(
-      `Permanently delete API key ${k.keyId}?\n\n` +
-      (k.revokedAt
-        ? 'This removes the revoked key from the list for good.'
-        : 'The key is still active — deleting it stops it working immediately, just like revoking, but also removes it from the list.') +
-      '\n\nThis cannot be undone.',
-    )
+    const ok = window.confirm(t(
+      k.revokedAt ? 'accounts.keys.confirmDeleteRevoked' : 'accounts.keys.confirmDeleteActive',
+      { keyId: k.keyId },
+    ))
     if (!ok) return
     del.mutate({ accountId: k.accountId, keyId: k.id })
   }
 
   function keyStatus(k: { revokedAt?: string | null; expiresAt?: string | null }) {
-    if (k.revokedAt) return <Badge color="danger">Revoked</Badge>
-    if (k.expiresAt && new Date(k.expiresAt) <= new Date()) return <Badge color="danger">Expired</Badge>
-    return <Badge color="success">Active</Badge>
+    if (k.revokedAt) return <Badge color="danger">{t('accounts.keys.status.revoked')}</Badge>
+    if (k.expiresAt && new Date(k.expiresAt) <= new Date()) return <Badge color="danger">{t('accounts.keys.status.expired')}</Badge>
+    return <Badge color="success">{t('accounts.keys.status.active')}</Badge>
   }
 
   return (
     <Dialog open={!!account} onOpenChange={(_, d) => !d.open && onClose()}>
       <DialogSurface style={{ minWidth: 'min(900px, 92vw)' }}>
         <DialogBody>
-          <DialogTitle>API keys for {account?.label || account?.name}</DialogTitle>
+          <DialogTitle>{t('accounts.keys.title', { name: account?.label || account?.name })}</DialogTitle>
           <DialogContent>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {rotated && (
                 <AutoScrollMessageBar intent="warning">
                   <MessageBarBody>
-                    <MessageBarTitle>Copy this key now — it will not be shown again.</MessageBarTitle>
+                    <MessageBarTitle>{t('accounts.keys.copyNow')}</MessageBarTitle>
                     <div className={s.rotated}>{rotated}</div>
                   </MessageBarBody>
                 </AutoScrollMessageBar>
@@ -1177,11 +1204,11 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
               <Table size="small">
                 <TableHeader>
                   <TableRow>
-                    <TableHeaderCell>Key ID</TableHeaderCell>
-                    <TableHeaderCell>Description</TableHeaderCell>
-                    <TableHeaderCell>Created</TableHeaderCell>
-                    <TableHeaderCell>Expires</TableHeaderCell>
-                    <TableHeaderCell>Status</TableHeaderCell>
+                    <TableHeaderCell>{t('accounts.keys.keyId')}</TableHeaderCell>
+                    <TableHeaderCell>{t('accounts.fields.description')}</TableHeaderCell>
+                    <TableHeaderCell>{t('accounts.fields.created')}</TableHeaderCell>
+                    <TableHeaderCell>{t('accounts.keys.expires')}</TableHeaderCell>
+                    <TableHeaderCell>{t('accounts.fields.status')}</TableHeaderCell>
                     <TableHeaderCell></TableHeaderCell>
                   </TableRow>
                 </TableHeader>
@@ -1197,15 +1224,15 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                               size="small"
                               value={editText}
                               maxLength={200}
-                              placeholder="e.g. holiday cover for Jane"
+                              placeholder={t('accounts.keys.descriptionPlaceholderShort')}
                               onChange={(_, d) => setEditText(d.value)}
                               onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(k); if (e.key === 'Escape') setEditingId(null) }}
                             />
-                            <Tooltip content="Save" relationship="label">
-                              <Button size="small" appearance="subtle" icon={<Checkmark20Regular />} onClick={() => saveEdit(k)} aria-label="Save description" />
+                            <Tooltip content={t('accounts.actions.save')} relationship="label">
+                              <Button size="small" appearance="subtle" icon={<Checkmark20Regular />} onClick={() => saveEdit(k)} aria-label={t('accounts.keys.saveDescription')} />
                             </Tooltip>
-                            <Tooltip content="Cancel" relationship="label">
-                              <Button size="small" appearance="subtle" icon={<Dismiss20Regular />} onClick={() => setEditingId(null)} aria-label="Cancel" />
+                            <Tooltip content={t('accounts.actions.cancel')} relationship="label">
+                              <Button size="small" appearance="subtle" icon={<Dismiss20Regular />} onClick={() => setEditingId(null)} aria-label={t('accounts.actions.cancel')} />
                             </Tooltip>
                           </div>
                         ) : (
@@ -1217,27 +1244,27 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                             ) : (
                               <span className={s.keyDescText} style={{ color: tokens.colorNeutralForeground3 }}>—</span>
                             )}
-                            <Tooltip content="Edit description" relationship="label">
-                              <Button size="small" appearance="subtle" icon={<Edit20Regular />} onClick={() => startEdit(k)} aria-label="Edit description" />
+                            <Tooltip content={t('accounts.keys.editDescription')} relationship="label">
+                              <Button size="small" appearance="subtle" icon={<Edit20Regular />} onClick={() => startEdit(k)} aria-label={t('accounts.keys.editDescription')} />
                             </Tooltip>
                           </div>
                         )}
                       </TableCell>
-                      <TableCell style={{ whiteSpace: 'nowrap' }}>{new Date(k.createdAt).toLocaleString()}</TableCell>
-                      <TableCell style={{ whiteSpace: 'nowrap' }}>{k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : 'Never'}</TableCell>
+                      <TableCell style={{ whiteSpace: 'nowrap' }}><LocalizedTime value={k.createdAt} /></TableCell>
+                      <TableCell style={{ whiteSpace: 'nowrap' }}>{k.expiresAt ? <LocalizedTime value={k.expiresAt} dateOnly /> : t('accounts.keys.never')}</TableCell>
                       <TableCell>{keyStatus(k)}</TableCell>
                       <TableCell>
                         <div className={s.keyActions}>
                           {!k.revokedAt && (
-                            <Button size="small" onClick={() => revoke.mutate({ accountId: k.accountId, keyId: k.id })}>Revoke</Button>
+                            <Button size="small" onClick={() => revoke.mutate({ accountId: k.accountId, keyId: k.id })}>{t('accounts.keys.revoke')}</Button>
                           )}
-                          <Tooltip content="Delete key" relationship="label">
+                          <Tooltip content={t('accounts.keys.delete')} relationship="label">
                             <Button
                               size="small"
                               appearance="subtle"
                               icon={<Delete20Regular />}
                               onClick={() => deleteKey(k)}
-                              aria-label={`Delete key ${k.keyId}`}
+                              aria-label={t('accounts.keys.deleteAria', { keyId: k.keyId })}
                             />
                           </Tooltip>
                         </div>
@@ -1246,17 +1273,17 @@ function KeysDialog({ account, onClose, rotated, onRotated }: { account: Account
                   ))}
                 </TableBody>
               </Table>
-              <Field label="Description for the next key (optional)" hint="A note on who or why this key is for — handy for temporary or holiday-cover keys, especially with an expiry.">
-                <Input value={description} maxLength={200} placeholder="e.g. holiday cover for Jane (reviewer)" onChange={(_, d) => setDescription(d.value)} />
+              <Field label={t('accounts.keys.nextDescription')} hint={t('accounts.keys.descriptionHint')}>
+                <Input value={description} maxLength={200} placeholder={t('accounts.keys.descriptionPlaceholder')} onChange={(_, d) => setDescription(d.value)} />
               </Field>
-              <Field label="Expiry for the next key (optional)" hint="Leave blank for a key that never expires. Maximum two years from today.">
+              <Field label={t('accounts.keys.nextExpiry')} hint={t('accounts.keys.expiryHint')}>
                 <Input type="date" value={expiry} min={minExpiry} max={maxExpiry} onChange={(_, d) => setExpiry(d.value)} />
               </Field>
             </div>
           </DialogContent>
           <DialogActions>
-            <Button appearance="primary" icon={<ArrowRotateClockwise20Regular />} onClick={doRotate}>Generate new key</Button>
-            <DialogTrigger><Button appearance="secondary" onClick={onClose}>Close</Button></DialogTrigger>
+            <Button appearance="primary" icon={<ArrowRotateClockwise20Regular />} onClick={doRotate}>{t('accounts.keys.generate')}</Button>
+            <DialogTrigger><Button appearance="secondary" onClick={onClose}>{t('accounts.actions.close')}</Button></DialogTrigger>
           </DialogActions>
         </DialogBody>
       </DialogSurface>

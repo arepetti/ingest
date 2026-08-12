@@ -56,6 +56,7 @@ public sealed class IngestApiFactory : WebApplicationFactory<Program>
         // Keep the third-party auth path inert.
         ["Sso__EnableSso"] = "false",
         ["Ingest__EnableSwagger"] = "false",
+        ["Ingest__DefaultLocale"] = " en-us ",
 
         // Features stay enabled (so their endpoints are reachable) but every background worker is
         // off — tests trigger drains/runs explicitly for determinism.

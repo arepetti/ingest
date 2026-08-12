@@ -21,6 +21,8 @@ internal sealed class SubmissionWarningBsonSerializer : SerializerBase<Submissio
 {
     private const string ValueNameField = "valueName";
     private const string MessageField = "message";
+    private const string CodeField = "code";
+    private const string ParamsField = "params";
 
     /// <inheritdoc />
     public override SubmissionWarning Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
@@ -39,6 +41,8 @@ internal sealed class SubmissionWarningBsonSerializer : SerializerBase<Submissio
             case BsonType.Document:
                 string? valueName = null;
                 var message = string.Empty;
+                string? code = null;
+                IReadOnlyDictionary<string, object?>? parameters = null;
                 reader.ReadStartDocument();
                 while (reader.ReadBsonType() != BsonType.EndOfDocument)
                 {
@@ -52,11 +56,22 @@ internal sealed class SubmissionWarningBsonSerializer : SerializerBase<Submissio
                         valueName = reader.ReadString();
                     else if (string.Equals(name, MessageField, StringComparison.OrdinalIgnoreCase))
                         message = reader.ReadString();
+                    else if (string.Equals(name, CodeField, StringComparison.OrdinalIgnoreCase))
+                        code = reader.ReadString();
+                    else if (string.Equals(name, ParamsField, StringComparison.OrdinalIgnoreCase) &&
+                             reader.GetCurrentBsonType() == BsonType.Document)
+                    {
+                        var document = BsonDocumentSerializer.Instance.Deserialize(context);
+                        parameters = document.Elements.ToDictionary(
+                            x => x.Name,
+                            x => (object?)BsonTypeMapper.MapToDotNetValue(x.Value),
+                            StringComparer.Ordinal);
+                    }
                     else
                         reader.SkipValue();
                 }
                 reader.ReadEndDocument();
-                return new SubmissionWarning(valueName, message);
+                return new SubmissionWarning(valueName, message, code, parameters);
 
             default:
                 // Anything unexpected: skip it and record a placeholder rather than throwing —
@@ -84,6 +99,25 @@ internal sealed class SubmissionWarningBsonSerializer : SerializerBase<Submissio
         }
         writer.WriteName(MessageField);
         writer.WriteString(value.Message ?? string.Empty);
+        if (!string.IsNullOrWhiteSpace(value.Code))
+        {
+            writer.WriteName(CodeField);
+            writer.WriteString(value.Code);
+        }
+        if (value.Params is { Count: > 0 })
+        {
+            writer.WriteName(ParamsField);
+            writer.WriteStartDocument();
+            foreach (var (name, parameter) in value.Params)
+            {
+                writer.WriteName(name);
+                BsonValueSerializer.Instance.Serialize(
+                    context,
+                    args,
+                    BsonTypeMapper.MapToBsonValue(parameter));
+            }
+            writer.WriteEndDocument();
+        }
         writer.WriteEndDocument();
     }
 }

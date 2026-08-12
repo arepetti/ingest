@@ -2,16 +2,32 @@
  * Shared "filter by period" helpers used by list pages that support a relative/custom date range.
  * Ranges are half-open: `from` inclusive, `to` exclusive — matching the server-side filters.
  */
+import type { TFunction } from 'i18next'
+import i18n from '../i18n'
 
 export type Interval = 'all' | 'lastDay' | 'lastWeek' | 'lastMonth' | 'custom'
 
-export const INTERVAL_LABELS: Record<Interval, string> = {
+const INTERVALS: Interval[] = ['all', 'lastDay', 'lastWeek', 'lastMonth', 'custom']
+
+const INTERVAL_FALLBACKS: Record<Interval, string> = {
   all: 'All time',
-  lastDay: 'Last day',
-  lastWeek: 'Last week',
-  lastMonth: 'Last month',
+  lastDay: 'Last 24 hours',
+  lastWeek: 'Last 7 days',
+  lastMonth: 'Last 30 days',
   custom: 'Custom range',
 }
+
+export function intervalLabel(interval: Interval, t?: TFunction): string {
+  return (t ?? (i18n.isInitialized ? i18n.t : undefined))?.(`shell.period.interval.${interval}`)
+    ?? INTERVAL_FALLBACKS[interval]
+}
+
+/** @deprecated Prefer {@link intervalLabel}; retained for cross-slice compatibility. */
+export const INTERVAL_LABELS = new Proxy({} as Record<Interval, string>, {
+  get: (_, key: string) => intervalLabel(key as Interval),
+  ownKeys: () => INTERVALS,
+  getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }),
+})
 
 function addDays(d: Date, days: number): Date {
   const r = new Date(d)
@@ -51,11 +67,21 @@ export function intervalRange(
  */
 export type ShiftKey = '1m' | '6m' | '1y'
 
-export const SHIFT_LABELS: Record<ShiftKey, string> = {
+const SHIFT_FALLBACKS: Record<ShiftKey, string> = {
   '1m': '1 month',
   '6m': '6 months',
   '1y': '1 year',
 }
+
+export function shiftLabel(shift: ShiftKey, t?: TFunction): string {
+  return (t ?? (i18n.isInitialized ? i18n.t : undefined))?.(`shell.period.shift.${shift}`)
+    ?? SHIFT_FALLBACKS[shift]
+}
+
+/** @deprecated Prefer {@link shiftLabel}; retained for cross-slice compatibility. */
+export const SHIFT_LABELS = new Proxy({} as Record<ShiftKey, string>, {
+  get: (_, key: string) => shiftLabel(key as ShiftKey),
+})
 
 /** Shift a UTC ISO timestamp back by the given amount (calendar-aware), e.g. `from2 = from - shift`. */
 export function shiftIso(iso: string, shift: ShiftKey): string {

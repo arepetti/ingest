@@ -59,7 +59,12 @@ public static class ReportMetadataParser
         // on the fence line itself.
         var closeIdx = FindClosingFence(content, firstFenceEnd);
         if (closeIdx < 0)
-            throw new ValidationException(new[] { "Report front matter opens with '---' but never closes." });
+            throw new ValidationException(new[]
+            {
+                new Diagnostic(
+                    DiagnosticCodes.Reports.FrontMatterUnclosed,
+                    "Report front matter opens with '---' but never closes."),
+            });
 
         var fmBody = content.Substring(firstFenceEnd, closeIdx - firstFenceEnd);
         var template = content.Substring(closeIdx + ClosingFenceLength(content, closeIdx));
@@ -116,7 +121,7 @@ public static class ReportMetadataParser
         // level keys) so a simple line scan with a peek-ahead for `- value` blocks under
         // `schemas:` is enough.
         var lines = fmBody.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-        var errors = new List<string>();
+        var errors = new List<Diagnostic>();
 
         for (var i = 0; i < lines.Length; i++)
         {
@@ -127,7 +132,11 @@ public static class ReportMetadataParser
             var colon = line.IndexOf(':');
             if (colon <= 0)
             {
-                errors.Add($"Cannot parse front-matter line: '{raw}'.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Reports.FrontMatterLineInvalid,
+                    $"Cannot parse front-matter line: '{raw}'.",
+                    ("line", raw),
+                    ("lineNumber", i + 1)));
                 continue;
             }
             var key = line.Substring(0, colon).Trim().ToLowerInvariant();
@@ -149,7 +158,11 @@ public static class ReportMetadataParser
                     if (string.IsNullOrEmpty(v)) break;
                     if (!Enum.TryParse<ReportType>(v, ignoreCase: true, out var parsed))
                     {
-                        errors.Add($"Front-matter 'type' must be 'Single' or 'Aggregate' (got '{v}').");
+                        errors.Add(Diagnostic.Create(
+                            DiagnosticCodes.Reports.FrontMatterTypeInvalid,
+                            $"Front-matter 'type' must be 'Single' or 'Aggregate' (got '{v}').",
+                            ("actualType", v),
+                            ("allowedTypes", new[] { "Single", "Aggregate" })));
                         break;
                     }
                     type = parsed;
@@ -191,7 +204,8 @@ public static class ReportMetadataParser
             }
         }
 
-        if (errors.Count > 0) throw new ValidationException(errors);
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
         return (name, label, description, type, (IReadOnlyList<string>)(schemas ?? new List<string>()));
     }
 
@@ -205,12 +219,16 @@ public static class ReportMetadataParser
         return raw;
     }
 
-    private static IEnumerable<string> ParseInlineList(string raw, List<string> errors)
+    private static IEnumerable<string> ParseInlineList(string raw, List<Diagnostic> errors)
     {
         var s = raw.Trim();
         if (s.Length < 2 || s[0] != '[' || s[^1] != ']')
         {
-            errors.Add($"Inline list must be wrapped in [..] (got '{raw}').");
+            errors.Add(Diagnostic.Create(
+                DiagnosticCodes.Reports.FrontMatterInlineListInvalid,
+                $"Inline list must be wrapped in [..] (got '{raw}').",
+                ("value", raw),
+                ("expectedWrapper", "[..]")));
             yield break;
         }
         var inner = s.Substring(1, s.Length - 2);

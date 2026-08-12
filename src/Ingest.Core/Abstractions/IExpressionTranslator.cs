@@ -1,3 +1,5 @@
+using Ingest.Core.Common;
+
 namespace Ingest.Core.Abstractions;
 
 /// <summary>
@@ -61,7 +63,17 @@ public interface IExpressionTranslator
 /// <param name="Ok">True when the parser accepted the expression. When false, <paramref name="Error"/> is non-null.</param>
 /// <param name="Error">Parser error message; <c>null</c> on success.</param>
 /// <param name="Position">Optional 0-based character offset the parser stumbled at; <c>null</c> when the underlying parser doesn't expose one.</param>
-public sealed record ExpressionSyntaxResult(bool Ok, string? Error = null, int? Position = null);
+public sealed record ExpressionSyntaxResult(bool Ok, string? Error = null, int? Position = null)
+{
+    /// <summary>Structured counterpart to <see cref="Error"/>.</summary>
+    public Diagnostic? ErrorDetail { get; init; } =
+        Error is null
+            ? null
+            : Diagnostic.Create(
+                DiagnosticCodes.Expressions.ParseFailed,
+                Error,
+                ("position", Position));
+}
 
 /// <summary>Outcome of an expression-to-JavaScript translation.</summary>
 /// <param name="Js">A JavaScript expression (not a statement) that, when evaluated with <c>V</c> and <c>H</c> in scope, returns the same result as the source rule.</param>

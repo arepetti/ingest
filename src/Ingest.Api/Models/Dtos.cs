@@ -1,4 +1,5 @@
 using Ingest.Core.Abstractions;
+using Ingest.Core.Common;
 using Ingest.Core.Entities;
 using Ingest.Core.Security;
 using Ingest.Core.Validation;
@@ -175,9 +176,12 @@ public sealed record AccountsBackupFileDto(
 /// <param name="Errors">Per-account errors for entries that were skipped.</param>
 public sealed record AccountsImportResultDto(int Created, int Updated, List<string> Errors)
 {
+    /// <summary>Structured counterparts to <see cref="Errors"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> ErrorDetails { get; init; } = Array.Empty<Diagnostic>();
+
     /// <summary>Project the domain result onto the wire shape.</summary>
     public static AccountsImportResultDto From(AccountsImportResult r) =>
-        new(r.Created, r.Updated, r.Errors.ToList());
+        new(r.Created, r.Updated, r.Errors.ToList()) { ErrorDetails = r.ErrorDetails };
 }
 
 /// <summary>Body for <c>POST /api/admin/accounts/{id}/erase</c> — a GDPR right-to-erasure request.</summary>
@@ -523,16 +527,23 @@ public sealed record SubmissionDto(
     List<SubmissionApprovalDto> Approvals,
     bool IsDraft)
 {
+    /// <summary>Structured counterparts to <see cref="Warnings"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> WarningDetails { get; init; } = Array.Empty<Diagnostic>();
+
     /// <summary>Project the domain entity onto the wire shape.</summary>
-    public static SubmissionDto From(Submission s) => new(
-        s.Id, s.ServiceAccountId, s.ServiceName,
-        s.Samples.Select(x => new SampleDto(x.SchemaName, x.ValueName, x.Value, x.Timestamp, x.Note)).ToList(),
-        (s.Warnings ?? new()).Select(w => w.Message).ToList(),
-        s.SubmittedAt, s.ReplacedAt, s.CreatedAt, s.CreatedBy, s.ModifiedAt, s.ModifiedBy, s.IsDeleted,
-        s.Source, s.ApprovalStatus,
-        (s.RequiredApprovers ?? new()).Select(ApproverSpecDto.From).ToList(),
-        (s.Approvals ?? new()).Select(SubmissionApprovalDto.From).ToList(),
-        s.IsDraft);
+    public static SubmissionDto From(Submission s) =>
+        new(
+            s.Id, s.ServiceAccountId, s.ServiceName,
+            s.Samples.Select(x => new SampleDto(x.SchemaName, x.ValueName, x.Value, x.Timestamp, x.Note)).ToList(),
+            (s.Warnings ?? new()).Select(w => w.Message).ToList(),
+            s.SubmittedAt, s.ReplacedAt, s.CreatedAt, s.CreatedBy, s.ModifiedAt, s.ModifiedBy, s.IsDeleted,
+            s.Source, s.ApprovalStatus,
+            (s.RequiredApprovers ?? new()).Select(ApproverSpecDto.From).ToList(),
+            (s.Approvals ?? new()).Select(SubmissionApprovalDto.From).ToList(),
+            s.IsDraft)
+        {
+            WarningDetails = (s.Warnings ?? new()).Select(w => w.ToDiagnostic()).ToList(),
+        };
 }
 
 /// <summary>
@@ -546,7 +557,11 @@ public sealed record SubmissionDto(
 /// Human-readable warnings, one per triggered rule. Always non-null; empty when the validator
 /// had nothing to report.
 /// </param>
-public sealed record SubmissionWriteResponse(Guid Id, IReadOnlyList<string> Warnings);
+public sealed record SubmissionWriteResponse(Guid Id, IReadOnlyList<string> Warnings)
+{
+    /// <summary>Structured counterparts to <see cref="Warnings"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> WarningDetails { get; init; } = Array.Empty<Diagnostic>();
+}
 
 /// <summary>Wire shape of one (schema, value) pair that a dry-run would discard before persistence.</summary>
 /// <param name="SchemaName">Machine-style schema name.</param>
@@ -578,14 +593,25 @@ public sealed record SubmissionValidationResponse(
     ApprovalStatus ApprovalStatus,
     IReadOnlyList<ApproverSpecDto> RequiredApprovers)
 {
+    /// <summary>Structured counterparts to <see cref="Errors"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> ErrorDetails { get; init; } = Array.Empty<Diagnostic>();
+
+    /// <summary>Structured counterparts to <see cref="Warnings"/>, in the same order.</summary>
+    public IReadOnlyList<Diagnostic> WarningDetails { get; init; } = Array.Empty<Diagnostic>();
+
     /// <summary>Project the service-layer outcome onto the wire shape.</summary>
-    public static SubmissionValidationResponse From(SubmissionValidationOutcome o) => new(
-        o.Valid,
-        o.Errors,
-        o.Warnings,
-        o.DiscardedSamples.Select(SampleRefDto.From).ToList(),
-        o.ApprovalStatus,
-        o.RequiredApprovers.Select(ApproverSpecDto.From).ToList());
+    public static SubmissionValidationResponse From(SubmissionValidationOutcome o) =>
+        new(
+            o.Valid,
+            o.Errors,
+            o.Warnings,
+            o.DiscardedSamples.Select(SampleRefDto.From).ToList(),
+            o.ApprovalStatus,
+            o.RequiredApprovers.Select(ApproverSpecDto.From).ToList())
+        {
+            ErrorDetails = o.ErrorDetails,
+            WarningDetails = o.WarningDetails,
+        };
 }
 
 /// <summary>Wire shape of a single designated approver in an approval policy.</summary>
@@ -1019,6 +1045,17 @@ public sealed record EmailMessageDto(
     string Category,
     Guid? RelatedAccountId)
 {
+    /// <summary>Structured context for <see cref="LastError"/> when delivery failed.</summary>
+    public Diagnostic? LastErrorDetail =>
+        LastError is null
+            ? null
+            : Diagnostic.Create(
+                DiagnosticCodes.Email.DeliveryFailed,
+                LastError,
+                ("messageId", Id),
+                ("attempts", Attempts),
+                ("status", Status.ToString()));
+
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static EmailMessageDto From(EmailMessage m) => new(
         m.Id, m.ToAddress, m.ToName, m.Subject, m.Status, m.Attempts, m.LastError,
@@ -1111,7 +1148,11 @@ public sealed record TranslateExpressionRequest(string Expression);
 /// <param name="Ok">True when the expression parsed cleanly. When false, <paramref name="Error"/> is non-null.</param>
 /// <param name="Error">Parser error message; <c>null</c> when <paramref name="Ok"/> is true.</param>
 /// <param name="Position">Optional 0-based character offset where the parser stumbled; <c>null</c> when the underlying parser doesn't expose one.</param>
-public sealed record ValidateExpressionResponse(bool Ok, string? Error = null, int? Position = null);
+public sealed record ValidateExpressionResponse(bool Ok, string? Error = null, int? Position = null)
+{
+    /// <summary>Structured counterpart to <see cref="Error"/>.</summary>
+    public Diagnostic? ErrorDetail { get; init; }
+}
 
 /// <summary>
 /// Request body for <c>POST /api/expressions/dependencies</c> — a batch of expressions to parse
@@ -1130,7 +1171,11 @@ public sealed record ExpressionDependencyBatchRequest(IReadOnlyList<string> Expr
 /// <c>.minimum</c>/<c>.maximum</c> themselves). Empty when the expression is blank or failed to parse.
 /// </param>
 /// <param name="Error">Parser error message when the expression failed to parse; <c>null</c> on success (including a blank input).</param>
-public sealed record ExpressionDependencyResult(IReadOnlyList<string> Identifiers, string? Error);
+public sealed record ExpressionDependencyResult(IReadOnlyList<string> Identifiers, string? Error)
+{
+    /// <summary>Structured counterpart to <see cref="Error"/>.</summary>
+    public Diagnostic? ErrorDetail { get; init; }
+}
 
 /// <summary>Response body for <c>POST /api/expressions/dependencies</c>. <see cref="Results"/> has exactly one entry per input expression, in the same order.</summary>
 public sealed record ExpressionDependencyBatchResponse(IReadOnlyList<ExpressionDependencyResult> Results);
@@ -1775,6 +1820,18 @@ public sealed record WebhookDeliveryDto(
     DateTime? NextAttemptAt,
     Guid? RelatedAccountId)
 {
+    /// <summary>Structured context for <see cref="LastError"/> when delivery failed.</summary>
+    public Diagnostic? LastErrorDetail =>
+        LastError is null
+            ? null
+            : Diagnostic.Create(
+                DiagnosticCodes.Webhooks.DeliveryFailed,
+                LastError,
+                ("deliveryId", Id),
+                ("endpointId", EndpointId),
+                ("attempts", Attempts),
+                ("statusCode", LastStatusCode));
+
     /// <summary>Project the domain entity onto the wire shape.</summary>
     public static WebhookDeliveryDto From(WebhookDelivery d) => new(
         d.Id, d.EndpointId, d.Url,

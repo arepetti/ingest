@@ -12,6 +12,8 @@ It's deliberately small. One container, one database. No multi-tenant SaaS, no m
 
 ## What you get
 
+
+
 ### A catalogue services have to respect
 
 Administrators define **schemas** — packages of KPI values (think *"monthly waste collection report"* with `tonnes_collected`, `incidents`, `downtime_hours`). Each value has a type, a unit, a reporting cadence, and a flag for whether it's required. Services see exactly the schemas they're entitled to submit against; everyone else sees nothing.
@@ -26,9 +28,11 @@ Every submission is validated server-side:
 - **Soft warnings** — schemas can flag unusual-but-legal values so analysts notice them, without rejecting the data.
 - **Cadence enforcement** — at most one submission per period, per service, per KPI. Supported cadences are **daily**, **weekly**, **fortnightly** (Monday-anchored biweeks), **monthly**, **quarterly** (calendar quarters), **semi-annually** (H1/H2), and **yearly**. Different values in the same schema can have different cadences, and the validator rejects silent duplicates inside an open window.
 
+
+
 ### A web console for the people who run it
 
-The bundled admin SPA (built with Microsoft Fluent UI) lets administrators:
+The bundled admin SPA lets administrators:
 
 - Create services, issue and rotate their API keys, disable them when staff move on.
 - Author schemas through a form — including the validation rules, no editor or deployment needed.
@@ -39,6 +43,14 @@ The bundled admin SPA (built with Microsoft Fluent UI) lets administrators:
 - Upload simple HTML+Liquid **reports** (single-submission summaries or period roll-ups) that operators can render and re-render with different filters.
 
 Service-side users can use a slimmed-down version of the same console to file submissions through the web while they're getting started.
+
+### …in your team's language
+
+The console ships translated into six locales — **English (US)**, **English (UK)**, **Italiano**, **简体中文**, **繁體中文**, and **日本語** — covering navigation, forms, validation feedback, and locale-aware date and number formatting. Each person picks their own from **Settings → General → Language**; the choice is saved in that browser, so nobody's preference overrides anyone else's, and a deployment-wide default is set with `Ingest:DefaultLocale`.
+
+Adding a seventh is a translation job, not a code change: drop a single JSON file into `web/admin/src/locales/` and it's picked up automatically, with the test suite enforcing that it stays in step with the English source. And the translator doesn't have to read the codebase to guess what a string means — every English string carries a note saying where it's rendered, which sense of an ambiguous word applies, and what each interpolated value is, with a test that fails if the English changes and the note isn't revisited. See [docs/architecture/architecture.md § Localization](docs/architecture/architecture.md#localization).
+
+Only the product's own interface is translated. Schema labels, validation messages, report content, comments, and anything else you author stay exactly as you typed them. The Microsoft Teams bot isn't localised yet.
 
 ### …or use the API and stop typing numbers in by hand
 
@@ -76,14 +88,16 @@ The whole system ships as a single Docker image bundling the API and the admin S
 ## Who it's for
 
 
-| You are…                                          | …and you get                                                                                                                                                                                     | …start here                                                                              |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| **Just kicking the tyres**                        | The whole thing running locally in a couple of minutes with **only Docker** — no .NET SDK, Node, or MongoDB to install.                                                                          | [docs/setup/quickstart.md](docs/setup/quickstart.md)                                     |
+| You are…                                             | …and you get                                                                                                                                                                                     | …start here                                                                              |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| **Just kicking the tyres**                           | The whole thing running locally in a couple of minutes with **only Docker** — no .NET SDK, Node, or MongoDB to install.                                                                          | [docs/setup/quickstart.md](docs/setup/quickstart.md)                                     |
 | A **catalogue administrator** running the deployment | The web console for managing services, schemas, submissions, and watching status across all services.                                                                                            | [docs/admin-user-guide/](docs/admin-user-guide/README.md)                                |
-| A **service** sending KPI data                    | A stable REST API that lets a scheduled job or an existing back-office system push KPIs automatically — no more weekly form-filling. A web form is there as a fallback (or for getting started). | [docs/client/](docs/client/README.md)                                                    |
-| A **data analyst / report author**                | A direct OData feed for Power BI (and equivalents), with examples and refresh-schedule guidance.                                                                                                 | [docs/setup/powerbi/](docs/setup/powerbi/README.md)                                      |
-| A **DevOps / SRE** rolling it out                 | A step-by-step Azure deployment, an exhaustive configuration reference, and an operational checklist.                                                                                            | [docs/setup/](docs/setup/README.md)                                                      |
-| A **developer / contributor**                     | Clean-architecture-ish layering, full XML doc comments, a focused test suite, and Aspire-driven local dev.                                                                                       | [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/architecture/](docs/architecture/README.md) |
+| A **service** sending KPI data                       | A stable REST API that lets a scheduled job or an existing back-office system push KPIs automatically — no more weekly form-filling. A web form is there as a fallback (or for getting started). | [docs/client/](docs/client/README.md)                                                    |
+| A **data analyst / report author**                   | A direct OData feed for Power BI (and equivalents), with examples and refresh-schedule guidance.                                                                                                 | [docs/setup/powerbi/](docs/setup/powerbi/README.md)                                      |
+| A **DevOps / SRE** rolling it out                    | A step-by-step Azure deployment, an exhaustive configuration reference, and an operational checklist.                                                                                            | [docs/setup/](docs/setup/README.md)                                                      |
+| A **developer / contributor**                        | Clean-architecture-ish layering, full XML doc comments, a focused test suite, and Aspire-driven local dev.                                                                                       | [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/architecture/](docs/architecture/README.md) |
+
+
 
 
 ## Documentation
@@ -95,6 +109,8 @@ Long-form docs live under `[docs/](docs/README.md)` and are split by audience:
 - **[setup/](docs/setup/README.md)** — deployment, configuration, and reporting integration.
 - **[architecture/](docs/architecture/README.md)** — system design and the auth model in depth.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev environment, tests, and where the source lives.
+
+
 
 ## Examples
 
@@ -127,13 +143,14 @@ Everything Ingest does, in one place:
 - **Soft warnings** — flag unusual-but-legal values without rejecting them.
 - **Cadence enforcement** — at most one submission per period, per service, per KPI; silent duplicates are rejected.
 
-**Admin web console (Fluent UI)**
+**Admin web console**
 
 - Manage services and accounts, issue/rotate/revoke API keys, disable accounts.
 - Author schemas and their validation rules — no editor or redeploy.
 - Browse and filter submissions; create or edit data **on behalf of** a service; **save work-in-progress drafts** and **clone** an existing submission into a new one; bulk-import history from JSON/CSV.
 - A status dashboard and **missing-submissions** analytics — who's up to date, who's behind, per KPI per period.
 - One-click historical plotting — with optional period-over-period comparison (e.g. this year vs last) and saveable filter presets — plus HTML + Liquid **reports** (single-submission or period roll-ups).
+- **Six interface languages** — English (US/UK), Italian, Simplified and Traditional Chinese, and Japanese, picked per user and remembered per browser, with locale-aware dates and numbers; a new language is one JSON file, no code change.
 
 **Integration & reporting**
 
@@ -153,6 +170,8 @@ Everything Ingest does, in one place:
 - **Backup & restore** convenience tool for small deployments and environment seeding.
 - **One container, one database** — health probes, structured logging, and OpenTelemetry tracing wired in; Aspire-driven local dev.
 
+
+
 ## Project status & support
 
 Ingest is an open-source project maintained by **a single developer in their spare time**. It's offered under the [MIT licence](LICENSE) **as-is, with no warranty and no SLA** — there's no company behind it and no guaranteed response time. That's stated plainly so you can plan around it, not to put you off: the project is built to be self-supportable and you're never locked in.
@@ -162,6 +181,8 @@ Ingest is an open-source project maintained by **a single developer in their spa
 - **How the project is run** (and how to become a co-maintainer — they're welcome) — [GOVERNANCE.md](GOVERNANCE.md).
 - **Relying on it in production?** Go ahead — but plan to self-support: the code is small and layered, every public type is documented, and [docs/](docs/README.md) covers deployment, configuration, and disaster recovery. The MIT licence means you can always fork and maintain your own copy.
 - **What does owning it actually cost?** [docs/ownership.md](docs/ownership.md) is an honest, manager-facing breakdown of the *effort* (not money) involved — what's mandatory vs optional, what runs where, and how it compares to the hand-made Excel/SharePoint/Access/OneDrive setups it replaces.
+
+
 
 ## License
 

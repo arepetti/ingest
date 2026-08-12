@@ -2,6 +2,7 @@ using Ingest.Api.Auth;
 using Ingest.Api.Common;
 using Ingest.Api.Models;
 using Ingest.Core.Abstractions;
+using Ingest.Core.Common;
 using Ingest.Core.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -49,7 +50,9 @@ public sealed class ReportsController(IReportService service) : ControllerBase
     public async Task<IActionResult> GetByName(string name, CancellationToken ct)
     {
         var r = await service.GetByNameAsync(name, ct);
-        return r is null ? NotFound() : Ok(ReportDto.From(r));
+        return r is null
+            ? NotFound(DiagnosticProblem.NotFound("Report", name))
+            : Ok(ReportDto.From(r));
     }
 
     /// <summary>
@@ -107,7 +110,13 @@ public sealed class AdminReportsController(IReportService service) : ControllerB
     public async Task<IActionResult> UploadFile(IFormFile? file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
-            return BadRequest(new { error = "No file uploaded (expected a 'file' multipart field with non-empty content)." });
+        {
+            const string message = "No file uploaded (expected a 'file' multipart field with non-empty content).";
+            return BadRequest(DiagnosticProblem.BadRequest(Diagnostic.Create(
+                DiagnosticCodes.Reports.MissingUpload,
+                message,
+                ("field", "file"))));
+        }
 
         using var reader = new StreamReader(file.OpenReadStream());
         var content = await reader.ReadToEndAsync(ct);

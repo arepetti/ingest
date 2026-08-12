@@ -54,7 +54,10 @@ public sealed class AccountService : IAccountService
         if (collision is not null)
         {
             if (!collision.IsDeleted)
-                throw new ConflictException($"Account '{input.Name}' already exists.");
+                throw new ConflictException(Diagnostic.Create(
+                    DiagnosticCodes.Accounts.AlreadyExists,
+                    $"Account '{input.Name}' already exists.",
+                    ("accountName", input.Name)));
 
             await _accounts.HardDeleteAsync(collision.Id, ct);
         }
@@ -120,7 +123,13 @@ public sealed class AccountService : IAccountService
         if (string.IsNullOrEmpty(trimmed)) return null;
 
         if (!MailAddress.TryCreate(trimmed, out _))
-            throw new ValidationException(new[] { $"'{trimmed}' is not a valid email address." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Accounts.InvalidEmail,
+                    $"'{trimmed}' is not a valid email address.",
+                    ("email", trimmed)),
+            });
 
         return trimmed.ToLowerInvariant();
     }
@@ -156,7 +165,13 @@ public sealed class AccountService : IAccountService
 
         var unknown = input.Where(c => !Capabilities.IsKnown(c)).Distinct(StringComparer.Ordinal).ToList();
         if (unknown.Count > 0)
-            throw new ValidationException(new[] { $"Unknown capabilities: {string.Join(", ", unknown)}." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Accounts.UnknownCapabilities,
+                    $"Unknown capabilities: {string.Join(", ", unknown)}.",
+                    ("capabilities", unknown)),
+            });
 
         return input.Distinct(StringComparer.Ordinal).ToList();
     }
@@ -192,7 +207,10 @@ public sealed class AccountService : IAccountService
         if (unknown.Count > 0)
             throw new ValidationException(new[]
             {
-                $"Assigned services must be existing service accounts. Unknown or non-service ids: {string.Join(", ", unknown)}.",
+                Diagnostic.Create(
+                    DiagnosticCodes.Accounts.InvalidAssignedServices,
+                    $"Assigned services must be existing service accounts. Unknown or non-service ids: {string.Join(", ", unknown)}.",
+                    ("serviceIds", unknown)),
             });
 
         return input;
@@ -216,9 +234,15 @@ public sealed class AccountService : IAccountService
         if (input.Count == 0) return new List<ExternalLogin>();
 
         if (kind != AccountKind.User)
-            throw new ValidationException(new[] { "Only User-kind accounts can have SSO sign-in links." });
+            throw new ValidationException(new[]
+            {
+                Diagnostic.Create(
+                    DiagnosticCodes.Accounts.SsoLinksUserOnly,
+                    "Only User-kind accounts can have SSO sign-in links.",
+                    ("accountKind", kind.ToString())),
+            });
 
-        var errors = new List<string>();
+        var errors = new List<Diagnostic>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<ExternalLogin>();
 
@@ -229,21 +253,33 @@ public sealed class AccountService : IAccountService
 
             if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(email))
             {
-                errors.Add("Each SSO link needs both a provider and an email.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Accounts.SsoLinkFieldsRequired,
+                    "Each SSO link needs both a provider and an email.",
+                    ("provider", provider),
+                    ("email", email)));
                 continue;
             }
 
             var dedupeKey = $"{provider}|{email}";
             if (!seen.Add(dedupeKey))
             {
-                errors.Add($"Duplicate SSO link for {provider} / {email}.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Accounts.DuplicateSsoLink,
+                    $"Duplicate SSO link for {provider} / {email}.",
+                    ("provider", provider),
+                    ("email", email)));
                 continue;
             }
 
             // Uniqueness across accounts: the pair may only be claimed by this account.
             var owner = await _accounts.GetByExternalLoginAsync(provider, email, ct);
             if (owner is not null && owner.Id != accountId)
-                errors.Add($"The {provider} identity '{email}' is already linked to another account.");
+                errors.Add(Diagnostic.Create(
+                    DiagnosticCodes.Accounts.SsoLinkInUse,
+                    $"The {provider} identity '{email}' is already linked to another account.",
+                    ("provider", provider),
+                    ("email", email)));
 
             var subject = link.Subject
                 ?? preserveSubjectsFrom?.FirstOrDefault(p =>
@@ -268,9 +304,16 @@ public sealed class AccountService : IAccountService
         if (existing is null) return; // idempotent: nothing to delete
 
         if (await _samples.IsAccountInUseAsync(id, ct))
-            throw new ConflictException(
-                $"Account '{existing.Label ?? existing.Name}' has submitted data and cannot be deleted. " +
-                "Disable it instead to revoke access while keeping the history intact.");
+        {
+            var displayName = existing.Label ?? existing.Name;
+            throw new ConflictException(Diagnostic.Create(
+                DiagnosticCodes.Accounts.DeleteInUse,
+                $"Account '{displayName}' has submitted data and cannot be deleted. " +
+                "Disable it instead to revoke access while keeping the history intact.",
+                ("accountId", id),
+                ("accountName", existing.Name),
+                ("displayName", displayName)));
+        }
 
         await _accounts.SoftDeleteAsync(id, ct);
         await _audit.RecordAsync(TargetTypeFor(existing), AuditChangeType.Delete, existing.Id, existing.Name, ct);
@@ -298,12 +341,18 @@ public sealed class AccountService : IAccountService
         var created = 0;
         var updated = 0;
         var errors = new List<string>();
+        var errorDetails = new List<Diagnostic>();
 
         foreach (var entry in accounts)
         {
             if (string.IsNullOrWhiteSpace(entry.Name))
             {
-                errors.Add("Skipped an account with no name.");
+                const string message = "Skipped an account with no name.";
+                errors.Add(message);
+                errorDetails.Add(Diagnostic.Create(
+                    DiagnosticCodes.Imports.AccountEntryNameMissing,
+                    message,
+                    ("accountName", null)));
                 continue;
             }
 
@@ -345,10 +394,22 @@ public sealed class AccountService : IAccountService
             }
             catch (Exception ex) when (ex is ValidationException or ConflictException)
             {
-                errors.Add($"'{entry.Name}': {ex.Message}");
+                var message = $"'{entry.Name}': {ex.Message}";
+                errors.Add(message);
+                var cause = ((DomainException)ex).Diagnostic;
+                errorDetails.Add(Diagnostic.Create(
+                    DiagnosticCodes.Imports.AccountEntry,
+                    message,
+                    ("accountName", entry.Name),
+                    ("causeCode", cause.Code),
+                    ("causeMessage", cause.Message),
+                    ("causeParams", cause.Params)));
             }
         }
 
-        return new AccountsImportResult(created, updated, errors);
+        return new AccountsImportResult(created, updated, errors)
+        {
+            ErrorDetails = errorDetails,
+        };
     }
 }

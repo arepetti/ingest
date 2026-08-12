@@ -9,7 +9,7 @@ import {
 import { Add20Regular, ArrowClockwise20Regular, ArrowDownload20Regular, ArrowUpload20Regular, Checkmark20Regular, Copy20Regular, Delete20Regular, Dismiss20Regular, DocumentPdf20Regular, Edit20Regular, Eye20Regular, MoreHorizontal20Regular, Open20Regular, Table20Regular } from '@fluentui/react-icons'
 import { AutoScrollMessageBar } from '../components/AutoScrollMessageBar'
 import { BulkImportDialog } from '../components/BulkImportDialog'
-import { formatApiError } from '../api/client'
+import { formatApiError, localizeDiagnostics } from '../api/client'
 import { fetchAllMySubmissions, fetchAllSubmissions, submissionPdfExportUrl, submissionsXlsxExportUrl, useAccounts, useApproveSubmission, useCapabilities, useDeleteSubmission, useMySchemas, useMySubmissions, useRejectSubmission, useSchemas, useSubmissions } from '../api/hooks'
 import { downloadFromUrl } from '../utils/download'
 import { RowActions } from '../components/RowActions'
@@ -17,12 +17,15 @@ import { useCsvExport, type ExportColumn } from '../utils/useCsvExport'
 import { SubmissionAvatar } from '../components/Avatars'
 import { DRAWER_EXPANDED_WIDTH, DrawerHeaderWithClose } from '../components/DrawerHeaderWithClose'
 import { GridMessageRow, GridPager, DEFAULT_PAGE_SIZE } from '../components/GridPager'
+import { LocalizedTime } from '../components/LocalizedTime'
 import { ValueLabel } from '../components/ValueLabel'
 import { confirmDelete } from '../utils/confirm'
-import { formatDate, formatDateTime } from '../utils/format'
+import { formatDateTime } from '../utils/format'
 import { walkLayout, type RenderItem } from '../utils/layout'
 import { clickableRowProps } from '../utils/a11y'
 import type { Account, ApprovalStatus, Schema, Submission } from '../api/types'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 /**
  * Status-filter values for the dropdown. 'all' clears the filter, 'draft' selects work-in-progress
@@ -30,15 +33,6 @@ import type { Account, ApprovalStatus, Schema, Submission } from '../api/types'
  * (only offered to cross-service viewers when the approval workflow is on).
  */
 type StatusFilter = 'all' | 'draft' | ApprovalStatus
-
-const statusFilterLabels: Record<StatusFilter, string> = {
-  all:         'All statuses',
-  draft:       'Draft',
-  Pending:     'Pending',
-  Approved:    'Approved',
-  Rejected:    'Rejected',
-  NotRequired: 'Not required',
-}
 
 /** The approval-state values offered in the status filter (drafts and 'all' are always available). */
 const approvalStatusFilters: ApprovalStatus[] = ['Pending', 'Approved', 'Rejected', 'NotRequired']
@@ -66,8 +60,9 @@ function rejectionNote(sub: Submission): string | null {
  * required, since they were live the moment they landed).
  */
 function ApprovalBadge({ status }: { status?: ApprovalStatus | null }) {
+  const { t } = useTranslation()
   if (!status || status === 'NotRequired') return <>—</>
-  return <Badge appearance="tint" color={approvalBadgeColor(status)}>{status}</Badge>
+  return <Badge appearance="tint" color={approvalBadgeColor(status)}>{t(`schemasSubmissions.common.approvalStatus.${status}`)}</Badge>
 }
 
 /**
@@ -76,7 +71,7 @@ function ApprovalBadge({ status }: { status?: ApprovalStatus | null }) {
  * the row they just clicked.
  */
 function submissionLabel(sub: Submission): string {
-  const when = new Date(sub.submittedAt).toLocaleString()
+  const when = formatDateTime(sub.submittedAt)
   return sub.serviceName ? `${when} (${sub.serviceName})` : when
 }
 
@@ -189,14 +184,6 @@ const useStyles = makeStyles({
 
 type Interval = 'all' | 'lastWeek' | 'lastMonth' | 'lastYear' | 'custom'
 
-const intervalLabels: Record<Interval, string> = {
-  all:       'All time',
-  lastWeek:  'Last week',
-  lastMonth: 'Last month',
-  lastYear:  'Last year',
-  custom:    'Custom range',
-}
-
 // Rolling window relative to "now". Picks UTC so the server-side filter matches the
 // SubmittedAt comparisons (which are stored as UTC).
 function intervalRange(interval: Interval, customFrom: string, customTo: string): { from?: string; to?: string } {
@@ -218,6 +205,7 @@ function intervalRange(interval: Interval, customFrom: string, customTo: string)
 
 export function SubmissionsPage() {
   const s = useStyles()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { me, has } = useCapabilities()
@@ -230,6 +218,21 @@ export function SubmissionsPage() {
   // additionally needs the approve capability; the backend enforces it regardless.
   const approvalEnabled = !!me?.approvalEnabled
   const canApprove = approvalEnabled && has('submissions:approve')
+  const statusFilterLabels: Record<StatusFilter, string> = {
+    all: t('schemasSubmissions.submissions.status.all'),
+    draft: t('schemasSubmissions.common.draft'),
+    Pending: t('schemasSubmissions.common.approvalStatus.Pending'),
+    Approved: t('schemasSubmissions.common.approvalStatus.Approved'),
+    Rejected: t('schemasSubmissions.common.approvalStatus.Rejected'),
+    NotRequired: t('schemasSubmissions.common.approvalStatus.NotRequired'),
+  }
+  const intervalLabels: Record<Interval, string> = {
+    all: t('schemasSubmissions.submissions.interval.all'),
+    lastWeek: t('schemasSubmissions.submissions.interval.lastWeek'),
+    lastMonth: t('schemasSubmissions.submissions.interval.lastMonth'),
+    lastYear: t('schemasSubmissions.submissions.interval.lastYear'),
+    custom: t('schemasSubmissions.submissions.interval.custom'),
+  }
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
@@ -346,20 +349,20 @@ export function SubmissionsPage() {
   // grid. Labels reuse the same resolvers the grid cells do so the file matches what's on screen.
   const exportColumns = useMemo<ExportColumn<Submission>[]>(() => {
     const cols: ExportColumn<Submission>[] = [
-      { header: 'Submitted at', value: sub => sub.submittedAt },
+      { header: t('schemasSubmissions.common.submittedAt'), value: sub => sub.submittedAt },
     ]
     if (!isService) {
-      cols.push({ header: 'Service', value: sub => resolveServiceLabel(sub, isService, me, services.data?.items ?? []) })
+      cols.push({ header: t('schemasSubmissions.common.service'), value: sub => resolveServiceLabel(sub, isService, me, services.data?.items ?? []) })
     }
     cols.push(
-      { header: 'Schema', value: sub => resolveSchemaLabel(sub, schemasByName) },
-      { header: 'Samples', value: sub => sub.samples.length },
-      { header: 'Warnings', value: sub => sub.warnings?.length ?? 0 },
-      { header: 'Created', value: sub => sub.createdAt },
-      { header: 'Created by', value: sub => sub.createdBy ?? '' },
+      { header: t('schemasSubmissions.common.schema'), value: sub => resolveSchemaLabel(sub, schemasByName) },
+      { header: t('schemasSubmissions.common.samples'), value: sub => sub.samples.length },
+      { header: t('schemasSubmissions.common.warnings'), value: sub => sub.warnings?.length ?? 0 },
+      { header: t('schemasSubmissions.common.created'), value: sub => sub.createdAt },
+      { header: t('schemasSubmissions.common.createdBy'), value: sub => sub.createdBy ?? '' },
     )
     return cols
-  }, [isService, me, services.data, schemasByName])
+  }, [isService, me, services.data, schemasByName, t])
 
   const fetchAllForExport = () =>
     isService
@@ -399,52 +402,56 @@ export function SubmissionsPage() {
   return (
     <div className={s.root}>
       <div className={s.toolbar}>
-        <Title2>{isService ? 'My submissions' : 'Submissions'}</Title2>
+        <Title2>{isService ? t('schemasSubmissions.submissions.myTitle') : t('schemasSubmissions.common.submissions')}</Title2>
         <Toolbar className={s.toolbarActions}>
           <Tooltip
             relationship="label"
-            content={isService && me?.submissionsClosed ? (me.submissionsClosedMessage || 'Submissions are temporarily closed.') : 'Create a new submission'}
+            content={isService && me?.submissionsClosed
+              ? (me.submissionsClosedMessage || t('schemasSubmissions.submissions.temporarilyClosed'))
+              : t('schemasSubmissions.submissions.createNew')}
           >
             <ToolbarButton
               appearance="primary" icon={<Add20Regular />}
               disabled={isService && !!me?.submissionsClosed}
               onClick={() => nav('/submissions/new')}
             >
-              New submission
+              {t('schemasSubmissions.submissions.new')}
             </ToolbarButton>
           </Tooltip>
           <Menu>
             <MenuTrigger disableButtonEnhancement>
-              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label="More actions" />
+              <MenuButton appearance="subtle" icon={<MoreHorizontal20Regular />} aria-label={t('schemasSubmissions.common.moreActions')} />
             </MenuTrigger>
             <MenuPopover>
               <MenuList>
-                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => submissions.refetch()}>Refresh</MenuItem>
+                <MenuItem icon={<ArrowClockwise20Regular />} onClick={() => submissions.refetch()}>{t('schemasSubmissions.common.refresh')}</MenuItem>
                 <MenuDivider />
                 <MenuItem
                   icon={<ArrowDownload20Regular />}
                   disabled={submissionsExport.exporting}
                   onClick={submissionsExport.exportList}
                 >
-                  {submissionsExport.exporting ? 'Exporting…' : 'Export this list'}
+                  {submissionsExport.exporting ? t('schemasSubmissions.common.exporting') : t('schemasSubmissions.common.exportList')}
                 </MenuItem>
                 {!isService && (
                   <Tooltip
                     relationship="label"
-                    content={canExportXlsx ? 'Export the filtered submissions to XLSX' : 'Pick a single schema to enable the XLSX export'}
+                    content={canExportXlsx
+                      ? t('schemasSubmissions.submissions.exportXlsxHelp')
+                      : t('schemasSubmissions.submissions.pickSchemaForXlsx')}
                   >
                     <MenuItem
                       icon={<Table20Regular />}
                       disabled={!canExportXlsx || xlsxExporting}
                       onClick={onExportXlsx}
                     >
-                      {xlsxExporting ? 'Exporting…' : 'Export XLSX (one schema)'}
+                      {xlsxExporting ? t('schemasSubmissions.common.exporting') : t('schemasSubmissions.submissions.exportXlsx')}
                     </MenuItem>
                   </Tooltip>
                 )}
                 {canImport && (
                   <MenuItem icon={<ArrowUpload20Regular />} onClick={() => setImportOpen(true)}>
-                    Import bulk data
+                    {t('schemasSubmissions.submissions.importBulk')}
                   </MenuItem>
                 )}
               </MenuList>
@@ -455,34 +462,34 @@ export function SubmissionsPage() {
 
       <div className={s.filters}>
         {!isService && (
-          <Field label="Service">
+          <Field label={t('schemasSubmissions.common.service')}>
             <Dropdown
-              placeholder="All services"
+              placeholder={t('schemasSubmissions.submissions.allServices')}
               selectedOptions={serviceId ? [serviceId] : []}
               value={serviceId ? (services.data?.items.find(a => a.id === serviceId)?.label ?? services.data?.items.find(a => a.id === serviceId)?.name ?? '') : ''}
               onOptionSelect={(_, d) => { setServiceId(d.optionValue || undefined); setPage(1) }}
             >
-              <Option value="">All services</Option>
+              <Option value="">{t('schemasSubmissions.submissions.allServices')}</Option>
               {(services.data?.items ?? []).map(a => (
                 <Option key={a.id} value={a.id}>{a.label || a.name}</Option>
               ))}
             </Dropdown>
           </Field>
         )}
-        <Field label="Schema">
+        <Field label={t('schemasSubmissions.common.schema')}>
           <Dropdown
-            placeholder="All schemas"
+            placeholder={t('schemasSubmissions.submissions.allSchemas')}
             selectedOptions={schemaName ? [schemaName] : []}
             value={schemaName ? (schemasByName.get(schemaName)?.label || schemaName) : ''}
             onOptionSelect={(_, d) => { setSchemaName(d.optionValue || undefined); setPage(1) }}
           >
-            <Option value="">All schemas</Option>
+            <Option value="">{t('schemasSubmissions.submissions.allSchemas')}</Option>
             {schemaList.map(sc => (
               <Option key={sc.id} value={sc.name}>{sc.label || sc.name}</Option>
             ))}
           </Dropdown>
         </Field>
-        <Field label="Status">
+        <Field label={t('schemasSubmissions.common.status')}>
           <Dropdown
             selectedOptions={[statusFilter]}
             value={statusFilterLabels[statusFilter]}
@@ -493,7 +500,7 @@ export function SubmissionsPage() {
             ))}
           </Dropdown>
         </Field>
-        <Field label="Interval">
+        <Field label={t('schemasSubmissions.submissions.interval.label')}>
           <Dropdown
             selectedOptions={[interval]}
             value={intervalLabels[interval]}
@@ -506,14 +513,14 @@ export function SubmissionsPage() {
         </Field>
         {interval === 'custom' && (
           <>
-            <Field label="From">
+            <Field label={t('schemasSubmissions.common.from')}>
               <Input
                 type="datetime-local"
                 value={customFrom}
                 onChange={(_, v) => { setCustomFrom(v.value); setPage(1) }}
               />
             </Field>
-            <Field label="To">
+            <Field label={t('schemasSubmissions.common.to')}>
               <Input
                 type="datetime-local"
                 value={customTo}
@@ -545,32 +552,32 @@ export function SubmissionsPage() {
       <Table size="small">
         <TableHeader>
           <TableRow>
-            <TableHeaderCell>Submitted at</TableHeaderCell>
-            {!isService && <TableHeaderCell>Service</TableHeaderCell>}
-            <TableHeaderCell>Schema</TableHeaderCell>
-            <TableHeaderCell>Status</TableHeaderCell>
-            <TableHeaderCell>Samples</TableHeaderCell>
-            <TableHeaderCell>Warnings</TableHeaderCell>
-            <TableHeaderCell>Created</TableHeaderCell>
-            <TableHeaderCell>Created by</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.submittedAt')}</TableHeaderCell>
+            {!isService && <TableHeaderCell>{t('schemasSubmissions.common.service')}</TableHeaderCell>}
+            <TableHeaderCell>{t('schemasSubmissions.common.schema')}</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.status')}</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.samples')}</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.warnings')}</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.created')}</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.createdBy')}</TableHeaderCell>
             <TableHeaderCell className={s.actionsHeader}></TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading && <GridMessageRow colSpan={colSpan}>Loading…</GridMessageRow>}
+          {isLoading && <GridMessageRow colSpan={colSpan}>{t('schemasSubmissions.common.loading')}</GridMessageRow>}
           {!isLoading && (data?.items ?? []).length === 0 && (
-            <GridMessageRow colSpan={colSpan}>No submissions match these filters.</GridMessageRow>
+            <GridMessageRow colSpan={colSpan}>{t('schemasSubmissions.submissions.empty')}</GridMessageRow>
           )}
           {(data?.items ?? []).map(sub => (
             <TableRow
               key={sub.id}
               className={`${s.row} ${s.rowClickable}`}
-              {...clickableRowProps(() => setViewing(sub), `View submission from ${submissionLabel(sub)}`)}
+              {...clickableRowProps(() => setViewing(sub), t('schemasSubmissions.submissions.viewFrom', { label: submissionLabel(sub) }))}
             >
               <TableCell>
-                <Tooltip content={formatDateTime(sub.submittedAt)} relationship="label">
+                <Tooltip content={<LocalizedTime value={sub.submittedAt} />} relationship="label">
                   <TableCellLayout media={<SubmissionAvatar status={sub.approvalStatus} isDraft={sub.isDraft} />}>
-                    {formatDate(sub.submittedAt)}
+                    <LocalizedTime value={sub.submittedAt} dateOnly />
                   </TableCellLayout>
                 </Tooltip>
               </TableCell>
@@ -578,7 +585,7 @@ export function SubmissionsPage() {
               <TableCell>{resolveSchemaLabel(sub, schemasByName)}</TableCell>
               <TableCell>
                 {sub.isDraft
-                  ? <Badge appearance="tint" color="informative">Draft</Badge>
+                  ? <Badge appearance="tint" color="informative">{t('schemasSubmissions.common.draft')}</Badge>
                   : approvalEnabled
                     ? (sub.approvalStatus === 'Rejected' && rejectionNote(sub)
                         ? <Tooltip content={rejectionNote(sub)!} relationship="label"><span><ApprovalBadge status={sub.approvalStatus} /></span></Tooltip>
@@ -592,8 +599,8 @@ export function SubmissionsPage() {
                   : '—'}
               </TableCell>
               <TableCell>
-                <Tooltip content={formatDateTime(sub.createdAt)} relationship="label">
-                  <span>{formatDate(sub.createdAt)}</span>
+                <Tooltip content={<LocalizedTime value={sub.createdAt} />} relationship="label">
+                  <LocalizedTime value={sub.createdAt} dateOnly />
                 </Tooltip>
               </TableCell>
               <TableCell>{sub.createdBy || '—'}</TableCell>
@@ -609,15 +616,15 @@ export function SubmissionsPage() {
                         disabled={approve.isPending || reject.isPending}
                         onClick={() => doApprove(sub)}
                       >
-                        Approve
+                        {t('schemasSubmissions.common.approve')}
                       </Button>
-                      <Tooltip content="Reject" relationship="label">
+                      <Tooltip content={t('schemasSubmissions.common.reject')} relationship="label">
                         <Button
                           size="small"
                           appearance="outline"
                           className={s.rejectBtn}
                           icon={<Dismiss20Regular />}
-                          aria-label="Reject"
+                          aria-label={t('schemasSubmissions.common.reject')}
                           disabled={approve.isPending || reject.isPending}
                           onClick={() => { setRejectNote(''); setRejecting(sub) }}
                         />
@@ -625,21 +632,21 @@ export function SubmissionsPage() {
                     </span>
                   )}
                   <RowActions
-                    ariaLabel={`Actions for submission ${sub.id}`}
+                    ariaLabel={t('schemasSubmissions.submissions.actionsFor', { id: sub.id })}
                     actions={[
                       // "View" reuses the editor layout in read-only mode (same look as Edit, just
                       // disabled). "View details" goes to the raw-table page for the flat sample
                       // dump — handy for diffing values or copy-pasting. The row click still opens
                       // the quick-look drawer beside the list.
-                      { key: 'view-form',    label: 'View',         icon: <Eye20Regular />,    onClick: () => nav(`/submissions/${sub.id}/view`) },
-                      { key: 'view-details', label: 'View details', icon: <Open20Regular />,   onClick: () => nav(`/submissions/${sub.id}`) },
-                      { key: 'edit',         label: 'Edit',         icon: <Edit20Regular />,   onClick: () => nav(`/submissions/${sub.id}/edit`) },
+                      { key: 'view-form',    label: t('schemasSubmissions.common.view'),         icon: <Eye20Regular />,    onClick: () => nav(`/submissions/${sub.id}/view`) },
+                      { key: 'view-details', label: t('schemasSubmissions.common.viewDetails'), icon: <Open20Regular />,   onClick: () => nav(`/submissions/${sub.id}`) },
+                      { key: 'edit',         label: t('schemasSubmissions.common.edit'),         icon: <Edit20Regular />,   onClick: () => nav(`/submissions/${sub.id}/edit`) },
                       // "Clone into new submission" opens a fresh /submissions/new form pre-filled from this
                       // row (service, schema, per-value rows), with the timestamp reset to now. It only
                       // populates the form — nothing is written until the user presses Submit.
-                      { key: 'clone',        label: 'Clone into new submission', icon: <Copy20Regular />, onClick: () => nav('/submissions/new', { state: { cloneFrom: sub } }) },
+                      { key: 'clone',        label: t('schemasSubmissions.submissions.cloneNew'), icon: <Copy20Regular />, onClick: () => nav('/submissions/new', { state: { cloneFrom: sub } }) },
                       // Hard-delete needs the submissions:delete capability; for everyone else this would just 403 anyway.
-                      ...(canDelete ? [{ key: 'delete', label: 'Delete', icon: <Delete20Regular />, destructive: true, onClick: () => { if (confirmDelete('submission', submissionLabel(sub))) del.mutate(sub.id) } }] : []),
+                      ...(canDelete ? [{ key: 'delete', label: t('schemasSubmissions.common.delete'), icon: <Delete20Regular />, destructive: true, onClick: () => { if (confirmDelete(t('schemasSubmissions.submissions.deleteType'), submissionLabel(sub))) del.mutate(sub.id) } }] : []),
                     ]}
                   />
                 </div>
@@ -667,7 +674,7 @@ export function SubmissionsPage() {
         style={viewerExpanded ? { width: DRAWER_EXPANDED_WIDTH } : undefined}
       >
         <DrawerHeaderWithClose
-          title="Submission"
+          title={t('schemasSubmissions.common.submission')}
           onClose={() => { setViewing(null); setViewerExpanded(false) }}
           expanded={viewerExpanded}
           onToggleExpand={() => setViewerExpanded(e => !e)}
@@ -688,26 +695,26 @@ export function SubmissionsPage() {
                     appearance="subtle"
                     icon={<Eye20Regular />}
                   >
-                    View
+                    {t('schemasSubmissions.common.view')}
                   </SplitButton>
                 )}
               </MenuTrigger>
               <MenuPopover>
                 <MenuList>
                   <MenuItem icon={<Eye20Regular />} onClick={() => { const id = viewing.id; setViewing(null); nav(`/submissions/${id}/view`) }}>
-                    View
+                    {t('schemasSubmissions.common.view')}
                   </MenuItem>
                   <MenuItem icon={<Open20Regular />} onClick={() => { const id = viewing.id; setViewing(null); nav(`/submissions/${id}`) }}>
-                    View details
+                    {t('schemasSubmissions.common.viewDetails')}
                   </MenuItem>
                   <MenuItem icon={<DocumentPdf20Regular />} onClick={() => onExportSubmissionPdf(viewing)}>
-                    Export as PDF
+                    {t('schemasSubmissions.submissions.exportPdf')}
                   </MenuItem>
                 </MenuList>
               </MenuPopover>
             </Menu>
             <ToolbarButton icon={<Edit20Regular />} onClick={() => { const id = viewing.id; setViewing(null); nav(`/submissions/${id}/edit`) }}>
-              Edit
+              {t('schemasSubmissions.common.edit')}
             </ToolbarButton>
             {canApprove && viewing.approvalStatus === 'Pending' && (
               <>
@@ -716,14 +723,14 @@ export function SubmissionsPage() {
                   disabled={approve.isPending || reject.isPending}
                   onClick={() => doApprove(viewing)}
                 >
-                  Approve
+                  {t('schemasSubmissions.common.approve')}
                 </ToolbarButton>
                 <ToolbarButton
                   icon={<Dismiss20Regular />}
                   disabled={approve.isPending || reject.isPending}
                   onClick={() => { setRejectNote(''); setRejecting(viewing) }}
                 >
-                  Reject
+                  {t('schemasSubmissions.common.reject')}
                 </ToolbarButton>
               </>
             )}
@@ -731,13 +738,13 @@ export function SubmissionsPage() {
               <ToolbarButton
                 icon={<Delete20Regular />}
                 onClick={() => {
-                  if (!confirmDelete('submission', submissionLabel(viewing))) return
+                  if (!confirmDelete(t('schemasSubmissions.submissions.deleteType'), submissionLabel(viewing))) return
                   const id = viewing.id
                   setViewing(null)
                   del.mutate(id)
                 }}
               >
-                Delete
+                {t('schemasSubmissions.common.delete')}
               </ToolbarButton>
             )}
           </Toolbar>
@@ -765,25 +772,24 @@ export function SubmissionsPage() {
       <Dialog open={!!rejecting} onOpenChange={(_, d) => { if (!d.open) { setRejecting(null); setRejectNote('') } }}>
         <DialogSurface>
           <DialogBody>
-            <DialogTitle>Reject submission</DialogTitle>
+            <DialogTitle>{t('schemasSubmissions.submissions.rejectTitle')}</DialogTitle>
             <DialogContent>
               <Body1>
-                This submission will be marked rejected and excluded from the OData feed and Explore,
-                but stays visible here. You can leave an optional reason for the submitter and other reviewers.
+                {t('schemasSubmissions.submissions.rejectHelp')}
               </Body1>
-              <Field label="Reason (optional)" style={{ marginTop: 12 }}>
+              <Field label={t('schemasSubmissions.submissions.rejectReason')} style={{ marginTop: 12 }}>
                 <Textarea
                   value={rejectNote}
                   onChange={(_, d) => setRejectNote(d.value)}
-                  placeholder="e.g. Week 22 figures look transposed — please re-check the night-shift totals."
+                  placeholder={t('schemasSubmissions.submissions.rejectPlaceholder')}
                   rows={3}
                 />
               </Field>
             </DialogContent>
             <DialogActions>
-              <Button appearance="secondary" onClick={() => { setRejecting(null); setRejectNote('') }}>Cancel</Button>
+              <Button appearance="secondary" onClick={() => { setRejecting(null); setRejectNote('') }}>{t('schemasSubmissions.common.cancel')}</Button>
               <Button appearance="primary" disabled={reject.isPending} onClick={submitReject}>
-                {reject.isPending ? 'Rejecting…' : 'Reject'}
+                {reject.isPending ? t('schemasSubmissions.submissions.rejecting') : t('schemasSubmissions.common.reject')}
               </Button>
             </DialogActions>
           </DialogBody>
@@ -829,93 +835,94 @@ function SubmissionViewBody({
   approvalEnabled: boolean
 }) {
   const s = useStyles()
+  const { t } = useTranslation()
   // A submission has at most one schema (the editor enforces it). Use the first sample's
   // schemaName as the source of truth and prefer the schema's friendly label when loaded.
   const schemaName = submission.samples[0]?.schemaName
   const schemaDisplay = schema?.label || schemaName || '—'
   const showApproval = approvalEnabled && submission.approvalStatus !== 'NotRequired'
+  const localizedWarnings = localizeDiagnostics(submission.warningDetails, submission.warnings)
 
   return (
     <div className={s.drawerForm}>
       <div className={s.threeCol}>
-        <Field label="Service"><Body1>{serviceLabel}</Body1></Field>
-        <Field label="Schema"><Body1>{schemaDisplay}</Body1></Field>
-        <Field label="Samples"><Body1>{submission.samples.length}</Body1></Field>
+        <Field label={t('schemasSubmissions.common.service')}><Body1>{serviceLabel}</Body1></Field>
+        <Field label={t('schemasSubmissions.common.schema')}><Body1>{schemaDisplay}</Body1></Field>
+        <Field label={t('schemasSubmissions.common.samples')}><Body1>{submission.samples.length}</Body1></Field>
       </div>
 
       {submission.isDraft && (
         <div>
-          <Badge appearance="tint" color="informative">Draft</Badge>
+          <Badge appearance="tint" color="informative">{t('schemasSubmissions.common.draft')}</Badge>
           <Body1 style={{ marginTop: 4, color: tokens.colorNeutralForeground3 }}>
-            This submission is a work-in-progress draft. It is excluded from reporting and approval
-            until it is published.
+            {t('schemasSubmissions.submissions.draftHelp')}
           </Body1>
         </div>
       )}
 
       {showApproval && (
         <>
-          <div className={s.sectionLabel}>Approval</div>
+          <div className={s.sectionLabel}>{t('schemasSubmissions.approval.heading')}</div>
           <div className={s.twoCol}>
-            <Field label="Status"><div><ApprovalBadge status={submission.approvalStatus} /></div></Field>
-            <Field label="Source"><Body1>{submission.source === 'Manual' ? 'Manual entry' : 'API'}</Body1></Field>
+            <Field label={t('schemasSubmissions.common.status')}><div><ApprovalBadge status={submission.approvalStatus} /></div></Field>
+            <Field label={t('schemasSubmissions.submissions.source')}><Body1>{submission.source === 'Manual' ? t('schemasSubmissions.submissions.manualEntry') : 'API'}</Body1></Field>
           </div>
           <ApprovalProgress submission={submission} styles={s} />
           {rejectionNote(submission) && (
             <div className={s.rejectNote}>
-              <Text weight="semibold">Rejection reason</Text>
+              <Text weight="semibold">{t('schemasSubmissions.submissions.rejectionReason')}</Text>
               <div>{rejectionNote(submission)}</div>
             </div>
           )}
         </>
       )}
 
-      <div className={s.sectionLabel}>Audit</div>
+      <div className={s.sectionLabel}>{t('schemasSubmissions.common.audit')}</div>
       <div className={s.twoCol}>
-        <Field label="Created">
+        <Field label={t('schemasSubmissions.common.created')}>
           <Body1>
-            {new Date(submission.createdAt).toLocaleString()}
-            {submission.createdBy ? ` · by ${submission.createdBy}` : ''}
+            <LocalizedTime value={submission.createdAt} />
+            {submission.createdBy ? ` · ${t('schemasSubmissions.common.by', { name: submission.createdBy })}` : ''}
           </Body1>
         </Field>
-        <Field label="Submitted at"><Body1>{new Date(submission.submittedAt).toLocaleString()}</Body1></Field>
-        <Field label="Modified">
+        <Field label={t('schemasSubmissions.common.submittedAt')}><Body1><LocalizedTime value={submission.submittedAt} /></Body1></Field>
+        <Field label={t('schemasSubmissions.common.modified')}>
           <Body1>
-            {new Date(submission.modifiedAt).toLocaleString()}
-            {submission.modifiedBy ? ` · by ${submission.modifiedBy}` : ''}
+            <LocalizedTime value={submission.modifiedAt} />
+            {submission.modifiedBy ? ` · ${t('schemasSubmissions.common.by', { name: submission.modifiedBy })}` : ''}
           </Body1>
         </Field>
       </div>
       {submission.replacedAt && (
-        <Field label="Replaced at"><Body1>{new Date(submission.replacedAt).toLocaleString()}</Body1></Field>
+        <Field label={t('schemasSubmissions.common.replacedAt')}><Body1><LocalizedTime value={submission.replacedAt} /></Body1></Field>
       )}
       {submission.isDeleted && (
-        <Badge appearance="outline" color="danger">Deleted</Badge>
+        <Badge appearance="outline" color="danger">{t('schemasSubmissions.common.deleted')}</Badge>
       )}
 
-      {(submission.warnings?.length ?? 0) > 0 && (
+      {localizedWarnings.length > 0 && (
         <>
-          <div className={s.sectionLabel}>Warnings ({submission.warnings.length})</div>
+          <div className={s.sectionLabel}>{t('schemasSubmissions.submissions.warningsCount', { count: localizedWarnings.length })}</div>
           <AutoScrollMessageBar intent="warning">
             <MessageBarBody>
               <ul className={s.warningsList}>
-                {submission.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                {localizedWarnings.map((w, i) => <li key={i}>{w}</li>)}
               </ul>
             </MessageBarBody>
           </AutoScrollMessageBar>
         </>
       )}
 
-      <div className={s.sectionLabel}>Values</div>
+      <div className={s.sectionLabel}>{t('schemasSubmissions.common.values')}</div>
       <Table size="small" className={s.valuesTable}>
         <TableHeader>
           <TableRow>
-            <TableHeaderCell>Name</TableHeaderCell>
-            <TableHeaderCell>Value</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.name')}</TableHeaderCell>
+            <TableHeaderCell>{t('schemasSubmissions.common.value')}</TableHeaderCell>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {renderValueRows(submission, schema, s)}
+          {renderValueRows(submission, schema, s, t)}
         </TableBody>
       </Table>
     </div>
@@ -933,6 +940,7 @@ function renderValueRows(
   submission: Submission,
   schema: Schema | undefined,
   s: ReturnType<typeof useStyles>,
+  t: TFunction,
 ): ReactNode {
   const samplesByName = new Map(submission.samples.map(x => [x.valueName.toLowerCase(), x]))
 
@@ -940,7 +948,7 @@ function renderValueRows(
     return submission.samples.map((sample, i) => (
       <TableRow key={`raw-${i}`}>
         <TableCell>{sample.valueName}</TableCell>
-        <TableCell>{formatSampleValue(sample.value, null)}</TableCell>
+        <TableCell>{formatSampleValue(sample.value, null, t)}</TableCell>
       </TableRow>
     ))
   }
@@ -950,7 +958,7 @@ function renderValueRows(
   // heading sitting above no actual content.
   const items = walkLayout(schema, { isValueVisible: name => samplesByName.has(name.toLowerCase()) })
 
-  return items.map((item, i) => renderItem(item, i, schema, samplesByName, s))
+  return items.map((item, i) => renderItem(item, i, schema, samplesByName, s, t))
 }
 
 function renderItem(
@@ -959,6 +967,7 @@ function renderItem(
   schema: Schema,
   samplesByName: Map<string, Submission['samples'][number]>,
   s: ReturnType<typeof useStyles>,
+  t: TFunction,
 ): ReactNode {
   if (item.kind === 'section-start') {
     return (
@@ -991,7 +1000,7 @@ function renderItem(
             <ValueLabel value={item.value} schema={schema} />
           </div>
         </TableCell>
-        <TableCell>{formatSampleValue(sample?.value ?? null, item.value.unit)}</TableCell>
+        <TableCell>{formatSampleValue(sample?.value ?? null, item.value.unit, t)}</TableCell>
       </TableRow>
     </Fragment>
   )
@@ -1008,6 +1017,7 @@ function ApprovalProgress({
   submission: Submission
   styles: ReturnType<typeof useStyles>
 }) {
+  const { t } = useTranslation()
   const required = (submission.requiredApprovers ?? []).filter(a => a.requirement === 'Required')
   const approvedIds = new Set((submission.approvals ?? []).filter(a => a.decision === 'Approved').map(a => a.approverAccountId))
   const approvedRequired = required.filter(a => approvedIds.has(a.accountId)).length
@@ -1016,15 +1026,15 @@ function ApprovalProgress({
   return (
     <>
       {required.length > 0 && submission.approvalStatus === 'Pending' && (
-        <Body1>{approvedRequired} of {required.length} required {required.length === 1 ? 'approval' : 'approvals'} received.</Body1>
+        <Body1>{t('schemasSubmissions.submissions.approvalsReceived', { approved: approvedRequired, count: required.length })}</Body1>
       )}
       {decisions.length > 0 && (
         <div>
           {decisions.map((d, i) => (
             <div key={i} className={styles.approverRow}>
-              <Badge appearance="tint" color={d.decision === 'Approved' ? 'success' : 'danger'}>{d.decision}</Badge>
+              <Badge appearance="tint" color={d.decision === 'Approved' ? 'success' : 'danger'}>{t(`schemasSubmissions.common.approvalStatus.${d.decision}`)}</Badge>
               <span>{d.approverName || d.approverAccountId}</span>
-              <span style={{ color: tokens.colorNeutralForeground3 }}>· {new Date(d.decidedAt).toLocaleString()}</span>
+              <span style={{ color: tokens.colorNeutralForeground3 }}>· <LocalizedTime value={d.decidedAt} /></span>
               {d.note && <span style={{ color: tokens.colorNeutralForeground2 }}>— {d.note}</span>}
             </div>
           ))}
@@ -1034,9 +1044,11 @@ function ApprovalProgress({
   )
 }
 
-function formatSampleValue(v: unknown, unit?: string | null): string {
+function formatSampleValue(v: unknown, unit: string | null | undefined, t: TFunction): string {
   if (v === null || v === undefined || v === '') return '—'
-  const text = typeof v === 'boolean' ? (v ? 'true' : 'false') : String(v)
+  const text = typeof v === 'boolean'
+    ? (v ? t('schemasSubmissions.common.true') : t('schemasSubmissions.common.false'))
+    : String(v)
   return unit ? `${text} ${unit}` : text
 }
 

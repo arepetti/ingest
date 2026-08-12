@@ -3,6 +3,7 @@ import { Avatar, type AvatarProps } from '@fluentui/react-components'
 import { ArrowRight20Regular, DocumentBulletList20Regular, Record20Regular, Resize20Regular } from '@fluentui/react-icons'
 import type { Account, AccountRole, ApprovalStatus, AuditChangeType, AuditTargetType, EventKind, Schema, SchemaValueType } from '../api/types'
 import { eventKindLabel } from '../utils/eventKind'
+import { useTranslation } from 'react-i18next'
 
 type AvatarColor = AvatarProps['color']
 type AvatarSize = AvatarProps['size']
@@ -23,6 +24,7 @@ function colorForRole(role: AccountRole, active: boolean): AvatarColor {
 }
 
 export function AccountAvatar({ account, size = 32 }: { account: Account; size?: AvatarSize }) {
+  const { t } = useTranslation()
   const active = account.enabled && !account.isDeleted
   return (
     <Avatar
@@ -30,12 +32,17 @@ export function AccountAvatar({ account, size = 32 }: { account: Account; size?:
       color={colorForRole(account.role, active)}
       size={size}
       badge={active ? undefined : { status: 'offline' }}
-      aria-label={`${account.kind} · ${account.role}${active ? '' : ' (disabled)'}`}
+      aria-label={t('shell.avatars.account', {
+        kind: t(`shell.account.kinds.${account.kind}`),
+        role: t(`shell.account.roles.${account.role}`),
+        context: active ? '' : t('shell.avatars.disabledSuffix'),
+      })}
     />
   )
 }
 
 export function SchemaAvatar({ schema, size = 32 }: { schema: Schema; size?: AvatarSize }) {
+  const { t } = useTranslation()
   const active = schema.enabled
   return (
     <Avatar
@@ -44,7 +51,7 @@ export function SchemaAvatar({ schema, size = 32 }: { schema: Schema; size?: Ava
       color={active ? 'colorful' : 'anchor'}
       size={size}
       badge={active ? undefined : { status: 'offline' }}
-      aria-label={active ? 'Schema' : 'Schema (disabled)'}
+      aria-label={active ? t('shell.avatars.schema') : t('shell.avatars.schemaDisabled')}
     />
   )
 }
@@ -65,12 +72,13 @@ const EVENT_KIND_COLORS: Record<EventKind, AvatarColor> = {
 }
 
 export function EventKindAvatar({ kind, size = 32 }: { kind: EventKind; size?: AvatarSize }) {
+  const { t } = useTranslation()
   return (
     <Avatar
       icon={EVENT_KIND_ICONS[kind]}
       color={EVENT_KIND_COLORS[kind]}
       size={size}
-      aria-label={eventKindLabel(kind)}
+      aria-label={eventKindLabel(kind, t)}
     />
   )
 }
@@ -88,10 +96,15 @@ function colorForApproval(status?: ApprovalStatus): AvatarColor {
 }
 
 export function SubmissionAvatar({ status, isDraft = false, size = 32 }: { status?: ApprovalStatus; isDraft?: boolean; size?: AvatarSize }) {
+  const { t } = useTranslation()
   // A draft is a lifecycle of its own (independent of approval), so it wins the tint and gets a
   // distinct grape colour (none of the approval states use it). Otherwise fall back to the
   // approval-status colour.
-  const label = isDraft ? 'Submission · Draft' : status && status !== 'NotRequired' ? `Submission · ${status}` : 'Submission'
+  const label = isDraft
+    ? t('shell.avatars.submissionStatus', { status: t('shell.submissionStatus.Draft') })
+    : status && status !== 'NotRequired'
+      ? t('shell.avatars.submissionStatus', { status: t(`shell.submissionStatus.${status}`) })
+      : t('shell.avatars.submission')
   return (
     <Avatar
       icon={<DocumentBulletList20Regular />}
@@ -114,31 +127,17 @@ function colorForChange(change: AuditChangeType): AvatarColor {
   }
 }
 
-// Short, distinct two-letter tags per target type (no icon). Distinct so colliding first letters
-// (Schema vs Submission, Account vs ApiKey) stay tellable apart at a glance.
-const TARGET_TYPE_INITIALS: Record<AuditTargetType, string> = {
-  User:          'Us',
-  Account:       'Ac',
-  Schema:        'Sc',
-  ApiKey:        'Ak',
-  Submission:    'Sb',
-  Report:        'Rp',
-  SchemaHistory: 'Sh',
-  ApprovalRule:  'Ar',
-  Settings:      'St',
-  Backup:        'Bk',
-  Event:         'Ev',
-  CommentThread: 'Ct',
-  Comment:       'Cm',
-}
-
 export function AuditChangeAvatar({ change, targetType, size = 32 }: { change: AuditChangeType; targetType: AuditTargetType; size?: AvatarSize }) {
+  const { t } = useTranslation()
   return (
     <Avatar
-      initials={TARGET_TYPE_INITIALS[targetType]}
+      initials={t(`shell.auditTargetInitials.${targetType}`)}
       color={colorForChange(change)}
       size={size}
-      aria-label={`${targetType} · ${change}`}
+      aria-label={t('shell.avatars.auditChange', {
+        target: t(`shell.auditTarget.${targetType}`),
+        change: t(`shell.auditChange.${change}`),
+      })}
     />
   )
 }
@@ -154,7 +153,7 @@ function colorForStatus(status: DeliveryStatus): AvatarColor {
 }
 
 export function StatusAvatar({
-  status, name, label = 'Status', size = 32,
+  status, name, label, size = 32,
 }: {
   status: DeliveryStatus
   /** Source text for the avatar's initials (e.g. the recipient, or the webhook event name). */
@@ -162,36 +161,35 @@ export function StatusAvatar({
   label?: string
   size?: AvatarSize
 }) {
+  const { t } = useTranslation()
   return (
     <Avatar
       name={name}
       color={colorForStatus(status)}
       size={size}
-      aria-label={`${label} · ${status}`}
+      aria-label={t('shell.avatars.deliveryStatus', {
+        label: label ?? t('shell.avatars.status'),
+        status: t(`shell.deliveryStatus.${status}`),
+      })}
     />
   )
 }
 
-// Single-letter tag per value type (Integer/Number/Date/Boolean/String all start distinctly).
-const VALUE_TYPE_INITIALS: Record<SchemaValueType, string> = {
-  String:  'S',
-  Integer: 'I',
-  Number:  'N',
-  Date:    'D',
-  Boolean: 'B',
-}
-
 export function SchemaValueAvatar({ type, enabled, size = 32 }: { type: SchemaValueType; enabled: boolean; size?: AvatarSize }) {
+  const { t } = useTranslation()
   // Mirrors SchemaAvatar: a stable per-type colour when enabled, neutral 'anchor' plus a small
   // offline badge when disabled — so disabled reads from the badge indicator, not a colour shade.
   return (
     <Avatar
-      initials={VALUE_TYPE_INITIALS[type]}
+      initials={t(`shell.valueTypeInitials.${type}`)}
       color={enabled ? 'colorful' : 'anchor'}
       idForColor={enabled ? type : undefined}
       size={size}
       badge={enabled ? undefined : { status: 'offline' }}
-      aria-label={`${type}${enabled ? '' : ' (disabled)'}`}
+      aria-label={t('shell.avatars.schemaValue', {
+        type: t(`shell.valueType.${type}`),
+        context: enabled ? '' : t('shell.avatars.disabledSuffix'),
+      })}
     />
   )
 }

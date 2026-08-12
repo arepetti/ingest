@@ -38,7 +38,21 @@ public sealed class Sample
 /// </remarks>
 /// <param name="ValueName">Machine name of the associated schema value, or <c>null</c> for submission-level warnings.</param>
 /// <param name="Message">Human-readable warning text (unchanged from the pre-structured format).</param>
-public sealed record SubmissionWarning(string? ValueName, string Message);
+/// <param name="Code">Stable diagnostic code; null only for warnings read from legacy storage.</param>
+/// <param name="Params">Named diagnostic parameters; null only for legacy storage.</param>
+public sealed record SubmissionWarning(
+    string? ValueName,
+    string Message,
+    string? Code = null,
+    IReadOnlyDictionary<string, object?>? Params = null)
+{
+    /// <summary>Project this persisted warning onto the shared diagnostic contract.</summary>
+    public Diagnostic ToDiagnostic() =>
+        new(
+            Code ?? DiagnosticCodes.Submissions.LegacyWarning,
+            Message,
+            Params ?? Diagnostic.EmptyParams);
+}
 
 /// <summary>
 /// A batch of <see cref="Sample"/> rows submitted together by one service. Submissions are the

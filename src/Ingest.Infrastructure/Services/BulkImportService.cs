@@ -35,14 +35,24 @@ public sealed class BulkImportService : IBulkImportService
         // Gate here instead, at the service-facing entry point.
         var status = await _appConfig.GetIngestionStatusAsync(ct);
         if (status.Closed)
-            throw new ServiceUnavailableException(
-                string.IsNullOrWhiteSpace(status.Message) ? "Submissions are temporarily closed." : status.Message!);
+        {
+            var message = string.IsNullOrWhiteSpace(status.Message)
+                ? "Submissions are temporarily closed."
+                : status.Message!;
+            throw new ServiceUnavailableException(Diagnostic.Create(
+                DiagnosticCodes.Submissions.IngestionClosed,
+                message,
+                ("configuredMessage", !string.IsNullOrWhiteSpace(status.Message))));
+        }
 
         var parsed = BulkImportParser.Parse(format, content);
         if (parsed.Errors.Count > 0)
-            throw new ValidationException(parsed.Errors);
+            throw new ValidationException(parsed.ErrorDetails);
         if (parsed.Submissions.Count == 0)
-            throw new ValidationException(new[] { "No submissions found in the file." });
+            throw new ValidationException(new[]
+            {
+                new Diagnostic(DiagnosticCodes.Imports.NoSubmissions, "No submissions found in the file."),
+            });
 
         var items = new List<BulkImportItemResult>(parsed.Submissions.Count);
         var succeeded = 0;
@@ -62,28 +72,44 @@ public sealed class BulkImportService : IBulkImportService
             {
                 var written = await _submissions.AdminCreateAsync(input, submittedAt: submittedAt, ct: ct);
                 succeeded++;
-                items.Add(new BulkImportItemResult(i, group.Group, true, false, written.Submission.Id, group.Samples.Count, Array.Empty<string>(), written.Warnings));
+                items.Add(new BulkImportItemResult(i, group.Group, true, false, written.Submission.Id, group.Samples.Count, Array.Empty<string>(), written.Warnings)
+                {
+                    ErrorDetails = Array.Empty<Diagnostic>(),
+                    WarningDetails = written.WarningDetails,
+                });
             }
             catch (ValidationException ex)
             {
                 // Idempotency: a group whose every blocking error is a cadence-duplicate already
                 // exists for its reporting window, so re-importing it is a no-op — count it as
                 // skipped rather than failed.
-                if (ex.Errors.Count > 0 && ex.Errors.All(SubmissionValidator.IsDuplicatePeriodError))
+                if (ex.ErrorDetails.Count > 0 && ex.ErrorDetails.All(SubmissionValidator.IsDuplicatePeriodError))
                 {
                     skipped++;
-                    items.Add(new BulkImportItemResult(i, group.Group, false, true, null, group.Samples.Count, Array.Empty<string>(), Array.Empty<string>()));
+                    items.Add(new BulkImportItemResult(i, group.Group, false, true, null, group.Samples.Count, Array.Empty<string>(), Array.Empty<string>())
+                    {
+                        ErrorDetails = Array.Empty<Diagnostic>(),
+                        WarningDetails = Array.Empty<Diagnostic>(),
+                    });
                 }
                 else
                 {
                     failed++;
-                    items.Add(new BulkImportItemResult(i, group.Group, false, false, null, group.Samples.Count, ex.Errors.ToList(), Array.Empty<string>()));
+                    items.Add(new BulkImportItemResult(i, group.Group, false, false, null, group.Samples.Count, ex.Errors.ToList(), Array.Empty<string>())
+                    {
+                        ErrorDetails = ex.ErrorDetails,
+                        WarningDetails = Array.Empty<Diagnostic>(),
+                    });
                 }
             }
             catch (NotFoundException ex)
             {
                 failed++;
-                items.Add(new BulkImportItemResult(i, group.Group, false, false, null, group.Samples.Count, new[] { ex.Message }, Array.Empty<string>()));
+                items.Add(new BulkImportItemResult(i, group.Group, false, false, null, group.Samples.Count, new[] { ex.Message }, Array.Empty<string>())
+                {
+                    ErrorDetails = new[] { ex.Diagnostic },
+                    WarningDetails = Array.Empty<Diagnostic>(),
+                });
             }
         }
 

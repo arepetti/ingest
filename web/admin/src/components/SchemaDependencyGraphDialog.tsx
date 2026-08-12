@@ -7,6 +7,7 @@ import { ArrowClockwise20Regular, Dismiss24Regular } from '@fluentui/react-icons
 import type { Schema } from '../api/types'
 import { formatApiError } from '../api/client'
 import { buildDependencyGraph, type DependencyEdge, type DependencyEdgeKind, type DependencyGraph } from '../utils/schemaDependencies'
+import { useTranslation } from 'react-i18next'
 
 const useStyles = makeStyles({
   surface: {
@@ -80,13 +81,13 @@ const useStyles = makeStyles({
 })
 
 /** Color + dash pattern per connector kind. Each combo differs in both, so it isn't color-only. */
-const EDGE_META: Record<DependencyEdgeKind, { color: string; dash?: string; width: number; label: string }> = {
-  calculated: { color: tokens.colorPaletteBlueForeground2, width: 2.2, label: 'Calculated from' },
-  visibleIf: { color: tokens.colorPaletteTealForeground2, dash: '7 4', width: 1.8, label: 'Visible when' },
-  enabledIf: { color: tokens.colorPalettePurpleForeground2, dash: '2 3 8 3', width: 1.8, label: 'Enabled when' },
-  validation: { color: tokens.colorPaletteCranberryForeground2, dash: '10 3', width: 1.8, label: 'Valid when' },
-  warning: { color: tokens.colorPaletteMarigoldForeground2, dash: '1 4', width: 1.8, label: 'Warns when' },
-  submissionValidation: { color: tokens.colorNeutralForeground3, dash: '1 3', width: 1.4, label: 'Cross-value validation (schema-level)' },
+const EDGE_META: Record<DependencyEdgeKind, { color: string; dash?: string; width: number; labelKey: string }> = {
+  calculated: { color: tokens.colorPaletteBlueForeground2, width: 2.2, labelKey: 'calculated' },
+  visibleIf: { color: tokens.colorPaletteTealForeground2, dash: '7 4', width: 1.8, labelKey: 'visibleIf' },
+  enabledIf: { color: tokens.colorPalettePurpleForeground2, dash: '2 3 8 3', width: 1.8, labelKey: 'enabledIf' },
+  validation: { color: tokens.colorPaletteCranberryForeground2, dash: '10 3', width: 1.8, labelKey: 'validation' },
+  warning: { color: tokens.colorPaletteMarigoldForeground2, dash: '1 4', width: 1.8, labelKey: 'warning' },
+  submissionValidation: { color: tokens.colorNeutralForeground3, dash: '1 3', width: 1.4, labelKey: 'submissionValidation' },
 }
 const EDGE_KIND_ORDER: DependencyEdgeKind[] = ['calculated', 'visibleIf', 'enabledIf', 'validation', 'warning', 'submissionValidation']
 
@@ -131,6 +132,7 @@ const MARGIN = 100
  */
 export function SchemaDependencyGraphDialog({ schema, open, onClose }: { schema: Schema; open: boolean; onClose: () => void }) {
   const s = useStyles()
+  const { t } = useTranslation()
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [generation, setGeneration] = useState(0)
 
@@ -172,33 +174,35 @@ export function SchemaDependencyGraphDialog({ schema, open, onClose }: { schema:
 
   const pairGroups = useMemo(() => groupByPair(graph.edges), [graph.edges])
 
-  const title = `Dependencies: ${schema.label || schema.name || 'Untitled schema'}`
+  const title = t('schemasSubmissions.dependencies.title', {
+    name: schema.label || schema.name || t('schemasSubmissions.common.untitledSchema'),
+  })
   const usedKinds = EDGE_KIND_ORDER.filter(k => graph.edges.some(e => e.kind === k))
 
   return (
     <Dialog open={open} onOpenChange={(_, d) => { if (!d.open) onClose() }}>
       <DialogSurface className={s.surface}>
         <DialogBody className={s.body}>
-          <DialogTitle action={<Button appearance="subtle" aria-label="Close" icon={<Dismiss24Regular />} onClick={onClose} />}>
+          <DialogTitle action={<Button appearance="subtle" aria-label={t('schemasSubmissions.common.close')} icon={<Dismiss24Regular />} onClick={onClose} />}>
             {title}
           </DialogTitle>
           <DialogContent className={s.content}>
             {state.status === 'loading' && (
               <div className={s.centered}>
-                <Spinner label="Walking this schema's rules for dependencies…" />
+                <Spinner label={t('schemasSubmissions.dependencies.loading')} />
               </div>
             )}
 
             {state.status === 'error' && (
               <MessageBar intent="error">
                 <MessageBarBody>
-                  Couldn&apos;t build the dependency graph: {state.message}
+                  {t('schemasSubmissions.dependencies.failed')} {state.message}
                   <Button
                     appearance="transparent" icon={<ArrowClockwise20Regular />}
                     style={{ marginLeft: '8px' }}
                     onClick={() => { setState({ status: 'loading' }); setGeneration(g => g + 1) }}
                   >
-                    Retry
+                    {t('schemasSubmissions.common.retry')}
                   </Button>
                 </MessageBarBody>
               </MessageBar>
@@ -206,7 +210,7 @@ export function SchemaDependencyGraphDialog({ schema, open, onClose }: { schema:
 
             {state.status === 'ready' && graph.nodes.length === 0 && (
               <MessageBar intent="warning">
-                <MessageBarBody>This schema has no usable values yet — add one to see its dependencies.</MessageBarBody>
+                <MessageBarBody>{t('schemasSubmissions.dependencies.noValues')}</MessageBarBody>
               </MessageBar>
             )}
 
@@ -241,7 +245,7 @@ export function SchemaDependencyGraphDialog({ schema, open, onClose }: { schema:
                             strokeDasharray={meta.dash} strokeLinecap="round"
                             markerEnd={edge.directed ? `url(#dep-arrow-${edge.kind})` : undefined}
                           >
-                            <title>{`${meta.label} — ${edge.from} → ${edge.to}\n${edge.expression}`}</title>
+                            <title>{`${t(`schemasSubmissions.dependencies.edge.${meta.labelKey}`)} — ${edge.from} → ${edge.to}\n${edge.expression}`}</title>
                           </path>
                         )
                       })}
@@ -260,19 +264,19 @@ export function SchemaDependencyGraphDialog({ schema, open, onClose }: { schema:
                 </div>
 
                 <div className={s.legendCol}>
-                  <span className={s.legendTitle}>Legend</span>
+                  <span className={s.legendTitle}>{t('schemasSubmissions.dependencies.legend')}</span>
                   <ul className={s.legendList}>
                     <li className={s.legendRow}>
                       <span className={s.legendNodeSwatch} />
-                      <span>Value</span>
+                      <span>{t('schemasSubmissions.dependencies.value')}</span>
                     </li>
                     <li className={s.legendRow}>
                       <span className={`${s.legendNodeSwatch} ${s.legendNodeSwatchCalculated}`} />
-                      <span>Calculated value</span>
+                      <span>{t('schemasSubmissions.dependencies.calculatedValue')}</span>
                     </li>
                   </ul>
                   <Text className={s.muted}>
-                    A connector points from a referenced value to the one whose rule depends on it.
+                    {t('schemasSubmissions.dependencies.connectorHelp')}
                   </Text>
                   <ul className={s.legendList}>
                     {(usedKinds.length > 0 ? usedKinds : EDGE_KIND_ORDER).map(kind => (
@@ -284,19 +288,19 @@ export function SchemaDependencyGraphDialog({ schema, open, onClose }: { schema:
                             strokeDasharray={EDGE_META[kind].dash} strokeLinecap="round"
                           />
                         </svg>
-                        <span>{EDGE_META[kind].label}</span>
+                        <span>{t(`schemasSubmissions.dependencies.edge.${EDGE_META[kind].labelKey}`)}</span>
                       </li>
                     ))}
                   </ul>
                   {graph.edges.length === 0 && (
-                    <Text className={s.muted}>No dependencies detected among these values yet.</Text>
+                    <Text className={s.muted}>{t('schemasSubmissions.dependencies.none')}</Text>
                   )}
                 </div>
               </div>
             )}
           </DialogContent>
           <DialogActions className={s.actions}>
-            <Button appearance="secondary" onClick={onClose}>Close</Button>
+            <Button appearance="secondary" onClick={onClose}>{t('schemasSubmissions.common.close')}</Button>
           </DialogActions>
         </DialogBody>
       </DialogSurface>
